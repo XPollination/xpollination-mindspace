@@ -36,7 +36,9 @@ export async function handleListFrames(
   input: { includeInactive?: boolean },
   repo: FrameRepository
 ): Promise<ListFramesResult> {
-  const frames = await repo.findActive();
+  const frames = input.includeInactive
+    ? await repo.findAll()
+    : await repo.findActive();
 
   // Parse JSON fields for each frame
   const parsedFrames = frames.map((frame: any) => ({

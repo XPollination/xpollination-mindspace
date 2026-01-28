@@ -12,6 +12,20 @@ import { DatabaseContext } from '../db/client.js';
 import { createFrameTool, handleCreateFrame } from './frames/createFrame.js';
 import { listFramesTool, handleListFrames } from './frames/listFrames.js';
 
+// Trend crawling tools
+import { crawlTrendsTool, handleCrawlTrends, CrawlTrendsInput } from './crawler/crawlTrends.js';
+
+// Content generation tools
+import { proposeTopicTool, handleProposeTopic, ProposeTopicInput } from './content/proposeTopic.js';
+import { writeDraftTool, handleWriteDraft, WriteDraftInput } from './content/writeDraft.js';
+
+// Verification tools
+import { factCheckTool, handleFactCheck, FactCheckInput } from './verification/factCheck.js';
+import { improveDraftTool, handleImproveDraft, ImproveDraftInput } from './verification/improveDraft.js';
+
+// Publishing tools
+import { publishPostTool, handlePublishPost, PublishPostInput } from './publishing/publishPost.js';
+
 export interface ToolDefinition {
   definition: Tool;
   handler: (args: unknown, db: DatabaseContext, pipeline: ContentPipeline) => Promise<unknown>;
@@ -21,7 +35,6 @@ export { DatabaseContext };
 
 /**
  * All available tools
- * Add new tools here as they are implemented
  */
 export const tools: ToolDefinition[] = [
   // Frame management
@@ -35,18 +48,36 @@ export const tools: ToolDefinition[] = [
   },
 
   // Trend crawling
-  // { definition: crawlTrendsTool, handler: handleCrawlTrends },
+  {
+    definition: crawlTrendsTool,
+    handler: async (args, db, _pipeline) => handleCrawlTrends(args as CrawlTrendsInput, db.frameRepo)
+  },
 
   // Content generation
-  // { definition: proposeTopicTool, handler: handleProposeTopic },
-  // { definition: writeDraftTool, handler: handleWriteDraft },
+  {
+    definition: proposeTopicTool,
+    handler: async (args, db, _pipeline) => handleProposeTopic(args as ProposeTopicInput, db.frameRepo)
+  },
+  {
+    definition: writeDraftTool,
+    handler: async (args, db, _pipeline) => handleWriteDraft(args as WriteDraftInput, db)
+  },
 
   // Verification
-  // { definition: factCheckTool, handler: handleFactCheck },
-  // { definition: improveDraftTool, handler: handleImproveDraft },
+  {
+    definition: factCheckTool,
+    handler: async (args, db, _pipeline) => handleFactCheck(args as FactCheckInput, db)
+  },
+  {
+    definition: improveDraftTool,
+    handler: async (args, db, _pipeline) => handleImproveDraft(args as ImproveDraftInput, db)
+  },
 
   // Publishing
-  // { definition: publishPostTool, handler: handlePublishPost },
+  {
+    definition: publishPostTool,
+    handler: async (args, db, _pipeline) => handlePublishPost(args as PublishPostInput, db)
+  }
 ];
 
 /**
