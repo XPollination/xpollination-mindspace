@@ -37,10 +37,12 @@ CREATE TABLE IF NOT EXISTS drafts (
     trend_id TEXT,
     title TEXT NOT NULL,
     content TEXT NOT NULL,           -- Markdown content
+    angle TEXT,                      -- The specific angle/perspective
     user_framing TEXT,               -- User's additional context
+    claims TEXT,                     -- JSON array of factual claims
     version INTEGER DEFAULT 1,
-    status TEXT DEFAULT 'draft',     -- draft, fact_checking, needs_improvement,
-                                     -- ready_for_review, approved, published, rejected
+    status TEXT DEFAULT 'draft',     -- draft, pending_verification, verified,
+                                     -- approved, published, rejected
     metadata TEXT,                   -- JSON: tags, category, etc.
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

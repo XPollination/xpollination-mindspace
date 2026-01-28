@@ -9,6 +9,7 @@ import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { FrameRepository } from './repositories/FrameRepository.js';
+import { DraftRepository } from './repositories/DraftRepository.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,13 +22,7 @@ export interface DatabaseContext {
 }
 
 export { FrameRepository } from './repositories/FrameRepository.js';
-
-export interface DraftRepository {
-  create(draft: unknown): Promise<string>;
-  findById(id: string): Promise<unknown>;
-  findByStatus(status: string): Promise<unknown[]>;
-  update(id: string, data: unknown): Promise<void>;
-}
+export { DraftRepository } from './repositories/DraftRepository.js';
 
 export interface TrendRepository {
   create(trend: unknown): Promise<string>;
@@ -61,13 +56,7 @@ export async function initDatabase(): Promise<DatabaseContext> {
 
   // Create repository instances
   const frameRepo = new FrameRepository(db);
-
-  const draftRepo: DraftRepository = {
-    create: async () => 'not-implemented',
-    findById: async () => null,
-    findByStatus: async () => [],
-    update: async () => {}
-  };
+  const draftRepo = new DraftRepository(db);
 
   const trendRepo: TrendRepository = {
     create: async () => 'not-implemented',
