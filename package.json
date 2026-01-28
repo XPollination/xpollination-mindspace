@@ -1,0 +1,44 @@
+{
+  "name": "xpollination-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for XPollination content pipeline - trend monitoring, content generation, fact-checking, and publishing",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "lint": "eslint src/",
+    "test": "vitest",
+    "db:migrate": "tsx src/db/migrate.ts"
+  },
+  "keywords": [
+    "mcp",
+    "content-pipeline",
+    "ai-agents",
+    "fact-checking",
+    "blog-automation"
+  ],
+  "author": "Thomas Pichler <herr.thomas.pichler@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.0.0",
+    "rss-parser": "^3.13.0",
+    "simple-git": "^3.22.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
