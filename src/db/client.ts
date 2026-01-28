@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { FrameRepository } from './repositories/FrameRepository.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -19,15 +20,7 @@ export interface DatabaseContext {
   workflowRepo: WorkflowRepository;
 }
 
-// Placeholder repository interfaces
-// TODO: Implement these in db/repositories/
-export interface FrameRepository {
-  create(frame: unknown): Promise<string>;
-  findById(id: string): Promise<unknown>;
-  findActive(): Promise<unknown[]>;
-  update(id: string, data: unknown): Promise<void>;
-  delete(id: string): Promise<void>;
-}
+export { FrameRepository } from './repositories/FrameRepository.js';
 
 export interface DraftRepository {
   create(draft: unknown): Promise<string>;
@@ -67,14 +60,7 @@ export async function initDatabase(): Promise<DatabaseContext> {
   db.exec(schema);
 
   // Create repository instances
-  // TODO: Implement actual repository classes
-  const frameRepo: FrameRepository = {
-    create: async () => 'not-implemented',
-    findById: async () => null,
-    findActive: async () => [],
-    update: async () => {},
-    delete: async () => {}
-  };
+  const frameRepo = new FrameRepository(db);
 
   const draftRepo: DraftRepository = {
     create: async () => 'not-implemented',

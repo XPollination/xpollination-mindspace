@@ -6,21 +6,18 @@
 
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { ContentPipeline } from '../workflow/processes/ContentPipeline.js';
+import { DatabaseContext } from '../db/client.js';
 
-// Tool definitions will be imported here as they are implemented
-// import { createFrameTool, handleCreateFrame } from './frames/createFrame.js';
+// Frame management tools
+import { createFrameTool, handleCreateFrame } from './frames/createFrame.js';
+import { listFramesTool, handleListFrames } from './frames/listFrames.js';
 
 export interface ToolDefinition {
   definition: Tool;
   handler: (args: unknown, db: DatabaseContext, pipeline: ContentPipeline) => Promise<unknown>;
 }
 
-export interface DatabaseContext {
-  frameRepo: unknown;  // FrameRepository
-  draftRepo: unknown;  // DraftRepository
-  trendRepo: unknown;  // TrendRepository
-  workflowRepo: unknown; // WorkflowRepository
-}
+export { DatabaseContext };
 
 /**
  * All available tools
@@ -28,7 +25,14 @@ export interface DatabaseContext {
  */
 export const tools: ToolDefinition[] = [
   // Frame management
-  // { definition: createFrameTool, handler: handleCreateFrame },
+  {
+    definition: createFrameTool,
+    handler: async (args, db, _pipeline) => handleCreateFrame(args, db.frameRepo)
+  },
+  {
+    definition: listFramesTool,
+    handler: async (args, db, _pipeline) => handleListFrames(args as { includeInactive?: boolean }, db.frameRepo)
+  },
 
   // Trend crawling
   // { definition: crawlTrendsTool, handler: handleCrawlTrends },

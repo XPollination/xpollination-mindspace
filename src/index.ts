@@ -26,7 +26,7 @@ import {
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { initDatabase } from './db/client.js';
+import { initDatabase, DatabaseContext } from './db/client.js';
 import { tools, handleToolCall } from './tools/index.js';
 import { resources, handleResourceRead } from './resources/index.js';
 import { ContentPipeline } from './workflow/processes/ContentPipeline.js';
