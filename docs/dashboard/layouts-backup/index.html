@@ -1,0 +1,431 @@
+{{ define "main" }}
+<div x-data="dashboard()" x-init="init()" class="min-h-screen">
+  <!-- Header -->
+  <header class="bg-pm-card border-b border-pm-border px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <h1 class="text-xl font-bold">Project Management</h1>
+        <select x-model="currentProject" @change="loadProject()"
+                class="bg-pm-bg border border-pm-border rounded px-3 py-1 text-sm">
+          <template x-for="project in projects" :key="project">
+            <option :value="project" x-text="project"></option>
+          </template>
+        </select>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-slate-400" x-text="'Last updated: ' + lastUpdated"></span>
+        <button @click="exportYaml()"
+                class="bg-pm-accent hover:bg-indigo-600 px-4 py-2 rounded text-sm font-medium">
+          Export YAML
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Scope Stack Breadcrumb -->
+  <template x-if="data.meta && data.meta.scope_stack && data.meta.scope_stack.length > 0">
+    <div class="bg-pm-bg border-b border-pm-border px-6 py-2">
+      <div class="flex items-center gap-2 text-sm">
+        <svg class="w-4 h-4 text-pm-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <template x-for="(node, idx) in data.meta.scope_stack" :key="node.id">
+          <div class="flex items-center gap-2">
+            <template x-if="idx > 0">
+              <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </template>
+            <span :class="{
+                    'text-pm-accent font-semibold': node.status === 'active',
+                    'text-emerald-400': node.status === 'complete',
+                    'text-slate-500': node.status === 'paused',
+                    'text-red-400': node.status === 'blocked'
+                  }"
+                  x-text="node.title"></span>
+            <span class="text-xs px-1.5 py-0.5 rounded"
+                  :class="{
+                    'bg-pm-accent/20 text-pm-accent': node.status === 'active',
+                    'bg-emerald-500/20 text-emerald-400': node.status === 'complete',
+                    'bg-slate-500/20 text-slate-400': node.status === 'paused',
+                    'bg-red-500/20 text-red-400': node.status === 'blocked'
+                  }"
+                  x-text="node.status"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <!-- Progress Bar -->
+  <div class="bg-pm-card border-b border-pm-border px-6 py-3">
+    <div class="flex items-center gap-4">
+      <span class="text-sm text-slate-400">Progress:</span>
+      <div class="flex-1 bg-pm-bg rounded-full h-3 overflow-hidden">
+        <div class="h-full bg-emerald-500 transition-all duration-300"
+             :style="'width: ' + progress + '%'"></div>
+      </div>
+      <span class="text-sm font-medium" x-text="progress + '%'"></span>
+      <span class="text-sm text-slate-400" x-text="'Items: ' + totalItems + ' | Done: ' + doneItems + ' | Blocked: ' + blockedItems"></span>
+    </div>
+  </div>
+
+  <div class="flex">
+    <!-- Main Content -->
+    <main class="flex-1 p-6 overflow-auto" style="max-height: calc(100vh - 120px);">
+      <!-- Phases -->
+      <div class="space-y-4">
+        <template x-for="phase in data.phases" :key="phase.id">
+          <div :class="{
+                  'bg-pm-card rounded-lg border border-pm-border overflow-hidden': phase.type !== 'scope_break',
+                  'bg-pm-card rounded-lg border-2 border-amber-500/50 overflow-hidden': phase.type === 'scope_break'
+                }">
+            <!-- Phase Header -->
+            <div @click="phase.collapsed = !phase.collapsed"
+                 class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-700/50">
+              <div class="flex items-center gap-3">
+                <!-- Scope Break lightning icon (v2.3) -->
+                <template x-if="phase.type === 'scope_break'">
+                  <span class="text-amber-400 text-lg shrink-0">⚡</span>
+                </template>
+                <svg :class="phase.collapsed ? '' : 'rotate-90'"
+                     class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+                <h2 class="font-semibold" x-text="phase.title"></h2>
+                <span class="text-sm text-slate-400" x-text="'(' + phase.items.length + ' items)'"></span>
+              </div>
+              <div class="flex items-center gap-3">
+                <!-- PDSA Phase Indicator Dots (v2.2) -->
+                <template x-if="phase.pdsa_phase">
+                  <div class="flex items-center gap-1 text-xs">
+                    <template x-for="step in ['plan', 'do', 'study', 'act']" :key="step">
+                      <div class="flex items-center gap-0.5">
+                        <span class="w-2 h-2 rounded-full inline-block"
+                              :class="{
+                                'bg-pm-accent': phase.pdsa_phase === step,
+                                'bg-emerald-500': getPdsaStepIndex(phase.pdsa_phase) > getPdsaStepIndex(step) || phase.pdsa_phase === 'complete',
+                                'bg-slate-600': getPdsaStepIndex(phase.pdsa_phase) < getPdsaStepIndex(step) && phase.pdsa_phase !== 'complete'
+                              }"></span>
+                        <span class="text-slate-500 hidden sm:inline"
+                              :class="{
+                                'text-pm-accent font-semibold': phase.pdsa_phase === step,
+                                'text-emerald-400': getPdsaStepIndex(phase.pdsa_phase) > getPdsaStepIndex(step) || phase.pdsa_phase === 'complete',
+                              }"
+                              x-text="step.charAt(0).toUpperCase()"></span>
+                      </div>
+                    </template>
+                    <template x-if="phase.pdsa_phase === 'complete'">
+                      <span class="text-emerald-400 ml-0.5">✓</span>
+                    </template>
+                  </div>
+                </template>
+                <span :class="'status-' + phase.status"
+                      class="px-2 py-0.5 rounded text-xs font-medium text-white"
+                      x-text="phase.status.replace('_', ' ')"></span>
+                <span class="text-sm text-slate-400" x-text="getPhaseProgress(phase) + '%'"></span>
+              </div>
+            </div>
+
+            <!-- Scope Break Reason Banner (v2.3) -->
+            <template x-if="phase.type === 'scope_break' && phase.scope_break_reason">
+              <div class="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-sm">
+                <span class="text-amber-400">Reason:</span>
+                <span class="text-slate-300" x-text="phase.scope_break_reason"></span>
+                <template x-if="phase.pdsa_phase === 'complete'">
+                  <span class="ml-2 text-emerald-400">→ Returning to parent scope</span>
+                </template>
+              </div>
+            </template>
+
+            <!-- Phase Items -->
+            <div x-show="!phase.collapsed" x-collapse>
+              <div :id="'phase-' + phase.id"
+                   class="p-4 space-y-3 bg-pm-bg/50 sortable-list">
+                <template x-for="item in phase.items" :key="item.id">
+                  <div :data-id="item.id"
+                       class="bg-pm-card rounded-lg border border-pm-border p-4 hover:border-pm-accent/50 transition-colors">
+                    <div class="flex items-start gap-3">
+                      <!-- Drag Handle -->
+                      <div class="drag-handle text-slate-500 hover:text-white mt-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm8-12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
+                        </svg>
+                      </div>
+
+                      <!-- Item Content -->
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                          <button @click="cycleStatus(item)"
+                                  :class="'status-' + item.status"
+                                  class="px-2 py-0.5 rounded text-xs font-medium text-white hover:opacity-80">
+                            <span x-text="getStatusIcon(item.status)"></span>
+                            <span x-text="item.status.replace('_', ' ')"></span>
+                          </button>
+                          <h3 class="font-medium" x-text="item.title"></h3>
+                        </div>
+
+                        <div class="flex items-center gap-4 text-xs text-slate-400">
+                          <span x-show="item.owner" class="flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            <span x-text="item.owner"></span>
+                          </span>
+                          <span x-show="item.dependencies && item.dependencies.length > 0" class="flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                            </svg>
+                            <span x-text="'Deps: ' + item.dependencies.join(', ')"></span>
+                          </span>
+                          <a x-show="item.pdca_ref" :href="'#' + item.pdca_ref" class="hover:text-pm-accent">
+                            PDCA
+                          </a>
+                        </div>
+
+                        <!-- Sub-items -->
+                        <template x-if="item.sub_items && item.sub_items.length > 0">
+                          <div class="mt-3">
+                            <button @click="item.showSubItems = !item.showSubItems"
+                                    class="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+                              <svg :class="item.showSubItems ? 'rotate-90' : ''"
+                                   class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                              </svg>
+                              <span x-text="'Sub-items (' + getSubItemProgress(item) + ')'"></span>
+                            </button>
+                            <div x-show="item.showSubItems" x-collapse class="mt-2 pl-4 border-l border-pm-border space-y-2">
+                              <template x-for="sub in item.sub_items" :key="sub.id">
+                                <div class="flex items-center gap-2 text-sm">
+                                  <button @click="cycleStatus(sub)" class="text-slate-400 hover:text-white">
+                                    <span x-text="getStatusIcon(sub.status)"></span>
+                                  </button>
+                                  <span :class="sub.status === 'done' ? 'line-through text-slate-500' : ''" x-text="sub.title"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+
+                        <!-- Quality Gates (v2.4) -->
+                        <template x-if="item.quality_gates && item.quality_gates.length > 0">
+                          <div class="mt-3">
+                            <button @click="item.showGates = !item.showGates"
+                                    class="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+                              <svg :class="item.showGates ? 'rotate-90' : ''"
+                                   class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                              </svg>
+                              <span x-text="'Quality Gates (' + item.quality_gates.filter(g => g.status === 'pass').length + '/' + item.quality_gates.length + ' passed)'"></span>
+                            </button>
+                            <div x-show="item.showGates" x-collapse class="mt-2 pl-4 border-l border-emerald-500/30 space-y-1.5">
+                              <template x-for="gate in item.quality_gates" :key="gate.name">
+                                <div class="flex items-center gap-2 text-sm">
+                                  <span :class="{
+                                          'text-emerald-400': gate.status === 'pass',
+                                          'text-red-400': gate.status === 'fail',
+                                          'text-slate-500': gate.status === 'pending'
+                                        }"
+                                        x-text="gate.status === 'pass' ? '✅' : gate.status === 'fail' ? '❌' : '⬜'"></span>
+                                  <span :class="{
+                                          'text-slate-300': gate.status === 'pass',
+                                          'text-red-300': gate.status === 'fail',
+                                          'text-slate-500': gate.status === 'pending'
+                                        }"
+                                        x-text="gate.name"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Dependency Graph -->
+      <div class="mt-6 bg-pm-card rounded-lg border border-pm-border p-4">
+        <h3 class="font-semibold mb-4">Dependency Graph</h3>
+        <div class="mermaid" x-html="data.dependencies_mermaid || 'flowchart TD\n  A[No dependencies defined]'"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    projects: [],
+    currentProject: 'xpollination-mcp-server',
+    data: { phases: [], dependencies_mermaid: '' },
+    lastUpdated: '',
+
+    get totalItems() {
+      return this.data.phases?.reduce((sum, p) => sum + (p.items?.length || 0), 0) || 0;
+    },
+
+    get doneItems() {
+      return this.data.phases?.reduce((sum, p) =>
+        sum + (p.items?.filter(i => i.status === 'done').length || 0), 0) || 0;
+    },
+
+    get blockedItems() {
+      return this.data.phases?.reduce((sum, p) =>
+        sum + (p.items?.filter(i => i.status === 'blocked').length || 0), 0) || 0;
+    },
+
+    get progress() {
+      return this.totalItems > 0 ? Math.round((this.doneItems / this.totalItems) * 100) : 0;
+    },
+
+    pollInterval: null,
+    lastRaw: '',
+
+    async init() {
+      // Load project list
+      this.projects = ['xpollination-mcp-server'];
+      await this.loadProject();
+      this.initSortable();
+      // Start live polling every 3 seconds
+      this.pollInterval = setInterval(() => this.pollForUpdates(), 3000);
+    },
+
+    async pollForUpdates() {
+      try {
+        const response = await fetch(`/projectmanagement/data/${this.currentProject}/context.json?_=${Date.now()}`);
+        if (response.ok) {
+          const text = await response.text();
+          if (text !== this.lastRaw) {
+            this.lastRaw = text;
+            const newData = JSON.parse(text);
+            // Preserve UI state (collapsed, showSubItems, showGates)
+            const uiState = {};
+            this.data.phases?.forEach(p => {
+              uiState[p.id] = { collapsed: p.collapsed };
+              p.items?.forEach(i => {
+                uiState[i.id] = { showSubItems: i.showSubItems, showGates: i.showGates };
+              });
+            });
+            this.data = newData;
+            this.lastUpdated = this.data.meta?.last_updated || 'Unknown';
+            this.data.phases?.forEach(p => {
+              p.collapsed = uiState[p.id]?.collapsed ?? false;
+              p.items?.forEach(i => {
+                i.showSubItems = uiState[i.id]?.showSubItems ?? false;
+                i.showGates = uiState[i.id]?.showGates ?? false;
+              });
+            });
+            setTimeout(() => mermaid.init(), 100);
+          }
+        }
+      } catch (e) {
+        // Silent fail on poll - will retry next interval
+      }
+    },
+
+    async loadProject() {
+      try {
+        const response = await fetch(`/projectmanagement/data/${this.currentProject}/context.json`);
+        if (response.ok) {
+          const text = await response.text();
+          this.lastRaw = text;
+          this.data = JSON.parse(text);
+          this.lastUpdated = this.data.meta?.last_updated || 'Unknown';
+          // Initialize UI state
+          this.data.phases?.forEach(p => {
+            p.collapsed = false;
+            p.items?.forEach(i => { i.showSubItems = false; i.showGates = false; });
+          });
+          // Re-render mermaid
+          setTimeout(() => mermaid.init(), 100);
+        }
+      } catch (e) {
+        console.error('Failed to load project:', e);
+      }
+    },
+
+    initSortable() {
+      setTimeout(() => {
+        document.querySelectorAll('.sortable-list').forEach(el => {
+          new Sortable(el, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: (evt) => {
+              // Update order in data
+              const phaseId = evt.from.id.replace('phase-', '');
+              const phase = this.data.phases.find(p => p.id === phaseId);
+              if (phase) {
+                const items = [...phase.items];
+                const [moved] = items.splice(evt.oldIndex, 1);
+                items.splice(evt.newIndex, 0, moved);
+                items.forEach((item, i) => item.order = i + 1);
+                phase.items = items;
+                this.saveToLocalStorage();
+              }
+            }
+          });
+        });
+      }, 500);
+    },
+
+    cycleStatus(item) {
+      const statuses = ['pending', 'in_progress', 'done'];
+      const idx = statuses.indexOf(item.status);
+      item.status = statuses[(idx + 1) % statuses.length];
+      this.saveToLocalStorage();
+    },
+
+    getStatusIcon(status) {
+      const icons = {
+        pending: '⬜',
+        in_progress: '🔵',
+        blocked: '🔴',
+        review: '🟡',
+        done: '✅'
+      };
+      return icons[status] || '⬜';
+    },
+
+    getPdsaStepIndex(step) {
+      const steps = ['plan', 'do', 'study', 'act', 'complete'];
+      return steps.indexOf(step);
+    },
+
+    getPhaseProgress(phase) {
+      const total = phase.items?.length || 0;
+      const done = phase.items?.filter(i => i.status === 'done').length || 0;
+      return total > 0 ? Math.round((done / total) * 100) : 0;
+    },
+
+    getSubItemProgress(item) {
+      const total = item.sub_items?.length || 0;
+      const done = item.sub_items?.filter(s => s.status === 'done').length || 0;
+      return `${done}/${total} done`;
+    },
+
+    saveToLocalStorage() {
+      localStorage.setItem(`pm-${this.currentProject}`, JSON.stringify(this.data));
+    },
+
+    exportYaml() {
+      const yaml = jsyaml.dump(this.data, { lineWidth: -1 });
+      const blob = new Blob([yaml], { type: 'text/yaml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${this.currentProject}-context.yaml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+}
+</script>
+{{ end }}

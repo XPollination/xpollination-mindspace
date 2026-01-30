@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ .Title }} | Project Management</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'pm-bg': '#0f172a',
+            'pm-card': '#1e293b',
+            'pm-border': '#334155',
+            'pm-accent': '#6366f1',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- SortableJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+  <!-- js-yaml for YAML export -->
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+
+    /* Drag handle cursor */
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+
+    /* Sortable ghost */
+    .sortable-ghost {
+      opacity: 0.4;
+      background: #6366f1 !important;
+    }
+
+    /* Sortable chosen */
+    .sortable-chosen {
+      box-shadow: 0 0 0 2px #6366f1;
+    }
+
+    /* Status colors */
+    .status-pending { background-color: #9ca3af; }
+    .status-in_progress { background-color: #3b82f6; }
+    .status-blocked { background-color: #ef4444; }
+    .status-review { background-color: #f59e0b; }
+    .status-done { background-color: #10b981; }
+  </style>
+</head>
+<body class="h-full bg-pm-bg text-white">
+  {{ block "main" . }}{{ end }}
+
+  <script>
+    // Initialize Mermaid with dark theme
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#6366f1',
+        primaryTextColor: '#fff',
+        primaryBorderColor: '#334155',
+        lineColor: '#64748b',
+        secondaryColor: '#1e293b',
+        tertiaryColor: '#0f172a'
+      }
+    });
+  </script>
+</body>
+</html>
