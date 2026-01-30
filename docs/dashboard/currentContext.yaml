@@ -1,0 +1,565 @@
+# Project Context Dashboard - PIVOTED TO PROJECT MANAGEMENT TOOL
+# Updated by: PDCA Agent (Claude)
+# PDCA Reference: 2026-01-29-UTC-1445.projectmanagement-tool.pdca.md
+
+meta:
+  id: "xpollination-mcp-server"
+  title: "XPollination MCP Server"
+  pdca_root: "docs/pdca/"
+  last_updated: "2026-01-30T10:45:00Z"
+  updated_by: "pdsa-agent"
+  version: "0.4.0"
+  active_pdsa: "2026-01-30-UTC-1100.pm-tool-v2-implementation.pdsa.md"
+  scope_stack:
+    - id: "root"
+      title: "Agentic Development Framework"
+      pdca: "2026-01-29-UTC-1100.01-agentic-development-framework.pdca.md"
+      status: "paused"
+    - id: "pm-tool"
+      title: "Project Management Tool"
+      pdca: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md"
+      status: "in_progress"
+    - id: "recursive-framework"
+      title: "Recursive PDSA Framework"
+      pdsa: "2026-01-30-UTC-1030.recursive-pdca-framework.pdca.md"
+      status: "complete"
+    - id: "pm-tool-v2"
+      title: "PM Tool v2 Implementation"
+      pdsa: "2026-01-30-UTC-1100.pm-tool-v2-implementation.pdsa.md"
+      status: "active"
+
+summary:
+  total_items: 28
+  done: 9
+  in_progress: 0
+  pending: 18
+  blocked: 1
+  overall_progress: 32
+
+status_legend:
+  pending:
+    icon: "⬜"
+    color: "#9CA3AF"
+  in_progress:
+    icon: "🔵"
+    color: "#3B82F6"
+  blocked:
+    icon: "🔴"
+    color: "#EF4444"
+  review:
+    icon: "🟡"
+    color: "#F59E0B"
+  done:
+    icon: "✅"
+    color: "#10B981"
+
+phases:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PHASE A: Infrastructure (CURRENT FOCUS)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-a"
+    title: "Infrastructure"
+    status: "done"
+    progress: 100
+    order: 1
+    pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-a"
+    description: "Set up Hugo site on Hetzner with nginx"
+
+    items:
+      - id: "a.1"
+        title: "Install Hugo on Hetzner"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 1
+        dependencies: []
+        pdca_ref: "2026-01-29-UTC-1445#a.1"
+        method: "Downloaded binary to ~/bin/hugo"
+        completed_at: "2026-01-29T16:48:00Z"
+        sub_items:
+          - id: "a.1.1"
+            title: "SSH to Hetzner"
+            status: "done"
+            order: 1
+            requirement: "Already on Hetzner (dev container)"
+          - id: "a.1.2"
+            title: "Install Hugo extended"
+            status: "done"
+            order: 2
+            requirement: "curl + tar to ~/bin/hugo (no sudo needed)"
+          - id: "a.1.3"
+            title: "Verify installation"
+            status: "done"
+            order: 3
+            requirement: "hugo v0.155.0 extended confirmed"
+
+      - id: "a.2"
+        title: "Configure nginx reverse proxy"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 2
+        dependencies: ["a.1"]
+        pdca_ref: "2026-01-29-UTC-1445#a.2"
+        method: "nginx serving static files from /var/www/projectmanagement"
+        completed_at: "2026-01-29T17:20:00Z"
+        sub_items:
+          - id: "a.2.1"
+            title: "Open firewall for Hugo dev server"
+            status: "done"
+            order: 1
+            requirement: "ufw allow from 10.33.33.0/24 to port 1313 (dev only)"
+          - id: "a.2.2"
+            title: "Create production nginx config"
+            status: "done"
+            order: 2
+            requirement: "/etc/nginx/sites-available/internal-tools with /projectmanagement location"
+
+      - id: "a.3"
+        title: "Create Hugo site structure"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["a.1"]
+        pdca_ref: "2026-01-29-UTC-1445#a.3"
+        completed_at: "2026-01-29T16:53:00Z"
+        sub_items:
+          - id: "a.3.1"
+            title: "Generate base Hugo site"
+            status: "done"
+            order: 1
+            requirement: "hugo new site ~/workspaces/projectmanagement"
+          - id: "a.3.2"
+            title: "Create hugo.toml"
+            status: "done"
+            order: 2
+            requirement: "baseURL, title, params configured"
+          - id: "a.3.3"
+            title: "Create layouts directory structure"
+            status: "done"
+            order: 3
+            requirement: "_default/baseof.html, index.html, partials/"
+
+      - id: "a.4"
+        title: "Set up Tailwind CSS"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 4
+        dependencies: ["a.3"]
+        pdca_ref: "2026-01-29-UTC-1445#a.4"
+        completed_at: "2026-01-29T16:50:00Z"
+        sub_items:
+          - id: "a.4.1"
+            title: "Add Tailwind CDN to head partial"
+            status: "done"
+            order: 1
+            requirement: "CDN in baseof.html with custom config"
+
+      - id: "a.5"
+        title: "Add Alpine.js + SortableJS"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 5
+        dependencies: ["a.3"]
+        pdca_ref: "2026-01-29-UTC-1445#a.5"
+        completed_at: "2026-01-29T16:50:00Z"
+        sub_items:
+          - id: "a.5.1"
+            title: "Add Alpine.js CDN"
+            status: "done"
+            order: 1
+            requirement: "defer script in baseof.html"
+          - id: "a.5.2"
+            title: "Add SortableJS CDN"
+            status: "done"
+            order: 2
+            requirement: "Script in baseof.html"
+
+      - id: "a.6"
+        title: "Live Update Testing"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 6
+        dependencies: ["a.2"]
+        pdca_ref: "2026-01-29-UTC-1445#a.6"
+        sub_items:
+          - id: "a.6.1"
+            title: "Dashboard auto-polls for changes"
+            status: "done"
+            order: 1
+            requirement: "3-second polling with string comparison"
+          - id: "a.6.2"
+            title: "New items appear without refresh"
+            status: "done"
+            order: 2
+            requirement: "This item should appear live"
+          - id: "a.6.3"
+            title: "Status changes reflect live"
+            status: "done"
+            order: 3
+            requirement: "Toggling status visible in real-time"
+          - id: "a.6.4"
+            title: "UI state preserved on update"
+            status: "done"
+            order: 4
+            requirement: "Collapsed/expanded state survives data refresh"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SCOPE BREAK: Recursive PDSA Framework (discovered during Phase A)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-scope-break"
+    title: "Scope Break: Recursive PDSA Framework"
+    status: "done"
+    progress: 0
+    order: 2
+    pdca_ref: "2026-01-30-UTC-1030.recursive-pdca-framework.pdca.md"
+    description: "SCOPE BREAK — Discovered need for hierarchical PDCA model before continuing PM tool"
+
+    items:
+      - id: "sb.1"
+        title: "Define PDSA terminology and model"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 1
+        dependencies: []
+        pdca_ref: "2026-01-30-UTC-1030#section-3"
+        completed_at: "2026-01-30T10:45:00Z"
+        sub_items:
+          - id: "sb.1.1"
+            title: "Research established frameworks"
+            status: "done"
+            order: 1
+            requirement: "Deming, Hoshin Kanri, Boyd, Toyota Kata, Fractal PM, Agile Spikes"
+          - id: "sb.1.2"
+            title: "Define terminology table"
+            status: "done"
+            order: 2
+            requirement: "Root PDSA, Child PDSA, Scope Break, Scope Stack, Catchball, Quality Gate"
+          - id: "sb.1.3"
+            title: "Document PDSA tree model"
+            status: "done"
+            order: 3
+            requirement: "Tree structure showing current project hierarchy"
+          - id: "sb.1.4"
+            title: "Define three-layer architecture"
+            status: "done"
+            order: 4
+            requirement: "Strategic, Tactical, Operational layers"
+      - id: "sb.2"
+        title: "Human review and catchball"
+        status: "done"
+        owner: "human"
+        order: 2
+        dependencies: ["sb.1"]
+        pdca_ref: "2026-01-30-UTC-1030#study"
+        sub_items:
+          - id: "sb.2.1"
+            title: "Human validates terminology"
+            status: "done"
+            order: 1
+            requirement: "Thomas confirms terms match mental model"
+          - id: "sb.2.2"
+            title: "Human validates PDSA tree model"
+            status: "done"
+            order: 2
+            requirement: "Thomas confirms tree represents actual workflow"
+          - id: "sb.2.3"
+            title: "Human confirms PM tool evolution requirements"
+            status: "done"
+            order: 3
+            requirement: "Thomas agrees on what dashboard needs to show"
+      - id: "sb.3"
+        title: "Apply framework to PM tool design"
+        status: "done"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["sb.2"]
+        pdca_ref: "2026-01-30-UTC-1030#act"
+        sub_items:
+          - id: "sb.3.1"
+            title: "Update currentContext.yaml with scope_stack"
+            status: "done"
+            order: 1
+            requirement: "Add scope_stack and pdsa_tree to data model"
+          - id: "sb.3.2"
+            title: "Feed requirements into PM tool Phase B"
+            status: "done"
+            order: 2
+            requirement: "New PDSA created: pm-tool-v2-implementation.pdsa.md"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PHASE B: Core Components
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-b"
+    title: "Core Components"
+    status: "pending"
+    progress: 0
+    order: 3
+    pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-b"
+    description: "Hugo templates and partials for dashboard"
+
+    items:
+      - id: "b.1"
+        title: "Data schema (YAML structure)"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 1
+        dependencies: []
+        pdca_ref: "2026-01-29-UTC-1445#b.1"
+
+      - id: "b.2"
+        title: "Hugo data templates"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 2
+        dependencies: ["a.3", "b.1"]
+        pdca_ref: "2026-01-29-UTC-1445#b.2"
+
+      - id: "b.3"
+        title: "Phase section partial"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["b.2"]
+        pdca_ref: "2026-01-29-UTC-1445#b.3"
+
+      - id: "b.4"
+        title: "Item card partial"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 4
+        dependencies: ["b.2"]
+        pdca_ref: "2026-01-29-UTC-1445#b.4"
+
+      - id: "b.5"
+        title: "Sub-item component"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 5
+        dependencies: ["b.4"]
+        pdca_ref: "2026-01-29-UTC-1445#b.5"
+
+      - id: "b.6"
+        title: "Progress bar component"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 6
+        dependencies: ["b.2"]
+        pdca_ref: "2026-01-29-UTC-1445#b.6"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PHASE C: Interactivity
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-c"
+    title: "Interactivity"
+    status: "pending"
+    progress: 0
+    order: 3
+    pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-c"
+    description: "Alpine.js state and SortableJS drag-drop"
+
+    items:
+      - id: "c.1"
+        title: "Alpine.js state management"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 1
+        dependencies: ["b.4"]
+        pdca_ref: "2026-01-29-UTC-1445#c.1"
+
+      - id: "c.2"
+        title: "SortableJS drag-drop"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 2
+        dependencies: ["c.1"]
+        pdca_ref: "2026-01-29-UTC-1445#c.2"
+
+      - id: "c.3"
+        title: "Status toggle"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["c.1"]
+        pdca_ref: "2026-01-29-UTC-1445#c.3"
+
+      - id: "c.4"
+        title: "Expand/collapse"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 4
+        dependencies: ["c.1"]
+        pdca_ref: "2026-01-29-UTC-1445#c.4"
+
+      - id: "c.5"
+        title: "localStorage persistence"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 5
+        dependencies: ["c.2"]
+        pdca_ref: "2026-01-29-UTC-1445#c.5"
+
+      - id: "c.6"
+        title: "YAML export"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 6
+        dependencies: ["c.5"]
+        pdca_ref: "2026-01-29-UTC-1445#c.6"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PHASE D: Visualization
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-d"
+    title: "Visualization"
+    status: "pending"
+    progress: 0
+    order: 4
+    pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-d"
+    description: "Mermaid graphs, progress, filters"
+
+    items:
+      - id: "d.1"
+        title: "Mermaid dependency graph"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 1
+        dependencies: ["b.2"]
+        pdca_ref: "2026-01-29-UTC-1445#d.1"
+
+      - id: "d.2"
+        title: "Dependency highlighting"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 2
+        dependencies: ["d.1", "c.1"]
+        pdca_ref: "2026-01-29-UTC-1445#d.2"
+
+      - id: "d.3"
+        title: "Progress calculations"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["b.2"]
+        pdca_ref: "2026-01-29-UTC-1445#d.3"
+
+      - id: "d.4"
+        title: "Filter sidebar"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 4
+        dependencies: ["c.1"]
+        pdca_ref: "2026-01-29-UTC-1445#d.4"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BLOCKED: Agentic Framework (Waiting for PM Tool)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-blocked"
+    title: "Agentic Development Framework"
+    status: "blocked"
+    progress: 0
+    order: 99
+    pdca_ref: "2026-01-29-UTC-1100.01-agentic-development-framework.pdca.md"
+    description: "BLOCKED until Project Management Tool complete"
+    blocked_reason: "Cannot effectively align on complex requirements without visual tool"
+
+    items:
+      - id: "blocked-1"
+        title: "Core Framework (Phase 1)"
+        status: "blocked"
+        owner: "coder-agent"
+        order: 1
+        dependencies: ["c.6"]
+        blocked_reason: "Waiting for PM Tool"
+
+      - id: "blocked-2"
+        title: "Orchestrator Agent (Phase 2)"
+        status: "blocked"
+        owner: "coder-agent"
+        order: 2
+        dependencies: ["blocked-1"]
+        blocked_reason: "Waiting for PM Tool"
+
+      - id: "blocked-3"
+        title: "Specialist Agents (Phase 3)"
+        status: "blocked"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["blocked-2"]
+        blocked_reason: "Waiting for PM Tool"
+
+# Dependency graph
+dependencies_mermaid: |
+  flowchart TD
+    subgraph PhaseA["Phase A: Infrastructure"]
+      a.1[Hugo Install]
+      a.2[nginx Config]
+      a.3[Site Structure]
+      a.4[Tailwind]
+      a.5[Alpine+Sortable]
+
+      a.1 --> a.2
+      a.1 --> a.3
+      a.3 --> a.4
+      a.3 --> a.5
+    end
+
+    subgraph PhaseB["Phase B: Components"]
+      b.1[Data Schema]
+      b.2[Templates]
+      b.3[Phase Section]
+      b.4[Item Card]
+      b.5[Sub-item]
+      b.6[Progress Bar]
+
+      a.3 --> b.2
+      b.1 --> b.2
+      b.2 --> b.3
+      b.2 --> b.4
+      b.4 --> b.5
+      b.2 --> b.6
+    end
+
+    subgraph PhaseC["Phase C: Interactivity"]
+      c.1[State Mgmt]
+      c.2[Drag-Drop]
+      c.3[Status Toggle]
+      c.4[Expand/Collapse]
+      c.5[localStorage]
+      c.6[YAML Export]
+
+      b.4 --> c.1
+      c.1 --> c.2
+      c.1 --> c.3
+      c.1 --> c.4
+      c.2 --> c.5
+      c.5 --> c.6
+    end
+
+    subgraph PhaseD["Phase D: Visualization"]
+      d.1[Mermaid Graph]
+      d.2[Dep Highlight]
+      d.3[Progress Calc]
+      d.4[Filters]
+
+      b.2 --> d.1
+      d.1 --> d.2
+      c.1 --> d.2
+      b.2 --> d.3
+      c.1 --> d.4
+    end
+
+    subgraph Blocked["BLOCKED: Agentic Framework"]
+      blocked-1[Core Framework]
+      blocked-2[Orchestrator]
+      blocked-3[Specialists]
+
+      c.6 --> blocked-1
+      blocked-1 --> blocked-2
+      blocked-2 --> blocked-3
+    end
+
+    style a.1 fill:#9CA3AF
+    style a.2 fill:#9CA3AF
+    style a.3 fill:#3B82F6
+    style blocked-1 fill:#EF4444
+    style blocked-2 fill:#EF4444
+    style blocked-3 fill:#EF4444
