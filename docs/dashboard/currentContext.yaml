@@ -6,7 +6,7 @@ meta:
   id: "xpollination-mcp-server"
   title: "XPollination MCP Server"
   pdca_root: "docs/pdca/"
-  last_updated: "2026-01-30T10:45:00Z"
+  last_updated: "2026-01-30T12:00:00Z"
   updated_by: "pdsa-agent"
   version: "0.4.0"
   active_pdsa: "2026-01-30-UTC-1100.pm-tool-v2-implementation.pdsa.md"
@@ -62,6 +62,7 @@ phases:
     status: "done"
     progress: 100
     order: 1
+    pdsa_phase: "complete"
     pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-a"
     description: "Set up Hugo site on Hetzner with nginx"
 
@@ -207,9 +208,12 @@ phases:
   # ═══════════════════════════════════════════════════════════════════════════
   - id: "phase-scope-break"
     title: "Scope Break: Recursive PDSA Framework"
+    type: "scope_break"
     status: "done"
     progress: 0
     order: 2
+    pdsa_phase: "complete"
+    scope_break_reason: "Need to understand hierarchical PDCA flow before continuing PM tool"
     pdca_ref: "2026-01-30-UTC-1030.recursive-pdca-framework.pdca.md"
     description: "SCOPE BREAK — Discovered need for hierarchical PDCA model before continuing PM tool"
 
@@ -222,6 +226,17 @@ phases:
         dependencies: []
         pdca_ref: "2026-01-30-UTC-1030#section-3"
         completed_at: "2026-01-30T10:45:00Z"
+        quality_gates:
+          - name: "QG-RF-1: Terminology unambiguous"
+            status: "pass"
+          - name: "QG-RF-2: Tree model matches workflow"
+            status: "pass"
+          - name: "QG-RF-3: PM tool requirements implementable"
+            status: "pass"
+          - name: "QG-RF-4: Data model backward-compatible"
+            status: "pass"
+          - name: "QG-RF-5: Human confirms alignment"
+            status: "pass"
         sub_items:
           - id: "sb.1.1"
             title: "Research established frameworks"
@@ -293,6 +308,7 @@ phases:
     status: "pending"
     progress: 0
     order: 3
+    pdsa_phase: "plan"
     pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-b"
     description: "Hugo templates and partials for dashboard"
 
@@ -352,7 +368,8 @@ phases:
     title: "Interactivity"
     status: "pending"
     progress: 0
-    order: 3
+    order: 4
+    pdsa_phase: "plan"
     pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-c"
     description: "Alpine.js state and SortableJS drag-drop"
 
@@ -412,7 +429,8 @@ phases:
     title: "Visualization"
     status: "pending"
     progress: 0
-    order: 4
+    order: 5
+    pdsa_phase: "plan"
     pdca_ref: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md#phase-d"
     description: "Mermaid graphs, progress, filters"
 
@@ -457,6 +475,7 @@ phases:
     status: "blocked"
     progress: 0
     order: 99
+    pdsa_phase: "plan"
     pdca_ref: "2026-01-29-UTC-1100.01-agentic-development-framework.pdca.md"
     description: "BLOCKED until Project Management Tool complete"
     blocked_reason: "Cannot effectively align on complex requirements without visual tool"
