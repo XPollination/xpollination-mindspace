@@ -6,10 +6,10 @@ meta:
   id: "xpollination-mcp-server"
   title: "XPollination MCP Server"
   pdca_root: "docs/pdca/"
-  last_updated: "2026-01-30T12:00:00Z"
-  updated_by: "pdsa-agent"
-  version: "0.4.0"
-  active_pdsa: "2026-01-30-UTC-1100.pm-tool-v2-implementation.pdsa.md"
+  last_updated: "2026-02-01T15:00:00Z"
+  updated_by: "orchestrator"
+  version: "0.5.0"
+  active_pdsa: "2026-02-01-UTC-1400.pm-tool-v3-recursive-tree.pdsa.md"
   scope_stack:
     - id: "root"
       title: "Agentic Development Framework"
@@ -19,22 +19,17 @@ meta:
       title: "Project Management Tool"
       pdca: "2026-01-29-UTC-1445.projectmanagement-tool.pdca.md"
       status: "in_progress"
-    - id: "recursive-framework"
-      title: "Recursive PDSA Framework"
-      pdsa: "2026-01-30-UTC-1030.recursive-pdca-framework.pdca.md"
-      status: "complete"
-    - id: "pm-tool-v2"
-      title: "PM Tool v2 Implementation"
-      pdsa: "2026-01-30-UTC-1100.pm-tool-v2-implementation.pdsa.md"
+    - id: "test-suite"
+      title: "Automated Test Suite — tmux 3-Pane Layout"
       status: "active"
 
 summary:
-  total_items: 28
+  total_items: 35
   done: 9
-  in_progress: 0
-  pending: 18
+  in_progress: 1
+  pending: 24
   blocked: 1
-  overall_progress: 32
+  overall_progress: 26
 
 status_legend:
   pending:
@@ -299,6 +294,136 @@ phases:
             status: "done"
             order: 2
             requirement: "New PDSA created: pm-tool-v2-implementation.pdsa.md"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ACTIVE: Automated Test Suite — tmux 3-Pane Layout Verification
+  # First automated quality gate. Tests verify the configured 3-pane layout
+  # (Orchestrator left, PDSA right-top, Dev right-bottom) is running correctly.
+  # This is the starting point for the automated test infrastructure.
+  # ═══════════════════════════════════════════════════════════════════════════
+  - id: "phase-test-suite"
+    title: "Automated Test Suite — tmux 3-Pane Layout"
+    status: "in_progress"
+    progress: 0
+    order: 3
+    pdsa_phase: "plan"
+    pdca_ref: "2026-02-01-UTC-1400.pm-tool-v3-recursive-tree.pdsa.md"
+    description: "First automated quality gate. Verifies 3-pane tmux layout matches configuration. Starting point for test infrastructure."
+
+    items:
+      - id: "ts.1"
+        title: "Create PDSA — tmux layout test suite"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 1
+        dependencies: []
+        description: >
+          ROLE: pdsa-agent.
+          CONTEXT: Thomas requires automated verification that the claude-dual tmux session
+          has exactly 3 panes in the configured layout (pane 0: Orchestrator left full-height,
+          pane 1: PDSA right-top, pane 2: Dev right-bottom). Currently only 2 panes exist.
+          ACTION: Research tmux testing approaches. Define quality criteria as testable assertions.
+          Write test case specifications with expected values. Create PDSA document.
+          ACCEPTANCE: PDSA document exists with test case definitions. Each test case has
+          a clear pass/fail criterion. Test cases cover: pane count, pane dimensions,
+          pane positions, agent identification per pane.
+
+      - id: "ts.2"
+        title: "Write automated test script"
+        status: "pending"
+        owner: "dev-agent"
+        order: 2
+        dependencies: ["ts.1"]
+        description: >
+          ROLE: dev-agent.
+          CONTEXT: PDSA agent has defined test cases for tmux 3-pane layout verification.
+          Test specs are in the PDSA document created in ts.1.
+          ACTION: Implement the test cases as a runnable bash test script.
+          Script must: use tmux commands to query pane state, compare against expected values,
+          output pass/fail per test case, return non-zero exit code on any failure.
+          Location: tests/tmux-layout-test.sh (in xpollination-mcp-server repo).
+          ACCEPTANCE: Script runs without errors. Outputs clear pass/fail per test case.
+          Non-zero exit on failure. No manual intervention needed.
+          GIT: Stage tests/tmux-layout-test.sh, commit, push.
+
+      - id: "ts.3"
+        title: "Run tests — expect failure"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 3
+        dependencies: ["ts.2"]
+        description: >
+          ROLE: pdsa-agent.
+          CONTEXT: Dev agent has written the test script at tests/tmux-layout-test.sh.
+          The current tmux layout has only 2 panes (dev pane missing), so tests MUST fail.
+          ACTION: Execute the test script. Capture output. Document which tests fail and why.
+          Analyze the root cause of each failure. This validates the test suite itself —
+          if tests pass when they should fail, the tests are wrong.
+          ACCEPTANCE: Tests executed. Failures documented with root cause analysis.
+          At minimum, pane count test must fail (expected 3, got 2).
+
+      - id: "ts.4"
+        title: "Plan fix steps for layout"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 4
+        dependencies: ["ts.3"]
+        description: >
+          ROLE: pdsa-agent.
+          CONTEXT: Test failures analyzed in ts.3. Root causes identified.
+          ACTION: Based on the failure analysis, define concrete fix subtasks for the dev agent.
+          Each subtask must have acceptance criteria. Consider: how to create the missing pane,
+          how to start a Claude instance in it, how to assign the dev-agent role,
+          how to verify the layout matches the configuration in CLAUDE.md.
+          Update PDSA document STUDY section with findings. Define subtasks in ACT section.
+          ACCEPTANCE: Fix subtasks defined with acceptance criteria. Each subtask is
+          actionable by the dev agent without further clarification.
+
+      - id: "ts.5"
+        title: "Implement the fix — restore 3-pane layout"
+        status: "pending"
+        owner: "dev-agent"
+        order: 5
+        dependencies: ["ts.4"]
+        description: >
+          ROLE: dev-agent.
+          CONTEXT: PDSA agent has defined fix subtasks in ts.4 with acceptance criteria.
+          The fix involves restoring the 3rd tmux pane (dev agent) in the claude-dual session.
+          ACTION: Follow the fix subtasks exactly as defined by PDSA. Create the missing pane.
+          Start Claude instance with dev-agent role. Verify layout matches expected configuration.
+          If the launcher script (synologyToClaude-DUAL.sh) needs updating, make those changes.
+          ACCEPTANCE: All fix subtasks completed. 3 panes visible in claude-dual session.
+          GIT: Stage changed files, commit, push.
+
+      - id: "ts.6"
+        title: "Run tests — expect pass"
+        status: "pending"
+        owner: "pdsa-agent"
+        order: 6
+        dependencies: ["ts.5"]
+        description: >
+          ROLE: pdsa-agent.
+          CONTEXT: Dev agent has implemented the fix in ts.5.
+          ACTION: Execute the test script again (tests/tmux-layout-test.sh).
+          All tests must now pass. If any test fails, report back to orchestrator
+          for another dev iteration. If all pass, update PDSA STUDY/ACT sections.
+          Document what was learned. Close the PDSA cycle.
+          ACCEPTANCE: All tests pass (exit code 0). PDSA STUDY/ACT updated and committed.
+
+      - id: "ts.7"
+        title: "Monitor process and update PM tool"
+        status: "in_progress"
+        owner: "orchestrator"
+        order: 7
+        dependencies: []
+        description: >
+          ROLE: orchestrator.
+          CONTEXT: This is an ongoing task throughout the test suite process.
+          ACTION: After each step (ts.1-ts.6) completes, update this currentContext.yaml
+          with the new status. Relay tasks between pdsa-agent and dev-agent.
+          Verify each agent stays in their role. Challenge scope creep.
+          Keep meta.last_updated current. Deploy YAML to dashboard.
+          ACCEPTANCE: PM tool reflects actual state at all times. No stale data.
 
   # ═══════════════════════════════════════════════════════════════════════════
   # PHASE B: Core Components
