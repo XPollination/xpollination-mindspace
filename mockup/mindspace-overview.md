@@ -13,11 +13,12 @@ mindmap
         schema["Node schema validation<br/>ACTIVE — 6 questions<br/>owner: pdsa-agent"]
         state_machine["State machine design<br/>ACTIVE — 5 questions<br/>owner: pdsa-agent"]
         dual_links["Dual-links pattern<br/>COMPLETE<br/>owner: pdsa-agent"]
-      feat(Features — BLOCKED)
+        traceability["Req-to-code traceability<br/>PENDING — new from Q16<br/>owner: pdsa-agent"]
+      feat(Features — DEPRIORITIZED per Q17)
         graph["Graph traversal"]
         dragdrop["Drag-and-drop"]
         dordod["DoR/DoD display"]
-      infra(Infrastructure — BLOCKED)
+      infra(Infrastructure — DEPRIORITIZED per Q17)
         tech["Tech stack<br/>Hugo, Alpine.js, Tailwind"]
         migration["v2 data migration"]
     mcp[xpollination-mcp-server]
@@ -40,15 +41,17 @@ mindmap
 | APPROVED | Thomas approved, all quality gates pass | 1 |
 | COMPLETE | All quality gates pass, outputs delivered | 4 |
 | ACTIVE | Work in progress, questions open | 4 |
-| PENDING | Not yet started or blocked by dependencies | 10 |
+| PENDING | Not yet started or blocked by dependencies | 6 |
+| DEPRIORITIZED | Documented for future, not on the critical path (per Q17) | 5 |
 
 ## Current Focus (Scope Stack)
 
 ```
-root → Grammar Phase — answering 29 questions across all active nodes
+root → Grammar Phase — 24 questions remaining across active nodes (5 answered)
 ```
 
 **Phase:** Trivium Grammar — gathering facts, identifying gaps, asking the right questions before building.
+**MVP decision (Q16):** MCP state machine only. No dashboard. Enforcement first.
 
 ## Dependency Flow
 
@@ -56,11 +59,12 @@ root → Grammar Phase — answering 29 questions across all active nodes
 flowchart LR
     vision["Vision PDSA ✅"] --> schema["Node Schema"]
     vision --> infra_pdsa["MCP Infra PDSA"]
+    schema --> traceability["Req-to-Code<br/>Traceability"]
     infra_pdsa --> zero_k["Zero-Knowledge Protocol"]
     infra_pdsa --> state_api["State Machine API"]
-    schema --> features["Mindspace Features"]
-    schema --> migration["v2 Data Migration"]
-    features --> ms_infra["Mindspace Infrastructure"]
+    schema --> features["Mindspace Features<br/>⏸ DEPRIORITIZED"]
+    schema --> migration["v2 Data Migration<br/>⏸ DEPRIORITIZED"]
+    features --> ms_infra["Mindspace Infrastructure<br/>⏸ DEPRIORITIZED"]
     schema --> ms_infra
     infra_pdsa --> schema_ext["SQLite Schema Extension"]
     schema --> schema_ext
@@ -68,21 +72,22 @@ flowchart LR
     style vision fill:#22c55e,color:#000
     style schema fill:#f59e0b,color:#000
     style infra_pdsa fill:#f59e0b,color:#000
+    style traceability fill:#f59e0b,color:#000
     style zero_k fill:#94a3b8,color:#000
     style state_api fill:#94a3b8,color:#000
-    style features fill:#94a3b8,color:#000
-    style migration fill:#94a3b8,color:#000
-    style ms_infra fill:#94a3b8,color:#000
+    style features fill:#64748b,color:#fff
+    style migration fill:#64748b,color:#fff
+    style ms_infra fill:#64748b,color:#fff
     style schema_ext fill:#94a3b8,color:#000
 ```
 
-**Legend:** Green = approved | Amber = active (questions open) | Gray = blocked/pending
+**Legend:** Green = approved | Amber = active | Light gray = pending | Dark gray = deprioritized
 
 ---
 
 ## Grammar Phase: Questions for Thomas
 
-> **29 questions** across 6 areas. Flow: Thomas answers -> PDSA agent documents in relevant PDSA -> marks answered here -> may generate follow-ups. Repeat until sufficient understanding to start implementation.
+> **29 questions** across 6 areas. **5 answered** (Area D complete). Flow: Thomas answers -> PDSA agent documents in relevant PDSA -> marks answered here -> may generate follow-ups. Repeat until sufficient understanding to start implementation.
 
 ### Question Flow — Where Questions Live
 
@@ -93,8 +98,8 @@ flowchart TD
 
     A["A. Node Schema<br/>0/6 answered"] --> B["B. State Machine<br/>0/5 answered"]
     C["C. MCP API & Permissions<br/>0/4 answered"] --> B
-    A --> E["E. UX & Dashboard<br/>0/4 answered"]
-    D["D. MVP & Strategy<br/>0/5 answered"] -.->|informs| A
+    A --> E["E. UX & Dashboard<br/>0/4 answered<br/>⏸ deprioritized"]
+    D["D. MVP & Strategy<br/>5/5 answered ✅"] -.->|informs| A
     D -.->|informs| C
     F["F. Process & Zero-Knowledge<br/>0/5 answered"] -.->|informs| C
 
@@ -102,8 +107,8 @@ flowchart TD
     style A fill:#f59e0b,color:#000
     style B fill:#f59e0b,color:#000
     style C fill:#f59e0b,color:#000
-    style D fill:#f59e0b,color:#000
-    style E fill:#f59e0b,color:#000
+    style D fill:#22c55e,color:#000
+    style E fill:#64748b,color:#fff
     style F fill:#f59e0b,color:#000
 ```
 
@@ -159,7 +164,7 @@ flowchart TD
 *Feeds into: MCP Infra PDSA Section 3*
 
 - [ ] **Q12: How does the MCP server identify the calling agent?**
-  Currently, MCP tools are called via Claude's MCP integration with no auth layer. An agent could claim to be any other agent. For zero-knowledge enforcement, the server must know WHO is calling. Options: (a) agent passes its ID as a parameter (trust-based), (b) separate MCP server connections per agent, (c) API tokens per agent. Which model?
+  Currently, MCP tools are called via Claude's MCP integration with no auth layer. An agent could claim to be any other agent. For zero-knowledge enforcement, the server must know WHO is calling. Options: (a) agent passes its ID as parameter (trust-based), (b) separate MCP server connections per agent, (c) API tokens per agent. Which model?
 
 - [ ] **Q13: What exactly are "stations"?**
   The API uses `station: "dev"` but stations are not defined anywhere. Is a station 1:1 with an agent (dev-station = dev-agent)? Can multiple agents serve one station? Can one agent serve multiple stations? Are stations just agent roles by another name, or a separate concept?
@@ -172,30 +177,30 @@ flowchart TD
 
 ---
 
-### D. MVP & Strategy — 5 questions
+### D. MVP & Strategy — 5 questions — ANSWERED
 
-*Cross-cutting — affects all nodes and build order*
+*Cross-cutting — affects all nodes and build order. Documented in Vision PDSA Section 13.*
 
-- [ ] **Q16: What is the minimum viable first release?**
-  Options: (a) Dashboard only — read-only Hugo visualization of YAML data, no enforcement, (b) MCP state machine only — agents use MCP tools, no visual dashboard, (c) Both — dashboard + state machine from day one, (d) Something smaller — just one MCP tool + one dashboard view as proof of concept?
+- [x] **Q16: What is the minimum viable first release?** — ANSWERED
+  **Decision:** (b) MCP state machine only. No dashboard. **New requirement:** requirements-to-code traceability (node `ms-req-traceability` created).
 
-- [ ] **Q17: Build dashboard first or MCP state machine first?**
-  Dashboard gives visual feedback fast but no enforcement. MCP gives enforcement but no visualization. Which provides more learning value for the next iteration? (May be answered by Q16.)
+- [x] **Q17: Build dashboard first or MCP state machine first?** — ANSWERED
+  **Decision:** MCP enforcement first. Dashboard/visualization deprioritized. Features and Infrastructure nodes marked DEPRIORITIZED.
 
-- [ ] **Q18: One MCP server or two?**
-  Content pipeline and mindspace currently share the same MCP server. Should they stay together (shared SQLite, shared process, simpler deployment) or split (separate servers, cleaner domain boundaries, independent scaling)?
+- [x] **Q18: One MCP server or two?** — ANSWERED
+  **Decision:** Single MCP server. Content pipeline + mindspace coexist. Optimize, learn, iterate. Split later if needed.
 
-- [ ] **Q19: YAML-to-SQLite transition strategy?**
-  When moving from YAML mockup to SQLite: (a) big-bang import (script imports mockup, stop using YAML), (b) dual-write period (YAML + SQLite kept in sync), (c) SQLite from day one of implementation (YAML was only for the simulation exercise)?
+- [x] **Q19: YAML-to-SQLite transition strategy?** — ANSWERED
+  **Decision:** Big bang import. YAML kept as backup/rollback. No dual-write. No production users to worry about.
 
-- [ ] **Q20: Resource budget on Hetzner CX22?**
-  The server has 4GB RAM. Claude agents use ~2.5GB, Paperless-ngx is running. How much RAM/CPU can the mindspace system use? Does this constrain the tech stack? (SQLite is lightweight; anything heavier could be a problem.)
+- [x] **Q20: Resource budget on Hetzner CX22?** — ANSWERED
+  **Decision:** Keep lightweight (preference), not hard-restricted. Possible server upgrade. SQLite is the right choice.
 
 ---
 
-### E. UX & Dashboard — 4 questions
+### E. UX & Dashboard — 4 questions — DEPRIORITIZED
 
-*Feeds into: Vision PDSA Section 6*
+*Feeds into: Vision PDSA Section 6. Per Q17, dashboard/visualization comes after MCP enforcement. Questions documented for future reference but not blocking implementation.*
 
 - [ ] **Q21: How should the scope stack be displayed?**
   Options: (a) text breadcrumb (`root > mindspace > Requirements > Vision`), (b) clickable breadcrumb with expand/collapse, (c) mini-map showing full tree with current position highlighted, (d) just the current node with up/down navigation arrows?
@@ -234,15 +239,15 @@ flowchart TD
 
 ## Question Progress
 
-| Area | Total | Answered | Remaining |
-|------|-------|----------|-----------|
-| A. Node Schema | 6 | 0 | 6 |
-| B. State Machine | 5 | 0 | 5 |
-| C. MCP API & Permissions | 4 | 0 | 4 |
-| D. MVP & Strategy | 5 | 0 | 5 |
-| E. UX & Dashboard | 4 | 0 | 4 |
-| F. Process & Zero-Knowledge | 5 | 0 | 5 |
-| **Total** | **29** | **0** | **29** |
+| Area | Total | Answered | Remaining | Status |
+|------|-------|----------|-----------|--------|
+| A. Node Schema | 6 | 0 | 6 | Open |
+| B. State Machine | 5 | 0 | 5 | Open |
+| C. MCP API & Permissions | 4 | 0 | 4 | Open |
+| D. MVP & Strategy | 5 | 5 | 0 | **Complete** |
+| E. UX & Dashboard | 4 | 0 | 4 | Deprioritized |
+| F. Process & Zero-Knowledge | 5 | 0 | 5 | Open |
+| **Total** | **29** | **5** | **24** | |
 
 ---
 
@@ -275,11 +280,18 @@ flowchart TD
 - **Output:** `xpollination-mcp-server/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md`
 - **Open questions:** Q12–Q15
 
+### Requirements-to-Code Traceability (ms-req-traceability) — NEW
+- **What:** Define how code links back to requirements/PDSAs for impact analysis
+- **DoR:** Node schema finalized -- NOT READY (depends on ms-node-schema)
+- **DoD:** Traceability pattern documented with examples. Thomas confirms.
+- **Output:** Traceability pattern specification
+- **Origin:** Thomas's answer to Q16 — "requirements are linked to the code so we at all time know what impact changes will have"
+
 ## Agents
 
 | Agent | Color | Active Nodes |
 |-------|-------|-------------|
-| Thomas | amber | Answering Grammar phase questions (Q1–Q29) |
+| Thomas | amber | Answering Grammar phase questions (24 remaining) |
 | Orchestrator | indigo | mindspace, mcp-server (coordination) |
 | PDSA | violet | Documenting answers, iterating question list |
 | Dev | emerald | Standing by (blocked until Grammar + Logic complete) |

@@ -210,14 +210,41 @@ tree:
                       description: "Dual-link pattern documented in vision PDSA Section 5"
                   status: "done"
 
-          # --- FEATURES ---
+              - id: "ms-req-traceability"
+                title: "How do we link requirements to code for impact analysis?"
+                owner: "pdsa-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "Thomas identified (Q16) that code must link back to PDSAs/requirements so changes can be traced to their impact. This enables quality iteration — change something, know what's affected, test what matters."
+                  inputs:
+                    - from: "ms-node-schema"
+                      type: "analysis"
+                      description: "Finalized node schema (traceability attaches to nodes)"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Define the traceability pattern: how code files/functions link to requirement nodes, how impact analysis works when a requirement changes."
+                  acceptance: "Pattern is documented with concrete examples. A requirement change can be traced to affected code. A code change can be traced to its originating requirement."
+                  quality_gates:
+                    - name: "Traceability pattern documented with examples"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "Thomas confirms pattern captures his intent"
+                      status: "pending"
+                      verifier: "thomas"
+                  outputs:
+                    - type: "analysis"
+                      description: "Requirements-to-code traceability pattern"
+                  status: "not_done"
+
+          # --- FEATURES (DEPRIORITIZED per Q17 — visualization comes after MCP enforcement) ---
           - id: "ms-features"
-            title: "Features"
+            title: "Features (DEPRIORITIZED — dashboard comes after MCP enforcement)"
             owner: "pdsa-agent"
             type: "task"
             status: "pending"
             definition_of_ready:
-              context: "Features can be defined after Requirements are sufficiently explored."
+              context: "Features can be defined after Requirements are sufficiently explored. DEPRIORITIZED per Q17: MCP enforcement first, visualization later."
               inputs:
                 - from: "ms-requirements"
                   type: "analysis"
@@ -320,14 +347,14 @@ tree:
                       description: "Dashboard shows self-aware node properties"
                   status: "not_done"
 
-          # --- INFRASTRUCTURE ---
+          # --- INFRASTRUCTURE (DEPRIORITIZED per Q17 — dashboard infra comes after MCP enforcement) ---
           - id: "ms-infrastructure"
-            title: "Infrastructure"
+            title: "Infrastructure (DEPRIORITIZED — dashboard infra comes after MCP enforcement)"
             owner: "dev-agent"
             type: "task"
             status: "pending"
             definition_of_ready:
-              context: "Infrastructure can begin when node schema is validated and features are specified."
+              context: "Infrastructure can begin when node schema is validated and features are specified. DEPRIORITIZED per Q17: MCP enforcement first, dashboard infrastructure later."
               inputs:
                 - from: "ms-node-schema"
                   type: "analysis"
