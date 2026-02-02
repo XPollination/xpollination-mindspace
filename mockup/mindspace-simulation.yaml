@@ -1,0 +1,635 @@
+# =============================================================================
+# Mindspace Mock-up — Simulating the product before building it
+#
+# This YAML represents what the mindmap data would look like if the mindspace
+# tool existed. Two projects live in the same mindspace: the mindspace itself
+# and the MCP server. Each node is a "self-aware container" carrying its own
+# DoR, DoD, and process state.
+#
+# Purpose: Iterate on this simulation as if the product exists. Learn from
+# the experience. Then build the first real iteration informed by that learning.
+#
+# Created: 2026-02-02 (Iteration 4)
+# =============================================================================
+
+meta:
+  title: "XPollination Mindspace"
+  last_updated: "2026-02-02T15:30:00Z"
+  updated_by: "pdsa-agent"
+  version: "0.1.0-mockup"
+  active_node: "ms-vision"
+  scope_stack:
+    - "root"
+    - "mindspace"
+    - "ms-requirements"
+    - "ms-vision"
+
+  agents:
+    thomas:
+      display: "Thomas"
+      color: "amber"
+      role: "Strategic direction, approval, Definition of Done verifier"
+    orchestrator:
+      display: "Orchestrator"
+      color: "indigo"
+      role: "Coordination, relay, quality gates, focus enforcement"
+    pdsa-agent:
+      display: "PDSA"
+      color: "violet"
+      role: "Planning, research, PDSA documentation, quality review"
+    dev-agent:
+      display: "Dev"
+      color: "emerald"
+      role: "Implementation, git commits, operational execution"
+
+# =============================================================================
+# THE MINDMAP TREE
+# =============================================================================
+
+tree:
+  - id: "root"
+    title: "XPollination Mindspace"
+    owner: "thomas"
+    type: "task"
+    status: "active"
+    children:
+
+      # =====================================================================
+      # PROJECT 1: MINDSPACE (the tool itself)
+      # =====================================================================
+      - id: "mindspace"
+        title: "xpollination-mindspace"
+        owner: "orchestrator"
+        type: "task"
+        status: "active"
+        pdsa_phase: "plan"
+        pdsa_ref:
+          git_url: "https://github.com/PichlerThomas/xpollination-mindspace"
+          local_path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace"
+        children:
+
+          # --- REQUIREMENTS ---
+          - id: "ms-requirements"
+            title: "Requirements"
+            owner: "pdsa-agent"
+            type: "task"
+            status: "active"
+            definition_of_ready:
+              context: "Thomas has described the mindmap vision. Trivium Method provides the thinking framework. We are in Grammar phase — gathering and structuring all requirements."
+              inputs: []
+              status: "ready"
+            definition_of_done:
+              action: "Explore each requirement via PDSA cycles until sufficient understanding to begin building."
+              acceptance: "All requirement nodes have status complete. Thomas approves the requirements as sufficient for a first implementation."
+              quality_gates:
+                - name: "All requirement questions answered with PDSA cycles"
+                  status: "pending"
+                  verifier: "pdsa-agent"
+                - name: "Thomas confirms requirements are sufficient to start building"
+                  status: "pending"
+                  verifier: "thomas"
+              outputs:
+                - type: "analysis"
+                  description: "Complete set of answered requirements ready for Feature/Infrastructure work"
+              status: "not_done"
+            children:
+
+              - id: "ms-vision"
+                title: "What is the mindspace vision?"
+                owner: "pdsa-agent"
+                type: "pdsa-cycle"
+                status: "active"
+                pdsa_phase: "plan"
+                pdsa_ref:
+                  git_url: "https://github.com/PichlerThomas/xpollination-mindspace/blob/main/docs/pdsa/2026-02-02-UTC-1300.mindspace-vision.pdsa.md"
+                  local_path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1300.mindspace-vision.pdsa.md"
+                definition_of_ready:
+                  context: "Thomas described the core metaphor (mindmap as shared mental model), the Trivium Method, and the self-aware node concept."
+                  inputs:
+                    - from: "thomas-input"
+                      type: "analysis"
+                      description: "Thomas's vision answers captured in /tmp/orchestrator-task-mindspace.md"
+                  status: "ready"
+                definition_of_done:
+                  action: "Create a vision PDSA that synthesizes Thomas's mindmap metaphor with the v3 recursive tree design. Iterate with Thomas until aligned."
+                  acceptance: "Thomas approves the vision PDSA as matching his intent."
+                  quality_gates:
+                    - name: "Node schema with intrinsic DoR/DoD"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "Trivium Method documented"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "Self-aware node concept with logistics analogy"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "Three-actor model (node/infrastructure/agent)"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "Thomas approves vision"
+                      status: "pending"
+                      verifier: "thomas"
+                  outputs:
+                    - type: "file"
+                      description: "Vision PDSA document"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1300.mindspace-vision.pdsa.md"
+                  status: "not_done"
+
+              - id: "ms-node-schema"
+                title: "What is the exact node schema?"
+                owner: "pdsa-agent"
+                type: "task"
+                status: "active"
+                definition_of_ready:
+                  context: "Vision PDSA Section 4.1 defines a draft schema. Needs validation through simulation."
+                  inputs:
+                    - from: "ms-vision"
+                      type: "file"
+                      description: "Vision PDSA with draft node schema"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1300.mindspace-vision.pdsa.md"
+                  status: "ready"
+                definition_of_done:
+                  action: "Validate the node schema by using it in this mock-up. Identify gaps, iterate."
+                  acceptance: "Schema is sufficient to represent all current mindspace nodes with full DoR/DoD. No fields missing."
+                  quality_gates:
+                    - name: "Mock-up uses schema correctly for all nodes"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "Thomas confirms schema captures his mental model"
+                      status: "pending"
+                      verifier: "thomas"
+                  outputs:
+                    - type: "analysis"
+                      description: "Validated node schema (or schema revision)"
+                  status: "not_done"
+
+              - id: "ms-state-machine"
+                title: "How does the node state machine work?"
+                owner: "pdsa-agent"
+                type: "task"
+                status: "active"
+                definition_of_ready:
+                  context: "MCP Server PDSA Section 4 defines a draft state machine. Needs validation."
+                  inputs:
+                    - from: "mcp-infra-pdsa"
+                      type: "file"
+                      description: "MCP server infrastructure PDSA with state machine design"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                  status: "ready"
+                definition_of_done:
+                  action: "Walk through the state machine with this mock-up's nodes. Verify every transition is valid and no edge cases are missing."
+                  acceptance: "State machine handles all node lifecycle scenarios in the mock-up."
+                  quality_gates:
+                    - name: "All nodes in mock-up have a valid status per state machine"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "analysis"
+                      description: "Validated state machine (or revision)"
+                  status: "not_done"
+
+              - id: "ms-dual-links"
+                title: "How do dual-links work across repos?"
+                owner: "pdsa-agent"
+                type: "task"
+                status: "complete"
+                pdsa_phase: "complete"
+                definition_of_ready:
+                  context: "Need a pattern for referencing content across repos that works for both humans (GitHub URLs) and agents (filesystem paths)."
+                  inputs: []
+                  status: "ready"
+                definition_of_done:
+                  action: "Define the dual-link pattern with concrete examples."
+                  acceptance: "Pattern is documented in vision PDSA with YAML examples."
+                  quality_gates:
+                    - name: "Dual-link schema defined"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "analysis"
+                      description: "Dual-link pattern documented in vision PDSA Section 5"
+                  status: "done"
+
+          # --- FEATURES ---
+          - id: "ms-features"
+            title: "Features"
+            owner: "pdsa-agent"
+            type: "task"
+            status: "pending"
+            definition_of_ready:
+              context: "Features can be defined after Requirements are sufficiently explored."
+              inputs:
+                - from: "ms-requirements"
+                  type: "analysis"
+                  description: "Completed requirements analysis"
+              status: "not_ready"
+            definition_of_done:
+              action: "Define each feature as a node with its own DoR/DoD. Create PDSAs for complex features."
+              acceptance: "All features specified, prioritized, and ready for implementation."
+              quality_gates:
+                - name: "Each feature has a clear DoD"
+                  status: "pending"
+                  verifier: "pdsa-agent"
+                - name: "Thomas approves feature set"
+                  status: "pending"
+                  verifier: "thomas"
+              outputs:
+                - type: "analysis"
+                  description: "Feature specifications ready for dev agent"
+              status: "not_done"
+            children:
+
+              - id: "ms-feat-graph-traversal"
+                title: "Graph traversal (navigate full tree)"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "Scope stack navigation, expand/collapse, breadcrumb. Defined in vision PDSA Section 6."
+                  inputs:
+                    - from: "ms-node-schema"
+                      type: "analysis"
+                      description: "Finalized node schema"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Implement tree rendering with expand/collapse and scope stack breadcrumb."
+                  acceptance: "User can navigate from root to any leaf and back. Scope stack updates on navigation."
+                  quality_gates:
+                    - name: "Tree renders at any depth"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "Breadcrumb navigation works"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "file"
+                      description: "Dashboard template with recursive tree renderer"
+                  status: "not_done"
+
+              - id: "ms-feat-drag-drop"
+                title: "Drag-and-drop (rearrange thoughts)"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "SortableJS nested lists. Defined in vision PDSA Section 6.2."
+                  inputs:
+                    - from: "ms-feat-graph-traversal"
+                      type: "state"
+                      description: "Tree rendering must work before drag-and-drop can be added"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Add SortableJS drag-and-drop to the tree. Nodes can move between parents."
+                  acceptance: "Drag a node from one parent to another. Node keeps its children and properties. References remain valid."
+                  quality_gates:
+                    - name: "Node moves between parents"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "Children preserved after move"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "state"
+                      description: "Dashboard supports node rearrangement"
+                  status: "not_done"
+
+              - id: "ms-feat-dor-dod-display"
+                title: "Display DoR/DoD on each node"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "Each node's intrinsic properties must be visible in the dashboard."
+                  inputs:
+                    - from: "ms-feat-graph-traversal"
+                      type: "state"
+                      description: "Tree rendering exists"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Add expandable DoR/DoD panels to each node in the tree view."
+                  acceptance: "Click a node to see its readiness inputs, completion criteria, quality gates, and outputs."
+                  quality_gates:
+                    - name: "DoR inputs shown with satisfaction status"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "DoD quality gates shown with pass/fail"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "state"
+                      description: "Dashboard shows self-aware node properties"
+                  status: "not_done"
+
+          # --- INFRASTRUCTURE ---
+          - id: "ms-infrastructure"
+            title: "Infrastructure"
+            owner: "dev-agent"
+            type: "task"
+            status: "pending"
+            definition_of_ready:
+              context: "Infrastructure can begin when node schema is validated and features are specified."
+              inputs:
+                - from: "ms-node-schema"
+                  type: "analysis"
+                  description: "Finalized node schema"
+                - from: "ms-features"
+                  type: "analysis"
+                  description: "Feature specifications"
+              status: "not_ready"
+            definition_of_done:
+              action: "Build the tech stack, deploy, connect to MCP server."
+              acceptance: "Dashboard accessible, MCP tools operational, data flowing."
+              quality_gates:
+                - name: "Dashboard serves from Hetzner"
+                  status: "pending"
+                  verifier: "dev-agent"
+                - name: "MCP tools respond correctly"
+                  status: "pending"
+                  verifier: "pdsa-agent"
+                - name: "Thomas can access and use the dashboard"
+                  status: "pending"
+                  verifier: "thomas"
+              outputs:
+                - type: "state"
+                  description: "Running mindspace system"
+              status: "not_done"
+            children:
+
+              - id: "ms-infra-tech-stack"
+                title: "Tech stack (Hugo, Alpine.js, Tailwind, SortableJS)"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "Already deployed for v2 PM tool. Reuse existing infrastructure on Hetzner."
+                  inputs: []
+                  status: "ready"
+                definition_of_done:
+                  action: "Verify existing Hugo + Alpine.js setup still works. Extend if needed."
+                  acceptance: "Hugo site builds, Alpine.js loads, Tailwind renders."
+                  quality_gates:
+                    - name: "Hugo build succeeds"
+                      status: "pending"
+                      verifier: "dev-agent"
+                  outputs:
+                    - type: "state"
+                      description: "Working tech stack on Hetzner"
+                  status: "not_done"
+
+              - id: "ms-infra-data-migration"
+                title: "Migrate v2 data to mindspace format"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "v2 currentContext.yaml must be transformed to mindspace node schema."
+                  inputs:
+                    - from: "ms-node-schema"
+                      type: "analysis"
+                      description: "Finalized node schema to migrate into"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Write migration script. Convert v2 phases/items/sub_items to recursive nodes with DoR/DoD."
+                  acceptance: "All v2 data represented in mindspace format. No data loss."
+                  quality_gates:
+                    - name: "All v2 phases present as nodes"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "Quality gates preserved"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "file"
+                      description: "Migration script and migrated data"
+                  status: "not_done"
+
+      # =====================================================================
+      # PROJECT 2: MCP SERVER (infrastructure layer)
+      # =====================================================================
+      - id: "mcp-server"
+        title: "xpollination-mcp-server"
+        owner: "orchestrator"
+        type: "task"
+        status: "active"
+        pdsa_ref:
+          git_url: "https://github.com/PichlerThomas/xpollination-mcp-server"
+          local_path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server"
+        children:
+
+          # --- REQUIREMENTS ---
+          - id: "mcp-requirements"
+            title: "Requirements"
+            owner: "pdsa-agent"
+            type: "task"
+            status: "active"
+            children:
+
+              - id: "mcp-infra-pdsa"
+                title: "How does the MCP server become the infrastructure layer?"
+                owner: "pdsa-agent"
+                type: "pdsa-cycle"
+                status: "active"
+                pdsa_phase: "plan"
+                pdsa_ref:
+                  git_url: "https://github.com/PichlerThomas/xpollination-mindspace/blob/main/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                  local_path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                definition_of_ready:
+                  context: "Vision PDSA Section 4.4 defines the three-actor model. MCP server already has WorkflowEngine, SQLite, and MCP SDK."
+                  inputs:
+                    - from: "ms-vision"
+                      type: "file"
+                      description: "Vision PDSA with three-actor model"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1300.mindspace-vision.pdsa.md"
+                  status: "ready"
+                definition_of_done:
+                  action: "Create PDSA defining MCP server's new role, API surface, state machine, and data model."
+                  acceptance: "PDSA documents the full API surface, state machine lifecycle, and SQLite schema extension."
+                  quality_gates:
+                    - name: "API surface defined with TypeScript signatures"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "State machine lifecycle documented"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "SQLite schema extension defined"
+                      status: "pass"
+                      verifier: "pdsa-agent"
+                    - name: "Thomas approves API design"
+                      status: "pending"
+                      verifier: "thomas"
+                  outputs:
+                    - type: "file"
+                      description: "MCP server infrastructure PDSA"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                  status: "not_done"
+
+              - id: "mcp-zero-knowledge"
+                title: "How do zero-knowledge agents interact with the state machine?"
+                owner: "pdsa-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "The three-actor model says agents are zero-knowledge workers. Need to define the exact agent-to-MCP interaction protocol."
+                  inputs:
+                    - from: "mcp-infra-pdsa"
+                      type: "file"
+                      description: "MCP infrastructure PDSA with API surface"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Define the protocol: how does an agent discover what work is available? How does it submit results? What happens on rejection?"
+                  acceptance: "Protocol is clear enough that a dev agent with no process knowledge can follow it."
+                  quality_gates:
+                    - name: "Protocol walkthrough with dev agent persona"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "analysis"
+                      description: "Agent interaction protocol"
+                  status: "not_done"
+
+          # --- FEATURES ---
+          - id: "mcp-features"
+            title: "Features"
+            owner: "pdsa-agent"
+            type: "task"
+            status: "active"
+            children:
+
+              - id: "mcp-feat-content-pipeline"
+                title: "Content pipeline (existing)"
+                owner: "dev-agent"
+                type: "task"
+                status: "complete"
+                pdsa_phase: "complete"
+                definition_of_ready:
+                  context: "Original MCP server purpose. All tools implemented."
+                  inputs: []
+                  status: "ready"
+                definition_of_done:
+                  action: "Implement crawl_trends, propose_topic, write_draft, fact_check, improve_draft, publish_post."
+                  acceptance: "All tools functional. End-to-end pipeline works."
+                  quality_gates:
+                    - name: "All 8 MCP tools implemented"
+                      status: "pass"
+                      verifier: "dev-agent"
+                    - name: "SQLite schema deployed"
+                      status: "pass"
+                      verifier: "dev-agent"
+                  outputs:
+                    - type: "state"
+                      description: "Working content pipeline"
+                  status: "done"
+
+              - id: "mcp-feat-state-machine-api"
+                title: "Mindspace state machine API (new)"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "Requires MCP infrastructure PDSA approved and node schema finalized."
+                  inputs:
+                    - from: "mcp-infra-pdsa"
+                      type: "file"
+                      description: "Approved MCP infrastructure PDSA"
+                    - from: "ms-node-schema"
+                      type: "analysis"
+                      description: "Finalized node schema"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Implement mindspace MCP tools: get_ready_nodes, submit_output, book_transition, create_node, set_focus."
+                  acceptance: "All tools enforce state machine rules. No agent can bypass quality gates."
+                  quality_gates:
+                    - name: "get_ready_nodes returns only station-scoped nodes"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "book_transition rejects invalid transitions"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "submit_output validates against DoD"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                    - name: "Integration test passes full lifecycle"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "state"
+                      description: "Working mindspace state machine via MCP tools"
+                  status: "not_done"
+
+          # --- INFRASTRUCTURE ---
+          - id: "mcp-infrastructure"
+            title: "Infrastructure"
+            owner: "dev-agent"
+            type: "task"
+            status: "active"
+            children:
+
+              - id: "mcp-infra-existing"
+                title: "Existing stack (Node.js, TypeScript, SQLite, MCP SDK)"
+                owner: "dev-agent"
+                type: "task"
+                status: "complete"
+                definition_of_ready:
+                  context: "Already built and deployed."
+                  inputs: []
+                  status: "ready"
+                definition_of_done:
+                  action: "MCP server runs, connects to Claude, all tools registered."
+                  acceptance: "npm start succeeds. Claude can call MCP tools."
+                  quality_gates:
+                    - name: "Server starts without errors"
+                      status: "pass"
+                      verifier: "dev-agent"
+                  outputs:
+                    - type: "state"
+                      description: "Running MCP server"
+                  status: "done"
+
+              - id: "mcp-infra-schema-extension"
+                title: "SQLite schema extension for mindspace nodes"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "MCP infrastructure PDSA Section 5 defines the schema. Implement it."
+                  inputs:
+                    - from: "mcp-infra-pdsa"
+                      type: "file"
+                      description: "Schema SQL from MCP infrastructure PDSA"
+                  status: "not_ready"
+                definition_of_done:
+                  action: "Add mindspace_nodes, mindspace_node_inputs, mindspace_node_outputs, mindspace_quality_gates, mindspace_transitions, mindspace_scope_stack tables."
+                  acceptance: "Schema applies cleanly. Existing content pipeline tables unaffected."
+                  quality_gates:
+                    - name: "Migration runs without errors"
+                      status: "pending"
+                      verifier: "dev-agent"
+                    - name: "Existing tables still work"
+                      status: "pending"
+                      verifier: "pdsa-agent"
+                  outputs:
+                    - type: "file"
+                      description: "Updated schema.sql"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/schema.sql"
+                  status: "not_done"
+
+              - id: "mcp-infra-unit-tests"
+                title: "Unit tests for MCP server"
+                owner: "dev-agent"
+                type: "task"
+                status: "pending"
+                definition_of_ready:
+                  context: "Tests defined in MCP server CLAUDE.md TODO section. 13 component tests + 1 e2e test."
+                  inputs: []
+                  status: "ready"
+                definition_of_done:
+                  action: "Write unit tests for all existing components."
+                  acceptance: "All tests pass. Coverage > 80% for implemented tools."
+                  quality_gates:
+                    - name: "npm test passes"
+                      status: "pending"
+                      verifier: "dev-agent"
+                  outputs:
+                    - type: "file"
+                      description: "Test files in src/**/*.test.ts"
+                  status: "not_done"
