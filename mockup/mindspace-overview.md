@@ -47,7 +47,7 @@ mindmap
 ## Current Focus (Scope Stack)
 
 ```
-root → Grammar Phase — 24 questions remaining across active nodes (5 answered)
+root → Grammar Phase — 22 questions remaining across active nodes (7 answered)
 ```
 
 **Phase:** Trivium Grammar — gathering facts, identifying gaps, asking the right questions before building.
@@ -124,7 +124,7 @@ flowchart TD
     vision["Vision PDSA ✅ APPROVED"] --> A
     vision --> C
 
-    A["A. Node Schema<br/>0/6 answered"] --> B["B. State Machine<br/>0/5 answered"]
+    A["A. Node Schema<br/>2/6 answered"] --> B["B. State Machine<br/>0/5 answered"]
     C["C. MCP API & Permissions<br/>0/4 answered"] --> B
     A --> E["E. UX & Dashboard<br/>0/4 answered<br/>⏸ deprioritized"]
     D["D. MVP & Strategy<br/>5/5 answered ✅"] -.->|informs| A
@@ -146,8 +146,8 @@ flowchart TD
 
 *Feeds into: Vision PDSA Section 4.1*
 
-- [ ] **Q1: Are the 6 node types complete?**
-  Schema defines: `task`, `quality-gate`, `decision`, `scope-break`, `milestone`, `pdsa-cycle`. Are any missing? What distinguishes a `decision` from a `task`? Is `scope-break` a node type or a state transition?
+- [x] **Q1: Are the 6 node types complete?** — ANSWERED
+  **Decision:** 5 types, not 6. `task`, `pdsa-cycle`, `group`, `decision`, `milestone`. Dropped `quality-gate` (it's a property, not a type) and `scope-break` (it's an event, not a type). Added `group` for container nodes. See Vision PDSA Section 14.3.
 
 - [ ] **Q2: Tree or DAG — can a node have multiple parents?**
   Vision Section 6.1 says "the mindmap is a tree (not a DAG)." But what if a thought is relevant to two branches? Do we duplicate the node, or allow cross-references? The `dependencies` field allows cross-links, but `children` is strictly tree. Is this the intended model?
@@ -161,8 +161,8 @@ flowchart TD
 - [ ] **Q5: Single owner or co-ownership?**
   Currently each node has one `owner`. Can Thomas and pdsa-agent co-own a node? Or is ownership always singular, with collaboration handled through the orchestrator relay pattern?
 
-- [ ] **Q6: Canonical status set — Vision vs MCP Infra?**
-  Vision PDSA lists 6 statuses: `pending`, `active`, `paused`, `complete`, `failed`, `blocked`. MCP Infra PDSA adds 3 more: `ready`, `review`, `rework`. That is 9 total. Which set is authoritative? Should the node schema align with the state machine, or are they different views (simplified vs detailed)?
+- [x] **Q6: Canonical status set — Vision vs MCP Infra?** — ANSWERED
+  **Decision:** 8 canonical statuses: `pending`, `ready`, `active`, `review`, `rework`, `complete`, `blocked`, `cancelled`. Dropped `paused` (subsumed into `blocked`) and `failed` (replaced by `cancelled`). Type-specific workflows limit which states are valid per type. See Vision PDSA Section 14.2.
 
 ---
 
@@ -269,13 +269,13 @@ flowchart TD
 
 | Area | Total | Answered | Remaining | Status |
 |------|-------|----------|-----------|--------|
-| A. Node Schema | 6 | 0 | 6 | Open |
+| A. Node Schema | 6 | 2 | 4 | Q1+Q6 answered |
 | B. State Machine | 5 | 0 | 5 | Open |
 | C. MCP API & Permissions | 4 | 0 | 4 | Open |
 | D. MVP & Strategy | 5 | 5 | 0 | **Complete** |
 | E. UX & Dashboard | 4 | 0 | 4 | Deprioritized |
 | F. Process & Zero-Knowledge | 5 | 0 | 5 | Open |
-| **Total** | **29** | **5** | **24** | |
+| **Total** | **29** | **7** | **22** | |
 
 ---
 
