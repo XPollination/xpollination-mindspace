@@ -174,7 +174,7 @@ tree:
                     - from: "mcp-infra-pdsa"
                       type: "file"
                       description: "MCP server infrastructure PDSA with state machine design"
-                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
                   status: "ready"
                 definition_of_done:
                   action: "Walk through the state machine with this mock-up's nodes. Verify every transition is valid and no edge cases are missing."
@@ -431,8 +431,8 @@ tree:
                 status: "active"
                 pdsa_phase: "plan"
                 pdsa_ref:
-                  git_url: "https://github.com/PichlerThomas/xpollination-mindspace/blob/main/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
-                  local_path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                  git_url: "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                  local_path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
                 definition_of_ready:
                   context: "Vision PDSA Section 4.4 defines the three-actor model. MCP server already has WorkflowEngine, SQLite, and MCP SDK."
                   inputs:
@@ -460,7 +460,7 @@ tree:
                   outputs:
                     - type: "file"
                       description: "MCP server infrastructure PDSA"
-                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
+                      path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-02-UTC-1500.mcp-server-infrastructure-layer.pdsa.md"
                   status: "not_done"
 
               - id: "mcp-zero-knowledge"
