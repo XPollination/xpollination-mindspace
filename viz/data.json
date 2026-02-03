@@ -1,9 +1,9 @@
 {
-  "exported_at": "2026-02-03T16:44:24.328Z",
-  "node_count": 40,
-  "queue_count": 8,
+  "exported_at": "2026-02-03T17:05:10.810Z",
+  "node_count": 41,
+  "queue_count": 4,
   "active_count": 3,
-  "completed_count": 28,
+  "completed_count": 32,
   "stations": [
     {
       "id": "sta-dev",
@@ -507,11 +507,11 @@
       "id": "3c7b85d5-82cd-4e37-9a40-b07545e5f826",
       "slug": "viz-agent-stations-live",
       "type": "requirement",
-      "status": "ready",
+      "status": "completed",
       "parent_ids": [],
       "dna_json": "{\"title\":\"Live Agent-Station Visualization with Auto-Update\",\"description\":\"The mindspace visualization needs major enhancements: auto-update, agent-to-station assignments, and human integration.\",\"requirements\":[\"AUTO-UPDATE: Visualization refreshes automatically to show current MCP state\",\"AGENT ASSIGNMENTS: Show which agent is monitoring which station (PDSA→Design, QA→Test, Dev→Task)\",\"MCP STORAGE: Agent assignments stored in MCP database (not just visual)\",\"HUMAN STATION: Add Human as a role/station, Thomas is currently logged in and assigned\",\"MISSING STATES: Current layout incomplete - review and fix station/state coverage\",\"LIVE INDICATOR: Visual showing current agent taking responsibility for each station\"],\"context\":{\"current_agents\":{\"Orchestrator\":\"monitors all, relays tasks\",\"PDSA\":\"monitors Design nodes\",\"QA\":\"monitors Test nodes\",\"Dev\":\"monitors Task nodes\",\"Human (Thomas)\":\"monitors Requirements, approves designs\"},\"current_issue\":\"No visibility into which agent is active on which station\"},\"review_required\":true,\"reviewer\":\"Thomas (Human)\",\"note\":\"PDSA must design this and bring back for Thomas review BEFORE implementation\"}",
       "created_at": "2026-02-03 15:14:50",
-      "updated_at": "2026-02-03 15:14:50",
+      "updated_at": "2026-02-03 17:05:06",
       "dna": {
         "title": "Live Agent-Station Visualization with Auto-Update",
         "description": "The mindspace visualization needs major enhancements: auto-update, agent-to-station assignments, and human integration.",
@@ -702,11 +702,11 @@
       "id": "2e552a57-c185-4eb5-aeca-d4f66b6d7464",
       "slug": "viz-node-highlight-nav",
       "type": "requirement",
-      "status": "ready",
+      "status": "completed",
       "parent_ids": [],
       "dna_json": "{\"title\":\"Node Highlight and Navigation Visual Feedback\",\"description\":\"Requirements for visualization interactivity:\\n\\n1. When clicking on a node, it needs to HIGHLIGHT (visual feedback)\\n2. When clicking a child link or parent link, it should SWITCH the highlight to the clicked target (follow the navigation)\\n3. Nodes need to be visualized by their current station - when PDSA agent is working on a requirement, it shows in PDSA station, NOT in Queue (pending)\\n\\nThomas's words:\\n> \\\"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\\\"\\n> \\\"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\\\"\",\"priority\":\"high\"}",
       "created_at": "2026-02-03 16:12:19",
-      "updated_at": "2026-02-03 16:12:19",
+      "updated_at": "2026-02-03 17:05:06",
       "dna": {
         "title": "Node Highlight and Navigation Visual Feedback",
         "description": "Requirements for visualization interactivity:\n\n1. When clicking on a node, it needs to HIGHLIGHT (visual feedback)\n2. When clicking a child link or parent link, it should SWITCH the highlight to the clicked target (follow the navigation)\n3. Nodes need to be visualized by their current station - when PDSA agent is working on a requirement, it shows in PDSA station, NOT in Queue (pending)\n\nThomas's words:\n> \"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\"\n> \"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\"",
@@ -758,11 +758,11 @@
       "id": "ad97adfb-3269-4a23-be05-1cb5870d7786",
       "slug": "viz-project-dropdown",
       "type": "requirement",
-      "status": "ready",
+      "status": "completed",
       "parent_ids": [],
       "dna_json": "{\"title\":\"Project Dropdown for Multi-Project Support\",\"description\":\"Requirements:\\n\\n1. Top left currently shows \\\"mindspace Warehouse\\\" - this is correct\\n2. Add a DROPDOWN to switch between projects\\n3. List all projects in current workspace (~/workspaces/github/PichlerThomas/)\\n4. Each project with a data/xpollination.db should appear in dropdown\\n\\nThomas's words:\\n> \\\"on the top left there is currently 'mindspace Warehouse' and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\\\"\",\"priority\":\"high\",\"next_task\":\"checkout git@github.com:XPollination/HomePage.git to test multi-project\"}",
       "created_at": "2026-02-03 16:21:06",
-      "updated_at": "2026-02-03 16:21:06",
+      "updated_at": "2026-02-03 17:05:06",
       "dna": {
         "title": "Project Dropdown for Multi-Project Support",
         "description": "Requirements:\n\n1. Top left currently shows \"mindspace Warehouse\" - this is correct\n2. Add a DROPDOWN to switch between projects\n3. List all projects in current workspace (~/workspaces/github/PichlerThomas/)\n4. Each project with a data/xpollination.db should appear in dropdown\n\nThomas's words:\n> \"on the top left there is currently 'mindspace Warehouse' and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\"",
@@ -1021,11 +1021,11 @@
       "id": "35b0de4a-d8d7-4ab7-b6b1-5407c3310d5a",
       "slug": "onboard-homepage-project",
       "type": "requirement",
-      "status": "ready",
+      "status": "complete",
       "parent_ids": [],
       "dna_json": "{\"title\":\"Onboard HomePage Project to PM System\",\"description\":\"Task for PDSA agent:\\n\\n1. After Dev clones git@github.com:XPollination/HomePage.git\\n2. Set up the project for PM system per ad97adfb-3269-4a23-be05-1cb5870d7786 (Project Dropdown requirement)\\n3. Initialize xpollination.db in the HomePage project\\n4. Verify it appears in the viz project dropdown\\n\\nContext:\\n- Project dropdown implementation complete (f9b1361)\\n- Viz server scans workspace for projects with data/xpollination.db\\n- Each project needs its own database initialized\\n\\nThomas's words:\\n> \\\"how to onboard the project homepage (i already provided link, add it to the context). task contains checking out the project and set it up as described in task ad97adfb\\\"\",\"priority\":\"high\",\"related_task\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\",\"git_repo\":\"git@github.com:XPollination/HomePage.git\"}",
       "created_at": "2026-02-03 16:41:51",
-      "updated_at": "2026-02-03 16:41:51",
+      "updated_at": "2026-02-03 16:50:50",
       "dna": {
         "title": "Onboard HomePage Project to PM System",
         "description": "Task for PDSA agent:\n\n1. After Dev clones git@github.com:XPollination/HomePage.git\n2. Set up the project for PM system per ad97adfb-3269-4a23-be05-1cb5870d7786 (Project Dropdown requirement)\n3. Initialize xpollination.db in the HomePage project\n4. Verify it appears in the viz project dropdown\n\nContext:\n- Project dropdown implementation complete (f9b1361)\n- Viz server scans workspace for projects with data/xpollination.db\n- Each project needs its own database initialized\n\nThomas's words:\n> \"how to onboard the project homepage (i already provided link, add it to the context). task contains checking out the project and set it up as described in task ad97adfb\"",
@@ -1073,6 +1073,21 @@
           "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-onboard-homepage-design.pdsa.md",
           "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-onboard-homepage-design.pdsa.md"
         }
+      }
+    },
+    {
+      "id": "a88f6ab9-b4c1-4948-8460-0614d2a579c4",
+      "slug": "create-onboard-script",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Create Onboarding Script for New Projects\",\"description\":\"Create scripts/onboard-project.sh in xpollination-mcp-server\\n\\nThomas's answers:\\n> \\\"1. leave empty. finish xpollination-mcp-server and then we continue with the first node of the homepage\\\"\\n> \\\"2. yes good idea to preserve this knowledge. add to xpollination-mcp-server (pdsa to be precise and will remember context!)\\\"\\n> \\\"3. can point to mcp server. is a good approach as changes on this project ripple through all projects using this method\\\"\\n\\nRequirements:\\n1. Script takes project path as argument\\n2. Creates data/xpollination.db using schema from mcp-server\\n3. Initializes default stations\\n4. Verifies setup\\n\\nSchema approach: Reference mcp-server schema (changes ripple to all projects)\",\"priority\":\"medium\"}",
+      "created_at": "2026-02-03 16:50:50",
+      "updated_at": "2026-02-03 16:55:09",
+      "dna": {
+        "title": "Create Onboarding Script for New Projects",
+        "description": "Create scripts/onboard-project.sh in xpollination-mcp-server\n\nThomas's answers:\n> \"1. leave empty. finish xpollination-mcp-server and then we continue with the first node of the homepage\"\n> \"2. yes good idea to preserve this knowledge. add to xpollination-mcp-server (pdsa to be precise and will remember context!)\"\n> \"3. can point to mcp server. is a good approach as changes on this project ripple through all projects using this method\"\n\nRequirements:\n1. Script takes project path as argument\n2. Creates data/xpollination.db using schema from mcp-server\n3. Initializes default stations\n4. Verifies setup\n\nSchema approach: Reference mcp-server schema (changes ripple to all projects)",
+        "priority": "medium"
       }
     }
   ]
