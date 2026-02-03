@@ -89,6 +89,47 @@
       font-size: 11px;
     }
 
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #888;
+      font-size: 12px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+
+    .live-dot.error {
+      background: #ef4444;
+      animation: none;
+    }
+
+    .live-dot.flash {
+      background: #60a5fa;
+      transform: scale(1.5);
+      transition: all 0.2s;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .package.updated {
+      animation: nodeFlash 0.5s ease-out;
+    }
+
+    @keyframes nodeFlash {
+      0% { filter: brightness(1.5); }
+      100% { filter: brightness(1); }
+    }
+
     .header-controls {
       display: flex;
       gap: 10px;
@@ -433,6 +474,10 @@
       <span id="search-count" class="search-count"></span>
     </div>
     <div class="header-controls">
+      <span id="live-indicator" class="live-indicator">
+        <span id="live-dot" class="live-dot"></span>
+        <span>Live</span>
+      </span>
       <span class="stats-bar" id="stats">Loading...</span>
       <div class="zoom-controls">
         <button id="zoom-in" title="Zoom In">+</button>
@@ -506,6 +551,9 @@
     let selectedNodeId = null;
     let searchQuery = '';
     let searchDebounceTimer = null;
+    let lastDataHash = null;
+    let pollInterval = null;
+    const POLL_INTERVAL_MS = 5000;
 
     // DOM elements
     const svg = document.getElementById('warehouse-svg');
@@ -519,6 +567,7 @@
     const projectSelector = document.getElementById('project-selector');
     const searchInput = document.getElementById('node-search');
     const searchCountEl = document.getElementById('search-count');
+    const liveDot = document.getElementById('live-dot');
 
     let currentProject = null;
 
@@ -583,6 +632,88 @@
         statsEl.textContent = 'Error loading data';
       }
     }
+
+    // Auto-refresh polling
+    function computeDataHash(data) {
+      return JSON.stringify(data).length + '-' + (data.node_count || 0) + '-' + (data.stations?.length || 0);
+    }
+
+    function findChangedNodeIds(oldNodes, newNodes) {
+      const changed = [];
+      for (const newNode of newNodes) {
+        const oldNode = oldNodes.find(o => o.id === newNode.id);
+        if (!oldNode || JSON.stringify(oldNode) !== JSON.stringify(newNode)) {
+          changed.push(newNode.id);
+        }
+      }
+      return changed;
+    }
+
+    function flashNodes(nodeIds) {
+      nodeIds.forEach(id => {
+        const el = document.querySelector(`.package[data-id="${id}"]`);
+        if (el) {
+          el.classList.add('updated');
+          setTimeout(() => el.classList.remove('updated'), 500);
+        }
+      });
+    }
+
+    async function pollData() {
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const response = await fetch('/api/data' + projectParam);
+        const data = await response.json();
+
+        const newHash = computeDataHash(data);
+        if (newHash !== lastDataHash) {
+          const oldNodes = [...nodes];
+          nodes = data.nodes || [];
+          stations = data.stations || [];
+
+          // Find changed nodes before re-render
+          const changedIds = findChangedNodeIds(oldNodes, nodes);
+
+          renderVisualization();
+          updateStats(data);
+          lastDataHash = newHash;
+
+          // Flash indicator and changed nodes
+          liveDot.classList.add('flash');
+          setTimeout(() => liveDot.classList.remove('flash'), 300);
+          if (changedIds.length > 0) {
+            setTimeout(() => flashNodes(changedIds), 100);
+          }
+        }
+
+        liveDot.classList.remove('error');
+      } catch (error) {
+        console.error('Poll failed:', error);
+        liveDot.classList.add('error');
+      }
+    }
+
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(pollData, POLL_INTERVAL_MS);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    // Pause polling when tab hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        pollData(); // Immediate refresh when returning
+        startPolling();
+      }
+    });
 
     function updateStats(data) {
       statsEl.textContent = `Q:${data.queue_count || 0} A:${data.active_count || 0} C:${data.completed_count || 0} | ${data.node_count} objects`;
@@ -1043,8 +1174,11 @@
       await loadData();
     };
 
-    // Initial load
-    loadProjects();
+    // Initial load and start polling
+    loadProjects().then(() => {
+      lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
+      startPolling();
+    });
   </script>
 </body>
 </html>
