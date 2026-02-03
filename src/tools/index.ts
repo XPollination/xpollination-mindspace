@@ -26,6 +26,18 @@ import { improveDraftTool, handleImproveDraft, ImproveDraftInput } from './verif
 // Publishing tools
 import { publishPostTool, handlePublishPost, PublishPostInput } from './publishing/publishPost.js';
 
+// PM (Project Management) tools
+import {
+  pmCreateNodeTool, handlePmCreateNode,
+  pmGetNodeTool, handlePmGetNode,
+  pmListNodesTool, handlePmListNodes,
+  pmUpdateNodeTool, handlePmUpdateNode,
+  pmTransitionTool, handlePmTransition,
+  pmGetValidTransitionsTool, handlePmGetValidTransitions,
+  pmValidateNodeTool, handlePmValidateNode,
+  pmDeleteNodeTool, handlePmDeleteNode
+} from './pm/index.js';
+
 export interface ToolDefinition {
   definition: Tool;
   handler: (args: unknown, db: DatabaseContext, pipeline: ContentPipeline) => Promise<unknown>;
@@ -77,6 +89,40 @@ export const tools: ToolDefinition[] = [
   {
     definition: publishPostTool,
     handler: async (args, db, _pipeline) => handlePublishPost(args as PublishPostInput, db)
+  },
+
+  // PM (Project Management) tools
+  {
+    definition: pmCreateNodeTool,
+    handler: async (args, db, _pipeline) => handlePmCreateNode(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmGetNodeTool,
+    handler: async (args, db, _pipeline) => handlePmGetNode(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmListNodesTool,
+    handler: async (args, db, _pipeline) => handlePmListNodes(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmUpdateNodeTool,
+    handler: async (args, db, _pipeline) => handlePmUpdateNode(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmTransitionTool,
+    handler: async (args, db, _pipeline) => handlePmTransition(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmGetValidTransitionsTool,
+    handler: async (args, db, _pipeline) => handlePmGetValidTransitions(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmValidateNodeTool,
+    handler: async (args, db, _pipeline) => handlePmValidateNode(args, db.mindspaceRepo)
+  },
+  {
+    definition: pmDeleteNodeTool,
+    handler: async (args, db, _pipeline) => handlePmDeleteNode(args, db.mindspaceRepo)
   }
 ];
 
