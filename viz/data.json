@@ -1,16 +1,66 @@
 {
-  "exported_at": "2026-02-03T14:03:57.404Z",
-  "node_count": 4,
+  "exported_at": "2026-02-03T16:05:46.011Z",
+  "node_count": 26,
+  "queue_count": 3,
+  "active_count": 0,
+  "completed_count": 22,
+  "stations": [
+    {
+      "id": "sta-dev",
+      "role": "dev",
+      "name": "Dev Station",
+      "agent_id": "dev-001",
+      "current_object_id": null,
+      "status": "working",
+      "created_at": "2026-02-03 15:30:11"
+    },
+    {
+      "id": "sta-human",
+      "role": "human",
+      "name": "Human Station",
+      "agent_id": null,
+      "current_object_id": null,
+      "status": "idle",
+      "created_at": "2026-02-03 15:30:11"
+    },
+    {
+      "id": "sta-orch",
+      "role": "orchestrator",
+      "name": "Orchestrator Station",
+      "agent_id": "orchestrator-001",
+      "current_object_id": null,
+      "status": "monitoring",
+      "created_at": "2026-02-03 15:30:11"
+    },
+    {
+      "id": "sta-pdsa",
+      "role": "pdsa",
+      "name": "PDSA Station",
+      "agent_id": "pdsa-001",
+      "current_object_id": null,
+      "status": "working",
+      "created_at": "2026-02-03 15:30:11"
+    },
+    {
+      "id": "sta-qa",
+      "role": "qa",
+      "name": "QA Station",
+      "agent_id": null,
+      "current_object_id": null,
+      "status": "idle",
+      "created_at": "2026-02-03 15:30:11"
+    }
+  ],
   "nodes": [
     {
       "id": "0e4fdfa9-21b8-4a5b-affd-80f30dfe900d",
       "slug": "viz-prototype-req",
       "type": "requirement",
-      "status": "ready",
+      "status": "completed",
       "parent_ids": [],
       "dna_json": "{\"title\":\"Mindspace Flow Visualization Prototype\",\"description\":\"Create a web-based visualization of the PM tool flow. Show packages (nodes) moving through stations (statuses). Include: warehouse metaphor, stations visible, zoom into requirement details, full DAG flow visible.\",\"acceptance_criteria\":[\"Web-accessible (localhost or deployed)\",\"Shows nodes as packages in a warehouse\",\"Shows stations (statuses) as areas\",\"Can zoom into node details\",\"Visualizes DAG dependencies\",\"Real-time or refresh to show flow\"],\"priority\":\"high\"}",
       "created_at": "2026-02-03 12:03:43",
-      "updated_at": "2026-02-03 12:03:43",
+      "updated_at": "2026-02-03 14:04:38",
       "dna": {
         "title": "Mindspace Flow Visualization Prototype",
         "description": "Create a web-based visualization of the PM tool flow. Show packages (nodes) moving through stations (statuses). Include: warehouse metaphor, stations visible, zoom into requirement details, full DAG flow visible.",
@@ -64,13 +114,13 @@
       "id": "30e4724f-2b01-4a1b-a1c6-a711d25b5442",
       "slug": "viz-test",
       "type": "test",
-      "status": "active",
+      "status": "completed",
       "parent_ids": [
         "1bf677f7-4975-4cea-a3df-f64230fc5988"
       ],
       "dna_json": "{\"title\":\"Test Visualization Prototype\",\"description\":\"QA role: Verify visualization meets acceptance criteria. Test all features.\",\"test_steps\":[\"Verify web accessibility\",\"Check package/node display\",\"Check station visualization\",\"Test zoom functionality\",\"Verify DAG flow display\"]}",
       "created_at": "2026-02-03 12:03:43",
-      "updated_at": "2026-02-03 12:03:43",
+      "updated_at": "2026-02-03 14:04:38",
       "dna": {
         "title": "Test Visualization Prototype",
         "description": "QA role: Verify visualization meets acceptance criteria. Test all features.",
@@ -80,6 +130,571 @@
           "Check station visualization",
           "Test zoom functionality",
           "Verify DAG flow display"
+        ]
+      }
+    },
+    {
+      "id": "718583ce-da48-474e-b9e6-a325725936af",
+      "slug": "viz-public-access",
+      "type": "requirement",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Make Visualization Publicly Accessible\",\"description\":\"The mindspace visualization at viz/index.html needs to be accessible at http://10.33.33.1 instead of localhost only.\",\"acceptance_criteria\":[\"Visualization accessible at http://10.33.33.1:8080/index.html\",\"Works from any device on VPN network\",\"Server binds to 0.0.0.0 or 10.33.33.1\"],\"priority\":\"high\"}",
+      "created_at": "2026-02-03 14:19:17",
+      "updated_at": "2026-02-03 14:21:38",
+      "dna": {
+        "title": "Make Visualization Publicly Accessible",
+        "description": "The mindspace visualization at viz/index.html needs to be accessible at http://10.33.33.1 instead of localhost only.",
+        "acceptance_criteria": [
+          "Visualization accessible at http://10.33.33.1:8080/index.html",
+          "Works from any device on VPN network",
+          "Server binds to 0.0.0.0 or 10.33.33.1"
+        ],
+        "priority": "high"
+      }
+    },
+    {
+      "id": "27888d8a-f798-41dd-9a17-bf98bcf4de65",
+      "slug": "viz-bind-public",
+      "type": "task",
+      "status": "completed",
+      "parent_ids": [
+        "718583ce-da48-474e-b9e6-a325725936af"
+      ],
+      "dna_json": "{\"title\":\"Bind Visualization Server to Public IP\",\"description\":\"Update the HTTP server to bind to 0.0.0.0:8080 so it is accessible at http://10.33.33.1:8080\",\"requirement_ref\":\"718583ce-da48-474e-b9e6-a325725936af\",\"implementation_hints\":\"python3 -m http.server binds to 0.0.0.0 by default, but may need --bind flag\",\"files_affected\":[\"viz/\"],\"test_url\":\"http://10.33.33.1:8080/index.html\"}",
+      "created_at": "2026-02-03 14:19:17",
+      "updated_at": "2026-02-03 14:21:38",
+      "dna": {
+        "title": "Bind Visualization Server to Public IP",
+        "description": "Update the HTTP server to bind to 0.0.0.0:8080 so it is accessible at http://10.33.33.1:8080",
+        "requirement_ref": "718583ce-da48-474e-b9e6-a325725936af",
+        "implementation_hints": "python3 -m http.server binds to 0.0.0.0 by default, but may need --bind flag",
+        "files_affected": [
+          "viz/"
+        ],
+        "test_url": "http://10.33.33.1:8080/index.html"
+      }
+    },
+    {
+      "id": "3d77b894-ab9c-408f-a4b5-2ef618301116",
+      "slug": "viz-public-test",
+      "type": "test",
+      "status": "completed",
+      "parent_ids": [
+        "27888d8a-f798-41dd-9a17-bf98bcf4de65"
+      ],
+      "dna_json": "{\"title\":\"Verify Public Access\",\"description\":\"Verify visualization is accessible at http://10.33.33.1:8080/index.html\",\"test_steps\":[\"curl http://10.33.33.1:8080/index.html returns valid HTML\",\"All visualization features work at public URL\"],\"task_ref\":\"27888d8a-f798-41dd-9a17-bf98bcf4de65\"}",
+      "created_at": "2026-02-03 14:19:17",
+      "updated_at": "2026-02-03 14:21:38",
+      "dna": {
+        "title": "Verify Public Access",
+        "description": "Verify visualization is accessible at http://10.33.33.1:8080/index.html",
+        "test_steps": [
+          "curl http://10.33.33.1:8080/index.html returns valid HTML",
+          "All visualization features work at public URL"
+        ],
+        "task_ref": "27888d8a-f798-41dd-9a17-bf98bcf4de65"
+      }
+    },
+    {
+      "id": "61beb482-688e-4506-9143-607ebe9b2575",
+      "slug": "viz-fix-public-access",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Fix Visualization Public Access\",\"description\":\"Thomas tested http://10.33.33.1:8080/index.html and got: site not available. The HTTP server may not be running or not bound correctly.\",\"user_feedback\":\"Thomas tested http://10.33.33.1:8080/index.html - site not available\",\"acceptance_criteria\":[\"http://10.33.33.1:8080/index.html returns valid HTML\",\"Server confirmed running and bound to 0.0.0.0:8080\"],\"priority\":\"high\",\"reported_by\":\"Thomas\"}",
+      "created_at": "2026-02-03 14:26:24",
+      "updated_at": "2026-02-03 14:29:31",
+      "dna": {
+        "title": "Fix Visualization Public Access",
+        "description": "Thomas tested http://10.33.33.1:8080/index.html and got: site not available. The HTTP server may not be running or not bound correctly.",
+        "user_feedback": "Thomas tested http://10.33.33.1:8080/index.html - site not available",
+        "acceptance_criteria": [
+          "http://10.33.33.1:8080/index.html returns valid HTML",
+          "Server confirmed running and bound to 0.0.0.0:8080"
+        ],
+        "priority": "high",
+        "reported_by": "Thomas"
+      }
+    },
+    {
+      "id": "70ed3e3e-218d-4d5a-94b7-c23c2794ed8b",
+      "slug": "viz-fix-public-test",
+      "type": "test",
+      "status": "completed",
+      "parent_ids": [
+        "61beb482-688e-4506-9143-607ebe9b2575"
+      ],
+      "dna_json": "{\"title\":\"Verify Public Access Fixed\",\"description\":\"Verify Thomas can access http://10.33.33.1:8080/index.html\",\"test_steps\":[\"curl http://10.33.33.1:8080/index.html returns HTML\",\"Thomas confirms access\"]}",
+      "created_at": "2026-02-03 14:26:24",
+      "updated_at": "2026-02-03 14:26:24",
+      "dna": {
+        "title": "Verify Public Access Fixed",
+        "description": "Verify Thomas can access http://10.33.33.1:8080/index.html",
+        "test_steps": [
+          "curl http://10.33.33.1:8080/index.html returns HTML",
+          "Thomas confirms access"
+        ]
+      }
+    },
+    {
+      "id": "74268904-036e-4bdf-8244-2a6b6b45840a",
+      "slug": "viz-synology-access-test",
+      "type": "test",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Test Visualization Access from Synology NAS\",\"description\":\"Verify the mindspace visualization is accessible from Synology NAS (10.33.33.2) via VPN.\",\"test_steps\":[\"SSH to Synology NAS (10.33.33.2)\",\"Run: curl -s http://10.33.33.1:8080/index.html | head -10\",\"Verify HTML response received\"],\"result\":\"FAILED\",\"failure_reason\":\"UFW firewall blocking port 8080 from VPN. curl: (28) Connection timeout. Fix needed: ufw allow from 10.33.33.0/24 to any port 8080\",\"tested_at\":\"2026-02-03T14:34:28.542Z\"}",
+      "created_at": "2026-02-03 14:31:15",
+      "updated_at": "2026-02-03 14:34:28",
+      "dna": {
+        "title": "Test Visualization Access from Synology NAS",
+        "description": "Verify the mindspace visualization is accessible from Synology NAS (10.33.33.2) via VPN.",
+        "test_steps": [
+          "SSH to Synology NAS (10.33.33.2)",
+          "Run: curl -s http://10.33.33.1:8080/index.html | head -10",
+          "Verify HTML response received"
+        ],
+        "result": "FAILED",
+        "failure_reason": "UFW firewall blocking port 8080 from VPN. curl: (28) Connection timeout. Fix needed: ufw allow from 10.33.33.0/24 to any port 8080",
+        "tested_at": "2026-02-03T14:34:28.542Z"
+      }
+    },
+    {
+      "id": "0ecf4d87-214f-48be-b3fc-cfbdda400ccb",
+      "slug": "viz-ufw-8080",
+      "type": "task",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Add UFW Rule for Visualization Port 8080\",\"description\":\"Add firewall rule to allow visualization access from VPN network. Command: sudo ufw allow from 10.33.33.0/24 to any port 8080 comment \\\"Mindspace viz VPN\\\"\",\"acceptance_criteria\":[\"UFW rule added for port 8080 from 10.33.33.0/24\",\"curl from Synology to 10.33.33.1:8080 returns HTML\"]}",
+      "created_at": "2026-02-03 14:34:28",
+      "updated_at": "2026-02-03 14:34:28",
+      "dna": {
+        "title": "Add UFW Rule for Visualization Port 8080",
+        "description": "Add firewall rule to allow visualization access from VPN network. Command: sudo ufw allow from 10.33.33.0/24 to any port 8080 comment \"Mindspace viz VPN\"",
+        "acceptance_criteria": [
+          "UFW rule added for port 8080 from 10.33.33.0/24",
+          "curl from Synology to 10.33.33.1:8080 returns HTML"
+        ]
+      }
+    },
+    {
+      "id": "806d2fcb-53ed-4909-b950-2c3fa7ca0922",
+      "slug": "process-task-activation",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Define Task Activation Responsibility\",\"description\":\"PDSA AGENT: Analyze and document who activates tasks (pending → active). Current problem: tasks created as pending, Dev only scans active/ready, orchestrator had to manually activate. PROPOSED: PDSA agent activates tasks when design/requirement is complete. Document this in a PDSA, then implement the behavioral change.\",\"problem\":\"Tasks stuck in pending because no one activates them\",\"proposed_solution\":\"PDSA agent transitions task from pending → active when parent design/requirement is completed\",\"deliverables\":[\"PDSA document analyzing the issue\",\"Clear rule: PDSA activates tasks after design approval\",\"Update scan behavior to include activation step\"],\"assigned_to\":\"PDSA+QA agent\"}",
+      "created_at": "2026-02-03 14:50:25",
+      "updated_at": "2026-02-03 14:51:52",
+      "dna": {
+        "title": "Define Task Activation Responsibility",
+        "description": "PDSA AGENT: Analyze and document who activates tasks (pending → active). Current problem: tasks created as pending, Dev only scans active/ready, orchestrator had to manually activate. PROPOSED: PDSA agent activates tasks when design/requirement is complete. Document this in a PDSA, then implement the behavioral change.",
+        "problem": "Tasks stuck in pending because no one activates them",
+        "proposed_solution": "PDSA agent transitions task from pending → active when parent design/requirement is completed",
+        "deliverables": [
+          "PDSA document analyzing the issue",
+          "Clear rule: PDSA activates tasks after design approval",
+          "Update scan behavior to include activation step"
+        ],
+        "assigned_to": "PDSA+QA agent"
+      }
+    },
+    {
+      "id": "cf2c0813-ca9d-4fc5-8072-73e23f7c571b",
+      "slug": "process-role-boundaries",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Fix Role Boundary Violation\",\"description\":\"PDSA AGENT: You violated role boundaries by completing Dev tasks directly. This is NOT allowed. Analyze why this happened and implement safeguards. Even if a task appears trivial or already done, Dev agent must be involved. Document in PDSA, then fix your behavior.\",\"violation_observed\":\"PDSA agent marked task nodes as completed without Dev involvement\",\"rule\":\"PDSA plans and tests. Dev implements. PDSA must NEVER complete task nodes directly.\",\"deliverables\":[\"PDSA document analyzing the violation\",\"Self-imposed safeguard: check node type before completing\",\"If type=task, PDSA cannot mark complete - must wait for Dev\"],\"assigned_to\":\"PDSA+QA agent\"}",
+      "created_at": "2026-02-03 14:50:25",
+      "updated_at": "2026-02-03 14:51:52",
+      "dna": {
+        "title": "Fix Role Boundary Violation",
+        "description": "PDSA AGENT: You violated role boundaries by completing Dev tasks directly. This is NOT allowed. Analyze why this happened and implement safeguards. Even if a task appears trivial or already done, Dev agent must be involved. Document in PDSA, then fix your behavior.",
+        "violation_observed": "PDSA agent marked task nodes as completed without Dev involvement",
+        "rule": "PDSA plans and tests. Dev implements. PDSA must NEVER complete task nodes directly.",
+        "deliverables": [
+          "PDSA document analyzing the violation",
+          "Self-imposed safeguard: check node type before completing",
+          "If type=task, PDSA cannot mark complete - must wait for Dev"
+        ],
+        "assigned_to": "PDSA+QA agent"
+      }
+    },
+    {
+      "id": "6ac36982-dbf8-45fa-82b1-f9e03e95895f",
+      "slug": "viz-structure-fix",
+      "type": "requirement",
+      "status": "cancelled",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Fix Visualization Structure - Stations by Type\",\"description\":\"Current visualization is WRONG. Packages flow through status stations (pending/ready/active/done). CORRECT: Stations should be NODE TYPES (requirement, design, task, test). Packages have status as internal property. Also need: dual-links in package details, meaningful titles.\",\"current_wrong\":\"Stations = statuses (pending, ready, active, done)\",\"correct_model\":\"Stations = types (requirement, design, task, test). Status is property inside each package.\",\"requirements\":[\"Stations are: requirement, design, task, test (and other node types)\",\"Packages show their status as internal property (badge/color)\",\"Package details show dual-links (parent and child references)\",\"Package titles must be meaningful and recognizable\"],\"priority\":\"high\"}",
+      "created_at": "2026-02-03 14:50:25",
+      "updated_at": "2026-02-03 16:05:24",
+      "dna": {
+        "title": "Fix Visualization Structure - Stations by Type",
+        "description": "Current visualization is WRONG. Packages flow through status stations (pending/ready/active/done). CORRECT: Stations should be NODE TYPES (requirement, design, task, test). Packages have status as internal property. Also need: dual-links in package details, meaningful titles.",
+        "current_wrong": "Stations = statuses (pending, ready, active, done)",
+        "correct_model": "Stations = types (requirement, design, task, test). Status is property inside each package.",
+        "requirements": [
+          "Stations are: requirement, design, task, test (and other node types)",
+          "Packages show their status as internal property (badge/color)",
+          "Package details show dual-links (parent and child references)",
+          "Package titles must be meaningful and recognizable"
+        ],
+        "priority": "high"
+      }
+    },
+    {
+      "id": "f96978fc-e89e-4157-a1c5-932df9f193c6",
+      "slug": "viz-structure-design",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [
+        "6ac36982-dbf8-45fa-82b1-f9e03e95895f"
+      ],
+      "dna_json": "{\"title\":\"Design Visualization Structure Fix\",\"description\":\"PDSA: Design the corrected visualization structure. Current is WRONG (stations=statuses). Correct: stations=types, status is property. Include dual-links and meaningful titles.\",\"requirement_ref\":\"6ac36982-dbf8-45fa-82b1-f9e03e95895f\",\"current_wrong\":\"Stations are statuses (pending, ready, active, done)\",\"correct_model\":\"Stations are types (requirement, design, task, test). Each package has status as internal property.\",\"design_requirements\":[\"Stations represent node TYPES not statuses\",\"Each package shows its STATUS as badge/color inside the package\",\"Package details panel shows dual-links (parents and children)\",\"Package titles must be the actual title from dna_json, not slug\"]}",
+      "created_at": "2026-02-03 14:54:54",
+      "updated_at": "2026-02-03 14:56:12",
+      "dna": {
+        "title": "Design Visualization Structure Fix",
+        "description": "PDSA: Design the corrected visualization structure. Current is WRONG (stations=statuses). Correct: stations=types, status is property. Include dual-links and meaningful titles.",
+        "requirement_ref": "6ac36982-dbf8-45fa-82b1-f9e03e95895f",
+        "current_wrong": "Stations are statuses (pending, ready, active, done)",
+        "correct_model": "Stations are types (requirement, design, task, test). Each package has status as internal property.",
+        "design_requirements": [
+          "Stations represent node TYPES not statuses",
+          "Each package shows its STATUS as badge/color inside the package",
+          "Package details panel shows dual-links (parents and children)",
+          "Package titles must be the actual title from dna_json, not slug"
+        ]
+      }
+    },
+    {
+      "id": "4e260991-b0c8-41b3-98dc-68905f093375",
+      "slug": "viz-structure-impl",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [
+        "f96978fc-e89e-4157-a1c5-932df9f193c6"
+      ],
+      "dna_json": "{\"title\":\"Implement Visualization Structure Fix\",\"description\":\"DEV: Implement the corrected visualization per PDSA design.\",\"design_ref\":\"f96978fc-e89e-4157-a1c5-932df9f193c6\",\"requirement_ref\":\"6ac36982-dbf8-45fa-82b1-f9e03e95895f\"}",
+      "created_at": "2026-02-03 14:54:54",
+      "updated_at": "2026-02-03 15:05:25",
+      "dna": {
+        "title": "Implement Visualization Structure Fix",
+        "description": "DEV: Implement the corrected visualization per PDSA design.",
+        "design_ref": "f96978fc-e89e-4157-a1c5-932df9f193c6",
+        "requirement_ref": "6ac36982-dbf8-45fa-82b1-f9e03e95895f"
+      }
+    },
+    {
+      "id": "cef8d22c-f883-46f3-b23b-ca10769e5630",
+      "slug": "roles-pdsa-qa-separation",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Document PDSA and QA as Separate Roles\",\"description\":\"CORRECTION: PDSA and QA are TWO separate roles, not one. Current situation: 1 agent handles both jobs. This is a configuration choice, not a role definition. Document this correctly.\",\"clarification\":{\"wrong\":\"PDSA+QA is one combined role\",\"correct\":\"PDSA and QA are two distinct roles. One agent MAY handle multiple roles based on startup configuration.\"},\"roles\":{\"PDSA\":{\"responsibility\":\"Planning, design, research, PDSA methodology\",\"monitors\":\"design nodes, requirement nodes\",\"does_not\":\"implement code, run final verification tests\"},\"QA\":{\"responsibility\":\"Testing, verification, quality gates\",\"monitors\":\"test nodes\",\"does_not\":\"plan, design, implement\"},\"Dev\":{\"responsibility\":\"Implementation only\",\"monitors\":\"task nodes\",\"does_not\":\"plan, design, test\"}},\"configuration_layer\":\"Terminal startup tells agent which role(s) to monitor. Example: claude instance started with \\\"You are PDSA and QA\\\" monitors both design AND test nodes.\",\"deliverables\":[\"Update process PDSA to reflect separate roles\",\"Document the configuration layer (terminal startup)\",\"Prepare for future: separate agents for each role\"],\"priority\":\"high\"}",
+      "created_at": "2026-02-03 15:04:24",
+      "updated_at": "2026-02-03 15:05:49",
+      "dna": {
+        "title": "Document PDSA and QA as Separate Roles",
+        "description": "CORRECTION: PDSA and QA are TWO separate roles, not one. Current situation: 1 agent handles both jobs. This is a configuration choice, not a role definition. Document this correctly.",
+        "clarification": {
+          "wrong": "PDSA+QA is one combined role",
+          "correct": "PDSA and QA are two distinct roles. One agent MAY handle multiple roles based on startup configuration."
+        },
+        "roles": {
+          "PDSA": {
+            "responsibility": "Planning, design, research, PDSA methodology",
+            "monitors": "design nodes, requirement nodes",
+            "does_not": "implement code, run final verification tests"
+          },
+          "QA": {
+            "responsibility": "Testing, verification, quality gates",
+            "monitors": "test nodes",
+            "does_not": "plan, design, implement"
+          },
+          "Dev": {
+            "responsibility": "Implementation only",
+            "monitors": "task nodes",
+            "does_not": "plan, design, test"
+          }
+        },
+        "configuration_layer": "Terminal startup tells agent which role(s) to monitor. Example: claude instance started with \"You are PDSA and QA\" monitors both design AND test nodes.",
+        "deliverables": [
+          "Update process PDSA to reflect separate roles",
+          "Document the configuration layer (terminal startup)",
+          "Prepare for future: separate agents for each role"
+        ],
+        "priority": "high"
+      }
+    },
+    {
+      "id": "69cf2fd3-e19b-40d9-9e67-a023d75b1ce0",
+      "slug": "viz-dual-links",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Design Clickable Parent and Child Links\",\"description\":\"Add clickable dual links to the package details panel. When a package is selected, show parent links and child links. Clicking a link should navigate to that node.\",\"requirements\":[\"Show parent nodes (from parent_ids) as clickable links\",\"Show child nodes (nodes that reference this one as parent) as clickable links\",\"Clicking a link selects that package and centers view on it\",\"Links should show node title (not just slug)\",\"Visual distinction between parent links and child links\"],\"ui_location\":\"Package details panel (right side)\",\"data_source\":\"parent_ids field contains parent references, query for children\"}",
+      "created_at": "2026-02-03 15:09:21",
+      "updated_at": "2026-02-03 16:05:24",
+      "dna": {
+        "title": "Design Clickable Parent and Child Links",
+        "description": "Add clickable dual links to the package details panel. When a package is selected, show parent links and child links. Clicking a link should navigate to that node.",
+        "requirements": [
+          "Show parent nodes (from parent_ids) as clickable links",
+          "Show child nodes (nodes that reference this one as parent) as clickable links",
+          "Clicking a link selects that package and centers view on it",
+          "Links should show node title (not just slug)",
+          "Visual distinction between parent links and child links"
+        ],
+        "ui_location": "Package details panel (right side)",
+        "data_source": "parent_ids field contains parent references, query for children"
+      }
+    },
+    {
+      "id": "90e7bb6a-c025-4f86-b29a-25dd5327c4ba",
+      "slug": "viz-dual-links-impl",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [
+        "69cf2fd3-e19b-40d9-9e67-a023d75b1ce0"
+      ],
+      "dna_json": "{\"title\":\"Implement Clickable Parent and Child Links\",\"description\":\"Implement dual links per PDSA design in viz/index.html\",\"design_ref\":\"69cf2fd3-e19b-40d9-9e67-a023d75b1ce0\"}",
+      "created_at": "2026-02-03 15:09:21",
+      "updated_at": "2026-02-03 16:05:24",
+      "dna": {
+        "title": "Implement Clickable Parent and Child Links",
+        "description": "Implement dual links per PDSA design in viz/index.html",
+        "design_ref": "69cf2fd3-e19b-40d9-9e67-a023d75b1ce0"
+      }
+    },
+    {
+      "id": "fd1e8f57-7f45-429f-a7c3-7afe9369942c",
+      "slug": "process-acceptance-criteria",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Reflect: Design Must Include Acceptance Criteria\",\"description\":\"PDSA AGENT REFLECTION: The viz-structure-fix design (f96978fc-e89e-4157-a1c5-932df9f193c6) lacked acceptance criteria. Dev agent lost context and implementation did not work correctly. Analyze this failure and optimize the design process.\",\"incident\":{\"design_id\":\"f96978fc-e89e-4157-a1c5-932df9f193c6\",\"problem\":\"Design lacked acceptance criteria\",\"consequence\":\"Dev lost context, implementation incorrect\"},\"reflection_required\":[\"Why were acceptance criteria missing?\",\"How did this cause context loss for Dev?\",\"What is the minimum viable design document?\"],\"optimization_required\":[\"Define mandatory fields for design nodes\",\"Add acceptance_criteria as REQUIRED field\",\"PDSA must verify criteria before marking design complete\",\"Update process PDSA with this learning\"],\"deliverables\":[\"Updated process documentation\",\"Self-check: verify current viz-dual-links design has proper criteria\"]}",
+      "created_at": "2026-02-03 15:11:15",
+      "updated_at": "2026-02-03 15:12:19",
+      "dna": {
+        "title": "Reflect: Design Must Include Acceptance Criteria",
+        "description": "PDSA AGENT REFLECTION: The viz-structure-fix design (f96978fc-e89e-4157-a1c5-932df9f193c6) lacked acceptance criteria. Dev agent lost context and implementation did not work correctly. Analyze this failure and optimize the design process.",
+        "incident": {
+          "design_id": "f96978fc-e89e-4157-a1c5-932df9f193c6",
+          "problem": "Design lacked acceptance criteria",
+          "consequence": "Dev lost context, implementation incorrect"
+        },
+        "reflection_required": [
+          "Why were acceptance criteria missing?",
+          "How did this cause context loss for Dev?",
+          "What is the minimum viable design document?"
+        ],
+        "optimization_required": [
+          "Define mandatory fields for design nodes",
+          "Add acceptance_criteria as REQUIRED field",
+          "PDSA must verify criteria before marking design complete",
+          "Update process PDSA with this learning"
+        ],
+        "deliverables": [
+          "Updated process documentation",
+          "Self-check: verify current viz-dual-links design has proper criteria"
+        ]
+      }
+    },
+    {
+      "id": "3c7b85d5-82cd-4e37-9a40-b07545e5f826",
+      "slug": "viz-agent-stations-live",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Live Agent-Station Visualization with Auto-Update\",\"description\":\"The mindspace visualization needs major enhancements: auto-update, agent-to-station assignments, and human integration.\",\"requirements\":[\"AUTO-UPDATE: Visualization refreshes automatically to show current MCP state\",\"AGENT ASSIGNMENTS: Show which agent is monitoring which station (PDSA→Design, QA→Test, Dev→Task)\",\"MCP STORAGE: Agent assignments stored in MCP database (not just visual)\",\"HUMAN STATION: Add Human as a role/station, Thomas is currently logged in and assigned\",\"MISSING STATES: Current layout incomplete - review and fix station/state coverage\",\"LIVE INDICATOR: Visual showing current agent taking responsibility for each station\"],\"context\":{\"current_agents\":{\"Orchestrator\":\"monitors all, relays tasks\",\"PDSA\":\"monitors Design nodes\",\"QA\":\"monitors Test nodes\",\"Dev\":\"monitors Task nodes\",\"Human (Thomas)\":\"monitors Requirements, approves designs\"},\"current_issue\":\"No visibility into which agent is active on which station\"},\"review_required\":true,\"reviewer\":\"Thomas (Human)\",\"note\":\"PDSA must design this and bring back for Thomas review BEFORE implementation\"}",
+      "created_at": "2026-02-03 15:14:50",
+      "updated_at": "2026-02-03 15:14:50",
+      "dna": {
+        "title": "Live Agent-Station Visualization with Auto-Update",
+        "description": "The mindspace visualization needs major enhancements: auto-update, agent-to-station assignments, and human integration.",
+        "requirements": [
+          "AUTO-UPDATE: Visualization refreshes automatically to show current MCP state",
+          "AGENT ASSIGNMENTS: Show which agent is monitoring which station (PDSA→Design, QA→Test, Dev→Task)",
+          "MCP STORAGE: Agent assignments stored in MCP database (not just visual)",
+          "HUMAN STATION: Add Human as a role/station, Thomas is currently logged in and assigned",
+          "MISSING STATES: Current layout incomplete - review and fix station/state coverage",
+          "LIVE INDICATOR: Visual showing current agent taking responsibility for each station"
+        ],
+        "context": {
+          "current_agents": {
+            "Orchestrator": "monitors all, relays tasks",
+            "PDSA": "monitors Design nodes",
+            "QA": "monitors Test nodes",
+            "Dev": "monitors Task nodes",
+            "Human (Thomas)": "monitors Requirements, approves designs"
+          },
+          "current_issue": "No visibility into which agent is active on which station"
+        },
+        "review_required": true,
+        "reviewer": "Thomas (Human)",
+        "note": "PDSA must design this and bring back for Thomas review BEFORE implementation"
+      }
+    },
+    {
+      "id": "cb60ebda-34b8-4e17-a995-a5b42ddcfc77",
+      "slug": "viz-agent-stations-design",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [
+        "3c7b85d5-82cd-4e37-9a40-b07545e5f826"
+      ],
+      "dna_json": "{\"title\":\"Design: Agent-Station Live Visualization\",\"description\":\"PDSA: Analyze requirement and create detailed design. This REQUIRES Thomas review before implementation.\",\"requirement_ref\":\"3c7b85d5-82cd-4e37-9a40-b07545e5f826\",\"design_tasks\":[\"Define MCP schema for agent assignments (which agent → which station)\",\"Design auto-update mechanism (polling interval, websocket, or SSE)\",\"Design visual representation of agent assignments on stations\",\"Design Human station and how Thomas appears in the system\",\"Review current layout - identify missing states\",\"Create mockup/wireframe of proposed changes\"],\"acceptance_criteria\":[\"Clear schema for storing agent-station assignments in MCP\",\"Auto-update interval defined (e.g., every 5s)\",\"Visual mockup showing agents on their stations\",\"Human role integrated into station view\",\"All missing states identified and addressed\"],\"workflow\":\"Design complete → WAIT for Thomas review → Only then create implementation task\",\"blocker\":\"DO NOT activate implementation task until Thomas approves design\"}",
+      "created_at": "2026-02-03 15:14:50",
+      "updated_at": "2026-02-03 15:16:23",
+      "dna": {
+        "title": "Design: Agent-Station Live Visualization",
+        "description": "PDSA: Analyze requirement and create detailed design. This REQUIRES Thomas review before implementation.",
+        "requirement_ref": "3c7b85d5-82cd-4e37-9a40-b07545e5f826",
+        "design_tasks": [
+          "Define MCP schema for agent assignments (which agent → which station)",
+          "Design auto-update mechanism (polling interval, websocket, or SSE)",
+          "Design visual representation of agent assignments on stations",
+          "Design Human station and how Thomas appears in the system",
+          "Review current layout - identify missing states",
+          "Create mockup/wireframe of proposed changes"
+        ],
+        "acceptance_criteria": [
+          "Clear schema for storing agent-station assignments in MCP",
+          "Auto-update interval defined (e.g., every 5s)",
+          "Visual mockup showing agents on their stations",
+          "Human role integrated into station view",
+          "All missing states identified and addressed"
+        ],
+        "workflow": "Design complete → WAIT for Thomas review → Only then create implementation task",
+        "blocker": "DO NOT activate implementation task until Thomas approves design"
+      }
+    },
+    {
+      "id": "0b2fb618-3bf1-4790-a23b-18d0d8a90a1b",
+      "slug": "viz-agent-stations-redesign",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [
+        "3c7b85d5-82cd-4e37-9a40-b07545e5f826"
+      ],
+      "dna_json": "{\"title\":\"Agent-Station Visualization Redesign (Object-Oriented)\",\"description\":\"Revise the agent-station design based on Thomas feedback. The current design is missing the object-oriented station approach.\",\"thomas_feedback\":{\"verbatim\":\"the website does not know what agent or human is in which station. its a sandbox. it gets loaded by the operator when we start working on a project. that is: 0 tasks at start. orchastrator loads project and station receives object that contains all tasks information, unpacks it and puts information into the column. then when pdsa agent startmonitoring there must be a logon functionality through the mcp server that he is now taking care of a certain role. then the station knows that and assigns the agent on the page for visualisation and so on - think on that line. object orientation. station in a warehouse. objects that are loading self into the station that then can visualze those properties\"},\"requirements\":[\"Station is a sandbox - starts with 0 tasks\",\"Orchestrator loads project -> station receives self-describing objects\",\"Objects unpack themselves and display properties in the column\",\"Agent logon functionality via MCP - agent takes responsibility for a role\",\"Station visualizes which agent is logged into which role\",\"Object-oriented approach - stations receive objects, not just data\"],\"acceptance_criteria\":[\"Design documents station as sandbox concept\",\"Design shows object loading flow (orchestrator -> station -> unpack)\",\"Design includes MCP schema for agent logon\",\"Design shows how station visualizes agent assignments\",\"Design is approved by Thomas before implementation\"],\"previous_design\":\"viz-agent-stations-design\",\"pdsa_ref\":\"docs/pdsa/2026-02-03-viz-agent-stations-design.pdsa.md\"}",
+      "created_at": "2026-02-03 15:25:32",
+      "updated_at": "2026-02-03 15:26:44",
+      "dna": {
+        "title": "Agent-Station Visualization Redesign (Object-Oriented)",
+        "description": "Revise the agent-station design based on Thomas feedback. The current design is missing the object-oriented station approach.",
+        "thomas_feedback": {
+          "verbatim": "the website does not know what agent or human is in which station. its a sandbox. it gets loaded by the operator when we start working on a project. that is: 0 tasks at start. orchastrator loads project and station receives object that contains all tasks information, unpacks it and puts information into the column. then when pdsa agent startmonitoring there must be a logon functionality through the mcp server that he is now taking care of a certain role. then the station knows that and assigns the agent on the page for visualisation and so on - think on that line. object orientation. station in a warehouse. objects that are loading self into the station that then can visualze those properties"
+        },
+        "requirements": [
+          "Station is a sandbox - starts with 0 tasks",
+          "Orchestrator loads project -> station receives self-describing objects",
+          "Objects unpack themselves and display properties in the column",
+          "Agent logon functionality via MCP - agent takes responsibility for a role",
+          "Station visualizes which agent is logged into which role",
+          "Object-oriented approach - stations receive objects, not just data"
+        ],
+        "acceptance_criteria": [
+          "Design documents station as sandbox concept",
+          "Design shows object loading flow (orchestrator -> station -> unpack)",
+          "Design includes MCP schema for agent logon",
+          "Design shows how station visualizes agent assignments",
+          "Design is approved by Thomas before implementation"
+        ],
+        "previous_design": "viz-agent-stations-design",
+        "pdsa_ref": "docs/pdsa/2026-02-03-viz-agent-stations-design.pdsa.md"
+      }
+    },
+    {
+      "id": "c9e9dbf1-bd0e-463b-b54a-ed29596637d2",
+      "slug": "viz-stations-impl",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [
+        "0b2fb618-3bf1-4790-a23b-18d0d8a90a1b"
+      ],
+      "dna_json": "{\"title\":\"Implement Station-Based Visualization\",\"description\":\"Implement the object-oriented station visualization per PDSA design.\",\"pdsa_ref\":\"docs/pdsa/2026-02-03-viz-agent-stations-redesign.pdsa.md\",\"implementation_sequence\":[\"1. Create stations table in SQLite schema\",\"2. Insert 5 default stations (pdsa, dev, qa, orchestrator, human)\",\"3. Update viz/export-data.js to include stations in data.json\",\"4. Refactor viz/index.html to show warehouse layout (stations, queue, completed)\",\"5. Add agent logon display (show agent_id on station when logged on)\",\"6. Add current object display (show loaded object in station)\"],\"acceptance_criteria\":[\"stations table exists with 5 default stations\",\"data.json includes stations array\",\"Visualization shows stations as sandboxes\",\"Queue area shows pending objects\",\"Completed area shows finished objects\",\"Logged-on agents shown on their stations\"],\"files_to_modify\":[\"data/schema.sql or direct SQL\",\"viz/export-data.js\",\"viz/index.html\"]}",
+      "created_at": "2026-02-03 15:28:32",
+      "updated_at": "2026-02-03 15:32:17",
+      "dna": {
+        "title": "Implement Station-Based Visualization",
+        "description": "Implement the object-oriented station visualization per PDSA design.",
+        "pdsa_ref": "docs/pdsa/2026-02-03-viz-agent-stations-redesign.pdsa.md",
+        "implementation_sequence": [
+          "1. Create stations table in SQLite schema",
+          "2. Insert 5 default stations (pdsa, dev, qa, orchestrator, human)",
+          "3. Update viz/export-data.js to include stations in data.json",
+          "4. Refactor viz/index.html to show warehouse layout (stations, queue, completed)",
+          "5. Add agent logon display (show agent_id on station when logged on)",
+          "6. Add current object display (show loaded object in station)"
+        ],
+        "acceptance_criteria": [
+          "stations table exists with 5 default stations",
+          "data.json includes stations array",
+          "Visualization shows stations as sandboxes",
+          "Queue area shows pending objects",
+          "Completed area shows finished objects",
+          "Logged-on agents shown on their stations"
+        ],
+        "files_to_modify": [
+          "data/schema.sql or direct SQL",
+          "viz/export-data.js",
+          "viz/index.html"
+        ]
+      }
+    },
+    {
+      "id": "dbda11a7-3f20-41fa-be59-c764b28a3459",
+      "slug": "dual-link-format-design",
+      "type": "design",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Design Dual Link Format for Cross-References\",\"description\":\"Define the dual link format for PDSA documents and object references. Dual links provide TWO reference formats: (1) Git URL for humans clicking in browsers, (2) Workspace path for agents direct access.\",\"requirements\":[\"Define dual link format: [Title](git-url) | workspace: path\",\"Apply to pdsa_ref, requirement_ref, design_ref fields in DNA\",\"Apply to PDSA document cross-references\",\"Document format in CLAUDE.md for team adoption\"],\"acceptance_criteria\":[\"Dual link format documented\",\"Example: Git: https://github.com/.../file.md | Workspace: /home/.../file.md\",\"Format works for both humans (click git URL) and agents (read workspace path)\"],\"context\":\"This is the ACTUAL dual link feature. Previously confused with parent/child navigation links.\",\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:05:41",
+      "updated_at": "2026-02-03 16:05:41",
+      "dna": {
+        "title": "Design Dual Link Format for Cross-References",
+        "description": "Define the dual link format for PDSA documents and object references. Dual links provide TWO reference formats: (1) Git URL for humans clicking in browsers, (2) Workspace path for agents direct access.",
+        "requirements": [
+          "Define dual link format: [Title](git-url) | workspace: path",
+          "Apply to pdsa_ref, requirement_ref, design_ref fields in DNA",
+          "Apply to PDSA document cross-references",
+          "Document format in CLAUDE.md for team adoption"
+        ],
+        "acceptance_criteria": [
+          "Dual link format documented",
+          "Example: Git: https://github.com/.../file.md | Workspace: /home/.../file.md",
+          "Format works for both humans (click git URL) and agents (read workspace path)"
+        ],
+        "context": "This is the ACTUAL dual link feature. Previously confused with parent/child navigation links.",
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md"
+        }
+      }
+    },
+    {
+      "id": "f8691003-02f5-4492-ae45-e5f558a798a9",
+      "slug": "dual-link-format-impl",
+      "type": "task",
+      "status": "pending",
+      "parent_ids": [
+        "dbda11a7-3f20-41fa-be59-c764b28a3459"
+      ],
+      "dna_json": "{\"title\":\"Implement Dual Links in PDSA Templates\",\"description\":\"Update PDSA document templates and object pdsa_ref fields to use dual link format. Both git URL and workspace path should be provided for all cross-references.\",\"design_ref\":\"dbda11a7-3f20-41fa-be59-c764b28a3459\",\"acceptance_criteria\":[\"PDSA templates include dual link format\",\"Object pdsa_ref fields use dual link format\",\"Existing PDSAs updated with dual link references\"]}",
+      "created_at": "2026-02-03 16:05:41",
+      "updated_at": "2026-02-03 16:05:41",
+      "dna": {
+        "title": "Implement Dual Links in PDSA Templates",
+        "description": "Update PDSA document templates and object pdsa_ref fields to use dual link format. Both git URL and workspace path should be provided for all cross-references.",
+        "design_ref": "dbda11a7-3f20-41fa-be59-c764b28a3459",
+        "acceptance_criteria": [
+          "PDSA templates include dual link format",
+          "Object pdsa_ref fields use dual link format",
+          "Existing PDSAs updated with dual link references"
         ]
       }
     }
