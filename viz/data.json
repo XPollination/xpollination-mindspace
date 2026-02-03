@@ -1,0 +1,87 @@
+{
+  "exported_at": "2026-02-03T14:03:57.404Z",
+  "node_count": 4,
+  "nodes": [
+    {
+      "id": "0e4fdfa9-21b8-4a5b-affd-80f30dfe900d",
+      "slug": "viz-prototype-req",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Mindspace Flow Visualization Prototype\",\"description\":\"Create a web-based visualization of the PM tool flow. Show packages (nodes) moving through stations (statuses). Include: warehouse metaphor, stations visible, zoom into requirement details, full DAG flow visible.\",\"acceptance_criteria\":[\"Web-accessible (localhost or deployed)\",\"Shows nodes as packages in a warehouse\",\"Shows stations (statuses) as areas\",\"Can zoom into node details\",\"Visualizes DAG dependencies\",\"Real-time or refresh to show flow\"],\"priority\":\"high\"}",
+      "created_at": "2026-02-03 12:03:43",
+      "updated_at": "2026-02-03 12:03:43",
+      "dna": {
+        "title": "Mindspace Flow Visualization Prototype",
+        "description": "Create a web-based visualization of the PM tool flow. Show packages (nodes) moving through stations (statuses). Include: warehouse metaphor, stations visible, zoom into requirement details, full DAG flow visible.",
+        "acceptance_criteria": [
+          "Web-accessible (localhost or deployed)",
+          "Shows nodes as packages in a warehouse",
+          "Shows stations (statuses) as areas",
+          "Can zoom into node details",
+          "Visualizes DAG dependencies",
+          "Real-time or refresh to show flow"
+        ],
+        "priority": "high"
+      }
+    },
+    {
+      "id": "1eaa5870-5c7b-4ec4-9f73-232ae818e3f4",
+      "slug": "viz-design",
+      "type": "design",
+      "status": "completed",
+      "parent_ids": [
+        "0e4fdfa9-21b8-4a5b-affd-80f30dfe900d"
+      ],
+      "dna_json": "{\"title\":\"Design Visualization Architecture\",\"description\":\"PDSA agent: Design the visualization approach. Choose tech stack (React, vanilla JS, D3, etc). Define component structure. Create design document.\",\"requirement_ref\":\"0e4fdfa9-21b8-4a5b-affd-80f30dfe900d\"}",
+      "created_at": "2026-02-03 12:03:43",
+      "updated_at": "2026-02-03 13:55:24",
+      "dna": {
+        "title": "Design Visualization Architecture",
+        "description": "PDSA agent: Design the visualization approach. Choose tech stack (React, vanilla JS, D3, etc). Define component structure. Create design document.",
+        "requirement_ref": "0e4fdfa9-21b8-4a5b-affd-80f30dfe900d"
+      }
+    },
+    {
+      "id": "1bf677f7-4975-4cea-a3df-f64230fc5988",
+      "slug": "viz-impl",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [
+        "1eaa5870-5c7b-4ec4-9f73-232ae818e3f4"
+      ],
+      "dna_json": "{\"title\":\"Implement Visualization Prototype\",\"description\":\"Dev agent: Implement the visualization based on PDSA design. Create web app, deploy locally or to server.\",\"design_ref\":\"1eaa5870-5c7b-4ec4-9f73-232ae818e3f4\",\"requirement_ref\":\"0e4fdfa9-21b8-4a5b-affd-80f30dfe900d\"}",
+      "created_at": "2026-02-03 12:03:43",
+      "updated_at": "2026-02-03 14:02:49",
+      "dna": {
+        "title": "Implement Visualization Prototype",
+        "description": "Dev agent: Implement the visualization based on PDSA design. Create web app, deploy locally or to server.",
+        "design_ref": "1eaa5870-5c7b-4ec4-9f73-232ae818e3f4",
+        "requirement_ref": "0e4fdfa9-21b8-4a5b-affd-80f30dfe900d"
+      }
+    },
+    {
+      "id": "30e4724f-2b01-4a1b-a1c6-a711d25b5442",
+      "slug": "viz-test",
+      "type": "test",
+      "status": "active",
+      "parent_ids": [
+        "1bf677f7-4975-4cea-a3df-f64230fc5988"
+      ],
+      "dna_json": "{\"title\":\"Test Visualization Prototype\",\"description\":\"QA role: Verify visualization meets acceptance criteria. Test all features.\",\"test_steps\":[\"Verify web accessibility\",\"Check package/node display\",\"Check station visualization\",\"Test zoom functionality\",\"Verify DAG flow display\"]}",
+      "created_at": "2026-02-03 12:03:43",
+      "updated_at": "2026-02-03 12:03:43",
+      "dna": {
+        "title": "Test Visualization Prototype",
+        "description": "QA role: Verify visualization meets acceptance criteria. Test all features.",
+        "test_steps": [
+          "Verify web accessibility",
+          "Check package/node display",
+          "Check station visualization",
+          "Test zoom functionality",
+          "Verify DAG flow display"
+        ]
+      }
+    }
+  ]
+}
