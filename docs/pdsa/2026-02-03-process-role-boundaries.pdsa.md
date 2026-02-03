@@ -96,3 +96,9 @@ Add to PDSA+QA Role:
 
 ### Immediate Correction
 This violation is acknowledged. Future behavior corrected.
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-process-role-boundaries.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-process-role-boundaries.pdsa.md

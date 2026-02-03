@@ -132,3 +132,9 @@ Implement the above changes in `viz/index.html`:
 ## ACT
 
 (To be filled after review)
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-dual-links.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-dual-links.pdsa.md

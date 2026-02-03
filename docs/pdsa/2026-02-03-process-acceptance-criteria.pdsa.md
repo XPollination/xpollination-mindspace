@@ -124,3 +124,9 @@ Before completing design node, verify:
 
 ### Immediate Action
 This design document itself demonstrates the requirement by including explicit acceptance criteria in the structure definition above.
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-process-acceptance-criteria.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-process-acceptance-criteria.pdsa.md

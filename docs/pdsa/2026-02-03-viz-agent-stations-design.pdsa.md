@@ -186,3 +186,9 @@ Update `data.json` to include:
 ## ACT
 
 (To be filled after review)
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-agent-stations-design.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-agent-stations-design.pdsa.md

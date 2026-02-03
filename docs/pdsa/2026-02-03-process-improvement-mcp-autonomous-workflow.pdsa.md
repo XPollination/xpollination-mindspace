@@ -148,3 +148,9 @@ done
 [15:11] Mark viz-public-* completed
 [15:12] MCP scan → no pending tasks → IDLE
 ```
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-process-improvement-mcp-autonomous-workflow.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-process-improvement-mcp-autonomous-workflow.pdsa.md

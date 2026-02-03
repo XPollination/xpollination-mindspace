@@ -99,3 +99,9 @@ This is a valid, useful feature - just incorrectly named.
 **PDSA Ref (dual format example):**
 - Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md
 - Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-correction-dual-links-misunderstanding.pdsa.md

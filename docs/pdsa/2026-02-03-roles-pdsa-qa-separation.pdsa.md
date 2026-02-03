@@ -150,3 +150,9 @@ Risk areas:
 - Working on design node → PDSA mode
 - Working on test node → QA mode
 ```
+
+---
+
+**PDSA Ref (dual format):**
+- Git: https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-roles-pdsa-qa-separation.pdsa.md
+- Workspace: /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-roles-pdsa-qa-separation.pdsa.md
