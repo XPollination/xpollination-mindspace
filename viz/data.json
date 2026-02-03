@@ -1,8 +1,8 @@
 {
-  "exported_at": "2026-02-03T16:05:46.011Z",
-  "node_count": 26,
-  "queue_count": 3,
-  "active_count": 0,
+  "exported_at": "2026-02-03T16:14:48.217Z",
+  "node_count": 28,
+  "queue_count": 4,
+  "active_count": 1,
   "completed_count": 22,
   "stations": [
     {
@@ -696,6 +696,57 @@
           "Object pdsa_ref fields use dual link format",
           "Existing PDSAs updated with dual link references"
         ]
+      }
+    },
+    {
+      "id": "2e552a57-c185-4eb5-aeca-d4f66b6d7464",
+      "slug": "viz-node-highlight-nav",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Node Highlight and Navigation Visual Feedback\",\"description\":\"Requirements for visualization interactivity:\\n\\n1. When clicking on a node, it needs to HIGHLIGHT (visual feedback)\\n2. When clicking a child link or parent link, it should SWITCH the highlight to the clicked target (follow the navigation)\\n3. Nodes need to be visualized by their current station - when PDSA agent is working on a requirement, it shows in PDSA station, NOT in Queue (pending)\\n\\nThomas's words:\\n> \\\"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\\\"\\n> \\\"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\\\"\",\"priority\":\"high\"}",
+      "created_at": "2026-02-03 16:12:19",
+      "updated_at": "2026-02-03 16:12:19",
+      "dna": {
+        "title": "Node Highlight and Navigation Visual Feedback",
+        "description": "Requirements for visualization interactivity:\n\n1. When clicking on a node, it needs to HIGHLIGHT (visual feedback)\n2. When clicking a child link or parent link, it should SWITCH the highlight to the clicked target (follow the navigation)\n3. Nodes need to be visualized by their current station - when PDSA agent is working on a requirement, it shows in PDSA station, NOT in Queue (pending)\n\nThomas's words:\n> \"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\"\n> \"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\"",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "96083628-2dbc-4488-bcc5-47a9c0a77326",
+      "slug": "viz-node-highlight-nav-design",
+      "type": "design",
+      "status": "active",
+      "parent_ids": [
+        "2e552a57-c185-4eb5-aeca-d4f66b6d7464"
+      ],
+      "dna_json": "{\"title\":\"Design: Node Highlight and Station-Based Visualization\",\"description\":\"PDSA design for node highlight, navigation feedback, and station-based node placement.\",\"requirement_ref\":\"2e552a57-c185-4eb5-aeca-d4f66b6d7464\",\"thomas_feedback\":{\"highlight\":\"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\",\"station_placement\":\"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\"},\"design_sections\":[\"Node highlight visual style\",\"Highlight switching on parent/child navigation\",\"Station-based node placement (active work shows in station, not queue)\"],\"acceptance_criteria\":[\"Clicking node highlights it visually\",\"Clicking parent/child link switches highlight to target\",\"Nodes with active work show in the working station, not Queue\",\"Design approved by Thomas before implementation\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:13:14",
+      "updated_at": "2026-02-03 16:13:14",
+      "dna": {
+        "title": "Design: Node Highlight and Station-Based Visualization",
+        "description": "PDSA design for node highlight, navigation feedback, and station-based node placement.",
+        "requirement_ref": "2e552a57-c185-4eb5-aeca-d4f66b6d7464",
+        "thomas_feedback": {
+          "highlight": "when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target",
+          "station_placement": "when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA"
+        },
+        "design_sections": [
+          "Node highlight visual style",
+          "Highlight switching on parent/child navigation",
+          "Station-based node placement (active work shows in station, not queue)"
+        ],
+        "acceptance_criteria": [
+          "Clicking node highlights it visually",
+          "Clicking parent/child link switches highlight to target",
+          "Nodes with active work show in the working station, not Queue",
+          "Design approved by Thomas before implementation"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md"
+        }
       }
     }
   ]
