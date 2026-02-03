@@ -3,7 +3,7 @@
 **Date:** 2026-02-03
 **Node:** viz-node-highlight-nav-design (96083628-2dbc-4488-bcc5-47a9c0a77326)
 **Type:** Design
-**Status:** AWAITING REVIEW
+**Status:** APPROVED - Ready for Implementation
 **Requirement:** viz-node-highlight-nav (2e552a57-c185-4eb5-aeca-d4f66b6d7464)
 
 ## PLAN
@@ -183,17 +183,32 @@ function renderQueue() {
 
 ---
 
-## Questions for Thomas
+## Thomas's Answers
 
-1. **Highlight style preference?** Border+glow, or different approach?
-2. **Auto-scroll?** When navigating to off-screen node, should view auto-scroll?
-3. **Station empty state?** What to show when a station has no active work?
+| Question | Answer |
+|----------|--------|
+| Highlight style? | **PDSA choice approved: border+glow** |
+| Auto-scroll? | **Yes** - auto-scroll when navigating to off-screen node |
+| Station empty state? | **Leave empty as is** |
 
 ---
 
 ## DO
 
-(Awaiting Thomas review before implementation)
+### Implementation Task Created
+**Node:** `viz-node-highlight-nav-impl`
+**Assigned to:** Dev agent
+
+### Handoff to Dev Agent
+
+Implement in `viz/index.html`:
+
+1. **Node highlight CSS** - Add `.package.selected` style with border+glow
+2. **Selection state** - Track `selectedNodeId`, update on click
+3. **Parent/child navigation** - Switch highlight + auto-scroll to target
+4. **Station-based placement** - Render nodes in stations based on `current_object_id`
+5. **Queue filtering** - Only show unassigned, non-completed nodes
+6. **Auto-scroll** - `scrollIntoView()` when navigating to off-screen node
 
 ## STUDY
 

@@ -1,9 +1,9 @@
 {
-  "exported_at": "2026-02-03T16:14:48.217Z",
-  "node_count": 28,
-  "queue_count": 4,
+  "exported_at": "2026-02-03T16:23:39.304Z",
+  "node_count": 32,
+  "queue_count": 7,
   "active_count": 1,
-  "completed_count": 22,
+  "completed_count": 23,
   "stations": [
     {
       "id": "sta-dev",
@@ -717,13 +717,13 @@
       "id": "96083628-2dbc-4488-bcc5-47a9c0a77326",
       "slug": "viz-node-highlight-nav-design",
       "type": "design",
-      "status": "active",
+      "status": "completed",
       "parent_ids": [
         "2e552a57-c185-4eb5-aeca-d4f66b6d7464"
       ],
-      "dna_json": "{\"title\":\"Design: Node Highlight and Station-Based Visualization\",\"description\":\"PDSA design for node highlight, navigation feedback, and station-based node placement.\",\"requirement_ref\":\"2e552a57-c185-4eb5-aeca-d4f66b6d7464\",\"thomas_feedback\":{\"highlight\":\"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\",\"station_placement\":\"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\"},\"design_sections\":[\"Node highlight visual style\",\"Highlight switching on parent/child navigation\",\"Station-based node placement (active work shows in station, not queue)\"],\"acceptance_criteria\":[\"Clicking node highlights it visually\",\"Clicking parent/child link switches highlight to target\",\"Nodes with active work show in the working station, not Queue\",\"Design approved by Thomas before implementation\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\"}}",
+      "dna_json": "{\"title\":\"Design: Node Highlight and Station-Based Visualization\",\"description\":\"PDSA design for node highlight, navigation feedback, and station-based node placement.\",\"requirement_ref\":\"2e552a57-c185-4eb5-aeca-d4f66b6d7464\",\"thomas_feedback\":{\"highlight\":\"when i am clicking on a node then it needs to highlight. when i am then doing child link or parent link then it shall also switch corresponding to that i have clicked as the next target\",\"station_placement\":\"when the pdsa agent is working on a requirement it is visualized then not in Queue (pending) but in the station PDSA\"},\"design_sections\":[\"Node highlight visual style\",\"Highlight switching on parent/child navigation\",\"Station-based node placement (active work shows in station, not queue)\"],\"acceptance_criteria\":[\"Clicking node highlights it visually\",\"Clicking parent/child link switches highlight to target\",\"Nodes with active work show in the working station, not Queue\",\"Design approved by Thomas before implementation\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\"},\"thomas_answers\":{\"highlight_style\":\"PDSA choice: border+glow\",\"auto_scroll\":\"Yes - auto-scroll when navigating to off-screen node\",\"station_empty_state\":\"Leave empty as is\"}}",
       "created_at": "2026-02-03 16:13:14",
-      "updated_at": "2026-02-03 16:13:14",
+      "updated_at": "2026-02-03 16:23:06",
       "dna": {
         "title": "Design: Node Highlight and Station-Based Visualization",
         "description": "PDSA design for node highlight, navigation feedback, and station-based node placement.",
@@ -746,6 +746,116 @@
         "pdsa_ref": {
           "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md",
           "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md"
+        },
+        "thomas_answers": {
+          "highlight_style": "PDSA choice: border+glow",
+          "auto_scroll": "Yes - auto-scroll when navigating to off-screen node",
+          "station_empty_state": "Leave empty as is"
+        }
+      }
+    },
+    {
+      "id": "ad97adfb-3269-4a23-be05-1cb5870d7786",
+      "slug": "viz-project-dropdown",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Project Dropdown for Multi-Project Support\",\"description\":\"Requirements:\\n\\n1. Top left currently shows \\\"mindspace Warehouse\\\" - this is correct\\n2. Add a DROPDOWN to switch between projects\\n3. List all projects in current workspace (~/workspaces/github/PichlerThomas/)\\n4. Each project with a data/xpollination.db should appear in dropdown\\n\\nThomas's words:\\n> \\\"on the top left there is currently 'mindspace Warehouse' and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\\\"\",\"priority\":\"high\",\"next_task\":\"checkout git@github.com:XPollination/HomePage.git to test multi-project\"}",
+      "created_at": "2026-02-03 16:21:06",
+      "updated_at": "2026-02-03 16:21:06",
+      "dna": {
+        "title": "Project Dropdown for Multi-Project Support",
+        "description": "Requirements:\n\n1. Top left currently shows \"mindspace Warehouse\" - this is correct\n2. Add a DROPDOWN to switch between projects\n3. List all projects in current workspace (~/workspaces/github/PichlerThomas/)\n4. Each project with a data/xpollination.db should appear in dropdown\n\nThomas's words:\n> \"on the top left there is currently 'mindspace Warehouse' and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\"",
+        "priority": "high",
+        "next_task": "checkout git@github.com:XPollination/HomePage.git to test multi-project"
+      }
+    },
+    {
+      "id": "ba0c2a43-d50d-4a78-a80b-82671b0e7e85",
+      "slug": "clone-homepage-test",
+      "type": "task",
+      "status": "pending",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Clone HomePage Repo to Test Multi-Project\",\"description\":\"Task:\\n1. Clone git@github.com:XPollination/HomePage.git to workspace\\n2. Initialize PM database for it\\n3. Test project dropdown switching\\n\\nBlocked by: viz-project-dropdown implementation\",\"git_repo\":\"git@github.com:XPollination/HomePage.git\",\"requirement_ref\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\"}",
+      "created_at": "2026-02-03 16:21:15",
+      "updated_at": "2026-02-03 16:21:15",
+      "dna": {
+        "title": "Clone HomePage Repo to Test Multi-Project",
+        "description": "Task:\n1. Clone git@github.com:XPollination/HomePage.git to workspace\n2. Initialize PM database for it\n3. Test project dropdown switching\n\nBlocked by: viz-project-dropdown implementation",
+        "git_repo": "git@github.com:XPollination/HomePage.git",
+        "requirement_ref": "ad97adfb-3269-4a23-be05-1cb5870d7786"
+      }
+    },
+    {
+      "id": "d3ea7967-8515-4d91-8b57-46dae3e8926b",
+      "slug": "viz-node-highlight-nav-impl",
+      "type": "task",
+      "status": "ready",
+      "parent_ids": [
+        "96083628-2dbc-4488-bcc5-47a9c0a77326"
+      ],
+      "dna_json": "{\"title\":\"Implement Node Highlight and Station-Based Visualization\",\"description\":\"Implement per approved PDSA design: node highlight on click, switch highlight on parent/child navigation, station-based node placement, auto-scroll.\",\"design_ref\":\"96083628-2dbc-4488-bcc5-47a9c0a77326\",\"implementation_tasks\":[\"Add .package.selected CSS with border+glow\",\"Track selectedNodeId state, update on click\",\"Parent/child link click: switch highlight + auto-scroll\",\"Render nodes in stations based on current_object_id\",\"Queue shows only unassigned, non-completed nodes\",\"scrollIntoView() for off-screen navigation targets\"],\"acceptance_criteria\":[\"Clicking node highlights with visible border/glow\",\"Only one node highlighted at a time\",\"Parent/child link click switches highlight to target\",\"Auto-scroll to off-screen nodes\",\"Nodes with station.current_object_id appear in that station\",\"Queue only shows unassigned nodes\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:23:06",
+      "updated_at": "2026-02-03 16:23:06",
+      "dna": {
+        "title": "Implement Node Highlight and Station-Based Visualization",
+        "description": "Implement per approved PDSA design: node highlight on click, switch highlight on parent/child navigation, station-based node placement, auto-scroll.",
+        "design_ref": "96083628-2dbc-4488-bcc5-47a9c0a77326",
+        "implementation_tasks": [
+          "Add .package.selected CSS with border+glow",
+          "Track selectedNodeId state, update on click",
+          "Parent/child link click: switch highlight + auto-scroll",
+          "Render nodes in stations based on current_object_id",
+          "Queue shows only unassigned, non-completed nodes",
+          "scrollIntoView() for off-screen navigation targets"
+        ],
+        "acceptance_criteria": [
+          "Clicking node highlights with visible border/glow",
+          "Only one node highlighted at a time",
+          "Parent/child link click switches highlight to target",
+          "Auto-scroll to off-screen nodes",
+          "Nodes with station.current_object_id appear in that station",
+          "Queue only shows unassigned nodes"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md"
+        }
+      }
+    },
+    {
+      "id": "539dc97d-4fc1-4f5e-93c1-7f7adebda73c",
+      "slug": "viz-project-dropdown-design",
+      "type": "design",
+      "status": "active",
+      "parent_ids": [
+        "ad97adfb-3269-4a23-be05-1cb5870d7786"
+      ],
+      "dna_json": "{\"title\":\"Design: Project Dropdown for Multi-Project Support\",\"description\":\"Design dropdown UI for switching between projects in the visualization.\",\"requirement_ref\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\",\"thomas_feedback\":{\"verbatim\":\"on the top left there is currently \\\"mindspace Warehouse\\\" and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\"},\"design_sections\":[\"Dropdown UI placement (top left, replacing static title)\",\"Project discovery (scan workspace for data/xpollination.db)\",\"Project switching mechanism\",\"Data loading on project change\"],\"acceptance_criteria\":[\"Dropdown shows current project name\",\"Dropdown lists all projects with xpollination.db\",\"Selecting project reloads visualization with that project data\",\"Design approved by Thomas before implementation\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:23:06",
+      "updated_at": "2026-02-03 16:23:06",
+      "dna": {
+        "title": "Design: Project Dropdown for Multi-Project Support",
+        "description": "Design dropdown UI for switching between projects in the visualization.",
+        "requirement_ref": "ad97adfb-3269-4a23-be05-1cb5870d7786",
+        "thomas_feedback": {
+          "verbatim": "on the top left there is currently \"mindspace Warehouse\" and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?"
+        },
+        "design_sections": [
+          "Dropdown UI placement (top left, replacing static title)",
+          "Project discovery (scan workspace for data/xpollination.db)",
+          "Project switching mechanism",
+          "Data loading on project change"
+        ],
+        "acceptance_criteria": [
+          "Dropdown shows current project name",
+          "Dropdown lists all projects with xpollination.db",
+          "Selecting project reloads visualization with that project data",
+          "Design approved by Thomas before implementation"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md"
         }
       }
     }
