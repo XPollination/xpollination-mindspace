@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mindspace Flow Visualization</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .header {
+      background: #16213e;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: #e94560;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .header-controls button {
+      background: #0f3460;
+      border: 1px solid #e94560;
+      color: #e94560;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .header-controls button:hover {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .zoom-controls {
+      display: flex;
+      gap: 5px;
+    }
+
+    .zoom-controls button {
+      width: 30px;
+      padding: 6px;
+    }
+
+    .main-container {
+      display: flex;
+      height: calc(100vh - 50px);
+    }
+
+    .viz-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #warehouse-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #warehouse-svg:active {
+      cursor: grabbing;
+    }
+
+    /* Station styles */
+    .station {
+      fill: #16213e;
+      stroke: #0f3460;
+      stroke-width: 2;
+    }
+
+    .station-label {
+      fill: #888;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Package styles */
+    .package {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .package:hover .package-box {
+      stroke-width: 3;
+      filter: brightness(1.2);
+    }
+
+    .package-box {
+      stroke-width: 2;
+      rx: 6;
+      ry: 6;
+    }
+
+    .package-box.type-requirement {
+      fill: #3b82f6;
+      stroke: #60a5fa;
+    }
+
+    .package-box.type-design {
+      fill: #22c55e;
+      stroke: #4ade80;
+    }
+
+    .package-box.type-task {
+      fill: #eab308;
+      stroke: #facc15;
+    }
+
+    .package-box.type-test {
+      fill: #a855f7;
+      stroke: #c084fc;
+    }
+
+    .package-label {
+      fill: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      pointer-events: none;
+    }
+
+    .package-type-icon {
+      fill: rgba(255,255,255,0.7);
+      font-size: 9px;
+      pointer-events: none;
+    }
+
+    /* Dependency arrows */
+    .dependency-arrow {
+      fill: none;
+      stroke: #e94560;
+      stroke-width: 2;
+      opacity: 0.6;
+    }
+
+    .dependency-arrow:hover {
+      opacity: 1;
+      stroke-width: 3;
+    }
+
+    .arrow-head {
+      fill: #e94560;
+    }
+
+    /* Detail panel */
+    .detail-panel {
+      width: 320px;
+      background: #16213e;
+      border-left: 1px solid #0f3460;
+      padding: 20px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .detail-panel.visible {
+      display: block;
+    }
+
+    .detail-panel h2 {
+      font-size: 16px;
+      color: #e94560;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    .detail-panel .close-btn {
+      float: right;
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .detail-panel .close-btn:hover {
+      color: #e94560;
+    }
+
+    .detail-field {
+      margin-bottom: 12px;
+    }
+
+    .detail-field label {
+      display: block;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .detail-field .value {
+      font-size: 14px;
+      color: #eee;
+    }
+
+    .detail-field .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge.type-requirement { background: #3b82f6; }
+    .badge.type-design { background: #22c55e; }
+    .badge.type-task { background: #eab308; color: #000; }
+    .badge.type-test { background: #a855f7; }
+
+    .badge.status-pending { background: #6b7280; }
+    .badge.status-ready { background: #3b82f6; }
+    .badge.status-active { background: #22c55e; }
+    .badge.status-done { background: #10b981; }
+    .badge.status-completed { background: #10b981; }
+
+    .detail-field .dependencies {
+      list-style: none;
+    }
+
+    .detail-field .dependencies li {
+      padding: 4px 0;
+      font-size: 13px;
+      color: #ccc;
+    }
+
+    .detail-field .dependencies li::before {
+      content: '→ ';
+      color: #e94560;
+    }
+
+    /* Legend */
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(22, 33, 62, 0.95);
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #0f3460;
+    }
+
+    .legend h3 {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+
+    .legend-color.requirement { background: #3b82f6; }
+    .legend-color.design { background: #22c55e; }
+    .legend-color.task { background: #eab308; }
+    .legend-color.test { background: #a855f7; }
+
+    /* Stats bar */
+    .stats-bar {
+      font-size: 12px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Mindspace Flow Visualization</h1>
+    <div class="header-controls">
+      <span class="stats-bar" id="stats">Loading...</span>
+      <div class="zoom-controls">
+        <button id="zoom-in" title="Zoom In">+</button>
+        <button id="zoom-out" title="Zoom Out">−</button>
+        <button id="zoom-reset" title="Reset Zoom">⟲</button>
+      </div>
+      <button id="refresh-btn">Refresh</button>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <div class="viz-container">
+      <svg id="warehouse-svg">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="arrow-head"/>
+          </marker>
+        </defs>
+        <g id="main-group">
+          <g id="stations-layer"></g>
+          <g id="dependencies-layer"></g>
+          <g id="packages-layer"></g>
+        </g>
+      </svg>
+
+      <div class="legend">
+        <h3>Package Types</h3>
+        <div class="legend-item"><div class="legend-color requirement"></div> Requirement</div>
+        <div class="legend-item"><div class="legend-color design"></div> Design</div>
+        <div class="legend-item"><div class="legend-color task"></div> Task</div>
+        <div class="legend-item"><div class="legend-color test"></div> Test</div>
+      </div>
+    </div>
+
+    <div class="detail-panel" id="detail-panel">
+      <button class="close-btn" id="close-detail">×</button>
+      <h2>Package Details</h2>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const CONFIG = {
+      stationWidth: 200,
+      stationHeight: 500,
+      stationGap: 40,
+      stationPadding: 20,
+      packageWidth: 160,
+      packageHeight: 50,
+      packageGap: 15,
+      initialViewBox: { x: -50, y: -50, width: 1000, height: 600 }
+    };
+
+    const STATIONS = ['pending', 'ready', 'active', 'done', 'completed'];
+    const STATION_LABELS = {
+      pending: 'Pending',
+      ready: 'Ready',
+      active: 'Active',
+      done: 'Done',
+      completed: 'Done'
+    };
+
+    // State
+    let nodes = [];
+    let nodePositions = {};
+    let currentViewBox = { ...CONFIG.initialViewBox };
+    let isPanning = false;
+    let panStart = { x: 0, y: 0 };
+
+    // DOM elements
+    const svg = document.getElementById('warehouse-svg');
+    const mainGroup = document.getElementById('main-group');
+    const stationsLayer = document.getElementById('stations-layer');
+    const dependenciesLayer = document.getElementById('dependencies-layer');
+    const packagesLayer = document.getElementById('packages-layer');
+    const detailPanel = document.getElementById('detail-panel');
+    const detailContent = document.getElementById('detail-content');
+    const statsEl = document.getElementById('stats');
+
+    // Initialize viewBox
+    updateViewBox();
+
+    // Load data
+    async function loadData() {
+      try {
+        const response = await fetch('data.json?' + Date.now());
+        const data = await response.json();
+        nodes = data.nodes || [];
+        renderVisualization();
+        updateStats(data);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        statsEl.textContent = 'Error loading data';
+      }
+    }
+
+    function updateStats(data) {
+      const counts = {};
+      nodes.forEach(n => {
+        const status = n.status === 'completed' ? 'done' : n.status;
+        counts[status] = (counts[status] || 0) + 1;
+      });
+      statsEl.textContent = `${data.node_count} packages | ` +
+        `P:${counts.pending || 0} R:${counts.ready || 0} A:${counts.active || 0} D:${(counts.done || 0) + (counts.completed || 0)}`;
+    }
+
+    function renderVisualization() {
+      // Clear layers
+      stationsLayer.innerHTML = '';
+      dependenciesLayer.innerHTML = '';
+      packagesLayer.innerHTML = '';
+      nodePositions = {};
+
+      renderStations();
+      renderPackages();
+      renderDependencies();
+    }
+
+    function renderStations() {
+      const uniqueStations = ['pending', 'ready', 'active', 'done'];
+      uniqueStations.forEach((status, index) => {
+        const x = index * (CONFIG.stationWidth + CONFIG.stationGap);
+        const y = 0;
+
+        // Station background
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('class', 'station');
+        rect.setAttribute('x', x);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', CONFIG.stationWidth);
+        rect.setAttribute('height', CONFIG.stationHeight);
+        rect.setAttribute('rx', 8);
+        stationsLayer.appendChild(rect);
+
+        // Station label
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('class', 'station-label');
+        label.setAttribute('x', x + CONFIG.stationWidth / 2);
+        label.setAttribute('y', y + 25);
+        label.setAttribute('text-anchor', 'middle');
+        label.textContent = STATION_LABELS[status];
+        stationsLayer.appendChild(label);
+      });
+    }
+
+    function renderPackages() {
+      // Group nodes by station
+      const stationNodes = {
+        pending: [],
+        ready: [],
+        active: [],
+        done: []
+      };
+
+      nodes.forEach(node => {
+        const status = node.status === 'completed' ? 'done' : node.status;
+        if (stationNodes[status]) {
+          stationNodes[status].push(node);
+        }
+      });
+
+      // Render packages in each station
+      const uniqueStations = ['pending', 'ready', 'active', 'done'];
+      uniqueStations.forEach((status, stationIndex) => {
+        const stationX = stationIndex * (CONFIG.stationWidth + CONFIG.stationGap);
+        const packageX = stationX + (CONFIG.stationWidth - CONFIG.packageWidth) / 2;
+
+        stationNodes[status].forEach((node, nodeIndex) => {
+          const packageY = 50 + nodeIndex * (CONFIG.packageHeight + CONFIG.packageGap);
+
+          // Store position for dependency arrows
+          nodePositions[node.id] = {
+            x: packageX + CONFIG.packageWidth / 2,
+            y: packageY + CONFIG.packageHeight / 2,
+            left: packageX,
+            right: packageX + CONFIG.packageWidth,
+            top: packageY,
+            bottom: packageY + CONFIG.packageHeight
+          };
+
+          // Create package group
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.setAttribute('class', 'package');
+          g.setAttribute('data-id', node.id);
+          g.onclick = () => showDetail(node);
+
+          // Package box
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('class', `package-box type-${node.type}`);
+          rect.setAttribute('x', packageX);
+          rect.setAttribute('y', packageY);
+          rect.setAttribute('width', CONFIG.packageWidth);
+          rect.setAttribute('height', CONFIG.packageHeight);
+          g.appendChild(rect);
+
+          // Type icon
+          const typeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          typeIcon.setAttribute('class', 'package-type-icon');
+          typeIcon.setAttribute('x', packageX + 8);
+          typeIcon.setAttribute('y', packageY + 15);
+          const icons = { requirement: 'REQ', design: 'DES', task: 'TSK', test: 'TST' };
+          typeIcon.textContent = icons[node.type] || node.type.substring(0, 3).toUpperCase();
+          g.appendChild(typeIcon);
+
+          // Slug label
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('class', 'package-label');
+          label.setAttribute('x', packageX + CONFIG.packageWidth / 2);
+          label.setAttribute('y', packageY + CONFIG.packageHeight / 2 + 5);
+          label.setAttribute('text-anchor', 'middle');
+          label.textContent = truncate(node.slug, 18);
+          g.appendChild(label);
+
+          packagesLayer.appendChild(g);
+        });
+      });
+    }
+
+    function renderDependencies() {
+      nodes.forEach(node => {
+        const parentIds = node.parent_ids || [];
+        parentIds.forEach(parentId => {
+          const from = nodePositions[parentId];
+          const to = nodePositions[node.id];
+
+          if (from && to) {
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('class', 'dependency-arrow');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+
+            // Calculate path (curved arrow from parent to child)
+            const dx = to.x - from.x;
+            const midX = from.x + dx / 2;
+
+            // Determine connection points
+            let startX, startY, endX, endY;
+            if (dx > 0) {
+              // Parent is to the left
+              startX = from.right;
+              startY = from.y;
+              endX = to.left;
+              endY = to.y;
+            } else if (dx < 0) {
+              // Parent is to the right
+              startX = from.left;
+              startY = from.y;
+              endX = to.right;
+              endY = to.y;
+            } else {
+              // Same column (vertical dependency)
+              startX = from.x;
+              startY = from.bottom;
+              endX = to.x;
+              endY = to.top;
+            }
+
+            // Create curved path
+            const controlOffset = Math.abs(dx) / 3 || 30;
+            const d = dx !== 0
+              ? `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`
+              : `M ${startX} ${startY} L ${endX} ${endY}`;
+
+            path.setAttribute('d', d);
+            dependenciesLayer.appendChild(path);
+          }
+        });
+      });
+    }
+
+    function showDetail(node) {
+      detailPanel.classList.add('visible');
+
+      const parentSlugs = (node.parent_ids || []).map(pid => {
+        const parent = nodes.find(n => n.id === pid);
+        return parent ? parent.slug : pid.substring(0, 8) + '...';
+      });
+
+      detailContent.innerHTML = `
+        <div class="detail-field">
+          <label>Slug</label>
+          <div class="value">${node.slug}</div>
+        </div>
+        <div class="detail-field">
+          <label>Type</label>
+          <div class="value"><span class="badge type-${node.type}">${node.type}</span></div>
+        </div>
+        <div class="detail-field">
+          <label>Status</label>
+          <div class="value"><span class="badge status-${node.status}">${node.status}</span></div>
+        </div>
+        <div class="detail-field">
+          <label>ID</label>
+          <div class="value" style="font-family: monospace; font-size: 11px;">${node.id}</div>
+        </div>
+        <div class="detail-field">
+          <label>Dependencies (${parentSlugs.length})</label>
+          ${parentSlugs.length > 0
+            ? `<ul class="dependencies">${parentSlugs.map(s => `<li>${s}</li>`).join('')}</ul>`
+            : '<div class="value" style="color: #666;">None</div>'}
+        </div>
+        <div class="detail-field">
+          <label>Created</label>
+          <div class="value">${formatDate(node.created_at)}</div>
+        </div>
+        <div class="detail-field">
+          <label>Updated</label>
+          <div class="value">${formatDate(node.updated_at)}</div>
+        </div>
+      `;
+    }
+
+    function hideDetail() {
+      detailPanel.classList.remove('visible');
+    }
+
+    // Zoom functions
+    function updateViewBox() {
+      svg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+    }
+
+    function zoom(factor) {
+      const centerX = currentViewBox.x + currentViewBox.width / 2;
+      const centerY = currentViewBox.y + currentViewBox.height / 2;
+
+      currentViewBox.width *= factor;
+      currentViewBox.height *= factor;
+      currentViewBox.x = centerX - currentViewBox.width / 2;
+      currentViewBox.y = centerY - currentViewBox.height / 2;
+
+      updateViewBox();
+    }
+
+    function resetZoom() {
+      currentViewBox = { ...CONFIG.initialViewBox };
+      updateViewBox();
+    }
+
+    // Pan functions
+    svg.addEventListener('mousedown', (e) => {
+      if (e.target === svg || e.target.classList.contains('station')) {
+        isPanning = true;
+        panStart = { x: e.clientX, y: e.clientY };
+      }
+    });
+
+    svg.addEventListener('mousemove', (e) => {
+      if (isPanning) {
+        const dx = (e.clientX - panStart.x) * (currentViewBox.width / svg.clientWidth);
+        const dy = (e.clientY - panStart.y) * (currentViewBox.height / svg.clientHeight);
+
+        currentViewBox.x -= dx;
+        currentViewBox.y -= dy;
+
+        panStart = { x: e.clientX, y: e.clientY };
+        updateViewBox();
+      }
+    });
+
+    svg.addEventListener('mouseup', () => { isPanning = false; });
+    svg.addEventListener('mouseleave', () => { isPanning = false; });
+
+    // Mouse wheel zoom
+    svg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.1 : 0.9;
+      zoom(factor);
+    });
+
+    // Utility functions
+    function truncate(str, len) {
+      return str.length > len ? str.substring(0, len - 1) + '…' : str;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      const d = new Date(dateStr);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Event listeners
+    document.getElementById('zoom-in').onclick = () => zoom(0.8);
+    document.getElementById('zoom-out').onclick = () => zoom(1.25);
+    document.getElementById('zoom-reset').onclick = resetZoom;
+    document.getElementById('refresh-btn').onclick = loadData;
+    document.getElementById('close-detail').onclick = hideDetail;
+
+    // Initial load
+    loadData();
+  </script>
+</body>
+</html>
