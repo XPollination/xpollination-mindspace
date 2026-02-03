@@ -22,9 +22,10 @@ Deep reflection on Vision PDSA documentation while Thomas was away. Identify gap
 | 9.5 | `dc753a4` | mindspace | Handoff file (initial) |
 | **NEW** | `509971f` | mindspace | **Requirements-to-Code Traceability Architecture PDSA (initial 608 lines)** |
 | Iteration 2 | `b8e4d3a` | mindspace | Thomas answers Q-TRACE-1 to Q-TRACE-6, format research |
-| Iteration 3 | `c9271bf` | mindspace | Thomas answers Q-TRACE-7 to Q-TRACE-10, MVP format proposal, 1170+ lines |
+| Iteration 3 | `c9271bf` | mindspace | Thomas answers Q-TRACE-7 to Q-TRACE-10, MVP format proposal |
+| **Iteration 4** | `698ac61` | mindspace | **CRITICAL: Traceability = Mindspace unification, 2000+ lines** |
 
-### Traceability Architecture PDSA — COMPLETE (3 Iterations)
+### Traceability Architecture PDSA — COMPLETE (4 Iterations)
 
 Thomas provided urgent new vision for Q-C (Requirements-to-Code Traceability). This is NOT a simple linking mechanism — it is a full architectural pattern based on biological cells.
 
@@ -79,7 +80,26 @@ export async function initiatePasswordReset(email: string): Promise<ResetResult>
 - Q-TRACE-9: Visualization deferred — query tools first
 - Q-TRACE-10: Static DNA → Living Cell pattern
 
-**Quality Gates:** 22 PASS, 1 PENDING (QG-23: Thomas approval)
+### CRITICAL UNIFICATION (Iteration 4)
+
+Thomas clarified: **"They are the same!"**
+
+> "Think about this scenario: the app is a station in a warehouse. In this case the station is operating the flow (requirement, design...) but it's still only a station. It gives the controller the functionality to always know the status and the next steps. When the systemic process is changed we only change the implementation of the station. Also stations are like sandboxes. They have access to the cells and can perform actions. And when the cell leaves the station the sandbox is in a state as it was entered. Also resilient design."
+
+**The Unified Model:**
+
+| Traceability | Mindspace | ONE System |
+|--------------|-----------|------------|
+| Cell | Node | `mindspace_nodes` row |
+| DNA | DoR/DoD + metadata | Node self-description |
+| Organ | Group | Container node |
+| Core | Project/Milestone | Coordination node |
+| Station | Node type | State machine per type |
+| Sandbox | Isolated execution | No side effects leak |
+
+**This answers Q-D:** MVP stations = 6 core node types (task, group, decision, requirement, design, test)
+
+**Quality Gates:** 27 PASS, 1 PENDING (QG-23: Thomas approval)
 
 ### Documentation Now Includes
 - **Section 15.6**: Structured YAML for all 12 node types with actor/action at each status
@@ -92,7 +112,7 @@ export async function initiatePasswordReset(email: string): Promise<ResetResult>
 Nothing — all work complete. Standing by for Thomas.
 
 ## Blockers
-2 decisions still needed (Q-C fully addressed):
+2 decisions still needed (Q-C and Q-D addressed):
 
 1. **Q-A: DAG or Tree for MVP?**
    - Vision says DAG (multiple parents, DRY principle)
@@ -105,14 +125,15 @@ Nothing — all work complete. Standing by for Thomas.
    - Options: (a) Keep 3-pane, (b) Move to 4 agents
 
 3. ~~**Q-C: Requirements-to-Code Traceability Mechanism?**~~ **COMPLETE**
-   - Full PDSA created (1170+ lines, 3 iterations)
+   - Full PDSA created (2000+ lines, 4 iterations)
    - All Q-TRACE questions answered (Q-TRACE-1 to Q-TRACE-10)
    - MVP format decided: JSON-in-JSDoc
    - **Awaiting Thomas approval (QG-23)**
 
-4. **Q-D: Which Node Types for MVP?**
-   - Vision defines 12 types with different state machines
-   - Options: (a) All 12 types, (b) Subset (task, group, decision) + expand later
+4. ~~**Q-D: Which Node Types for MVP?**~~ **ANSWERED by unification**
+   - Station types = Node types
+   - MVP: 6 stations (task, group, decision, requirement, design, test)
+   - Remaining 6 can be added later without changing architecture
 
 ## Key Decisions
 - Proceeded with status set alignment (Q-E) — assumed YES
@@ -124,17 +145,17 @@ Nothing — all work complete. Standing by for Thomas.
 ## Next Steps
 
 ### When Thomas Returns
-1. **PRIORITY: Approve Traceability Architecture PDSA (QG-23)** — Review the full PDSA (1170+ lines)
-   - Does the architecture capture Thomas's vision?
-   - Is JSON-in-JSDoc the right MVP format?
-   - Is 4-layer validation the right approach?
-2. Answer remaining blocking questions (Q-A: DAG/Tree, Q-B: 4-agents/3-pane, Q-D: Node types)
+1. **PRIORITY: Approve Unified Architecture (QG-23)** — Review the full PDSA (2000+ lines)
+   - Does Traceability = Mindspace capture the vision?
+   - Is Station/Sandbox pattern correct?
+   - Are 6 MVP stations correct (task, group, decision, requirement, design, test)?
+2. Answer remaining blocking questions (Q-A: DAG/Tree, Q-B: 4-agents/3-pane)
 3. After decisions: update MCP Infra PDSA schema for DAG if needed
 4. Proceed to implementation phases:
-   - Phase 1: Build DNA parser (extract `@dna` from JSDoc)
-   - Phase 2: Build DNA validator (4-layer validation)
-   - Phase 3: Build DNA analyzer (coverage, gaps, impact)
-   - Phase 4: Integrate with MCP server as mindspace tools
+   - Phase 1: Implement station state machines in MCP server (M.2)
+   - Phase 2: Add DNA fields to mindspace_nodes schema
+   - Phase 3: Build validation (4-layer) into station transitions
+   - Phase 4: Build analyzer tools (coverage, gaps, impact)
 
 ### Reference
 - `/tmp/pdsa-reflection-2026-02-03.md` — Full analysis from earlier session
@@ -149,7 +170,7 @@ Nothing — all work complete. Standing by for Thomas.
 
 ### xpollination-mindspace
 - `docs/pdsa/2026-02-02-UTC-1300.mindspace-vision.pdsa.md` — Added Section 15.6 + Section 16
-- `docs/pdsa/2026-02-03-UTC-0835.requirements-to-code-traceability-architecture.pdsa.md` — **1170+ lines** (3 iterations complete)
+- `docs/pdsa/2026-02-03-UTC-0835.requirements-to-code-traceability-architecture.pdsa.md` — **2000+ lines** (4 iterations, UNIFIED)
 - `.claude/handoffs/2026-02-03-pdsa-reflection-handoff.md` — This file
 
 ### xpollination-mcp-server
