@@ -1,9 +1,9 @@
 {
-  "exported_at": "2026-02-03T16:23:39.304Z",
-  "node_count": 32,
-  "queue_count": 7,
-  "active_count": 1,
-  "completed_count": 23,
+  "exported_at": "2026-02-03T16:30:11.916Z",
+  "node_count": 37,
+  "queue_count": 10,
+  "active_count": 2,
+  "completed_count": 24,
   "stations": [
     {
       "id": "sta-dev",
@@ -827,13 +827,13 @@
       "id": "539dc97d-4fc1-4f5e-93c1-7f7adebda73c",
       "slug": "viz-project-dropdown-design",
       "type": "design",
-      "status": "active",
+      "status": "completed",
       "parent_ids": [
         "ad97adfb-3269-4a23-be05-1cb5870d7786"
       ],
-      "dna_json": "{\"title\":\"Design: Project Dropdown for Multi-Project Support\",\"description\":\"Design dropdown UI for switching between projects in the visualization.\",\"requirement_ref\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\",\"thomas_feedback\":{\"verbatim\":\"on the top left there is currently \\\"mindspace Warehouse\\\" and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\"},\"design_sections\":[\"Dropdown UI placement (top left, replacing static title)\",\"Project discovery (scan workspace for data/xpollination.db)\",\"Project switching mechanism\",\"Data loading on project change\"],\"acceptance_criteria\":[\"Dropdown shows current project name\",\"Dropdown lists all projects with xpollination.db\",\"Selecting project reloads visualization with that project data\",\"Design approved by Thomas before implementation\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\"}}",
+      "dna_json": "{\"title\":\"Design: Project Dropdown for Multi-Project Support\",\"description\":\"Design dropdown UI for switching between projects in the visualization.\",\"requirement_ref\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\",\"thomas_feedback\":{\"verbatim\":\"on the top left there is currently \\\"mindspace Warehouse\\\" and that is correct for now. but soon i will switch to another project and want to use the same project management system. can you make a drop down with it and have all projects that are in the current workspace put in there?\"},\"design_sections\":[\"Dropdown UI placement (top left, replacing static title)\",\"Project discovery (scan workspace for data/xpollination.db)\",\"Project switching mechanism\",\"Data loading on project change\"],\"acceptance_criteria\":[\"Dropdown shows current project name\",\"Dropdown lists all projects with xpollination.db\",\"Selecting project reloads visualization with that project data\",\"Design approved by Thomas before implementation\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\"},\"thomas_answers\":{\"project_display_name\":\"Folder name\",\"include_empty_projects\":\"Yes\",\"nodejs_server\":\"Yes acceptable - each project spins up own environment, if server exists, add to it\"},\"status\":\"APPROVED\"}",
       "created_at": "2026-02-03 16:23:06",
-      "updated_at": "2026-02-03 16:23:06",
+      "updated_at": "2026-02-03 16:29:10",
       "dna": {
         "title": "Design: Project Dropdown for Multi-Project Support",
         "description": "Design dropdown UI for switching between projects in the visualization.",
@@ -856,6 +856,148 @@
         "pdsa_ref": {
           "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md",
           "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md"
+        },
+        "thomas_answers": {
+          "project_display_name": "Folder name",
+          "include_empty_projects": "Yes",
+          "nodejs_server": "Yes acceptable - each project spins up own environment, if server exists, add to it"
+        },
+        "status": "APPROVED"
+      }
+    },
+    {
+      "id": "27e029da-00cb-4cb4-8954-e8c1cd7cb465",
+      "slug": "viz-search-query",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Search Query for Object Details\",\"description\":\"Requirements:\\n1. Add a search input field on the page\\n2. Search should filter/find nodes by ANY field in \\\"object details\\\"\\n3. Real-time filtering as user types\\n\\nThomas's words:\\n> \\\"a search query on the page as well so i can search for any field in 'object details'\\\"\",\"priority\":\"high\"}",
+      "created_at": "2026-02-03 16:26:36",
+      "updated_at": "2026-02-03 16:26:36",
+      "dna": {
+        "title": "Search Query for Object Details",
+        "description": "Requirements:\n1. Add a search input field on the page\n2. Search should filter/find nodes by ANY field in \"object details\"\n3. Real-time filtering as user types\n\nThomas's words:\n> \"a search query on the page as well so i can search for any field in 'object details'\"",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "03085b5d-9a5b-4d0b-8a78-a39763b6b023",
+      "slug": "viz-auto-refresh",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Auto-Refresh Live Data\",\"description\":\"Requirements:\\n1. Webpage should show latest information automatically\\n2. No manual refresh needed\\n3. Could be polling, WebSocket, or SSE\\n\\nThomas's words:\\n> \\\"ensure that the webpage shows latest information. i needed to refresh manually\\\"\",\"priority\":\"high\"}",
+      "created_at": "2026-02-03 16:26:36",
+      "updated_at": "2026-02-03 16:26:36",
+      "dna": {
+        "title": "Auto-Refresh Live Data",
+        "description": "Requirements:\n1. Webpage should show latest information automatically\n2. No manual refresh needed\n3. Could be polling, WebSocket, or SSE\n\nThomas's words:\n> \"ensure that the webpage shows latest information. i needed to refresh manually\"",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "8c162d3b-f864-43ad-a9ae-e11eaf6cea78",
+      "slug": "viz-project-dropdown-impl",
+      "type": "task",
+      "status": "ready",
+      "parent_ids": [
+        "539dc97d-4fc1-4f5e-93c1-7f7adebda73c"
+      ],
+      "dna_json": "{\"title\":\"Implement Project Dropdown\",\"description\":\"Implement project dropdown per approved PDSA design.\",\"design_ref\":\"539dc97d-4fc1-4f5e-93c1-7f7adebda73c\",\"implementation_tasks\":[\"Add GET /api/projects endpoint to list projects\",\"Add GET /api/data?project=name endpoint\",\"Replace static title with dropdown select\",\"Dynamic data loading on project change\",\"Include all projects (even empty)\",\"Use folder names as display names\"],\"acceptance_criteria\":[\"Dropdown replaces static title\",\"Shows all projects with xpollination.db\",\"Project switch loads new data without page reload\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:29:10",
+      "updated_at": "2026-02-03 16:29:10",
+      "dna": {
+        "title": "Implement Project Dropdown",
+        "description": "Implement project dropdown per approved PDSA design.",
+        "design_ref": "539dc97d-4fc1-4f5e-93c1-7f7adebda73c",
+        "implementation_tasks": [
+          "Add GET /api/projects endpoint to list projects",
+          "Add GET /api/data?project=name endpoint",
+          "Replace static title with dropdown select",
+          "Dynamic data loading on project change",
+          "Include all projects (even empty)",
+          "Use folder names as display names"
+        ],
+        "acceptance_criteria": [
+          "Dropdown replaces static title",
+          "Shows all projects with xpollination.db",
+          "Project switch loads new data without page reload"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md"
+        }
+      }
+    },
+    {
+      "id": "2529c907-b909-42f9-a5b3-2c6cd5f92ba5",
+      "slug": "viz-search-query-design",
+      "type": "design",
+      "status": "active",
+      "parent_ids": [
+        "27e029da-00cb-4cb4-8954-e8c1cd7cb465"
+      ],
+      "dna_json": "{\"title\":\"Design: Search Query for Object Details\",\"description\":\"Design search functionality to filter nodes by any field in object details.\",\"requirement_ref\":\"27e029da-00cb-4cb4-8954-e8c1cd7cb465\",\"thomas_feedback\":{\"verbatim\":\"a search query on the page as well so i can search for any field in \\\"object details\\\"\"},\"design_sections\":[\"Search input UI placement\",\"Real-time filtering logic\",\"Searchable fields (all DNA fields)\",\"Result highlighting\"],\"acceptance_criteria\":[\"Search input visible on page\",\"Filters nodes as user types\",\"Searches all fields in object DNA\",\"Matching nodes highlighted or filtered\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-search-query-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-search-query-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:29:10",
+      "updated_at": "2026-02-03 16:29:10",
+      "dna": {
+        "title": "Design: Search Query for Object Details",
+        "description": "Design search functionality to filter nodes by any field in object details.",
+        "requirement_ref": "27e029da-00cb-4cb4-8954-e8c1cd7cb465",
+        "thomas_feedback": {
+          "verbatim": "a search query on the page as well so i can search for any field in \"object details\""
+        },
+        "design_sections": [
+          "Search input UI placement",
+          "Real-time filtering logic",
+          "Searchable fields (all DNA fields)",
+          "Result highlighting"
+        ],
+        "acceptance_criteria": [
+          "Search input visible on page",
+          "Filters nodes as user types",
+          "Searches all fields in object DNA",
+          "Matching nodes highlighted or filtered"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-search-query-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-search-query-design.pdsa.md"
+        }
+      }
+    },
+    {
+      "id": "c1060cc5-753d-4251-95a0-14c41f5e7761",
+      "slug": "viz-auto-refresh-design",
+      "type": "design",
+      "status": "active",
+      "parent_ids": [
+        "03085b5d-9a5b-4d0b-8a78-a39763b6b023"
+      ],
+      "dna_json": "{\"title\":\"Design: Auto-Refresh Live Data\",\"description\":\"Design auto-refresh mechanism to show latest data without manual refresh.\",\"requirement_ref\":\"03085b5d-9a5b-4d0b-8a78-a39763b6b023\",\"thomas_feedback\":{\"verbatim\":\"ensure that the webpage shows latest information. i needed to refresh manually\"},\"design_sections\":[\"Refresh mechanism (polling vs WebSocket vs SSE)\",\"Refresh interval\",\"Visual indicator of refresh status\",\"Efficient diff-based updates\"],\"acceptance_criteria\":[\"Page shows latest data automatically\",\"No manual refresh needed\",\"Visual indicator when data updates\",\"Efficient (not excessive polling)\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-auto-refresh-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-auto-refresh-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:29:10",
+      "updated_at": "2026-02-03 16:29:10",
+      "dna": {
+        "title": "Design: Auto-Refresh Live Data",
+        "description": "Design auto-refresh mechanism to show latest data without manual refresh.",
+        "requirement_ref": "03085b5d-9a5b-4d0b-8a78-a39763b6b023",
+        "thomas_feedback": {
+          "verbatim": "ensure that the webpage shows latest information. i needed to refresh manually"
+        },
+        "design_sections": [
+          "Refresh mechanism (polling vs WebSocket vs SSE)",
+          "Refresh interval",
+          "Visual indicator of refresh status",
+          "Efficient diff-based updates"
+        ],
+        "acceptance_criteria": [
+          "Page shows latest data automatically",
+          "No manual refresh needed",
+          "Visual indicator when data updates",
+          "Efficient (not excessive polling)"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-auto-refresh-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-auto-refresh-design.pdsa.md"
         }
       }
     }

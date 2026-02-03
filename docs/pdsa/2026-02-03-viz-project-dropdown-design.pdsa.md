@@ -3,7 +3,7 @@
 **Date:** 2026-02-03
 **Node:** viz-project-dropdown-design (539dc97d-4fc1-4f5e-93c1-7f7adebda73c)
 **Type:** Design
-**Status:** AWAITING REVIEW
+**Status:** APPROVED - Ready for Implementation
 **Requirement:** viz-project-dropdown
 
 ## PLAN
@@ -207,17 +207,32 @@ const WORKSPACE_PATH = '/home/developer/workspaces/github/PichlerThomas';
 
 ---
 
-## Questions for Thomas
+## Thomas's Answers
 
-1. **Project display name:** Show folder name (e.g., `xpollination-mcp-server`) or a friendlier name?
-2. **Empty projects:** Include projects with empty databases, or only those with nodes?
-3. **Server requirement:** This needs a Node.js server running - acceptable?
+| Question | Answer |
+|----------|--------|
+| Project display name | **Folder name** |
+| Empty projects | **Yes, include them** |
+| Server requirement | **Yes acceptable** - each project spins up own environment, if server exists, add to it |
 
 ---
 
 ## DO
 
-(Awaiting Thomas review before implementation)
+### Implementation Task Created
+**Node:** `viz-project-dropdown-impl`
+**Assigned to:** Dev agent
+
+### Handoff to Dev Agent
+
+Implement project dropdown:
+
+1. **Server endpoint** - `GET /api/projects` to list projects with xpollination.db
+2. **Server endpoint** - `GET /api/data?project=name` to get project data
+3. **Dropdown UI** - Replace static title with `<select>` dropdown
+4. **Dynamic loading** - On change, fetch new data and re-render (no page reload)
+5. **Include all projects** - Even empty ones (per Thomas)
+6. **Use folder names** - As display names (per Thomas)
 
 ## STUDY
 
