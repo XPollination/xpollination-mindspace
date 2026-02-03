@@ -62,13 +62,13 @@ const NODE_TRANSITIONS: Record<NodeType, Record<NodeStatus, NodeStatus[]>> = {
     cancelled: [] // Terminal state
   },
   group: {
-    pending: ['ready', 'blocked', 'cancelled'],
-    ready: ['active', 'blocked', 'cancelled'],
-    active: ['review', 'blocked', 'cancelled'],
-    review: ['complete', 'rework', 'cancelled'],
-    rework: ['active', 'blocked', 'cancelled'],
+    pending: ['active', 'blocked', 'cancelled'],
+    ready: [],  // Group skips ready
+    active: ['complete', 'blocked', 'cancelled'],
+    review: [],  // NO review for group
+    rework: [],  // NO rework for group
     complete: [],
-    blocked: ['ready', 'cancelled'],
+    blocked: ['active', 'cancelled'],
     cancelled: []
   },
   decision: {
