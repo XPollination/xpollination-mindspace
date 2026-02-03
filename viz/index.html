@@ -266,19 +266,35 @@
       flex-shrink: 0;
     }
 
-    .detail-field .dependencies {
+    .detail-field .node-links {
       list-style: none;
+      margin-top: 4px;
     }
 
-    .detail-field .dependencies li {
+    .detail-field .node-links li {
       padding: 4px 0;
       font-size: 13px;
       color: #ccc;
     }
 
-    .detail-field .dependencies li::before {
-      content: '← ';
+    .detail-field .node-links li.clickable {
+      cursor: pointer;
+      color: #60a5fa;
+    }
+
+    .detail-field .node-links li.clickable:hover {
       color: #e94560;
+      text-decoration: underline;
+    }
+
+    .detail-field .node-links li.parent::before {
+      content: '↑ ';
+      color: #e94560;
+    }
+
+    .detail-field .node-links li.child::before {
+      content: '↓ ';
+      color: #22c55e;
     }
 
     /* Legend - now shows status colors */
@@ -594,9 +610,15 @@
     function showDetail(node) {
       detailPanel.classList.add('visible');
 
+      // Get parent nodes
       const parentNodes = (node.parent_ids || []).map(pid => {
         return nodes.find(n => n.id === pid);
       }).filter(Boolean);
+
+      // Get child nodes (nodes that have this node as a parent)
+      const childNodes = nodes.filter(n =>
+        n.parent_ids && n.parent_ids.includes(node.id)
+      );
 
       const dna = node.dna || {};
       const acceptanceCriteria = dna.acceptance_criteria || [];
@@ -633,10 +655,20 @@
         </div>
         ` : ''}
         <div class="detail-field">
-          <label>Dependencies (${parentNodes.length})</label>
+          <label>Parents (${parentNodes.length})</label>
           ${parentNodes.length > 0
-            ? `<ul class="dependencies">${parentNodes.map(p => `<li>${p.dna?.title || p.slug}</li>`).join('')}</ul>`
+            ? `<ul class="node-links">${parentNodes.map(p =>
+                `<li class="parent clickable" data-id="${p.id}">${p.dna?.title || p.slug}</li>`
+              ).join('')}</ul>`
             : '<div class="value" style="color: #666;">None (root node)</div>'}
+        </div>
+        <div class="detail-field">
+          <label>Children (${childNodes.length})</label>
+          ${childNodes.length > 0
+            ? `<ul class="node-links">${childNodes.map(c =>
+                `<li class="child clickable" data-id="${c.id}">${c.dna?.title || c.slug}</li>`
+              ).join('')}</ul>`
+            : '<div class="value" style="color: #666;">None (leaf node)</div>'}
         </div>
         <div class="detail-field">
           <label>ID</label>
@@ -651,6 +683,14 @@
           <div class="value" style="font-size: 12px; color: #888;">${formatDate(node.updated_at)}</div>
         </div>
       `;
+
+      // Add click handlers for navigation
+      detailContent.querySelectorAll('.clickable').forEach(el => {
+        el.onclick = () => {
+          const targetNode = nodes.find(n => n.id === el.dataset.id);
+          if (targetNode) showDetail(targetNode);
+        };
+      });
     }
 
     function hideDetail() {
