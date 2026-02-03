@@ -215,11 +215,12 @@ describe('TC-2: Station Allows Valid Transitions Per Node Type', () => {
   });
 
   it('TC-2.11: group: pending→active from children', () => {
-    // Note: This tests the transition path, not the child aggregation logic
+    // Group skips ready - goes directly to active when children activate
+    // Per Vision PDSA: group valid statuses are pending, active, complete, blocked, cancelled
     const result = validateTransition({
       nodeType: 'group',
       fromStatus: 'pending',
-      toStatus: 'ready',
+      toStatus: 'active',
       actor: 'system'
     });
     expect(result.allowed).toBe(true);
@@ -360,13 +361,14 @@ describe('TC-4: 6 MVP Stations Work Correctly', () => {
     expect(isTerminalStatus('decision', 'complete')).toBe(true);
   });
 
-  it('TC-4.6: group station - lifecycle (should NOT have review)', () => {
+  it('TC-4.6: group station - lifecycle (NO ready, NO review)', () => {
     // Per Vision PDSA: group has pending, active, complete, blocked, cancelled
-    // Current implementation has review - this is a known issue
-    expect(getValidTransitions('group', 'pending')).toContain('ready');
-    expect(getValidTransitions('group', 'ready')).toContain('active');
-    // The following SHOULD fail but won't with current implementation:
-    // expect(getValidTransitions('group', 'active')).not.toContain('review');
+    // Group skips ready (auto-transitions based on children)
+    // Group has NO review/rework (status derived from children)
+    expect(getValidTransitions('group', 'pending')).toContain('active');
+    expect(getValidTransitions('group', 'pending')).not.toContain('ready');
+    expect(getValidTransitions('group', 'active')).toContain('complete');
+    expect(getValidTransitions('group', 'active')).not.toContain('review');
     expect(isTerminalStatus('group', 'complete')).toBe(true);
   });
 });
