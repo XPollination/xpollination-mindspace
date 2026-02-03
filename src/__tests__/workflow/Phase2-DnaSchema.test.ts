@@ -622,7 +622,7 @@ describe('Integration: Repository DNA validation', () => {
     });
 
     const result = await repo.update('good-node', {
-      dna: { title: '', priority: 'invalid' } as TaskDna
+      dna: { title: '', priority: 'invalid' } as unknown as TaskDna
     });
 
     expect(result.success).toBe(false);
