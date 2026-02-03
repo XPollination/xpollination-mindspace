@@ -10,6 +10,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { FrameRepository } from './repositories/FrameRepository.js';
 import { DraftRepository } from './repositories/DraftRepository.js';
+import { MindspaceNodeRepository } from './repositories/MindspaceNodeRepository.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -19,10 +20,12 @@ export interface DatabaseContext {
   draftRepo: DraftRepository;
   trendRepo: TrendRepository;
   workflowRepo: WorkflowRepository;
+  mindspaceRepo: MindspaceNodeRepository;
 }
 
 export { FrameRepository } from './repositories/FrameRepository.js';
 export { DraftRepository } from './repositories/DraftRepository.js';
+export { MindspaceNodeRepository } from './repositories/MindspaceNodeRepository.js';
 
 export interface TrendRepository {
   create(trend: unknown): Promise<string>;
@@ -57,6 +60,7 @@ export async function initDatabase(): Promise<DatabaseContext> {
   // Create repository instances
   const frameRepo = new FrameRepository(db);
   const draftRepo = new DraftRepository(db);
+  const mindspaceRepo = new MindspaceNodeRepository(db);
 
   const trendRepo: TrendRepository = {
     create: async () => 'not-implemented',
@@ -76,6 +80,7 @@ export async function initDatabase(): Promise<DatabaseContext> {
     frameRepo,
     draftRepo,
     trendRepo,
-    workflowRepo
+    workflowRepo,
+    mindspaceRepo
   };
 }
