@@ -782,7 +782,7 @@
       detailContent.querySelectorAll('.clickable').forEach(el => {
         el.onclick = () => {
           const targetNode = nodes.find(n => n.id === el.dataset.id);
-          if (targetNode) showDetail(targetNode, true);
+          if (targetNode) showDetail(targetNode, false); // auto-scroll disabled per Thomas
         };
       });
     }
