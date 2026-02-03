@@ -116,3 +116,24 @@ CREATE INDEX IF NOT EXISTS idx_trends_frame_status ON trends(frame_id, status);
 CREATE INDEX IF NOT EXISTS idx_drafts_status ON drafts(status);
 CREATE INDEX IF NOT EXISTS idx_workflow_draft ON workflow_state(draft_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_state ON workflow_state(current_state);
+
+-- ============================================
+-- MINDSPACE PM TOOL TABLES
+-- ============================================
+
+-- Mindspace nodes: DAG nodes for project management
+CREATE TABLE IF NOT EXISTS mindspace_nodes (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,              -- task, group, decision, requirement, design, test
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, ready, active, review, rework, complete, blocked, cancelled
+    parent_ids TEXT,                 -- JSON array of parent node IDs (DAG structure)
+    slug TEXT NOT NULL,              -- Human-readable identifier
+    dna_json TEXT NOT NULL,          -- JSON: node DNA (title, description, acceptance_criteria, etc.)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for mindspace queries
+CREATE INDEX IF NOT EXISTS idx_mindspace_type ON mindspace_nodes(type);
+CREATE INDEX IF NOT EXISTS idx_mindspace_status ON mindspace_nodes(status);
+CREATE INDEX IF NOT EXISTS idx_mindspace_slug ON mindspace_nodes(slug);
