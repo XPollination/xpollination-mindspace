@@ -148,6 +148,12 @@
       filter: brightness(1.2);
     }
 
+    .package.selected .package-box {
+      stroke: #e94560;
+      stroke-width: 3;
+      filter: drop-shadow(0 0 12px rgba(233, 69, 96, 0.5));
+    }
+
     .package-box {
       stroke-width: 2;
       rx: 4;
@@ -435,6 +441,7 @@
     let currentViewBox = { ...CONFIG.initialViewBox };
     let isPanning = false;
     let panStart = { x: 0, y: 0 };
+    let selectedNodeId = null;
 
     // DOM elements
     const svg = document.getElementById('warehouse-svg');
@@ -600,7 +607,13 @@
     }
 
     function renderQueue() {
-      const queuedNodes = nodes.filter(n => n.status === 'pending' || n.status === 'ready');
+      // Get IDs of nodes assigned to stations
+      const assignedIds = stations.map(s => s.current_object_id).filter(Boolean);
+      // Queue shows pending/ready nodes that are NOT assigned to a station
+      const queuedNodes = nodes.filter(n =>
+        (n.status === 'pending' || n.status === 'ready') &&
+        !assignedIds.includes(n.id)
+      );
       const startY = LAYOUT.queueY + 40;
       const startX = 15;
 
@@ -642,7 +655,13 @@
     }
 
     function renderCompleted() {
-      const completedNodes = nodes.filter(n => n.status === 'completed' || n.status === 'done');
+      // Get IDs of nodes assigned to stations
+      const assignedIds = stations.map(s => s.current_object_id).filter(Boolean);
+      // Completed shows done/completed nodes that are NOT assigned to a station
+      const completedNodes = nodes.filter(n =>
+        (n.status === 'completed' || n.status === 'done') &&
+        !assignedIds.includes(n.id)
+      );
       const startY = LAYOUT.completedY + 40;
       const startX = 15;
 
@@ -691,7 +710,9 @@
       return el;
     }
 
-    function showDetail(node) {
+    function showDetail(node, doScroll = false) {
+      selectNode(node.id);
+      if (doScroll) scrollToNode(node.id);
       detailPanel.classList.add('visible');
 
       const parentNodes = (node.parent_ids || []).map(pid =>
@@ -761,13 +782,43 @@
       detailContent.querySelectorAll('.clickable').forEach(el => {
         el.onclick = () => {
           const targetNode = nodes.find(n => n.id === el.dataset.id);
-          if (targetNode) showDetail(targetNode);
+          if (targetNode) showDetail(targetNode, true);
         };
       });
     }
 
     function hideDetail() {
       detailPanel.classList.remove('visible');
+    }
+
+    function selectNode(nodeId) {
+      // Remove previous selection
+      document.querySelectorAll('.package.selected').forEach(el =>
+        el.classList.remove('selected')
+      );
+
+      // Add new selection
+      selectedNodeId = nodeId;
+      const el = document.querySelector(`.package[data-id="${nodeId}"]`);
+      if (el) el.classList.add('selected');
+    }
+
+    function scrollToNode(nodeId) {
+      const el = document.querySelector(`.package[data-id="${nodeId}"]`);
+      if (!el) return;
+
+      const rect = el.querySelector('.package-box');
+      if (!rect) return;
+
+      const x = parseFloat(rect.getAttribute('x'));
+      const y = parseFloat(rect.getAttribute('y'));
+      const width = parseFloat(rect.getAttribute('width'));
+      const height = parseFloat(rect.getAttribute('height'));
+
+      // Center the viewBox on this node
+      currentViewBox.x = x + width / 2 - currentViewBox.width / 2;
+      currentViewBox.y = y + height / 2 - currentViewBox.height / 2;
+      updateViewBox();
     }
 
     // Zoom functions
