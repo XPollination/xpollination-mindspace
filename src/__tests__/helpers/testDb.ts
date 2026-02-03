@@ -10,6 +10,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { FrameRepository } from '../../db/repositories/FrameRepository.js';
 import { DraftRepository } from '../../db/repositories/DraftRepository.js';
+import { MindspaceNodeRepository } from '../../db/repositories/MindspaceNodeRepository.js';
 import type { DatabaseContext } from '../../db/client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -29,6 +30,7 @@ export function createTestDb(): DatabaseContext {
   // Create repositories
   const frameRepo = new FrameRepository(db);
   const draftRepo = new DraftRepository(db);
+  const mindspaceRepo = new MindspaceNodeRepository(db);
 
   // Stub repositories for trends and workflow
   const trendRepo = {
@@ -49,7 +51,8 @@ export function createTestDb(): DatabaseContext {
     frameRepo,
     draftRepo,
     trendRepo,
-    workflowRepo
+    workflowRepo,
+    mindspaceRepo
   };
 }
 
