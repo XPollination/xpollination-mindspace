@@ -28,10 +28,30 @@
       border-bottom: 1px solid #0f3460;
     }
 
-    .header h1 {
-      font-size: 18px;
-      font-weight: 500;
+    .project-dropdown {
+      background: #16213e;
       color: #e94560;
+      border: 1px solid #e94560;
+      padding: 6px 12px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .project-dropdown:hover {
+      background: #1a2744;
+    }
+
+    .project-dropdown:focus {
+      box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.3);
+    }
+
+    .header-subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-left: 8px;
     }
 
     .header-controls {
@@ -369,7 +389,10 @@
 </head>
 <body>
   <div class="header">
-    <h1>Mindspace Warehouse</h1>
+    <select id="project-selector" class="project-dropdown">
+      <option value="">Loading...</option>
+    </select>
+    <span class="header-subtitle">Warehouse</span>
     <div class="header-controls">
       <span class="stats-bar" id="stats">Loading...</span>
       <div class="zoom-controls">
@@ -452,12 +475,59 @@
     const detailPanel = document.getElementById('detail-panel');
     const detailContent = document.getElementById('detail-content');
     const statsEl = document.getElementById('stats');
+    const projectSelector = document.getElementById('project-selector');
+
+    let currentProject = null;
 
     // Initialize viewBox
     updateViewBox();
 
-    // Load data
+    // Load projects list
+    async function loadProjects() {
+      try {
+        const response = await fetch('/api/projects');
+        const data = await response.json();
+
+        projectSelector.innerHTML = '';
+        data.projects.forEach(project => {
+          const option = document.createElement('option');
+          option.value = project.name;
+          option.textContent = project.name;
+          if (project.name === data.current) {
+            option.selected = true;
+            currentProject = project.name;
+          }
+          projectSelector.appendChild(option);
+        });
+
+        // Load data for current project
+        await loadData();
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        // Fallback to static data.json
+        projectSelector.innerHTML = '<option>Local</option>';
+        await loadDataStatic();
+      }
+    }
+
+    // Load data from API
     async function loadData() {
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const response = await fetch('/api/data' + projectParam);
+        const data = await response.json();
+        nodes = data.nodes || [];
+        stations = data.stations || [];
+        renderVisualization();
+        updateStats(data);
+      } catch (error) {
+        console.error('Failed to load data from API:', error);
+        await loadDataStatic();
+      }
+    }
+
+    // Fallback: load static data.json
+    async function loadDataStatic() {
       try {
         const response = await fetch('data.json?' + Date.now());
         const data = await response.json();
@@ -881,8 +951,16 @@
     document.getElementById('refresh-btn').onclick = loadData;
     document.getElementById('close-detail').onclick = hideDetail;
 
+    // Project change handler
+    projectSelector.onchange = async (e) => {
+      currentProject = e.target.value;
+      hideDetail();
+      selectedNodeId = null;
+      await loadData();
+    };
+
     // Initial load
-    loadData();
+    loadProjects();
   </script>
 </body>
 </html>
