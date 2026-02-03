@@ -1,9 +1,9 @@
 {
-  "exported_at": "2026-02-03T16:30:11.916Z",
-  "node_count": 37,
-  "queue_count": 10,
-  "active_count": 2,
-  "completed_count": 24,
+  "exported_at": "2026-02-03T16:44:24.328Z",
+  "node_count": 40,
+  "queue_count": 8,
+  "active_count": 3,
+  "completed_count": 28,
   "stations": [
     {
       "id": "sta-dev",
@@ -774,11 +774,11 @@
       "id": "ba0c2a43-d50d-4a78-a80b-82671b0e7e85",
       "slug": "clone-homepage-test",
       "type": "task",
-      "status": "pending",
+      "status": "done",
       "parent_ids": [],
       "dna_json": "{\"title\":\"Clone HomePage Repo to Test Multi-Project\",\"description\":\"Task:\\n1. Clone git@github.com:XPollination/HomePage.git to workspace\\n2. Initialize PM database for it\\n3. Test project dropdown switching\\n\\nBlocked by: viz-project-dropdown implementation\",\"git_repo\":\"git@github.com:XPollination/HomePage.git\",\"requirement_ref\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\"}",
       "created_at": "2026-02-03 16:21:15",
-      "updated_at": "2026-02-03 16:21:15",
+      "updated_at": "2026-02-03 16:44:18",
       "dna": {
         "title": "Clone HomePage Repo to Test Multi-Project",
         "description": "Task:\n1. Clone git@github.com:XPollination/HomePage.git to workspace\n2. Initialize PM database for it\n3. Test project dropdown switching\n\nBlocked by: viz-project-dropdown implementation",
@@ -790,13 +790,13 @@
       "id": "d3ea7967-8515-4d91-8b57-46dae3e8926b",
       "slug": "viz-node-highlight-nav-impl",
       "type": "task",
-      "status": "ready",
+      "status": "done",
       "parent_ids": [
         "96083628-2dbc-4488-bcc5-47a9c0a77326"
       ],
       "dna_json": "{\"title\":\"Implement Node Highlight and Station-Based Visualization\",\"description\":\"Implement per approved PDSA design: node highlight on click, switch highlight on parent/child navigation, station-based node placement, auto-scroll.\",\"design_ref\":\"96083628-2dbc-4488-bcc5-47a9c0a77326\",\"implementation_tasks\":[\"Add .package.selected CSS with border+glow\",\"Track selectedNodeId state, update on click\",\"Parent/child link click: switch highlight + auto-scroll\",\"Render nodes in stations based on current_object_id\",\"Queue shows only unassigned, non-completed nodes\",\"scrollIntoView() for off-screen navigation targets\"],\"acceptance_criteria\":[\"Clicking node highlights with visible border/glow\",\"Only one node highlighted at a time\",\"Parent/child link click switches highlight to target\",\"Auto-scroll to off-screen nodes\",\"Nodes with station.current_object_id appear in that station\",\"Queue only shows unassigned nodes\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-node-highlight-nav-design.pdsa.md\"}}",
       "created_at": "2026-02-03 16:23:06",
-      "updated_at": "2026-02-03 16:23:06",
+      "updated_at": "2026-02-03 16:44:23",
       "dna": {
         "title": "Implement Node Highlight and Station-Based Visualization",
         "description": "Implement per approved PDSA design: node highlight on click, switch highlight on parent/child navigation, station-based node placement, auto-scroll.",
@@ -899,13 +899,13 @@
       "id": "8c162d3b-f864-43ad-a9ae-e11eaf6cea78",
       "slug": "viz-project-dropdown-impl",
       "type": "task",
-      "status": "ready",
+      "status": "done",
       "parent_ids": [
         "539dc97d-4fc1-4f5e-93c1-7f7adebda73c"
       ],
       "dna_json": "{\"title\":\"Implement Project Dropdown\",\"description\":\"Implement project dropdown per approved PDSA design.\",\"design_ref\":\"539dc97d-4fc1-4f5e-93c1-7f7adebda73c\",\"implementation_tasks\":[\"Add GET /api/projects endpoint to list projects\",\"Add GET /api/data?project=name endpoint\",\"Replace static title with dropdown select\",\"Dynamic data loading on project change\",\"Include all projects (even empty)\",\"Use folder names as display names\"],\"acceptance_criteria\":[\"Dropdown replaces static title\",\"Shows all projects with xpollination.db\",\"Project switch loads new data without page reload\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-project-dropdown-design.pdsa.md\"}}",
       "created_at": "2026-02-03 16:29:10",
-      "updated_at": "2026-02-03 16:29:10",
+      "updated_at": "2026-02-03 16:44:23",
       "dna": {
         "title": "Implement Project Dropdown",
         "description": "Implement project dropdown per approved PDSA design.",
@@ -998,6 +998,80 @@
         "pdsa_ref": {
           "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-viz-auto-refresh-design.pdsa.md",
           "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-viz-auto-refresh-design.pdsa.md"
+        }
+      }
+    },
+    {
+      "id": "494b0184-d168-4f17-b4b5-796bc8726cb0",
+      "slug": "viz-disable-autoscroll",
+      "type": "task",
+      "status": "done",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Change Request: Disable scrollToNode\",\"description\":\"Thomas feedback: scrollToNode is not good. \\n\\nAction:\\n1. Disable auto-scroll functionality (keep code for later activation)\\n2. Document the change\\n\\nNote: Code can remain, just deactivate. May enable later.\",\"type\":\"change_request\",\"priority\":\"high\"}",
+      "created_at": "2026-02-03 16:34:26",
+      "updated_at": "2026-02-03 16:44:23",
+      "dna": {
+        "title": "Change Request: Disable scrollToNode",
+        "description": "Thomas feedback: scrollToNode is not good. \n\nAction:\n1. Disable auto-scroll functionality (keep code for later activation)\n2. Document the change\n\nNote: Code can remain, just deactivate. May enable later.",
+        "type": "change_request",
+        "priority": "high"
+      }
+    },
+    {
+      "id": "35b0de4a-d8d7-4ab7-b6b1-5407c3310d5a",
+      "slug": "onboard-homepage-project",
+      "type": "requirement",
+      "status": "ready",
+      "parent_ids": [],
+      "dna_json": "{\"title\":\"Onboard HomePage Project to PM System\",\"description\":\"Task for PDSA agent:\\n\\n1. After Dev clones git@github.com:XPollination/HomePage.git\\n2. Set up the project for PM system per ad97adfb-3269-4a23-be05-1cb5870d7786 (Project Dropdown requirement)\\n3. Initialize xpollination.db in the HomePage project\\n4. Verify it appears in the viz project dropdown\\n\\nContext:\\n- Project dropdown implementation complete (f9b1361)\\n- Viz server scans workspace for projects with data/xpollination.db\\n- Each project needs its own database initialized\\n\\nThomas's words:\\n> \\\"how to onboard the project homepage (i already provided link, add it to the context). task contains checking out the project and set it up as described in task ad97adfb\\\"\",\"priority\":\"high\",\"related_task\":\"ad97adfb-3269-4a23-be05-1cb5870d7786\",\"git_repo\":\"git@github.com:XPollination/HomePage.git\"}",
+      "created_at": "2026-02-03 16:41:51",
+      "updated_at": "2026-02-03 16:41:51",
+      "dna": {
+        "title": "Onboard HomePage Project to PM System",
+        "description": "Task for PDSA agent:\n\n1. After Dev clones git@github.com:XPollination/HomePage.git\n2. Set up the project for PM system per ad97adfb-3269-4a23-be05-1cb5870d7786 (Project Dropdown requirement)\n3. Initialize xpollination.db in the HomePage project\n4. Verify it appears in the viz project dropdown\n\nContext:\n- Project dropdown implementation complete (f9b1361)\n- Viz server scans workspace for projects with data/xpollination.db\n- Each project needs its own database initialized\n\nThomas's words:\n> \"how to onboard the project homepage (i already provided link, add it to the context). task contains checking out the project and set it up as described in task ad97adfb\"",
+        "priority": "high",
+        "related_task": "ad97adfb-3269-4a23-be05-1cb5870d7786",
+        "git_repo": "git@github.com:XPollination/HomePage.git"
+      }
+    },
+    {
+      "id": "7f6b1d69-d026-4573-a384-04889846352c",
+      "slug": "onboard-homepage-design",
+      "type": "design",
+      "status": "active",
+      "parent_ids": [
+        "35b0de4a-d8d7-4ab7-b6b1-5407c3310d5a"
+      ],
+      "dna_json": "{\"title\":\"Design: Onboard HomePage Project to PM System\",\"description\":\"Design the process to initialize HomePage project for the PM visualization system.\",\"requirement_ref\":\"35b0de4a-d8d7-4ab7-b6b1-5407c3310d5a\",\"thomas_feedback\":{\"verbatim\":\"how to onboard the project homepage (i already provided link, add it to the context). task contains checking out the project and set it up as described in task ad97adfb\"},\"current_state\":{\"homepage_cloned\":true,\"path\":\"/home/developer/workspaces/github/PichlerThomas/HomePage\",\"data_dir_exists\":true,\"db_exists\":false},\"design_sections\":[\"Database initialization (copy schema from mcp-server)\",\"Verification steps\",\"First nodes to create in HomePage\"],\"acceptance_criteria\":[\"HomePage has data/xpollination.db initialized\",\"Database has same schema as mcp-server\",\"HomePage appears in project dropdown\",\"Can switch to HomePage in visualization\"],\"pdsa_ref\":{\"git\":\"https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-onboard-homepage-design.pdsa.md\",\"workspace\":\"/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-onboard-homepage-design.pdsa.md\"}}",
+      "created_at": "2026-02-03 16:43:53",
+      "updated_at": "2026-02-03 16:43:53",
+      "dna": {
+        "title": "Design: Onboard HomePage Project to PM System",
+        "description": "Design the process to initialize HomePage project for the PM visualization system.",
+        "requirement_ref": "35b0de4a-d8d7-4ab7-b6b1-5407c3310d5a",
+        "thomas_feedback": {
+          "verbatim": "how to onboard the project homepage (i already provided link, add it to the context). task contains checking out the project and set it up as described in task ad97adfb"
+        },
+        "current_state": {
+          "homepage_cloned": true,
+          "path": "/home/developer/workspaces/github/PichlerThomas/HomePage",
+          "data_dir_exists": true,
+          "db_exists": false
+        },
+        "design_sections": [
+          "Database initialization (copy schema from mcp-server)",
+          "Verification steps",
+          "First nodes to create in HomePage"
+        ],
+        "acceptance_criteria": [
+          "HomePage has data/xpollination.db initialized",
+          "Database has same schema as mcp-server",
+          "HomePage appears in project dropdown",
+          "Can switch to HomePage in visualization"
+        ],
+        "pdsa_ref": {
+          "git": "https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/2026-02-03-onboard-homepage-design.pdsa.md",
+          "workspace": "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/docs/pdsa/2026-02-03-onboard-homepage-design.pdsa.md"
         }
       }
     }
