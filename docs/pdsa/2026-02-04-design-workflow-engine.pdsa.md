@@ -4,7 +4,7 @@
 **Node:** design-workflow-engine (910b3601-b5d0-429c-97fb-054c868dec32)
 **Type:** Design
 **Status:** ACTIVE
-**Iteration:** 5 (add viz status visibility requirement)
+**Iteration:** 6 (add missing role enforcement code + lesson learned)
 
 ## PLAN
 
@@ -21,6 +21,17 @@ LIAISON currently acts as a manual workflow engine. Design to automate.
 | 3 | complete used twice | Added `approved` status |
 | 4 | Content dropped | Restore validateCreate, CRITICAL PRINCIPLE, add immutability |
 | 5 | Viz missing statuses | Add AC for viz showing all 10 statuses |
+| 6 | Role code missing | Add validateTransition() with role enforcement |
+
+### Iteration 6 Explanation
+
+**Why were items missed in iterations 3-5?**
+
+PDSA agent treated "update PDSA" as "rewrite PDSA" instead of "add to PDSA". Summary/replacement approach caused items to be dropped without verification.
+
+**Lesson learned file created:** `/home/developer/.claude/lessons-learned/pdsa-feedback-tracking.md`
+
+**Process fix:** Before submitting, verify EACH feedback item is verifiably present in PDSA.
 
 ---
 
@@ -118,6 +129,78 @@ function validateCreate(type) {
   if (!['task', 'bug'].includes(type)) {
     throw new Error(`Invalid type: ${type}. Only 'task' and 'bug' allowed.`);
   }
+}
+```
+
+### validateTransition() Function with ROLE ENFORCEMENT (NEW - Iteration 6)
+
+**This is the ACTUAL CODE, not just a description.**
+
+```javascript
+function validateTransition(type, fromStatus, toStatus, actor, currentRole) {
+  const key = `${fromStatus}->${toStatus}`;
+  const typeRules = ALLOWED_TRANSITIONS[type];
+
+  // REJECT: Unknown type
+  if (!typeRules) {
+    throw new Error(`Invalid type: ${type}. Only 'task' and 'bug' allowed.`);
+  }
+
+  // REJECT: Undefined transition
+  const rule = typeRules[key];
+  if (!rule) {
+    throw new Error(`Transition ${key} not allowed for type ${type}.`);
+  }
+
+  // REJECT: Wrong actor
+  if (!rule.actor.includes(actor)) {
+    throw new Error(`Actor '${actor}' cannot perform ${key}. Allowed: ${rule.actor.join(', ')}`);
+  }
+
+  // ROLE ENFORCEMENT - CRITICAL
+  // Only the assigned role can claim (ready→active)
+  if (key === 'ready->active') {
+    if (actor !== currentRole && actor !== 'system') {
+      throw new Error(
+        `Role mismatch: Only role '${currentRole}' can claim this task. ` +
+        `Actor '${actor}' attempted to claim.`
+      );
+    }
+  }
+
+  return {
+    allowed: true,
+    setRole: rule.setRole,
+    message: `Transition ${key} allowed for actor ${actor}`
+  };
+}
+```
+
+**Integration in interface-cli.js transition command:**
+
+```javascript
+function cmdTransition(id, newStatus, actor) {
+  const node = getNode(id);
+  const dna = JSON.parse(node.dna_json);
+  const currentRole = dna.role || 'system';
+
+  // Call validator with role enforcement
+  const result = validateTransition(
+    node.type,
+    node.status,
+    newStatus,
+    actor,
+    currentRole
+  );
+
+  // If setRole is specified, update the DNA
+  if (result.setRole) {
+    dna.role = result.setRole;
+    updateDna(id, { role: result.setRole });
+  }
+
+  // Proceed with transition
+  performTransition(node.id, newStatus);
 }
 ```
 
