@@ -91,6 +91,12 @@ describe('AC1: ALLOWED_TRANSITIONS whitelist', () => {
       expect(result).toBeNull();
     });
 
+    it('rejects pending->ready for dev (dev not in allowedActors)', () => {
+      const result = validateTransition('bug', 'pending', 'ready', 'dev', null);
+      expect(result).toContain('not allowed');
+      expect(result).toContain('Allowed: liaison, pdsa, system');
+    });
+
     it('allows ready->active for dev', () => {
       const result = validateTransition('bug', 'ready', 'active', 'dev', 'dev');
       expect(result).toBeNull();
