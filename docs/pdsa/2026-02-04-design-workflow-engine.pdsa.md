@@ -419,6 +419,7 @@ If validation is enabled before migration, existing tasks will fail operations.
 9. **Add `approved` status** - to VALID_STATUSES
 10. **Viz: Show all 10 statuses** - add ACTIVE section, AWAITING section, color all statuses
 11. **Type migration** - run migration script BEFORE enabling TypeValidator
+12. **BUG FIX: review→rework must set newRole: dev** - Found by QA 2026-02-04. When QA sends task back for rework, the role must change to dev so dev agent can pick it up. Add `newRole: 'dev'` to `review->rework` transition in ALLOWED_TRANSITIONS for both task and bug types.
 
 ---
 
