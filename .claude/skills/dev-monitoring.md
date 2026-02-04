@@ -23,8 +23,8 @@ Monitor multiple projects in the workspace for implementation tasks assigned to 
 
 ### What to Monitor
 
-1. **Ready Tasks** (status: `ready`, type: `task`)
-   - Filter for `role: dev` OR no role specified
+1. **Ready Items with role:dev** (status: `ready`, any type)
+   - Query: `WHERE status='ready' AND dna_json LIKE '%role":"dev%'`
    - Process highest priority first
 
 2. **Task Fields**
@@ -61,25 +61,21 @@ function checkProjects() {
       const db = new Database(project.path, { readonly: true });
 
       const tasks = db.prepare(`
-        SELECT slug, status,
+        SELECT slug, type, status,
                json_extract(dna_json, '$.title') as title,
-               json_extract(dna_json, '$.role') as role,
                json_extract(dna_json, '$.priority') as priority
         FROM mindspace_nodes
-        WHERE type = 'task' AND status = 'ready'
+        WHERE status = 'ready' AND dna_json LIKE '%role":"dev%'
       `).all();
 
-      // Filter for DEV tasks (role:dev or no role)
-      const forDev = tasks.filter(t => !t.role || t.role === 'dev');
-
-      if (forDev.length > 0) {
-        console.log(`[${project.name}] ${forDev.length} DEV task(s):`);
-        forDev.forEach(t => {
-          console.log(`  - ${t.slug}: ${t.title || '(no title)'}`);
+      if (tasks.length > 0) {
+        console.log(`[${project.name}] ${tasks.length} DEV item(s):`);
+        tasks.forEach(t => {
+          console.log(`  - ${t.slug} (${t.type}): ${t.title || '(no title)'}`);
           devTasks.push({project: project.name, ...t});
         });
       } else {
-        console.log(`[${project.name}] No DEV tasks`);
+        console.log(`[${project.name}] No DEV items`);
       }
 
       db.close();
