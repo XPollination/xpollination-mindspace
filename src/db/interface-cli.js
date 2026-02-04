@@ -20,6 +20,7 @@
 
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
+import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -70,6 +71,81 @@ const PERMISSIONS = {
     transitions: 'all'
   }
 };
+
+// Valid roles
+const VALID_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator'];
+
+// DNA Field Validators - reject invalid data at write time
+const FIELD_VALIDATORS = {
+  // Validate status field
+  status: (value) => {
+    if (!VALID_STATUSES.includes(value)) {
+      return `Invalid status: "${value}". Valid: ${VALID_STATUSES.join(', ')}`;
+    }
+    return null;
+  },
+
+  // Validate role field
+  role: (value) => {
+    if (!VALID_ROLES.includes(value)) {
+      return `Invalid role: "${value}". Valid: ${VALID_ROLES.join(', ')}`;
+    }
+    return null;
+  },
+
+  // Validate pdsa_file field (must be existing file path)
+  pdsa_file: (value) => {
+    if (typeof value !== 'string') {
+      return `pdsa_file must be a string path`;
+    }
+    if (!existsSync(value)) {
+      return `pdsa_file does not exist: "${value}"`;
+    }
+    if (!value.endsWith('.pdsa.md')) {
+      return `pdsa_file must end with .pdsa.md: "${value}"`;
+    }
+    return null;
+  },
+
+  // Validate pdsa_ref field (must be object with git and/or workspace)
+  pdsa_ref: (value) => {
+    if (typeof value === 'string') {
+      return `pdsa_ref must be an object {git, workspace}, not a string. Got: "${value}"`;
+    }
+    if (typeof value !== 'object' || value === null) {
+      return `pdsa_ref must be an object {git, workspace}`;
+    }
+    if (!value.git && !value.workspace) {
+      return `pdsa_ref must have at least git or workspace property`;
+    }
+    if (value.git && !value.git.endsWith('.pdsa.md')) {
+      return `pdsa_ref.git must end with .pdsa.md: "${value.git}"`;
+    }
+    if (value.workspace && !value.workspace.endsWith('.pdsa.md')) {
+      return `pdsa_ref.workspace must end with .pdsa.md: "${value.workspace}"`;
+    }
+    if (value.workspace && !existsSync(value.workspace)) {
+      return `pdsa_ref.workspace file does not exist: "${value.workspace}"`;
+    }
+    return null;
+  }
+};
+
+// Validate DNA fields before write
+function validateDnaFields(dna) {
+  const errors = [];
+
+  for (const [field, validator] of Object.entries(FIELD_VALIDATORS)) {
+    if (dna[field] !== undefined) {
+      const errorMsg = validator(dna[field]);
+      if (errorMsg) {
+        errors.push(errorMsg);
+      }
+    }
+  }
+
+  return errors;
+}
 
 function getDb() {
   const dbPath = process.env.DATABASE_PATH || join(__dirname, '../../data/xpollination.db');
@@ -217,6 +293,12 @@ function cmdUpdateDna(id, dnaJson, actor) {
     error(`Invalid JSON: ${e.message}`);
   }
 
+  // Validate DNA fields before write
+  const validationErrors = validateDnaFields(dna);
+  if (validationErrors.length > 0) {
+    error(`Validation failed:\n${validationErrors.join('\n')}`);
+  }
+
   const db = getDb();
 
   // Get current node
@@ -254,6 +336,12 @@ function cmdCreate(type, slug, dnaJson, actor) {
     dna = JSON.parse(dnaJson);
   } catch (e) {
     error(`Invalid JSON: ${e.message}`);
+  }
+
+  // Validate DNA fields before write
+  const validationErrors = validateDnaFields(dna);
+  if (validationErrors.length > 0) {
+    error(`Validation failed:\n${validationErrors.join('\n')}`);
   }
 
   const db = getDb();
