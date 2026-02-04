@@ -964,7 +964,7 @@
       const assignedIds = stations.map(s => s.current_object_id).filter(Boolean);
       // Completed shows done/completed nodes that are NOT assigned to a station AND match search
       const completedNodes = nodes.filter(n =>
-        (n.status === 'completed' || n.status === 'done') &&
+        (n.status === 'complete' || n.status === 'completed' || n.status === 'done') &&
         !assignedIds.includes(n.id) &&
         matchesSearch(n, searchQuery)
       );
