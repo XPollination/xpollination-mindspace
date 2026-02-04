@@ -56,7 +56,8 @@ const stations = db.prepare(`
 // Count objects by status
 const queueCount = parsedNodes.filter(n => n.status === 'pending' || n.status === 'ready').length;
 const activeCount = parsedNodes.filter(n => n.status === 'active').length;
-const completedCount = parsedNodes.filter(n => n.status === 'complete' || n.status === 'completed' || n.status === 'done').length;
+const postWorkStatuses = ['complete', 'completed', 'done', 'review', 'rework', 'blocked', 'cancelled'];
+const completedCount = parsedNodes.filter(n => postWorkStatuses.includes(n.status)).length;
 
 const output = {
   exported_at: new Date().toISOString(),

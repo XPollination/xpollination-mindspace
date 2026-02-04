@@ -278,9 +278,25 @@
     }
 
     .package-box.status-done,
-    .package-box.status-completed {
+    .package-box.status-completed,
+    .package-box.status-complete {
       fill: #14b8a6;
       stroke: #2dd4bf;
+    }
+
+    .package-box.status-rework {
+      fill: #ef4444;
+      stroke: #f87171;
+    }
+
+    .package-box.status-blocked {
+      fill: #dc2626;
+      stroke: #ef4444;
+    }
+
+    .package-box.status-cancelled {
+      fill: #9ca3af;
+      stroke: #d1d5db;
     }
 
     .package-label {
@@ -371,8 +387,12 @@
     .badge.status-ready { background: #3b82f6; }
     .badge.status-active { background: #22c55e; }
     .badge.status-review { background: #f59e0b; }
+    .badge.status-rework { background: #ef4444; }
+    .badge.status-complete { background: #14b8a6; }
     .badge.status-done { background: #14b8a6; }
     .badge.status-completed { background: #14b8a6; }
+    .badge.status-blocked { background: #dc2626; }
+    .badge.status-cancelled { background: #9ca3af; }
 
     .detail-field .criteria-list {
       list-style: none;
@@ -822,7 +842,7 @@
         class: 'area-label',
         x: 10, y: LAYOUT.completedY + 20
       });
-      completedLabel.textContent = 'COMPLETED';
+      completedLabel.textContent = 'POST-WORK (review/complete/blocked)';
       areasLayer.appendChild(completedLabel);
     }
 
@@ -962,9 +982,10 @@
     function renderCompleted() {
       // Get IDs of nodes assigned to stations
       const assignedIds = stations.map(s => s.current_object_id).filter(Boolean);
-      // Completed shows done/completed nodes that are NOT assigned to a station AND match search
+      // Post-work statuses: complete, done, review, rework, blocked, cancelled
+      const postWorkStatuses = ['complete', 'completed', 'done', 'review', 'rework', 'blocked', 'cancelled'];
       const completedNodes = nodes.filter(n =>
-        (n.status === 'complete' || n.status === 'completed' || n.status === 'done') &&
+        postWorkStatuses.includes(n.status) &&
         !assignedIds.includes(n.id) &&
         matchesSearch(n, searchQuery)
       );
