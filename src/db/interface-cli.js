@@ -20,7 +20,7 @@
 
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
-import { existsSync } from 'fs';
+import { existsSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -94,7 +94,7 @@ const ALLOWED_TRANSITIONS = {
     'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
     'active->review': { allowedActors: ['dev'], newRole: 'qa' },
     'review->complete': { allowedActors: ['pdsa', 'qa'] },
-    'review->rework': { allowedActors: ['pdsa', 'qa'] },
+    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
     'rework->active': { allowedActors: ['dev'] },
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system'] },
@@ -106,7 +106,7 @@ const ALLOWED_TRANSITIONS = {
     'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
     'active->review': { allowedActors: ['dev'], newRole: 'qa' },
     'review->complete': { allowedActors: ['pdsa', 'qa'] },
-    'review->rework': { allowedActors: ['pdsa', 'qa'] },
+    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
     'rework->active': { allowedActors: ['dev'] },
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system'] },
@@ -392,6 +392,20 @@ function cmdTransition(id, newStatus, actor) {
 
   if (newRole && newRole !== currentRole) {
     result.roleChanged = { from: currentRole, to: newRole };
+  }
+
+  // NotificationService: Write to /tmp/human-notification.json on approval transition
+  if (newStatus === 'approval') {
+    const notification = {
+      timestamp: new Date().toISOString(),
+      node_id: node.id,
+      slug: node.slug,
+      title: updatedDna.title || node.slug,
+      requires: 'Thomas approval',
+      link: `viz/index.html?id=${node.id}`
+    };
+    writeFileSync('/tmp/human-notification.json', JSON.stringify(notification, null, 2));
+    result.notification = 'Written to /tmp/human-notification.json';
   }
 
   output(result);
