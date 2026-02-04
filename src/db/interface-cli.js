@@ -24,12 +24,18 @@ import { existsSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Import workflow engine (testable module)
+import {
+  VALID_STATUSES,
+  VALID_TYPES,
+  VALID_ROLES,
+  ALLOWED_TRANSITIONS,
+  validateTransition,
+  getNewRoleForTransition,
+  validateType
+} from './workflow-engine.js';
 
-// Valid statuses (no 'd' in complete!)
-// approval = human gate (Thomas reviews design)
-// approved = design approved, ready for dev release
-const VALID_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 'review', 'rework', 'complete', 'blocked', 'cancelled'];
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
@@ -73,94 +79,6 @@ const PERMISSIONS = {
     transitions: 'all'
   }
 };
-
-// Valid roles
-const VALID_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator'];
-
-// Valid types (simplified: only task and bug)
-const VALID_TYPES = ['task', 'bug'];
-
-// CRITICAL PRINCIPLE: If the system does not PREVENT it, it WILL happen.
-// ALLOWED_TRANSITIONS whitelist - any undefined transition is REJECTED
-const ALLOWED_TRANSITIONS = {
-  // Task flow (requires PDSA first)
-  'task': {
-    'pending->ready': { allowedActors: ['liaison', 'system'], newRole: 'pdsa' },
-    'ready->active': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
-    'active->approval': { allowedActors: ['pdsa'] },
-    'approval->approved': { allowedActors: ['liaison', 'thomas'] },
-    'approval->rework': { allowedActors: ['liaison', 'thomas'] },
-    'approved->ready': { allowedActors: ['liaison', 'system'], newRole: 'dev' },
-    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
-    'active->review': { allowedActors: ['dev'], newRole: 'qa' },
-    'review->complete': { allowedActors: ['pdsa', 'qa'] },
-    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
-    'rework->active': { allowedActors: ['dev'] },
-    // Special transitions
-    'any->blocked': { allowedActors: ['liaison', 'system'] },
-    'any->cancelled': { allowedActors: ['liaison', 'system'] }
-  },
-  // Bug flow (can bypass PDSA)
-  'bug': {
-    'pending->ready': { allowedActors: ['liaison', 'pdsa', 'system'], newRole: 'dev' },
-    'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
-    'active->review': { allowedActors: ['dev'], newRole: 'qa' },
-    'review->complete': { allowedActors: ['pdsa', 'qa'] },
-    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
-    'rework->active': { allowedActors: ['dev'] },
-    // Special transitions
-    'any->blocked': { allowedActors: ['liaison', 'system'] },
-    'any->cancelled': { allowedActors: ['liaison', 'system'] }
-  }
-};
-
-// Validate transition against whitelist
-function validateTransition(nodeType, fromStatus, toStatus, actor, currentRole) {
-  const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
-  if (!typeTransitions) {
-    return `Invalid type: ${nodeType}. Allowed: ${VALID_TYPES.join(', ')}`;
-  }
-
-  const transitionKey = `${fromStatus}->${toStatus}`;
-  let rule = typeTransitions[transitionKey];
-
-  // Check for role-specific transition (e.g., ready->active:dev)
-  if (!rule && currentRole) {
-    rule = typeTransitions[`${transitionKey}:${currentRole}`];
-  }
-
-  // Check for 'any' transitions (blocked, cancelled)
-  if (!rule) {
-    rule = typeTransitions[`any->${toStatus}`];
-  }
-
-  if (!rule) {
-    return `Transition ${transitionKey} not allowed for type=${nodeType}. Undefined transitions are PROHIBITED.`;
-  }
-
-  // Check actor permission
-  if (!rule.allowedActors.includes(actor) && !rule.allowedActors.includes('system')) {
-    return `Actor ${actor} not allowed for transition ${transitionKey}. Allowed: ${rule.allowedActors.join(', ')}`;
-  }
-
-  // Check role requirement for claim (ready->active)
-  if (rule.requireRole && currentRole !== rule.requireRole) {
-    return `Only role=${rule.requireRole} can claim this task. Current role: ${currentRole}`;
-  }
-
-  return null; // Valid
-}
-
-// Get new role for transition (if role should change)
-function getNewRoleForTransition(nodeType, fromStatus, toStatus) {
-  const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
-  if (!typeTransitions) return null;
-
-  const transitionKey = `${fromStatus}->${toStatus}`;
-  const rule = typeTransitions[transitionKey];
-
-  return rule?.newRole || null;
-}
 
 // DNA Field Validators - reject invalid data at write time
 const FIELD_VALIDATORS = {
