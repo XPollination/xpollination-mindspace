@@ -4,6 +4,7 @@
 **Node:** design-workflow-engine (910b3601-b5d0-429c-97fb-054c868dec32)
 **Type:** Design
 **Status:** ACTIVE
+**Iteration:** 2 (rework from Thomas/LIAISON feedback)
 
 ## PLAN
 
@@ -18,26 +19,18 @@ LIAISON currently acts as a manual workflow engine:
 
 This manual process is BY DESIGN to learn what an automated workflow engine needs.
 
-### Critical Gap Identified
-
-Current "review" status is ambiguous:
-1. PDSA design awaiting HUMAN approval (before dev starts)
-2. Dev implementation awaiting QA verification (after dev finishes)
-
-These are different quality gates with different actors.
-
-### Goals
+### Goals (Updated)
 
 - AC1: Document current manual workflow patterns observed
 - AC2: Propose status enhancement for design approval gate
-- AC3: Define complete state machine with type-aware rules
+- AC3: Define complete state machine with **SIMPLIFIED types (bug, task only)**
 - AC4: Specify actor permissions for each transition
 - AC5: Design human notification mechanism for approval gates
 - AC6: Propose workflow engine architecture
 - AC7: Thomas reviews and approves before implementation
-- AC-NEW: Workflow engine automatically transitions role when phase changes
-- AC-NEW: Define single-storyline model (phase-based OR parent-child)
-- AC-NEW: Enforce claim step (only target role can set ready→active)
+- **AC-REWORK-1:** PROHIBIT undefined transitions (validation at write time)
+- **AC-REWORK-2:** Add role column to transition table
+- **AC-REWORK-3:** Remove requirement/design/test types
 
 ---
 
@@ -46,12 +39,6 @@ These are different quality gates with different actors.
 ### AC1: Current Manual Workflow Patterns
 
 **Observed flow:** LIAISON polls → finds status change → routes to next actor → monitors → reports
-
-**Manual tasks:**
-- Status transition
-- Routing between agents
-- Spelling/field fixes
-- Progress reports
 
 **Pain points:**
 - High token usage for polling
@@ -64,143 +51,206 @@ These are different quality gates with different actors.
 
 **Rationale:** Distinguish human design approval from QA technical review
 
-**Usage:** Design nodes go:
-```
-pending → ready → active → approval (wait for Thomas) → complete
-```
-Then dev task created.
+### AC3: Complete State Machine (SIMPLIFIED - Iteration 2)
 
-### AC3: Complete State Machine
+**Issue Types: ONLY TWO**
+| Type | Description | PDSA Required? |
+|------|-------------|----------------|
+| `task` | New work, feature, requirement | YES - must go through PDSA |
+| `bug` | Fix for known issue | NO - can bypass to dev |
 
 **Statuses:**
 - `pending` - Not yet released
 - `ready` - Available for claiming
 - `active` - Being worked on
-- `approval` - Awaiting human approval (design only)
-- `review` - Awaiting QA review (task only)
+- `approval` - Awaiting human approval (task only)
+- `review` - Awaiting QA review
 - `rework` - Needs revision
 - `complete` - Done
 - `blocked` - Cannot proceed
 - `cancelled` - Abandoned
 
-**Transitions by type:**
+### AC3 + AC-REWORK-2: Transition Table with Role Changes
 
-| Type | Transition | Actor | Description |
-|------|------------|-------|-------------|
-| design | pending→ready | LIAISON | Release for PDSA |
-| design | ready→active | PDSA | PDSA claims |
-| design | active→approval | PDSA | PDSA submits design |
-| design | approval→complete | Thomas | Thomas approves |
-| design | approval→rework | Thomas | Thomas requests changes |
-| design | rework→active | PDSA | PDSA revises |
-| task | pending→ready | PDSA/LIAISON | Release for dev |
-| task | ready→active | Dev | Dev claims |
-| task | active→review | Dev | Dev submits implementation |
-| task | review→complete | QA | QA approves |
-| task | review→rework | QA | QA requests changes |
-| task | rework→active | Dev | Dev revises |
+**Type: task (requires PDSA)**
 
-### AC4: Actor Permission Matrix
+| From | To | Actor | Role Change | Description |
+|------|-----|-------|-------------|-------------|
+| pending | ready | liaison/system | → pdsa | Release for PDSA research |
+| ready | active | pdsa | (stays pdsa) | PDSA claims task |
+| active | approval | pdsa | (stays pdsa) | PDSA submits design, awaits Thomas |
+| approval | complete | thomas | → dev | Thomas approves, ready for dev |
+| approval | rework | thomas | (stays pdsa) | Thomas requests changes |
+| rework | active | pdsa | (stays pdsa) | PDSA revises |
+| complete | ready | system | → dev | Auto-release for dev (post-approval) |
+| ready | active | dev | (stays dev) | Dev claims implementation |
+| active | review | dev | → qa | Dev submits, awaits QA |
+| review | complete | qa | (stays qa) | QA approves |
+| review | rework | qa | → dev | QA requests changes |
+| rework | active | dev | (stays dev) | Dev revises |
 
-| Actor | Allowed Transitions |
-|-------|---------------------|
-| liaison | pending→ready, any→cancelled, any→blocked |
+**Type: bug (bypasses PDSA)**
+
+| From | To | Actor | Role Change | Description |
+|------|-----|-------|-------------|-------------|
+| pending | ready | liaison/system | → dev | Direct to dev (PDSA bypassed) |
+| ready | active | dev | (stays dev) | Dev claims |
+| active | review | dev | → qa | Dev submits fix |
+| review | complete | qa | (stays qa) | QA approves |
+| review | rework | qa | → dev | QA requests changes |
+| rework | active | dev | (stays dev) | Dev revises |
+
+### AC-REWORK-1: PROHIBIT Undefined Transitions
+
+**CRITICAL PRINCIPLE:** If the system does not PREVENT it, it WILL happen.
+
+**Implementation:**
+
+```javascript
+// In TransitionValidator
+const ALLOWED_TRANSITIONS = {
+  task: {
+    'pending->ready': { actor: ['liaison', 'system'], setRole: 'pdsa' },
+    'ready->active': { actor: ['pdsa', 'dev'], setRole: null }, // actor must match current role
+    'active->approval': { actor: ['pdsa'], setRole: null },
+    'approval->complete': { actor: ['thomas'], setRole: 'dev' },
+    'approval->rework': { actor: ['thomas'], setRole: null },
+    'rework->active': { actor: ['pdsa', 'dev'], setRole: null },
+    'complete->ready': { actor: ['system'], setRole: 'dev' }, // post-approval auto-release
+    'active->review': { actor: ['dev'], setRole: 'qa' },
+    'review->complete': { actor: ['qa'], setRole: null },
+    'review->rework': { actor: ['qa'], setRole: 'dev' }
+  },
+  bug: {
+    'pending->ready': { actor: ['liaison', 'system'], setRole: 'dev' },
+    'ready->active': { actor: ['dev'], setRole: null },
+    'active->review': { actor: ['dev'], setRole: 'qa' },
+    'review->complete': { actor: ['qa'], setRole: null },
+    'review->rework': { actor: ['qa'], setRole: 'dev' },
+    'rework->active': { actor: ['dev'], setRole: null }
+  }
+};
+
+function validateTransition(type, fromStatus, toStatus, actor, currentRole) {
+  const key = `${fromStatus}->${toStatus}`;
+  const typeRules = ALLOWED_TRANSITIONS[type];
+
+  // REJECT: Unknown type
+  if (!typeRules) {
+    throw new Error(`Invalid type: ${type}. Only 'task' and 'bug' allowed.`);
+  }
+
+  // REJECT: Undefined transition
+  const rule = typeRules[key];
+  if (!rule) {
+    throw new Error(`Transition ${key} not allowed for type ${type}.`);
+  }
+
+  // REJECT: Wrong actor
+  if (!rule.actor.includes(actor)) {
+    throw new Error(`Actor '${actor}' cannot perform ${key}.`);
+  }
+
+  // REJECT: Actor doesn't match role (for role-specific transitions)
+  if (key === 'ready->active' && actor !== currentRole && actor !== 'system') {
+    throw new Error(`Only assigned role can claim: current role is ${currentRole}, actor is ${actor}.`);
+  }
+
+  return { allowed: true, setRole: rule.setRole };
+}
+```
+
+**Type validation at creation:**
+
+```javascript
+function validateCreate(type) {
+  if (!['task', 'bug'].includes(type)) {
+    throw new Error(`Invalid type: ${type}. Only 'task' and 'bug' allowed.`);
+  }
+}
+```
+
+### AC4: Actor Permission Matrix (Updated)
+
+| Actor | Allowed Actions |
+|-------|-----------------|
+| liaison | pending→ready for task/bug, any→cancelled, any→blocked |
 | thomas | approval→complete, approval→rework |
-| pdsa | ready→active (type=design), active→approval, review→complete, review→rework |
-| dev | ready→active (type=task), active→review |
-| system | automatic notifications, timeout escalations |
+| pdsa | ready→active (if role=pdsa), active→approval |
+| dev | ready→active (if role=dev), active→review |
+| qa | review→complete, review→rework |
+| system | pending→ready, complete→ready (auto-release) |
 
 ### AC5: Human Notification Mechanism
 
-**Mechanism:** Write to `/tmp/human-notification.json` on approval status
+**Trigger:** When status transitions to `approval`
 
-**Content:**
+**Mechanism:** Write to `/tmp/human-notification.json`:
 ```json
 {
   "node_id": "...",
   "title": "...",
+  "type": "task",
   "requires": "Thomas approval",
-  "link": "viz URL"
+  "link": "viz URL",
+  "created_at": "ISO timestamp"
 }
 ```
-
-**Future:** Email/Slack webhook when available
 
 ### AC6: Workflow Engine Architecture
 
 **Components:**
-1. **TransitionValidator** - validates status changes against rules
-2. **ActorAuthorizer** - checks permission for actor+transition
-3. **NotificationService** - triggers on status changes
-4. **WorkflowPoller** - replaces manual LIAISON polling
+1. **TransitionValidator** - validates status changes against rules, REJECTS undefined
+2. **TypeValidator** - REJECTS invalid types at creation
+3. **ActorAuthorizer** - checks permission for actor+transition+role
+4. **RoleTransitioner** - updates role based on transition rules
+5. **NotificationService** - triggers on status changes
+6. **WorkflowPoller** - replaces manual LIAISON polling
 
 **Location:** `src/workflow/`
 
-**Integration:** `pm_transition` tool calls TransitionValidator before db write
-
-### LIAISON Feedback Items
-
-#### Feedback 1: Role Not Updated During Phase Transitions
-- Task req-regulated-database-access completed by PDSA (role: pdsa)
-- When released for development, role remained pdsa instead of dev
-- Dev agent monitor looks for role:dev tasks - did not pick it up
-- **Requirement:** Workflow engine must handle role transitions when tasks move between phases
-
-#### Feedback 2: Type Morphing Creates Chaos
-- Current: feature-self-contained-dna (req) + design-self-contained-dna (design) = 2 unlinked nodes
-- **Problem:** Work fragments into many items instead of ONE story with phases
-
-**Models to consider:**
-| Model | Description | Pros | Cons |
-|-------|-------------|------|------|
-| Phase Model | Single node, status reflects phase | Simple, clear storyline, DNA accumulates | Large objects |
-| Parent-Child | Epic/Story parent, subtasks as children | Clear lineage, parallelizable | More complex |
-
-#### Feedback 3: Claim Step Bypassed
-- LIAISON set task to active instead of ready - bypassed claim step
-- **Correct flow:** LIAISON releases → ready → Dev claims → active
-- **Requirement:** Only target agent can transition ready→active
-
-#### Feedback 4: Bypass PDSA Workflow Valid
-- Example: migrate-to-database-interface went direct from parent complete → child task → ready for dev
-- **Rule:** Full PDSA for new features, architectural decisions. Bypass OK for follow-up tasks, migrations, bug fixes where solution is known.
+**Integration point:** `interface-cli.js transition` command calls TransitionValidator
 
 ---
 
 ## STUDY
 
-### Research Answers
+### Rework Items Addressed
 
-| Question | Answer |
-|----------|--------|
-| approval as status or flag? | New status - cleaner than flag |
-| Distinguish human vs automated gates? | Type-aware rules (design=human, task=QA) |
-| Supported triggers? | Status change, timeout, parent completion |
-| Rejection handling? | Goes to rework status, then back to active |
-| Configurable rules? | Start hardcoded, config later if needed |
+| ID | Feedback | Resolution |
+|----|----------|------------|
+| Q1 | Add bypass path, PROHIBIT undefined | Bug type bypasses PDSA. ALLOWED_TRANSITIONS whitelist rejects all undefined. |
+| Q2 | Simplify to bug + task | Done. Only two types allowed. TypeValidator rejects others. |
+| Q3 | Add role to transition table | Done. Role column shows when role changes on each transition. |
+| Q4 | Remove requirement/design/test | Done. Only bug and task exist now. |
 
-### Validation
+### Validation Principle
 
-All 6 original ACs + 3 new ACs from LIAISON feedback documented.
+**CRITICAL:** Validation at write time, not review time.
+- Any transition not in ALLOWED_TRANSITIONS → REJECTED
+- Any type not in ['task', 'bug'] → REJECTED
+- Any actor not permitted for transition → REJECTED
+- Any claim by wrong role → REJECTED
 
 ---
 
 ## ACT
 
-### Implementation Tasks (in order)
+### Implementation Tasks (Updated)
 
-1. **TransitionValidator** - enforce type-aware transition rules
-2. **ActorAuthorizer** - verify actor can perform transition
-3. **Role auto-update** - change role when phase changes
-4. **Claim enforcement** - only target agent can claim
-5. **NotificationService** - human notification on approval
-6. **Integration** - connect to interface-cli.js
+1. **TransitionValidator** - ALLOWED_TRANSITIONS whitelist
+2. **TypeValidator** - reject non-task/bug at creation
+3. **RoleTransitioner** - update role based on setRole rules
+4. **ActorAuthorizer** - verify actor can perform transition
+5. **Claim enforcement** - only matching role can ready→active
+6. **NotificationService** - write to /tmp/human-notification.json
+7. **Integration** - add validation to interface-cli.js
 
-### Pending Decision
+### Decision Made
 
-**Single storyline model:** Phase-based vs Parent-child needs Thomas decision.
-
-Recommendation: **Phase model** fits Cell/DNA vision better - one cell accumulates all work in its DNA.
+**Issue types:** `task` and `bug` only.
+- `task` = requires PDSA (new work, features, requirements)
+- `bug` = bypasses PDSA (known issue, clear fix)
 
 ---
 
