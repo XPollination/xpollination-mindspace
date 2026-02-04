@@ -4,7 +4,7 @@
 **Node:** design-workflow-engine (910b3601-b5d0-429c-97fb-054c868dec32)
 **Type:** Design
 **Status:** ACTIVE
-**Iteration:** 4 (restore dropped content + add immutability)
+**Iteration:** 5 (add viz status visibility requirement)
 
 ## PLAN
 
@@ -20,6 +20,7 @@ LIAISON currently acts as a manual workflow engine. Design to automate.
 | 2 | Simplify types | Only bug + task. PROHIBIT undefined. |
 | 3 | complete used twice | Added `approved` status |
 | 4 | Content dropped | Restore validateCreate, CRITICAL PRINCIPLE, add immutability |
+| 5 | Viz missing statuses | Add AC for viz showing all 10 statuses |
 
 ---
 
@@ -176,6 +177,34 @@ pending → ready(dev) → active → review → COMPLETE*
 *COMPLETE = FINAL + IMMUTABLE
 ```
 
+### Viz Status Visibility (NEW - Iteration 5)
+
+**Requirement:** Visualization must show ALL 10 statuses.
+
+**Current gap:** Active nodes fall through filter - not in queue, not in post-work.
+
+**Status Colors:**
+
+| Status | Color | Hex | Section |
+|--------|-------|-----|---------|
+| pending | Gray | #6b7280 | QUEUE |
+| ready | Blue | #3b82f6 | QUEUE |
+| active | Green | #22c55e | **ACTIVE (new section)** |
+| approval | Amber | #f59e0b | AWAITING |
+| approved | Purple | #8b5cf6 | AWAITING |
+| review | Orange | #f97316 | IN REVIEW |
+| rework | Red | #ef4444 | IN REVIEW |
+| complete | Teal | #14b8a6 | DONE |
+| blocked | Dark Red | #dc2626 | BLOCKED |
+| cancelled | Light Gray | #9ca3af | DONE |
+
+**Viz sections (5):**
+1. **ACTIVE** - nodes being worked on (active)
+2. **QUEUE** - available nodes (pending, ready)
+3. **AWAITING** - waiting for human action (approval, approved)
+4. **IN REVIEW** - QA phase (review, rework)
+5. **DONE** - finished or cancelled (complete, blocked, cancelled)
+
 ---
 
 ## STUDY
@@ -214,6 +243,7 @@ pending → ready(dev) → active → review → COMPLETE*
 7. **Immutability check** - reject update-dna on status=complete
 8. **Integration** - add all validation to interface-cli.js
 9. **Add `approved` status** - to VALID_STATUSES
+10. **Viz: Show all 10 statuses** - add ACTIVE section, AWAITING section, color all statuses
 
 ---
 
