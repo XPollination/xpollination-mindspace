@@ -1104,17 +1104,15 @@
               ).join('')}</ul>`
             : '<div class="value" style="color: #666;">None (leaf)</div>'}
         </div>
-        ${dna.pdsa_ref || node.type === 'design' ? `
+        ${dna.pdsa_ref && (dna.pdsa_ref.git || dna.pdsa_ref.workspace) ? `
         <div class="detail-field">
-          <label>Dual Links</label>
+          <label>PDSA</label>
           <div class="dual-links">
-            ${dna.pdsa_ref ? `
-              <div><a href="${dna.pdsa_ref.git || '#'}" target="_blank" class="dual-link git-link">Git: ${(dna.pdsa_ref.git || '').split('/').pop() || 'View on GitHub'}</a></div>
-              <div class="dual-link workspace-link">WS: ${dna.pdsa_ref.workspace || 'N/A'}</div>
-            ` : `
-              <div><a href="https://github.com/PichlerThomas/xpollination-mcp-server/blob/main/docs/pdsa/" target="_blank" class="dual-link git-link">Git: docs/pdsa/</a></div>
-              <div class="dual-link workspace-link">WS: /home/developer/workspaces/.../docs/pdsa/</div>
-            `}
+            <div class="dual-link pdsa-name" style="color: #22c55e; font-weight: 500; margin-bottom: 4px;">
+              ${(dna.pdsa_ref.git || dna.pdsa_ref.workspace || '').split('/').pop().replace('.pdsa.md', '') || 'Unknown'}
+            </div>
+            ${dna.pdsa_ref.git ? `<div><a href="${dna.pdsa_ref.git}" target="_blank" class="dual-link git-link">Git: ${dna.pdsa_ref.git.split('/').pop()}</a></div>` : ''}
+            ${dna.pdsa_ref.workspace ? `<div class="dual-link workspace-link">WS: ${dna.pdsa_ref.workspace}</div>` : ''}
           </div>
         </div>
         ` : ''}
