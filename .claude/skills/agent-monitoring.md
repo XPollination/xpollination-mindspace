@@ -117,10 +117,22 @@ stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
 - Returns `0` = no work
 - Returns `>0` = work found, read the file
 
-**Workflow:**
-1. Background script polls DB every 30s
-2. Claude checks file size (1 stat call = minimal tokens)
-3. If >0 bytes, read file and process task
+**Workflow (CONTINUOUS LOOP):**
+1. Background script polls DB every 30s, writes to `/tmp/agent-work-{role}.json`
+2. Claude checks file size: `stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0`
+3. If >0 bytes, read file and process ALL tasks in order
+4. After processing (or if 0 bytes), **wait 30s and goto step 2**
+
+**CRITICAL:** Do NOT check once and stop. The workflow is a CONTINUOUS LOOP. After each check (whether work found or not), wait 30 seconds and check again. The agent must keep polling until told to stop.
+
+**Loop Pattern for Claude:**
+```
+while true:
+    bytes = stat file
+    if bytes > 0:
+        read file, process tasks
+    sleep 30s
+```
 
 ## Adding New Projects
 
