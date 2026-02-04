@@ -299,6 +299,16 @@
       stroke: #d1d5db;
     }
 
+    .package-box.status-approval {
+      fill: #f59e0b;
+      stroke: #fbbf24;
+    }
+
+    .package-box.status-approved {
+      fill: #8b5cf6;
+      stroke: #a78bfa;
+    }
+
     .package-label {
       fill: #fff;
       font-size: 9px;
@@ -393,6 +403,8 @@
     .badge.status-completed { background: #14b8a6; }
     .badge.status-blocked { background: #dc2626; }
     .badge.status-cancelled { background: #9ca3af; }
+    .badge.status-approval { background: #f59e0b; }
+    .badge.status-approved { background: #8b5cf6; }
 
     .detail-field .criteria-list {
       list-style: none;
@@ -583,16 +595,27 @@
       packageGap: 8,
       queuePackageWidth: 100,
       queuePackageHeight: 35,
-      initialViewBox: { x: -20, y: -20, width: 1000, height: 700 }
+      initialViewBox: { x: -20, y: -20, width: 1000, height: 900 }
     };
 
-    // Layout areas
+    // Layout areas - 5 sections for all 10 statuses
     const LAYOUT = {
       stationsY: 20,
+      // QUEUE: pending, ready
       queueY: 250,
-      queueHeight: 150,
-      completedY: 430,
-      completedHeight: 220
+      queueHeight: 100,
+      // ACTIVE: active
+      activeY: 360,
+      activeHeight: 100,
+      // AWAITING: approval, approved
+      awaitingY: 470,
+      awaitingHeight: 100,
+      // IN REVIEW: review, rework
+      inReviewY: 580,
+      inReviewHeight: 100,
+      // DONE: complete, blocked, cancelled
+      doneY: 690,
+      doneHeight: 150
     };
 
     // State
@@ -807,43 +830,39 @@
       renderAreas();
       renderStations();
       renderQueue();
-      renderCompleted();
+      renderActive();
+      renderAwaiting();
+      renderInReview();
+      renderDone();
     }
 
     function renderAreas() {
       const totalWidth = stations.length * (CONFIG.stationWidth + CONFIG.stationGap);
 
-      // Queue area
-      const queueRect = createSVGElement('rect', {
-        class: 'area-box',
-        x: 0, y: LAYOUT.queueY,
-        width: totalWidth, height: LAYOUT.queueHeight,
-        rx: 8
-      });
-      areasLayer.appendChild(queueRect);
+      // Helper to create area box with label
+      function createArea(y, height, label) {
+        const rect = createSVGElement('rect', {
+          class: 'area-box',
+          x: 0, y: y,
+          width: totalWidth, height: height,
+          rx: 8
+        });
+        areasLayer.appendChild(rect);
 
-      const queueLabel = createSVGElement('text', {
-        class: 'area-label',
-        x: 10, y: LAYOUT.queueY + 20
-      });
-      queueLabel.textContent = 'QUEUE (pending)';
-      areasLayer.appendChild(queueLabel);
+        const text = createSVGElement('text', {
+          class: 'area-label',
+          x: 10, y: y + 20
+        });
+        text.textContent = label;
+        areasLayer.appendChild(text);
+      }
 
-      // Completed area
-      const completedRect = createSVGElement('rect', {
-        class: 'area-box',
-        x: 0, y: LAYOUT.completedY,
-        width: totalWidth, height: LAYOUT.completedHeight,
-        rx: 8
-      });
-      areasLayer.appendChild(completedRect);
-
-      const completedLabel = createSVGElement('text', {
-        class: 'area-label',
-        x: 10, y: LAYOUT.completedY + 20
-      });
-      completedLabel.textContent = 'POST-WORK (review/complete/blocked)';
-      areasLayer.appendChild(completedLabel);
+      // 5 sections for all 10 statuses
+      createArea(LAYOUT.queueY, LAYOUT.queueHeight, 'QUEUE (pending, ready)');
+      createArea(LAYOUT.activeY, LAYOUT.activeHeight, 'ACTIVE (in progress)');
+      createArea(LAYOUT.awaitingY, LAYOUT.awaitingHeight, 'AWAITING (approval, approved)');
+      createArea(LAYOUT.inReviewY, LAYOUT.inReviewHeight, 'IN REVIEW (review, rework)');
+      createArea(LAYOUT.doneY, LAYOUT.doneHeight, 'DONE (complete, blocked, cancelled)');
     }
 
     function renderStations() {
@@ -931,18 +950,20 @@
     }
 
     function renderQueue() {
-      // Get IDs of nodes assigned to stations
+      renderSection(['pending', 'ready'], LAYOUT.queueY + 40);
+    }
+
+    // Helper to render nodes in a section
+    function renderSection(statuses, startY) {
       const assignedIds = stations.map(s => s.current_object_id).filter(Boolean);
-      // Queue shows pending/ready nodes that are NOT assigned to a station AND match search
-      const queuedNodes = nodes.filter(n =>
-        (n.status === 'pending' || n.status === 'ready') &&
+      const sectionNodes = nodes.filter(n =>
+        statuses.includes(n.status) &&
         !assignedIds.includes(n.id) &&
         matchesSearch(n, searchQuery)
       );
-      const startY = LAYOUT.queueY + 40;
       const startX = 15;
 
-      queuedNodes.forEach((node, index) => {
+      sectionNodes.forEach((node, index) => {
         const col = index % 8;
         const row = Math.floor(index / 8);
         const x = startX + col * (CONFIG.queuePackageWidth + 10);
@@ -979,54 +1000,20 @@
       });
     }
 
-    function renderCompleted() {
-      // Get IDs of nodes assigned to stations
-      const assignedIds = stations.map(s => s.current_object_id).filter(Boolean);
-      // Post-work statuses: complete, done, review, rework, blocked, cancelled
-      const postWorkStatuses = ['complete', 'completed', 'done', 'review', 'rework', 'blocked', 'cancelled'];
-      const completedNodes = nodes.filter(n =>
-        postWorkStatuses.includes(n.status) &&
-        !assignedIds.includes(n.id) &&
-        matchesSearch(n, searchQuery)
-      );
-      const startY = LAYOUT.completedY + 40;
-      const startX = 15;
+    function renderActive() {
+      renderSection(['active'], LAYOUT.activeY + 30);
+    }
 
-      completedNodes.forEach((node, index) => {
-        const col = index % 8;
-        const row = Math.floor(index / 8);
-        const x = startX + col * (CONFIG.queuePackageWidth + 10);
-        const y = startY + row * (CONFIG.queuePackageHeight + 8);
+    function renderAwaiting() {
+      renderSection(['approval', 'approved'], LAYOUT.awaitingY + 30);
+    }
 
-        const g = createSVGElement('g', { class: 'package', 'data-id': node.id });
-        g.onclick = () => showDetail(node);
+    function renderInReview() {
+      renderSection(['review', 'rework'], LAYOUT.inReviewY + 30);
+    }
 
-        const rect = createSVGElement('rect', {
-          class: 'package-box status-' + node.status,
-          x: x, y: y,
-          width: CONFIG.queuePackageWidth, height: CONFIG.queuePackageHeight
-        });
-        g.appendChild(rect);
-
-        const typeLabel = createSVGElement('text', {
-          class: 'package-type',
-          x: x + 5, y: y + 12
-        });
-        typeLabel.textContent = node.type.substring(0, 3).toUpperCase();
-        g.appendChild(typeLabel);
-
-        const title = node.dna?.title || node.slug;
-        const label = createSVGElement('text', {
-          class: 'package-label',
-          x: x + CONFIG.queuePackageWidth / 2,
-          y: y + CONFIG.queuePackageHeight / 2 + 6,
-          'text-anchor': 'middle'
-        });
-        label.textContent = truncate(title, 12);
-        g.appendChild(label);
-
-        packagesLayer.appendChild(g);
-      });
+    function renderDone() {
+      renderSection(['complete', 'completed', 'done', 'blocked', 'cancelled'], LAYOUT.doneY + 30);
     }
 
     function createSVGElement(tag, attrs) {
