@@ -420,6 +420,7 @@ If validation is enabled before migration, existing tasks will fail operations.
 10. **Viz: Show all 10 statuses** - add ACTIVE section, AWAITING section, color all statuses
 11. **Type migration** - run migration script BEFORE enabling TypeValidator
 12. **BUG FIX: review→rework must set newRole: dev** - Found by QA 2026-02-04. When QA sends task back for rework, the role must change to dev so dev agent can pick it up. Add `newRole: 'dev'` to `review->rework` transition in ALLOWED_TRANSITIONS for both task and bug types.
+13. **BUG FIX: Dev monitor must check status='rework'** - Found 2026-02-04. Dev agent monitor (viz/agent-monitor.cjs) only checks `status='ready'` but dev also needs to see `status='rework'` tasks (sent back by QA). Fix: add role-aware status checking for dev role: `const statuses = role === 'dev' ? ['ready', 'rework'] : ...`. Pattern matches QA monitor fix that checks both 'ready' and 'review'.
 
 ---
 
