@@ -4,6 +4,59 @@
 
 MCP (Model Context Protocol) server that powers the XPollination content generation pipeline. Claude acts as the orchestrator, calling MCP tools in sequence to discover trends, generate content, verify facts, and publish to a Hugo blog.
 
+## Agent Task Monitoring (ALL AGENTS)
+
+**Every agent must use this skill to receive tasks from the PM system.**
+
+### Start Monitor (once per agent session)
+```bash
+source ~/.nvm/nvm.sh
+# PDSA+QA agent:
+nohup node viz/agent-monitor.cjs pdsa qa > /tmp/agent-monitor-pdsa.log 2>&1 &
+
+# Dev agent:
+nohup node viz/agent-monitor.cjs dev > /tmp/agent-monitor-dev.log 2>&1 &
+```
+
+### Check for Work (minimal tokens)
+```bash
+# PDSA/QA agent checks:
+stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
+stat -c%s /tmp/agent-work-qa.json 2>/dev/null || echo 0
+
+# Dev agent checks:
+stat -c%s /tmp/agent-work-dev.json 2>/dev/null || echo 0
+```
+- Returns `0` = no work
+- Returns `>0` = work found, read the file: `cat /tmp/agent-work-{role}.json`
+
+### When Work is Found
+1. Read the work file to get task ID and details
+2. Query database for full task DNA
+3. Claim task: `UPDATE mindspace_nodes SET status='active' WHERE id=?`
+4. Do the work
+5. **CRITICAL: Write findings to DNA before completing**
+   - `dna.findings` = what you discovered
+   - `dna.proposed_design` = your proposal (for design tasks)
+   - `dna.implementation` = what you built (for dev tasks)
+6. Complete task: `UPDATE mindspace_nodes SET status='complete' WHERE id=?`
+
+### Self-Contained Objects (CRITICAL)
+**All communication MUST be in the task DNA.** Objects must be readable standalone.
+- NO relying on external links
+- NO "see PDSA doc at..." without also embedding the content
+- If someone reads only the task DNA, they should understand everything
+
+### Status Values (CRITICAL)
+Use ONLY these values - others break visualization:
+- `pending`, `ready`, `active`, `review`, `rework`, `complete`, `blocked`, `cancelled`
+- **Use `complete` NOT `completed`** (no 'd')
+
+### Multi-Project Support
+Monitor covers: xpollination-mcp-server, HomePage (and any project with data/xpollination.db)
+
+---
+
 ## Quick Start
 
 ```bash
