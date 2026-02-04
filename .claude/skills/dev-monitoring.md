@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Monitor multiple projects in the workspace for implementation tasks assigned to the DEV role (or unassigned tasks).
+Monitor multiple projects in the workspace for implementation tasks assigned to the DEV role.
 
 ## Projects Monitored
 
@@ -23,72 +23,52 @@ Monitor multiple projects in the workspace for implementation tasks assigned to 
 
 ### What to Monitor
 
-1. **Ready Items with role:dev** (status: `ready`, any type)
-   - Query: `WHERE status='ready' AND dna_json LIKE '%role":"dev%'`
-   - Process highest priority first
+**Query:** Nodes with `status='ready'` AND `role:dev` in dna_json
 
-2. **Task Fields**
-   - `slug` - task identifier
-   - `dna_json.title` - human-readable title
-   - `dna_json.description` - what to implement
-   - `dna_json.acceptance_criteria` - definition of done
-   - `dna_json.role` - assigned role (dev, pdsa, qa, etc.)
+```sql
+SELECT slug, type, status, dna_json
+FROM mindspace_nodes
+WHERE status = 'ready' AND dna_json LIKE '%"role":"dev"%'
+```
 
-### Node.js Implementation
+- **Any type is valid:** task, design, requirement, etc.
+- **Role determines assignment:** `role:dev` in dna_json
+- **Status must be `ready`:** indicates work is available
 
-```javascript
-const Database = require('better-sqlite3');
+### Running the Monitor
 
-const projects = [
-  {
-    name: "xpollination-mcp-server",
-    path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/data/xpollination.db"
-  },
-  {
-    name: "HomePage",
-    path: "/home/developer/workspaces/github/PichlerThomas/HomePage/data/xpollination.db"
-  }
-];
+**IMPORTANT:** Do NOT run monitoring loops inside Claude - it wastes tokens.
 
-function checkProjects() {
-  const timestamp = new Date().toLocaleTimeString();
-  console.log(`[${timestamp}] MULTI-PROJECT DEV MONITORING`);
+Use the standalone monitor script instead:
 
-  let devTasks = [];
+```bash
+# Start standalone monitor (runs outside Claude, saves tokens)
+source ~/.nvm/nvm.sh
+nohup node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/dev-monitor.cjs --loop > /tmp/dev-monitor.log 2>&1 &
 
-  projects.forEach(project => {
-    try {
-      const db = new Database(project.path, { readonly: true });
+# Check monitor status
+tail /tmp/dev-monitor.log
 
-      const tasks = db.prepare(`
-        SELECT slug, type, status,
-               json_extract(dna_json, '$.title') as title,
-               json_extract(dna_json, '$.priority') as priority
-        FROM mindspace_nodes
-        WHERE status = 'ready' AND dna_json LIKE '%role":"dev%'
-      `).all();
+# Check if work is available
+cat /tmp/dev-work-found.json 2>/dev/null || echo "No work"
+```
 
-      if (tasks.length > 0) {
-        console.log(`[${project.name}] ${tasks.length} DEV item(s):`);
-        tasks.forEach(t => {
-          console.log(`  - ${t.slug} (${t.type}): ${t.title || '(no title)'}`);
-          devTasks.push({project: project.name, ...t});
-        });
-      } else {
-        console.log(`[${project.name}] No DEV items`);
-      }
+**Files:**
+- Script: `viz/dev-monitor.cjs`
+- Log: `/tmp/dev-monitor.log`
+- Work notification: `/tmp/dev-work-found.json` (created when work found)
 
-      db.close();
-    } catch (err) {
-      console.log(`[${project.name}] Error: ${err.message}`);
-    }
-  });
+**Workflow:**
+1. Monitor runs independently in background
+2. When work is found, it writes to `/tmp/dev-work-found.json`
+3. Only invoke Claude when work file exists
 
-  console.log(`Total DEV tasks: ${devTasks.length}`);
-  return devTasks;
-}
+### Single Check Mode
 
-checkProjects();
+For a one-time check (useful for Claude):
+
+```bash
+node viz/dev-monitor.cjs
 ```
 
 ## Workflow When Task Found
@@ -98,12 +78,29 @@ checkProjects();
 3. **Implement** - Follow git protocol (specific staging, atomic commands, immediate push)
 4. **Complete** - Update status to `review` (not `done` - QA reviews first)
 
+## Status Values (IMPORTANT)
+
+Use these canonical status values when updating nodes:
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Not started |
+| `ready` | Ready for work |
+| `active` | Being worked on |
+| `review` | Awaiting human review |
+| `rework` | Needs changes |
+| `complete` | **Finished (NO 'd')** |
+| `blocked` | Cannot proceed |
+| `cancelled` | Intentionally stopped |
+
+**CRITICAL:** Use `complete` not `completed`. The 'd' suffix breaks visualization.
+
 ## Adding New Projects
 
 To add a new project to monitoring:
 
 1. Ensure the project has `data/xpollination.db` initialized
-2. Add entry to the `projects` array
+2. Add entry to the `projects` array in `viz/dev-monitor.cjs`
 3. Restart monitoring loop
 
 ## Related Skills
