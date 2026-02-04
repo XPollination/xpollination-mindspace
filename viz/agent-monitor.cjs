@@ -56,8 +56,9 @@ function checkForWork() {
     roles.forEach(role => {
       // Determine which statuses to check for this role
       // - qa role: check both 'ready' AND 'review' (QA reviews tasks in review status)
+      // - dev role: check both 'ready' AND 'rework' (dev gets rework tasks back from QA)
       // - other roles: check 'ready' only
-      const statuses = role === 'qa' ? ['ready', 'review'] : ['ready'];
+      const statuses = role === 'qa' ? ['ready', 'review'] : role === 'dev' ? ['ready', 'rework'] : ['ready'];
 
       statuses.forEach(status => {
         try {
