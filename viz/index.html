@@ -1049,6 +1049,10 @@
           <label>Status</label>
           <div class="value"><span class="badge status-${node.status}">${node.status}</span></div>
         </div>
+        <div class="detail-field">
+          <label>Role</label>
+          <div class="value">${dna.role || '-'}</div>
+        </div>
         ${dna.description ? `
         <div class="detail-field">
           <label>Description</label>
