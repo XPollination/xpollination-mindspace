@@ -4,7 +4,7 @@
 **Node:** design-workflow-engine (910b3601-b5d0-429c-97fb-054c868dec32)
 **Type:** Design
 **Status:** ACTIVE
-**Iteration:** 6 (add missing role enforcement code + lesson learned)
+**Iteration:** 7 (add migration chapter for existing types)
 
 ## PLAN
 
@@ -22,6 +22,7 @@ LIAISON currently acts as a manual workflow engine. Design to automate.
 | 4 | Content dropped | Restore validateCreate, CRITICAL PRINCIPLE, add immutability |
 | 5 | Viz missing statuses | Add AC for viz showing all 10 statuses |
 | 6 | Role code missing | Add validateTransition() with role enforcement |
+| 7 | Migration missing | Add migration chapter for existing types |
 
 ### Iteration 6 Explanation
 
@@ -313,6 +314,96 @@ pending → ready(dev) → active → review → COMPLETE*
 
 ---
 
+## MIGRATION CHAPTER (NEW - Iteration 7)
+
+**Principle:** System cannot enforce rules that break existing data. Migrate first, then enforce.
+
+**Context:** Workflow engine only allows type=task and type=bug, but database has existing types (design, requirement, test, etc.). This task itself had type=design before migration.
+
+### Step 1: Find All Existing Non-Task/Bug Types
+
+```sql
+-- Query to find ALL nodes with invalid types
+SELECT id, slug, type, status, created_at
+FROM mindspace_nodes
+WHERE type NOT IN ('task', 'bug')
+ORDER BY type, created_at;
+```
+
+**Expected types to find:** design, requirement, test, feature, etc.
+
+### Step 2: Migration Script
+
+```sql
+-- Migration: Convert all non-task/bug types to task
+-- Run this BEFORE enabling type validation
+
+-- Convert design → task
+UPDATE mindspace_nodes SET type = 'task' WHERE type = 'design';
+
+-- Convert requirement → task
+UPDATE mindspace_nodes SET type = 'task' WHERE type = 'requirement';
+
+-- Convert test → task
+UPDATE mindspace_nodes SET type = 'task' WHERE type = 'test';
+
+-- Convert any other types → task
+UPDATE mindspace_nodes SET type = 'task' WHERE type NOT IN ('task', 'bug');
+```
+
+**Alternative: JavaScript migration via interface-cli.js**
+
+```javascript
+// node src/db/migrate-types.js
+const db = require('better-sqlite3')('data/xpollination.db');
+
+const invalidTypes = db.prepare(`
+  SELECT id, slug, type FROM mindspace_nodes
+  WHERE type NOT IN ('task', 'bug')
+`).all();
+
+console.log(`Found ${invalidTypes.length} nodes to migrate`);
+
+const update = db.prepare(`UPDATE mindspace_nodes SET type = 'task' WHERE id = ?`);
+
+for (const node of invalidTypes) {
+  console.log(`Migrating ${node.slug}: ${node.type} → task`);
+  update.run(node.id);
+}
+
+console.log('Migration complete');
+db.close();
+```
+
+### Step 3: Verification Query
+
+```sql
+-- Verify NO invalid types remain after migration
+SELECT type, COUNT(*) as count
+FROM mindspace_nodes
+GROUP BY type;
+
+-- Expected result:
+-- task | N
+-- bug  | M
+-- (no other types should appear)
+```
+
+### Step 4: Order of Operations
+
+**CRITICAL: Migration MUST run BEFORE validation enforcement.**
+
+```
+1. Run migration script (convert all types to task/bug)
+2. Verify migration complete (no invalid types)
+3. Deploy TypeValidator code
+4. Enable validation enforcement
+```
+
+If validation is enabled before migration, existing tasks will fail operations.
+
+---
+
 ## ACT
 
 ### Implementation Tasks (Cumulative)
@@ -327,6 +418,7 @@ pending → ready(dev) → active → review → COMPLETE*
 8. **Integration** - add all validation to interface-cli.js
 9. **Add `approved` status** - to VALID_STATUSES
 10. **Viz: Show all 10 statuses** - add ACTIVE section, AWAITING section, color all statuses
+11. **Type migration** - run migration script BEFORE enabling TypeValidator
 
 ---
 
