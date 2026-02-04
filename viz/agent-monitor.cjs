@@ -54,28 +54,40 @@ function checkForWork() {
   projects.forEach(proj => {
     // Query for each role using interface-cli.js
     roles.forEach(role => {
-      try {
-        const result = execSync(
-          `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=ready --role=${role}`,
-          { encoding: 'utf-8', timeout: 10000 }
-        );
+      // Determine which statuses to check for this role
+      // - qa role: check both 'ready' AND 'review' (QA reviews tasks in review status)
+      // - other roles: check 'ready' only
+      const statuses = role === 'qa' ? ['ready', 'review'] : ['ready'];
 
-        const data = JSON.parse(result);
+      statuses.forEach(status => {
+        try {
+          const result = execSync(
+            `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=${status} --role=${role}`,
+            { encoding: 'utf-8', timeout: 10000 }
+          );
 
-        if (data.nodes && data.nodes.length > 0) {
-          data.nodes.forEach(n => {
-            workByRole[role].push({
-              project: proj.name,
-              id: n.id,
-              slug: n.slug,
-              type: n.type,
-              title: n.title || n.slug
+          const data = JSON.parse(result);
+
+          if (data.nodes && data.nodes.length > 0) {
+            data.nodes.forEach(n => {
+              // Avoid duplicates
+              const exists = workByRole[role].some(w => w.id === n.id);
+              if (!exists) {
+                workByRole[role].push({
+                  project: proj.name,
+                  id: n.id,
+                  slug: n.slug,
+                  type: n.type,
+                  status: n.status || status,
+                  title: n.title || n.slug
+                });
+              }
             });
-          });
+          }
+        } catch (err) {
+          // Skip errors silently (project may not have DB)
         }
-      } catch (err) {
-        // Skip errors silently (project may not have DB)
-      }
+      });
     });
   });
 
