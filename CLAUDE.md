@@ -32,14 +32,40 @@ stat -c%s /tmp/agent-work-dev.json 2>/dev/null || echo 0
 
 ### When Work is Found
 1. Read the work file to get task ID and details
-2. Query database for full task DNA
-3. Claim task: `UPDATE mindspace_nodes SET status='active' WHERE id=?`
+2. Get full task DNA: `node src/db/interface-cli.js get <slug>`
+3. Claim task: `node src/db/interface-cli.js transition <slug> active <actor>`
 4. Do the work
 5. **CRITICAL: Write findings to DNA before completing**
+   - `node src/db/interface-cli.js update-dna <slug> '{"findings":"..."}' <actor>`
    - `dna.findings` = what you discovered
    - `dna.proposed_design` = your proposal (for design tasks)
    - `dna.implementation` = what you built (for dev tasks)
-6. Complete task: `UPDATE mindspace_nodes SET status='complete' WHERE id=?`
+6. Complete task: `node src/db/interface-cli.js transition <slug> review <actor>`
+
+### Database Interface CLI (Regulated Access)
+All agents use `src/db/interface-cli.js` for database operations:
+```bash
+# Get node details
+node src/db/interface-cli.js get <id|slug>
+
+# List nodes with filters
+node src/db/interface-cli.js list --status=ready --role=dev
+
+# Claim task (transition to active)
+node src/db/interface-cli.js transition <slug> active dev
+
+# Update DNA (findings, implementation, etc.)
+node src/db/interface-cli.js update-dna <slug> '{"key":"value"}' dev
+
+# Complete work (dev sends to review, QA can mark complete)
+node src/db/interface-cli.js transition <slug> review dev
+
+# Create new node (pdsa, liaison, system only)
+node src/db/interface-cli.js create task my-slug '{"title":"...","role":"dev"}' pdsa
+```
+
+**Actors:** dev, pdsa, qa, liaison, orchestrator, system
+**Direct SQL access is DENIED** - use interface-cli.js for all operations
 
 ### Self-Contained Objects (CRITICAL)
 **All communication MUST be in the task DNA.** Objects must be readable standalone.

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Agent Monitor - Parameterized for any role (DRY pattern)
+ * Uses interface-cli.js for regulated database access
  *
  * Usage:
  *   node agent-monitor.cjs pdsa qa    # PDSA+QA agent
@@ -14,14 +15,23 @@
  *   stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
  */
 
-const Database = require('better-sqlite3');
+const { execSync } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
 const POLL_INTERVAL = 30000; // 30 seconds
 
 const projects = [
-  { name: "xpollination-mcp-server", path: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/data/xpollination.db" },
-  { name: "HomePage", path: "/home/developer/workspaces/github/PichlerThomas/HomePage/data/xpollination.db" }
+  {
+    name: "xpollination-mcp-server",
+    dbPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/data/xpollination.db",
+    cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
+  },
+  {
+    name: "HomePage",
+    dbPath: "/home/developer/workspaces/github/PichlerThomas/HomePage/data/xpollination.db",
+    cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
+  }
 ];
 
 // Get roles from command line args
@@ -42,36 +52,31 @@ function checkForWork() {
   roles.forEach(r => workByRole[r] = []);
 
   projects.forEach(proj => {
-    try {
-      const db = new Database(proj.path, { readonly: true });
+    // Query for each role using interface-cli.js
+    roles.forEach(role => {
+      try {
+        const result = execSync(
+          `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=ready --role=${role}`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
 
-      // Build query for all monitored roles
-      const roleClauses = roles.map(r => `dna_json LIKE '%"role":"${r}"%'`).join(' OR ');
-      const query = `
-        SELECT id, slug, type, dna_json
-        FROM mindspace_nodes
-        WHERE status = 'ready' AND (${roleClauses})
-      `;
+        const data = JSON.parse(result);
 
-      const nodes = db.prepare(query).all();
-
-      nodes.forEach(n => {
-        const dna = JSON.parse(n.dna_json || '{}');
-        if (dna.role && workByRole[dna.role] !== undefined) {
-          workByRole[dna.role].push({
-            project: proj.name,
-            id: n.id,
-            slug: n.slug,
-            type: n.type,
-            title: dna.title || n.slug
+        if (data.nodes && data.nodes.length > 0) {
+          data.nodes.forEach(n => {
+            workByRole[role].push({
+              project: proj.name,
+              id: n.id,
+              slug: n.slug,
+              type: n.type,
+              title: n.title || n.slug
+            });
           });
         }
-      });
-
-      db.close();
-    } catch (err) {
-      // Skip errors silently
-    }
+      } catch (err) {
+        // Skip errors silently (project may not have DB)
+      }
+    });
   });
 
   // Write output files per role
