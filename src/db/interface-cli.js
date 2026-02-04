@@ -27,7 +27,9 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Valid statuses (no 'd' in complete!)
-const VALID_STATUSES = ['pending', 'ready', 'active', 'review', 'rework', 'complete', 'blocked', 'cancelled'];
+// approval = human gate (Thomas reviews design)
+// approved = design approved, ready for dev release
+const VALID_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 'review', 'rework', 'complete', 'blocked', 'cancelled'];
 
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
@@ -74,6 +76,91 @@ const PERMISSIONS = {
 
 // Valid roles
 const VALID_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator'];
+
+// Valid types (simplified: only task and bug)
+const VALID_TYPES = ['task', 'bug'];
+
+// CRITICAL PRINCIPLE: If the system does not PREVENT it, it WILL happen.
+// ALLOWED_TRANSITIONS whitelist - any undefined transition is REJECTED
+const ALLOWED_TRANSITIONS = {
+  // Task flow (requires PDSA first)
+  'task': {
+    'pending->ready': { allowedActors: ['liaison', 'system'], newRole: 'pdsa' },
+    'ready->active': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
+    'active->approval': { allowedActors: ['pdsa'] },
+    'approval->approved': { allowedActors: ['liaison', 'thomas'] },
+    'approval->rework': { allowedActors: ['liaison', 'thomas'] },
+    'approved->ready': { allowedActors: ['liaison', 'system'], newRole: 'dev' },
+    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
+    'active->review': { allowedActors: ['dev'], newRole: 'qa' },
+    'review->complete': { allowedActors: ['pdsa', 'qa'] },
+    'review->rework': { allowedActors: ['pdsa', 'qa'] },
+    'rework->active': { allowedActors: ['dev'] },
+    // Special transitions
+    'any->blocked': { allowedActors: ['liaison', 'system'] },
+    'any->cancelled': { allowedActors: ['liaison', 'system'] }
+  },
+  // Bug flow (can bypass PDSA)
+  'bug': {
+    'pending->ready': { allowedActors: ['liaison', 'pdsa', 'system'], newRole: 'dev' },
+    'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
+    'active->review': { allowedActors: ['dev'], newRole: 'qa' },
+    'review->complete': { allowedActors: ['pdsa', 'qa'] },
+    'review->rework': { allowedActors: ['pdsa', 'qa'] },
+    'rework->active': { allowedActors: ['dev'] },
+    // Special transitions
+    'any->blocked': { allowedActors: ['liaison', 'system'] },
+    'any->cancelled': { allowedActors: ['liaison', 'system'] }
+  }
+};
+
+// Validate transition against whitelist
+function validateTransition(nodeType, fromStatus, toStatus, actor, currentRole) {
+  const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
+  if (!typeTransitions) {
+    return `Invalid type: ${nodeType}. Allowed: ${VALID_TYPES.join(', ')}`;
+  }
+
+  const transitionKey = `${fromStatus}->${toStatus}`;
+  let rule = typeTransitions[transitionKey];
+
+  // Check for role-specific transition (e.g., ready->active:dev)
+  if (!rule && currentRole) {
+    rule = typeTransitions[`${transitionKey}:${currentRole}`];
+  }
+
+  // Check for 'any' transitions (blocked, cancelled)
+  if (!rule) {
+    rule = typeTransitions[`any->${toStatus}`];
+  }
+
+  if (!rule) {
+    return `Transition ${transitionKey} not allowed for type=${nodeType}. Undefined transitions are PROHIBITED.`;
+  }
+
+  // Check actor permission
+  if (!rule.allowedActors.includes(actor) && !rule.allowedActors.includes('system')) {
+    return `Actor ${actor} not allowed for transition ${transitionKey}. Allowed: ${rule.allowedActors.join(', ')}`;
+  }
+
+  // Check role requirement for claim (ready->active)
+  if (rule.requireRole && currentRole !== rule.requireRole) {
+    return `Only role=${rule.requireRole} can claim this task. Current role: ${currentRole}`;
+  }
+
+  return null; // Valid
+}
+
+// Get new role for transition (if role should change)
+function getNewRoleForTransition(nodeType, fromStatus, toStatus) {
+  const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
+  if (!typeTransitions) return null;
+
+  const transitionKey = `${fromStatus}->${toStatus}`;
+  const rule = typeTransitions[transitionKey];
+
+  return rule?.newRole || null;
+}
 
 // DNA Field Validators - reject invalid data at write time
 const FIELD_VALIDATORS = {
@@ -261,25 +348,53 @@ function cmdTransition(id, newStatus, actor) {
   }
 
   const fromStatus = node.status;
+  const nodeType = node.type;
+  const dna = JSON.parse(node.dna_json || '{}');
+  const currentRole = dna.role || null;
   const transition = `${fromStatus}->${newStatus}`;
 
-  checkPermission(actor, 'transition', transition);
+  // Validate transition against whitelist
+  const validationError = validateTransition(nodeType, fromStatus, newStatus, actor, currentRole);
+  if (validationError) {
+    db.close();
+    error(validationError);
+  }
 
-  // Perform transition
-  db.prepare(`
-    UPDATE mindspace_nodes
-    SET status = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(newStatus, node.id);
+  // Check if role should change on this transition
+  const newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus);
+  let updatedDna = dna;
+  if (newRole && newRole !== currentRole) {
+    updatedDna = { ...dna, role: newRole };
+  }
 
-  output({
+  // Perform transition (and role update if needed)
+  if (newRole && newRole !== currentRole) {
+    db.prepare(`
+      UPDATE mindspace_nodes
+      SET status = ?, dna_json = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(newStatus, JSON.stringify(updatedDna), node.id);
+  } else {
+    db.prepare(`
+      UPDATE mindspace_nodes
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(newStatus, node.id);
+  }
+
+  const result = {
     success: true,
     id: node.id,
     slug: node.slug,
     transition: transition,
     actor: actor
-  });
+  };
 
+  if (newRole && newRole !== currentRole) {
+    result.roleChanged = { from: currentRole, to: newRole };
+  }
+
+  output(result);
   db.close();
 }
 
@@ -307,6 +422,12 @@ function cmdUpdateDna(id, dnaJson, actor) {
     error(`Node not found: ${id}`);
   }
 
+  // Immutability rule: complete tasks cannot be modified
+  if (node.status === 'complete') {
+    db.close();
+    error(`Cannot modify complete task [${node.slug}]. Create a child task instead.`);
+  }
+
   // Merge DNA (preserve existing fields)
   const existingDna = JSON.parse(node.dna_json);
   const mergedDna = { ...existingDna, ...dna };
@@ -330,6 +451,11 @@ function cmdUpdateDna(id, dnaJson, actor) {
 
 function cmdCreate(type, slug, dnaJson, actor) {
   checkPermission(actor, 'create');
+
+  // Validate type - only task and bug allowed
+  if (!VALID_TYPES.includes(type)) {
+    error(`Invalid type: "${type}". Only allowed: ${VALID_TYPES.join(', ')}. Use 'task' for features/requirements, 'bug' for fixes.`);
+  }
 
   let dna;
   try {
