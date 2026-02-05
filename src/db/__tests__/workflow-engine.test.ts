@@ -160,9 +160,10 @@ describe('AC2: validateTransition() actor permissions', () => {
       expect(result).toContain('not allowed');
     });
 
-    it('allows pdsa for active->review (AC3: pdsa, dev, liaison allowed)', () => {
+    it('rejects pdsa-role task for active->review (must use active->approval)', () => {
+      // PDSA-role tasks MUST go through approval gate, not directly to review
       const result = validateTransition('task', 'active', 'review', 'pdsa', 'pdsa');
-      expect(result).toBeNull();
+      expect(result).toContain('Only role=dev');
     });
 
     it('rejects dev for review->complete (qa only)', () => {
