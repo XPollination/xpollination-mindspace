@@ -57,8 +57,9 @@ function checkForWork() {
       // Determine which statuses to check for this role
       // - qa role: check both 'ready' AND 'review' (QA reviews tasks in review status)
       // - dev role: check both 'ready' AND 'rework' (dev gets rework tasks back from QA)
+      // - pdsa role: check both 'ready' AND 'rework' (pdsa gets rework tasks back from QA)
       // - other roles: check 'ready' only
-      const statuses = role === 'qa' ? ['ready', 'review'] : role === 'dev' ? ['ready', 'rework'] : ['ready'];
+      const statuses = role === 'qa' ? ['ready', 'review'] : (role === 'dev' || role === 'pdsa') ? ['ready', 'rework'] : ['ready'];
 
       statuses.forEach(status => {
         try {
@@ -115,8 +116,71 @@ function checkForWork() {
   }
 }
 
+/**
+ * AC11: Detect orphaned work
+ * - Tasks in 'active' status >24h without update
+ * - Output: /tmp/orphan-alerts.json
+ */
+function checkForOrphans() {
+  const ts = new Date().toLocaleTimeString();
+  const orphans = [];
+  const now = Date.now();
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+  projects.forEach(proj => {
+    try {
+      // Get all active tasks
+      const result = execSync(
+        `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=active`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+
+      const data = JSON.parse(result);
+
+      if (data.nodes && data.nodes.length > 0) {
+        data.nodes.forEach(n => {
+          // Check if updated_at is older than 24h
+          if (n.updated_at) {
+            const updated = new Date(n.updated_at + ' UTC').getTime();
+            const age = now - updated;
+            if (age > TWENTY_FOUR_HOURS) {
+              orphans.push({
+                project: proj.name,
+                id: n.id,
+                slug: n.slug,
+                title: n.title || n.slug,
+                role: n.role,
+                status: n.status,
+                updated_at: n.updated_at,
+                stale_hours: Math.round(age / (60 * 60 * 1000))
+              });
+            }
+          }
+        });
+      }
+    } catch (err) {
+      // Skip errors silently
+    }
+  });
+
+  // Write orphan alerts
+  const file = '/tmp/orphan-alerts.json';
+  if (orphans.length > 0) {
+    fs.writeFileSync(file, JSON.stringify({
+      found_at: new Date().toISOString(),
+      alert: 'ORPHANED TASKS - active >24h without update',
+      orphans
+    }, null, 2));
+    console.log(`[${ts}] ORPHAN ALERT: ${orphans.length} task(s) stuck in active >24h`);
+  } else {
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+}
+
 // Initial check
 checkForWork();
+checkForOrphans();
 
 // Continuous polling
 setInterval(checkForWork, POLL_INTERVAL);
+setInterval(checkForOrphans, POLL_INTERVAL * 10); // Check orphans every 5 minutes

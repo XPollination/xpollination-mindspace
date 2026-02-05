@@ -75,8 +75,29 @@ node src/db/interface-cli.js create task my-slug '{"title":"...","role":"dev"}' 
 
 ### Status Values (CRITICAL)
 Use ONLY these values - others break visualization:
-- `pending`, `ready`, `active`, `review`, `rework`, `complete`, `blocked`, `cancelled`
+- `pending`, `ready`, `active`, `approval`, `approved`, `testing`, `review`, `rework`, `complete`, `blocked`, `cancelled`
 - **Use `complete` NOT `completed`** (no 'd')
+
+### Task Workflow (Role-Based Transitions)
+
+**PDSA Design Path:**
+```
+pending → ready(pdsa) → active(pdsa) → approval(human) → approved → testing(qa) → ready(dev) → active(dev) → review(qa) → complete
+                                                                                              ↓
+                                                                                         rework(dev) ↺
+```
+
+**LIAISON Content Path:**
+```
+pending → ready(liaison) → active(liaison) → review(qa) → complete
+```
+
+**Key Principles:**
+- Role assigned at creation is PRESERVED unless explicitly transitioned
+- `ready->active`: Only the matching role can claim (dev claims dev tasks, pdsa claims pdsa tasks)
+- `rework->active`: Original role reclaims their rework (pdsa fixes pdsa rework, dev fixes dev rework)
+- `review->rework`: Sets role back to dev (or original implementer)
+- `approval->approved`: Human gate, sets role to liaison for monitoring
 
 ### Multi-Project Support
 Monitor covers: xpollination-mcp-server, HomePage (and any project with data/xpollination.db)
