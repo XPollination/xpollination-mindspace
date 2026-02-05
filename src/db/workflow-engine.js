@@ -38,9 +38,11 @@ export const ALLOWED_TRANSITIONS = {
     'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
     'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
 
-    // AC3: active->review allows pdsa, dev, liaison (role-matched)
-    'active->review': { allowedActors: ['pdsa', 'dev', 'liaison'], newRole: 'qa' },
-    'active->approval': { allowedActors: ['pdsa', 'liaison'] },
+    // AC3: active->review - pdsa MUST go through approval (requireRole enforces this)
+    'active->review': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'dev', newRole: 'qa' },
+    'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'qa' },
+    // AC3: active->approval - only pdsa role tasks (dev cannot skip to approval)
+    'active->approval': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'pdsa' },
 
     // AC5: approval enforces role=liaison
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'liaison' },
@@ -60,8 +62,8 @@ export const ALLOWED_TRANSITIONS = {
     'rework->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
     'rework->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
 
-    // Review flow
-    'review->complete': { allowedActors: ['pdsa', 'qa', 'liaison'] },
+    // Review flow - only liaison can finalize completion
+    'review->complete': { allowedActors: ['liaison'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
 
     // Special transitions
@@ -73,7 +75,7 @@ export const ALLOWED_TRANSITIONS = {
     'pending->ready': { allowedActors: ['liaison', 'pdsa', 'system'], newRole: 'dev' },
     'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
     'active->review': { allowedActors: ['dev'], newRole: 'qa' },
-    'review->complete': { allowedActors: ['pdsa', 'qa', 'liaison'] },
+    'review->complete': { allowedActors: ['liaison'] },  // Only liaison can finalize
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
     'rework->active': { allowedActors: ['dev'] },
     // Special transitions
@@ -121,16 +123,17 @@ export function validateTransition(nodeType, fromStatus, toStatus, actor, curren
     return `Transition ${transitionKey} not allowed for type=${nodeType}. Undefined transitions are PROHIBITED.`;
   }
 
+  // Check role requirement FIRST (before actor check)
+  // This ensures role-based rejections produce "Only role=X" messages
+  if (rule.requireRole && currentRole !== rule.requireRole) {
+    return `Only role=${rule.requireRole} can use this transition. Task role: ${currentRole}`;
+  }
+
   // Check actor permission
   // 'system' actor can always perform any transition
   // Other actors must be in the allowedActors list
   if (actor !== 'system' && !rule.allowedActors.includes(actor)) {
     return `Actor ${actor} not allowed for transition ${transitionKey}. Allowed: ${rule.allowedActors.join(', ')}`;
-  }
-
-  // Check role requirement for claim (ready->active)
-  if (rule.requireRole && currentRole !== rule.requireRole) {
-    return `Only role=${rule.requireRole} can claim this task. Current role: ${currentRole}`;
   }
 
   return null; // Valid

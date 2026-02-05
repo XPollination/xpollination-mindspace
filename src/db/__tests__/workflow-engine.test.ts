@@ -69,8 +69,14 @@ describe('AC1: ALLOWED_TRANSITIONS whitelist', () => {
       expect(result).toBeNull();
     });
 
-    it('allows review->complete for qa', () => {
+    it('rejects review->complete for qa (liaison only)', () => {
+      // Only liaison can complete - QA reviews but doesn't finalize
       const result = validateTransition('task', 'review', 'complete', 'qa', 'qa');
+      expect(result).toContain('not allowed');
+    });
+
+    it('allows review->complete for liaison', () => {
+      const result = validateTransition('task', 'review', 'complete', 'liaison', 'qa');
       expect(result).toBeNull();
     });
 
@@ -107,8 +113,14 @@ describe('AC1: ALLOWED_TRANSITIONS whitelist', () => {
       expect(result).toBeNull();
     });
 
-    it('allows review->complete for qa', () => {
+    it('rejects review->complete for qa (liaison only)', () => {
+      // Only liaison can complete bugs - QA reviews but doesn't finalize
       const result = validateTransition('bug', 'review', 'complete', 'qa', 'qa');
+      expect(result).toContain('not allowed');
+    });
+
+    it('allows review->complete for liaison', () => {
+      const result = validateTransition('bug', 'review', 'complete', 'liaison', 'qa');
       expect(result).toBeNull();
     });
   });
@@ -375,8 +387,14 @@ describe('AC8 & AC9: Full workflow paths', () => {
       expect(result).toBeNull();
     });
 
-    it('qa can complete review->complete', () => {
+    it('qa cannot complete review->complete (liaison only)', () => {
+      // Only liaison can finalize completion
       const result = validateTransition('task', 'review', 'complete', 'qa', 'qa');
+      expect(result).toContain('not allowed');
+    });
+
+    it('liaison can complete review->complete', () => {
+      const result = validateTransition('task', 'review', 'complete', 'liaison', 'qa');
       expect(result).toBeNull();
     });
   });
