@@ -10,9 +10,10 @@
 
 // Valid statuses (no 'd' in complete!)
 // approval = human gate (Thomas reviews design)
-// approved = design approved, ready for dev release
+// approved = design approved, ready for next phase
+// testing = QA creates tests before dev implements
 export const VALID_STATUSES = [
-  'pending', 'ready', 'active', 'approval', 'approved',
+  'pending', 'ready', 'active', 'approval', 'approved', 'testing',
   'review', 'rework', 'complete', 'blocked', 'cancelled'
 ];
 
@@ -24,29 +25,55 @@ export const VALID_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator'];
 
 // ALLOWED_TRANSITIONS whitelist - any undefined transition is REJECTED
 export const ALLOWED_TRANSITIONS = {
-  // Task flow (requires PDSA first)
+  // Task flow - role-aware transitions
+  // Key principle: Role assigned at creation should be preserved unless explicitly transitioned
   'task': {
-    'pending->ready': { allowedActors: ['liaison', 'system'], newRole: 'pdsa' },
-    'ready->active': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
-    'active->approval': { allowedActors: ['pdsa'] },
-    'approval->approved': { allowedActors: ['liaison', 'thomas'] },
-    'approval->rework': { allowedActors: ['liaison', 'thomas'] },
-    'approved->ready': { allowedActors: ['liaison', 'system'], newRole: 'dev' },
+    // AC1: pending->ready preserves original role (no automatic override)
+    'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'] },
+
+    // AC2: ready->active allows role-matched claiming
+    'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'] },
+    'ready->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
     'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
-    'active->review': { allowedActors: ['dev'], newRole: 'qa' },
-    'review->complete': { allowedActors: ['pdsa', 'qa'] },
+    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
+    'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
+
+    // AC3: active->review allows pdsa, dev, liaison (role-matched)
+    'active->review': { allowedActors: ['pdsa', 'dev', 'liaison'], newRole: 'qa' },
+    'active->approval': { allowedActors: ['pdsa', 'liaison'] },
+
+    // AC5: approval enforces role=liaison
+    'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'liaison' },
+    'approval->rework': { allowedActors: ['liaison', 'thomas'] },
+
+    // AC6 & AC7: QA testing phase
+    'approved->testing': { allowedActors: ['liaison', 'system'], newRole: 'qa' },
+    'testing->active': { allowedActors: ['qa'], requireRole: 'qa' },
+    'testing->ready': { allowedActors: ['qa'], newRole: 'dev' },
+
+    // Legacy path (approved->ready for non-TDD flow)
+    'approved->ready': { allowedActors: ['liaison', 'system'], newRole: 'dev' },
+
+    // AC4: rework->active allows pdsa, dev, qa (role-matched)
+    'rework->active': { allowedActors: ['pdsa', 'dev', 'qa'] },
+    'rework->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
+    'rework->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
+    'rework->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
+
+    // Review flow
+    'review->complete': { allowedActors: ['pdsa', 'qa', 'liaison'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
-    'rework->active': { allowedActors: ['dev'] },
+
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system'] },
     'any->cancelled': { allowedActors: ['liaison', 'system'] }
   },
-  // Bug flow (can bypass PDSA)
+  // Bug flow (can bypass PDSA, simplified)
   'bug': {
     'pending->ready': { allowedActors: ['liaison', 'pdsa', 'system'], newRole: 'dev' },
     'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
     'active->review': { allowedActors: ['dev'], newRole: 'qa' },
-    'review->complete': { allowedActors: ['pdsa', 'qa'] },
+    'review->complete': { allowedActors: ['pdsa', 'qa', 'liaison'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
     'rework->active': { allowedActors: ['dev'] },
     // Special transitions

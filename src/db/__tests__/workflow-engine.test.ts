@@ -160,9 +160,9 @@ describe('AC2: validateTransition() actor permissions', () => {
       expect(result).toContain('not allowed');
     });
 
-    it('rejects pdsa for active->review (dev only)', () => {
-      const result = validateTransition('task', 'active', 'review', 'pdsa', 'dev');
-      expect(result).toContain('not allowed');
+    it('allows pdsa for active->review (AC3: pdsa, dev, liaison allowed)', () => {
+      const result = validateTransition('task', 'active', 'review', 'pdsa', 'pdsa');
+      expect(result).toBeNull();
     });
 
     it('rejects dev for review->complete (qa only)', () => {
@@ -245,9 +245,9 @@ describe('AC3: validateType() type validation', () => {
 describe('AC4 & AC5: getNewRoleForTransition() role changes', () => {
 
   describe('Task flow role changes', () => {
-    it('pending->ready sets role to pdsa', () => {
+    it('pending->ready preserves original role (AC1: no automatic override)', () => {
       const result = getNewRoleForTransition('task', 'pending', 'ready');
-      expect(result).toBe('pdsa');
+      expect(result).toBeNull(); // Role preserved, not changed
     });
 
     it('approved->ready sets role to dev', () => {
@@ -312,13 +312,14 @@ describe('AC4 & AC5: getNewRoleForTransition() role changes', () => {
 
 describe('Constants validation', () => {
 
-  it('VALID_STATUSES contains all 10 statuses', () => {
-    expect(VALID_STATUSES).toHaveLength(10);
+  it('VALID_STATUSES contains all 11 statuses (includes testing)', () => {
+    expect(VALID_STATUSES).toHaveLength(11);
     expect(VALID_STATUSES).toContain('pending');
     expect(VALID_STATUSES).toContain('ready');
     expect(VALID_STATUSES).toContain('active');
     expect(VALID_STATUSES).toContain('approval');
     expect(VALID_STATUSES).toContain('approved');
+    expect(VALID_STATUSES).toContain('testing'); // AC6: New testing status
     expect(VALID_STATUSES).toContain('review');
     expect(VALID_STATUSES).toContain('rework');
     expect(VALID_STATUSES).toContain('complete');
