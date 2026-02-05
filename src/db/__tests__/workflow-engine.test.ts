@@ -345,3 +345,129 @@ describe('Constants validation', () => {
     expect(ALLOWED_TRANSITIONS).toHaveProperty('bug');
   });
 });
+
+// ============================================================================
+// AC8 & AC9: Full path tests
+// ============================================================================
+
+describe('AC8 & AC9: Full workflow paths', () => {
+
+  describe('AC8: LIAISON content path (no role changes)', () => {
+    // Path: pending→ready(liaison)→active(liaison)→review(qa)→complete
+    it('liaison can transition pending->ready', () => {
+      const result = validateTransition('task', 'pending', 'ready', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('pending->ready preserves liaison role', () => {
+      const newRole = getNewRoleForTransition('task', 'pending', 'ready');
+      expect(newRole).toBeNull(); // Role preserved
+    });
+
+    it('liaison can claim ready->active for liaison role task', () => {
+      const result = validateTransition('task', 'ready', 'active', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('liaison can submit active->review', () => {
+      const result = validateTransition('task', 'active', 'review', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('qa can complete review->complete', () => {
+      const result = validateTransition('task', 'review', 'complete', 'qa', 'qa');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('AC9: PDSA design path with testing phase', () => {
+    // Path: pending→ready(pdsa)→active(pdsa)→approval→approved→testing(qa)→ready(dev)→active(dev)→review(qa)→complete
+
+    it('pdsa can claim ready->active for pdsa role task', () => {
+      const result = validateTransition('task', 'ready', 'active', 'pdsa', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('pdsa can submit active->approval', () => {
+      const result = validateTransition('task', 'active', 'approval', 'pdsa', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('thomas can approve approval->approved', () => {
+      const result = validateTransition('task', 'approval', 'approved', 'thomas', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('approval->approved sets role to liaison', () => {
+      const newRole = getNewRoleForTransition('task', 'approval', 'approved');
+      expect(newRole).toBe('liaison');
+    });
+
+    it('liaison can transition approved->testing', () => {
+      const result = validateTransition('task', 'approved', 'testing', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('approved->testing sets role to qa', () => {
+      const newRole = getNewRoleForTransition('task', 'approved', 'testing');
+      expect(newRole).toBe('qa');
+    });
+
+    it('qa can activate testing->active (to create tests)', () => {
+      const result = validateTransition('task', 'testing', 'active', 'qa', 'qa');
+      expect(result).toBeNull();
+    });
+
+    it('qa can transition testing->ready (tests done, dev can start)', () => {
+      const result = validateTransition('task', 'testing', 'ready', 'qa', 'qa');
+      expect(result).toBeNull();
+    });
+
+    it('testing->ready sets role to dev', () => {
+      const newRole = getNewRoleForTransition('task', 'testing', 'ready');
+      expect(newRole).toBe('dev');
+    });
+
+    it('dev can claim ready->active for dev role task', () => {
+      const result = validateTransition('task', 'ready', 'active', 'dev', 'dev');
+      expect(result).toBeNull();
+    });
+
+    it('dev can submit active->review', () => {
+      const result = validateTransition('task', 'active', 'review', 'dev', 'dev');
+      expect(result).toBeNull();
+    });
+
+    it('active->review sets role to qa', () => {
+      const newRole = getNewRoleForTransition('task', 'active', 'review');
+      expect(newRole).toBe('qa');
+    });
+
+    it('qa can send review->rework', () => {
+      const result = validateTransition('task', 'review', 'rework', 'qa', 'qa');
+      expect(result).toBeNull();
+    });
+
+    it('review->rework sets role to dev', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'rework');
+      expect(newRole).toBe('dev');
+    });
+
+    it('dev can reclaim rework->active', () => {
+      const result = validateTransition('task', 'rework', 'active', 'dev', 'dev');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('AC4: PDSA rework path (pdsa can claim pdsa rework)', () => {
+    it('pdsa can claim rework->active for pdsa role task', () => {
+      const result = validateTransition('task', 'rework', 'active', 'pdsa', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('dev cannot claim pdsa rework', () => {
+      const result = validateTransition('task', 'rework', 'active', 'dev', 'pdsa');
+      expect(result).toContain('not allowed');
+    });
+  });
+});
