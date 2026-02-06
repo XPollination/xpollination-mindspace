@@ -54,17 +54,15 @@ function checkForWork() {
   projects.forEach(proj => {
     // Query for each role using interface-cli.js
     roles.forEach(role => {
-      // Determine which statuses to check for this role
-      // Every role checks 'active' for its own tasks (agent restart recovery)
-      // - qa role: + 'ready', 'review', 'testing' (QA creates tests in testing phase)
-      // - dev/pdsa role: + 'ready', 'rework' (get rework tasks back from QA)
-      // - other roles: + 'ready' only
-      const baseStatuses = role === 'qa'
-        ? ['ready', 'review', 'testing']
-        : (role === 'dev' || role === 'pdsa')
-          ? ['ready', 'rework']
-          : ['ready'];
-      const statuses = [...baseStatuses, 'active'];
+      // Per WORKFLOW.md v9: State + Role = Context
+      // Each role monitors specific states (all include 'active' for restart recovery)
+      const STATUS_MAP = {
+        pdsa:    ['ready', 'active', 'review', 'rework'],
+        qa:      ['approved', 'testing', 'review', 'rework'],
+        dev:     ['ready', 'active', 'rework'],
+        liaison: ['approval', 'review', 'complete', 'rework', 'ready', 'active'],
+      };
+      const statuses = STATUS_MAP[role] || ['ready', 'active'];
 
       statuses.forEach(status => {
         try {
