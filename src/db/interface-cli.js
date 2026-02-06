@@ -32,7 +32,8 @@ import {
   ALLOWED_TRANSITIONS,
   validateTransition,
   getNewRoleForTransition,
-  validateType
+  validateType,
+  validateDnaRequirements
 } from './workflow-engine.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -274,6 +275,13 @@ function cmdTransition(id, newStatus, actor) {
   if (validationError) {
     db.close();
     error(validationError);
+  }
+
+  // Validate DNA requirements for this transition (e.g., pdsa_ref required for approval)
+  const dnaError = validateDnaRequirements(nodeType, fromStatus, newStatus, dna, currentRole);
+  if (dnaError) {
+    db.close();
+    error(dnaError);
   }
 
   // Check if role should change on this transition (currentRole needed for role-specific rules)

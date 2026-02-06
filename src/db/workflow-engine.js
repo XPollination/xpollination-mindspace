@@ -44,7 +44,8 @@ export const ALLOWED_TRANSITIONS = {
     // Liaison content path: liaison sends to review, Monitor=liaison (liaison presents to human)
     'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
     // AC3: active->approval - only pdsa role tasks (dev cannot skip to approval)
-    'active->approval': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'pdsa' },
+    // Requires pdsa_ref in DNA (PDSA doc must exist before human approval)
+    'active->approval': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'pdsa', requiresDna: ['pdsa_ref'] },
 
     // AC5: approval enforces role=liaison
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'liaison' },
@@ -195,5 +196,44 @@ export function validateType(type) {
   if (!VALID_TYPES.includes(type)) {
     return `Invalid type: "${type}". Only allowed: ${VALID_TYPES.join(', ')}. Use 'task' for features/requirements, 'bug' for fixes.`;
   }
+  return null;
+}
+
+/**
+ * Validate DNA requirements for a transition.
+ * Some transitions require specific DNA fields to be present.
+ *
+ * @param {string} nodeType - 'task' or 'bug'
+ * @param {string} fromStatus - Current status
+ * @param {string} toStatus - Target status
+ * @param {object} dna - The node's DNA object
+ * @param {string|null} currentRole - Current role (for role-specific rules)
+ * @returns {string|null} Error message if invalid, null if valid
+ */
+export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, currentRole = null) {
+  const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
+  if (!typeTransitions) return null;
+
+  const transitionKey = `${fromStatus}->${toStatus}`;
+
+  // Check role-specific transition first
+  let rule = null;
+  if (currentRole) {
+    rule = typeTransitions[`${transitionKey}:${currentRole}`];
+  }
+  if (!rule) {
+    rule = typeTransitions[transitionKey];
+  }
+  if (!rule) return null;
+
+  // Check DNA requirements
+  if (rule.requiresDna && Array.isArray(rule.requiresDna)) {
+    for (const field of rule.requiresDna) {
+      if (!dna || !dna[field]) {
+        return `Transition ${transitionKey} requires dna.${field} to be set. PDSA tasks must have a linked PDSA document before approval.`;
+      }
+    }
+  }
+
   return null;
 }

@@ -19,7 +19,8 @@ import {
   ALLOWED_TRANSITIONS,
   validateTransition,
   getNewRoleForTransition,
-  validateType
+  validateType,
+  validateDnaRequirements
 } from '../workflow-engine.js';
 
 // ============================================================================
@@ -487,6 +488,315 @@ describe('AC8 & AC9: Full workflow paths', () => {
     it('dev cannot claim pdsa rework', () => {
       const result = validateTransition('task', 'rework', 'active', 'dev', 'pdsa');
       expect(result).toContain('not allowed');
+    });
+  });
+});
+
+// ============================================================================
+// WORKFLOW.md v12: Human-Decision Transitions (liaison executes)
+// Source of Truth: docs/WORKFLOW.md
+// ============================================================================
+
+describe('WORKFLOW.md v12: Human-Decision Transitions', () => {
+
+  describe('approval → approved/rework (human gate)', () => {
+    it('liaison can approve approval->approved', () => {
+      const result = validateTransition('task', 'approval', 'approved', 'liaison', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('thomas can approve approval->approved', () => {
+      const result = validateTransition('task', 'approval', 'approved', 'thomas', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('liaison can reject approval->rework (autonomous)', () => {
+      const result = validateTransition('task', 'approval', 'rework', 'liaison', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('thomas can reject approval->rework (human decision)', () => {
+      const result = validateTransition('task', 'approval', 'rework', 'thomas', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('dev cannot reject approval->rework', () => {
+      const result = validateTransition('task', 'approval', 'rework', 'dev', 'pdsa');
+      expect(result).toContain('not allowed');
+    });
+
+    it('approval->rework routes to pdsa (design rejected, pdsa reworks)', () => {
+      const newRole = getNewRoleForTransition('task', 'approval', 'rework');
+      expect(newRole).toBe('pdsa');
+    });
+  });
+
+  describe('review+liaison → complete/rework (final human gate)', () => {
+    it('liaison can complete review+liaison (human approves final)', () => {
+      const result = validateTransition('task', 'review', 'complete', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('review->complete with role=liaison sets role to liaison', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'complete', 'liaison');
+      expect(newRole).toBe('liaison');
+    });
+
+    it('liaison can rework review+liaison (human rejects final)', () => {
+      const result = validateTransition('task', 'review', 'rework', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('review->rework with role=liaison routes to liaison (not dev)', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'rework', 'liaison');
+      expect(newRole).toBe('liaison');
+    });
+  });
+
+  describe('complete → rework (human reopens)', () => {
+    it('liaison can transition complete->rework', () => {
+      const result = validateTransition('task', 'complete', 'rework', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+
+    it('dev cannot transition complete->rework', () => {
+      const result = validateTransition('task', 'complete', 'rework', 'dev', 'liaison');
+      expect(result).toContain('not allowed');
+    });
+
+    it('qa cannot transition complete->rework', () => {
+      const result = validateTransition('task', 'complete', 'rework', 'qa', 'liaison');
+      expect(result).toContain('not allowed');
+    });
+
+    it('pdsa cannot transition complete->rework', () => {
+      const result = validateTransition('task', 'complete', 'rework', 'pdsa', 'liaison');
+      expect(result).toContain('not allowed');
+    });
+
+    it('liaison can reopen bugs complete->rework', () => {
+      const result = validateTransition('bug', 'complete', 'rework', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+  });
+});
+
+// ============================================================================
+// WORKFLOW.md v12: Rework Routing (7 entry points)
+// ============================================================================
+
+describe('WORKFLOW.md v12: Rework Routing', () => {
+
+  describe('Rework role assignment per entry point', () => {
+    // Entry 1+2: approval->rework → pdsa (liaison autonomous OR human rejects design)
+    it('approval->rework routes to pdsa', () => {
+      const newRole = getNewRoleForTransition('task', 'approval', 'rework');
+      expect(newRole).toBe('pdsa');
+    });
+
+    // Entry 3: review+qa rework → dev (QA finds test issues)
+    it('review->rework with role=qa routes to dev', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'rework', 'qa');
+      expect(newRole).toBe('dev');
+    });
+
+    // Entry 4: review+pdsa rework → dev (PDSA finds design mismatch)
+    it('review->rework with role=pdsa routes to dev', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'rework', 'pdsa');
+      expect(newRole).toBe('dev');
+    });
+
+    // Entry 5: review+liaison rework → liaison (human rejects liaison content)
+    it('review->rework with role=liaison routes to liaison', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'rework', 'liaison');
+      expect(newRole).toBe('liaison');
+    });
+  });
+
+  describe('PDSA review actors', () => {
+    it('pdsa can rework from review+pdsa', () => {
+      const result = validateTransition('task', 'review', 'rework', 'pdsa', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('qa can rework from review+qa', () => {
+      const result = validateTransition('task', 'review', 'rework', 'qa', 'qa');
+      expect(result).toBeNull();
+    });
+  });
+});
+
+// ============================================================================
+// WORKFLOW.md v12: Liaison Content Path - Rework Re-entry
+// ============================================================================
+
+describe('WORKFLOW.md v12: Liaison Rework Re-entry', () => {
+
+  it('liaison can reclaim rework->active for liaison role task', () => {
+    const result = validateTransition('task', 'rework', 'active', 'liaison', 'liaison');
+    expect(result).toBeNull();
+  });
+
+  it('dev cannot claim liaison rework', () => {
+    const result = validateTransition('task', 'rework', 'active', 'dev', 'liaison');
+    expect(result).not.toBeNull(); // Must be rejected
+  });
+
+  it('rework->active for liaison preserves liaison role', () => {
+    const newRole = getNewRoleForTransition('task', 'rework', 'active', 'liaison');
+    expect(newRole).toBeNull(); // Role preserved, not changed
+  });
+});
+
+// ============================================================================
+// WORKFLOW.md v12: QA Rework Re-entry (active+qa → testing)
+// ============================================================================
+
+describe('WORKFLOW.md v12: QA Rework Re-entry', () => {
+
+  it('qa can transition active->testing when role=qa', () => {
+    const result = validateTransition('task', 'active', 'testing', 'qa', 'qa');
+    expect(result).toBeNull();
+  });
+
+  it('dev cannot transition active->testing', () => {
+    const result = validateTransition('task', 'active', 'testing', 'dev', 'dev');
+    expect(result).toContain('not allowed');
+  });
+
+  it('active->testing sets role to qa', () => {
+    const newRole = getNewRoleForTransition('task', 'active', 'testing', 'qa');
+    expect(newRole).toBe('qa');
+  });
+
+  it('qa can then transition testing->ready (hand to dev)', () => {
+    const result = validateTransition('task', 'testing', 'ready', 'qa', 'qa');
+    expect(result).toBeNull();
+  });
+
+  it('testing->ready sets role to dev', () => {
+    const newRole = getNewRoleForTransition('task', 'testing', 'ready');
+    expect(newRole).toBe('dev');
+  });
+});
+
+// ============================================================================
+// WORKFLOW.md v12: Review Chain (review→review with role change)
+// ============================================================================
+
+describe('WORKFLOW.md v12: Review Chain Transitions', () => {
+
+  describe('review+qa → review+pdsa (QA approves, PDSA verifies)', () => {
+    it('qa can transition review->review when role=qa', () => {
+      const result = validateTransition('task', 'review', 'review', 'qa', 'qa');
+      expect(result).toBeNull();
+    });
+
+    it('review->review with role=qa sets role to pdsa', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'review', 'qa');
+      expect(newRole).toBe('pdsa');
+    });
+
+    it('dev cannot transition review->review', () => {
+      const result = validateTransition('task', 'review', 'review', 'dev', 'qa');
+      expect(result).toContain('not allowed');
+    });
+  });
+
+  describe('review+pdsa → review+liaison (PDSA approves, liaison presents)', () => {
+    it('pdsa can transition review->review when role=pdsa', () => {
+      const result = validateTransition('task', 'review', 'review', 'pdsa', 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('review->review with role=pdsa sets role to liaison', () => {
+      const newRole = getNewRoleForTransition('task', 'review', 'review', 'pdsa');
+      expect(newRole).toBe('liaison');
+    });
+  });
+
+  describe('review+liaison → complete (human approves via liaison)', () => {
+    // Already covered in Human-Decision Transitions tests
+    it('liaison can complete from review+liaison', () => {
+      const result = validateTransition('task', 'review', 'complete', 'liaison', 'liaison');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Full review chain path', () => {
+    it('review chain: qa→pdsa→liaison role progression', () => {
+      // Step 1: review+qa - QA approves → role changes to pdsa
+      const role1 = getNewRoleForTransition('task', 'review', 'review', 'qa');
+      expect(role1).toBe('pdsa');
+
+      // Step 2: review+pdsa - PDSA approves → role changes to liaison
+      const role2 = getNewRoleForTransition('task', 'review', 'review', 'pdsa');
+      expect(role2).toBe('liaison');
+
+      // Step 3: review+liaison - human approves → complete
+      const role3 = getNewRoleForTransition('task', 'review', 'complete', 'liaison');
+      expect(role3).toBe('liaison');
+    });
+  });
+});
+
+// ============================================================================
+// AC5: DNA Requirements Validation (pdsa_ref required for approval)
+// ============================================================================
+
+describe('AC5: DNA Requirements Validation', () => {
+
+  describe('active->approval requires pdsa_ref', () => {
+    it('allows active->approval when pdsa_ref is set', () => {
+      const dna = { role: 'pdsa', pdsa_ref: 'pdsa/my-design.md' };
+      const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('rejects active->approval when pdsa_ref is missing', () => {
+      const dna = { role: 'pdsa' };
+      const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
+      expect(result).toContain('pdsa_ref');
+      expect(result).toContain('PDSA');
+    });
+
+    it('rejects active->approval when dna is null', () => {
+      const result = validateDnaRequirements('task', 'active', 'approval', null, 'pdsa');
+      expect(result).toContain('pdsa_ref');
+    });
+
+    it('rejects active->approval when pdsa_ref is empty string', () => {
+      const dna = { role: 'pdsa', pdsa_ref: '' };
+      const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
+      expect(result).toContain('pdsa_ref');
+    });
+  });
+
+  describe('other transitions do not require pdsa_ref', () => {
+    it('allows pending->ready without pdsa_ref', () => {
+      const dna = { role: 'pdsa' };
+      const result = validateDnaRequirements('task', 'pending', 'ready', dna, null);
+      expect(result).toBeNull();
+    });
+
+    it('allows ready->active without pdsa_ref', () => {
+      const dna = { role: 'pdsa' };
+      const result = validateDnaRequirements('task', 'ready', 'active', dna, 'pdsa');
+      expect(result).toBeNull();
+    });
+
+    it('allows active->review (dev path) without pdsa_ref', () => {
+      const dna = { role: 'dev' };
+      const result = validateDnaRequirements('task', 'active', 'review', dna, 'dev');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('bug type does not require pdsa_ref', () => {
+    it('allows bug active->review without pdsa_ref', () => {
+      const dna = { role: 'dev' };
+      const result = validateDnaRequirements('bug', 'active', 'review', dna, 'dev');
+      expect(result).toBeNull();
     });
   });
 });
