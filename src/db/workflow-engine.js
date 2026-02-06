@@ -44,8 +44,8 @@ export const ALLOWED_TRANSITIONS = {
     // Liaison content path: liaison sends to review, Monitor=liaison (liaison presents to human)
     'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
     // Per WORKFLOW.md v12 line 15: only pdsa submits to approval (human gate)
-    // Requires pdsa_ref in DNA (PDSA doc must exist before human approval)
-    'active->approval': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['pdsa_ref'] },
+    // Requires pdsa_ref in DNA. Monitor=liaison, so set newRole: liaison
+    'active->approval': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['pdsa_ref'], newRole: 'liaison' },
 
     // AC5: approval enforces role=liaison
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'liaison' },
