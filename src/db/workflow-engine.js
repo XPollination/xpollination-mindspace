@@ -71,8 +71,9 @@ export const ALLOWED_TRANSITIONS = {
     // Per WORKFLOW.md v12: QA active->testing transition (only QA actor, sets qa role)
     'active->testing': { allowedActors: ['qa'], newRole: 'qa' },
 
-    // Review flow - per WORKFLOW.md: pdsa completes PDSA path, liaison completes liaison path
-    'review->complete': { allowedActors: ['pdsa', 'liaison'], newRole: 'liaison' },
+    // Review flow - per WORKFLOW.md v12: only liaison (human proxy) can complete
+    // PDSA forwards via review->review:pdsa, does not complete directly
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
     // Per WORKFLOW.md v12: review+liaison -> rework routes back to liaison (human rejects final)
     'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
