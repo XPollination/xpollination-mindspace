@@ -38,14 +38,14 @@ export const ALLOWED_TRANSITIONS = {
     'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
     'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
 
-    // AC3: active->review - pdsa MUST go through approval (requireRole enforces this)
-    // Per WORKFLOW.md: dev sends to review, Monitor=qa (QA reviews dev work)
-    'active->review': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'dev', newRole: 'qa' },
+    // Per WORKFLOW.md v12 line 21: dev sends to review, Monitor=qa (QA reviews dev work)
+    // ONLY dev can do active->review. PDSA MUST use active->approval instead.
+    'active->review': { allowedActors: ['dev'], requireRole: 'dev', newRole: 'qa' },
     // Liaison content path: liaison sends to review, Monitor=liaison (liaison presents to human)
     'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
-    // AC3: active->approval - only pdsa role tasks (dev cannot skip to approval)
+    // Per WORKFLOW.md v12 line 15: only pdsa submits to approval (human gate)
     // Requires pdsa_ref in DNA (PDSA doc must exist before human approval)
-    'active->approval': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'pdsa', requiresDna: ['pdsa_ref'] },
+    'active->approval': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['pdsa_ref'] },
 
     // AC5: approval enforces role=liaison
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'liaison' },
