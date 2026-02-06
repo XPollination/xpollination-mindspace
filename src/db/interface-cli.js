@@ -112,26 +112,24 @@ const FIELD_VALIDATORS = {
     return null;
   },
 
-  // Validate pdsa_ref field (must be object with git and/or workspace)
+  // Validate pdsa_ref field (must be git-relative path or GitHub URL)
   pdsa_ref: (value) => {
-    if (typeof value === 'string') {
-      return `pdsa_ref must be an object {git, workspace}, not a string. Got: "${value}"`;
+    // Must be a string
+    if (typeof value !== 'string') {
+      return `pdsa_ref must be a git-relative path string (e.g., pdsa/filename.md), not ${typeof value}`;
     }
-    if (typeof value !== 'object' || value === null) {
-      return `pdsa_ref must be an object {git, workspace}`;
+
+    // Reject filesystem paths
+    if (value.startsWith('/') || value.includes('/home/') || value.includes('workspaces/')) {
+      return `pdsa_ref must be a git-relative path (e.g., pdsa/filename.md) or GitHub URL. Filesystem paths are not allowed. Current value rejected: "${value}"`;
     }
-    if (!value.git && !value.workspace) {
-      return `pdsa_ref must have at least git or workspace property`;
+
+    // Must match valid patterns: pdsa/, docs/, or https://github.com/
+    const validPattern = /^(pdsa\/|docs\/|https:\/\/github\.com\/)/;
+    if (!validPattern.test(value)) {
+      return `pdsa_ref must start with pdsa/, docs/, or https://github.com/. Current value rejected: "${value}"`;
     }
-    if (value.git && !value.git.endsWith('.pdsa.md')) {
-      return `pdsa_ref.git must end with .pdsa.md: "${value.git}"`;
-    }
-    if (value.workspace && !value.workspace.endsWith('.pdsa.md')) {
-      return `pdsa_ref.workspace must end with .pdsa.md: "${value.workspace}"`;
-    }
-    if (value.workspace && !existsSync(value.workspace)) {
-      return `pdsa_ref.workspace file does not exist: "${value.workspace}"`;
-    }
+
     return null;
   }
 };
@@ -278,8 +276,8 @@ function cmdTransition(id, newStatus, actor) {
     error(validationError);
   }
 
-  // Check if role should change on this transition
-  const newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus);
+  // Check if role should change on this transition (currentRole needed for role-specific rules)
+  const newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus, currentRole);
   let updatedDna = dna;
   if (newRole && newRole !== currentRole) {
     updatedDna = { ...dna, role: newRole };
