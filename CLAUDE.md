@@ -41,6 +41,23 @@ stat -c%s /tmp/agent-work-dev.json 2>/dev/null || echo 0
    - `dna.implementation` = what you built (for dev tasks)
 6. Complete task: `node src/db/interface-cli.js transition <slug> review <actor>`
 
+### Monitoring Discipline (CRITICAL)
+
+**After completing ANY task, actively poll for new work. Don't wait to be told.**
+
+```
+Submit task → Wait 30s → Check work file → If 0, repeat → If >0, process
+```
+
+**Rules:**
+1. **Never diagnose monitor issues without reading the log first** - `tail -20 /tmp/agent-monitor-{role}.log`
+2. **Never kill the monitor without evidence it's broken** - check if it's still polling (new timestamps)
+3. **After submitting a task, poll the work file every 30-60s** - don't wait to be told
+4. **The monitor works. Trust it.** If you miss work, it's because you stopped checking
+5. **Check the work FILE, not the code** - `stat -c%s /tmp/agent-work-{role}.json`
+
+**Common mistake:** Agent checks once, sees no work (`-`), stops checking. Meanwhile rework arrives and sits unnoticed.
+
 ### Database Interface CLI (Regulated Access)
 All agents use `src/db/interface-cli.js` for database operations:
 ```bash
