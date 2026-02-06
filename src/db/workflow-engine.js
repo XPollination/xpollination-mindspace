@@ -39,14 +39,17 @@ export const ALLOWED_TRANSITIONS = {
     'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
 
     // AC3: active->review - pdsa MUST go through approval (requireRole enforces this)
+    // Per WORKFLOW.md: dev sends to review, Monitor=qa (QA reviews dev work)
     'active->review': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'dev', newRole: 'qa' },
-    'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'qa' },
+    // Liaison content path: liaison sends to review, Monitor=liaison (liaison presents to human)
+    'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
     // AC3: active->approval - only pdsa role tasks (dev cannot skip to approval)
     'active->approval': { allowedActors: ['pdsa', 'dev', 'liaison'], requireRole: 'pdsa' },
 
     // AC5: approval enforces role=liaison
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'liaison' },
-    'approval->rework': { allowedActors: ['liaison', 'thomas'] },
+    // Per WORKFLOW.md: approval->rework routes to pdsa (design rejected, pdsa reworks)
+    'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa' },
 
     // AC6 & AC7: QA testing phase
     'approved->testing': { allowedActors: ['liaison', 'system'], newRole: 'qa' },
@@ -56,15 +59,28 @@ export const ALLOWED_TRANSITIONS = {
     // Legacy path (approved->ready for non-TDD flow)
     'approved->ready': { allowedActors: ['liaison', 'system'], newRole: 'dev' },
 
-    // AC4: rework->active allows pdsa, dev, qa (role-matched)
-    'rework->active': { allowedActors: ['pdsa', 'dev', 'qa'] },
+    // AC4: rework->active allows pdsa, dev, qa, liaison (role-matched)
+    'rework->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'] },
     'rework->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
     'rework->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
     'rework->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
+    // Per WORKFLOW.md v12: liaison reclaims liaison rework
+    'rework->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
 
-    // Review flow - only liaison can finalize completion
-    'review->complete': { allowedActors: ['liaison'] },
+    // Per WORKFLOW.md v12: QA active->testing transition (only QA actor, sets qa role)
+    'active->testing': { allowedActors: ['qa'], newRole: 'qa' },
+
+    // Review flow - per WORKFLOW.md: pdsa completes PDSA path, liaison completes liaison path
+    'review->complete': { allowedActors: ['pdsa', 'liaison'], newRole: 'liaison' },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
+    // Per WORKFLOW.md v12: review+liaison -> rework routes back to liaison (human rejects final)
+    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
+    // Per WORKFLOW.md v12: review chain transitions (QA->PDSA->Liaison)
+    'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
+    'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
+
+    // Per WORKFLOW.md v12: complete->rework (human reopens task)
+    'complete->rework': { allowedActors: ['liaison'] },
 
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system'] },
@@ -74,10 +90,14 @@ export const ALLOWED_TRANSITIONS = {
   'bug': {
     'pending->ready': { allowedActors: ['liaison', 'pdsa', 'system'], newRole: 'dev' },
     'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
+    // Per WORKFLOW.md: dev sends to review, Monitor=qa (QA reviews)
     'active->review': { allowedActors: ['dev'], newRole: 'qa' },
-    'review->complete': { allowedActors: ['liaison'] },  // Only liaison can finalize
+    // Bug path: only liaison can finalize completion (QA reviews but doesn't complete)
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
     'rework->active': { allowedActors: ['dev'] },
+    // Per WORKFLOW.md v12: complete->rework (human reopens bug)
+    'complete->rework': { allowedActors: ['liaison'] },
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system'] },
     'any->cancelled': { allowedActors: ['liaison', 'system'] }
