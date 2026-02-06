@@ -55,11 +55,16 @@ function checkForWork() {
     // Query for each role using interface-cli.js
     roles.forEach(role => {
       // Determine which statuses to check for this role
-      // - qa role: check both 'ready' AND 'review' (QA reviews tasks in review status)
-      // - dev role: check both 'ready' AND 'rework' (dev gets rework tasks back from QA)
-      // - pdsa role: check both 'ready' AND 'rework' (pdsa gets rework tasks back from QA)
-      // - other roles: check 'ready' only
-      const statuses = role === 'qa' ? ['ready', 'review'] : (role === 'dev' || role === 'pdsa') ? ['ready', 'rework'] : ['ready'];
+      // Every role checks 'active' for its own tasks (agent restart recovery)
+      // - qa role: + 'ready', 'review', 'testing' (QA creates tests in testing phase)
+      // - dev/pdsa role: + 'ready', 'rework' (get rework tasks back from QA)
+      // - other roles: + 'ready' only
+      const baseStatuses = role === 'qa'
+        ? ['ready', 'review', 'testing']
+        : (role === 'dev' || role === 'pdsa')
+          ? ['ready', 'rework']
+          : ['ready'];
+      const statuses = [...baseStatuses, 'active'];
 
       statuses.forEach(status => {
         try {
