@@ -24,17 +24,17 @@ Monitor multiple projects for tasks assigned to specified roles. Single script s
 
 ### What to Monitor
 
-**Query:** Nodes with `status='ready'` AND `role` in dna_json is `pdsa` OR `qa`
+**Query:** Nodes with `status='ready'` AND `role` in dna_json is `pdsa`
 
 ```sql
 SELECT id, slug, type, status, dna_json
 FROM mindspace_nodes
 WHERE status = 'ready'
-  AND (dna_json LIKE '%"role":"pdsa"%' OR dna_json LIKE '%"role":"qa"%')
+  AND dna_json LIKE '%"role":"pdsa"%'
 ```
 
 - **Any type is valid:** task, design, requirement, etc.
-- **Role determines assignment:** `role:pdsa` or `role:qa` in dna_json
+- **Role determines assignment:** `role:pdsa` in dna_json
 - **Status must be `ready`:** indicates work is available
 
 ### Node.js Implementation
@@ -61,22 +61,22 @@ function checkProjects() {
     try {
       const db = new Database(project.path, { readonly: true });
 
-      // Check for nodes assigned to pdsa or qa role
+      // Check for nodes assigned to pdsa role
       const nodes = db.prepare(`
         SELECT id, slug, type, status, dna_json
         FROM mindspace_nodes
         WHERE status = 'ready'
-          AND (dna_json LIKE '%"role":"pdsa"%' OR dna_json LIKE '%"role":"qa"%')
+          AND dna_json LIKE '%"role":"pdsa"%'
       `).all();
 
       if (nodes.length > 0) {
-        console.log(`[${project.name}] ${nodes.length} node(s) for PDSA/QA:`);
+        console.log(`[${project.name}] ${nodes.length} node(s) for PDSA:`);
         nodes.forEach(n => {
           const dna = JSON.parse(n.dna_json || '{}');
           console.log(`  - ${n.slug} (${n.type}) role:${dna.role}`);
         });
       } else {
-        console.log(`[${project.name}] No work for PDSA/QA`);
+        console.log(`[${project.name}] No work for PDSA`);
       }
 
       db.close();
@@ -95,9 +95,9 @@ checkProjects();
 **Script:** `viz/agent-monitor.cjs` (parameterized)
 
 ```bash
-# Start for PDSA+QA agent
+# Start for PDSA agent
 source ~/.nvm/nvm.sh
-nohup node viz/agent-monitor.cjs pdsa qa > /tmp/agent-monitor.log 2>&1 &
+nohup node viz/agent-monitor.cjs pdsa > /tmp/agent-monitor-pdsa.log 2>&1 &
 
 # Start for Dev agent
 nohup node viz/agent-monitor.cjs dev > /tmp/agent-monitor-dev.log 2>&1 &
@@ -105,20 +105,20 @@ nohup node viz/agent-monitor.cjs dev > /tmp/agent-monitor-dev.log 2>&1 &
 
 **Output files per role:**
 - `/tmp/agent-work-pdsa.json`
-- `/tmp/agent-work-qa.json`
 - `/tmp/agent-work-dev.json`
 
 ### Minimal Token Monitoring (inside Claude)
 
 Check for work with byte count (minimal tokens):
 ```bash
+# PDSA agent checks:
 stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
 ```
 - Returns `0` = no work
 - Returns `>0` = work found, read the file
 
 **Workflow (CONTINUOUS LOOP):**
-1. Background script polls DB every 30s, writes to `/tmp/agent-work-{role}.json`
+1. Background script polls DB every 30s, writes to `/tmp/agent-work-pdsa.json`
 2. Claude checks file size: `stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0`
 3. If >0 bytes, read file and process ALL tasks in order
 4. After processing (or if 0 bytes), **wait 30s and goto step 2**

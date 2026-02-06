@@ -11,8 +11,8 @@ MCP (Model Context Protocol) server that powers the XPollination content generat
 ### Start Monitor (once per agent session)
 ```bash
 source ~/.nvm/nvm.sh
-# PDSA+QA agent:
-nohup node viz/agent-monitor.cjs pdsa qa > /tmp/agent-monitor-pdsa.log 2>&1 &
+# PDSA agent:
+nohup node viz/agent-monitor.cjs pdsa > /tmp/agent-monitor-pdsa.log 2>&1 &
 
 # Dev agent:
 nohup node viz/agent-monitor.cjs dev > /tmp/agent-monitor-dev.log 2>&1 &
@@ -20,9 +20,8 @@ nohup node viz/agent-monitor.cjs dev > /tmp/agent-monitor-dev.log 2>&1 &
 
 ### Check for Work (minimal tokens)
 ```bash
-# PDSA/QA agent checks:
+# PDSA agent checks:
 stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
-stat -c%s /tmp/agent-work-qa.json 2>/dev/null || echo 0
 
 # Dev agent checks:
 stat -c%s /tmp/agent-work-dev.json 2>/dev/null || echo 0
