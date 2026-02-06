@@ -2,141 +2,150 @@
 
 **Date:** 2026-02-06
 **Task:** security-agent-role-verification
-**Status:** Iteration 1
+**Status:** Iteration 2 (rework v3 — auto-registration, zero human involvement)
 
 ---
 
 ## PLAN
 
 ### Problem Statement
-On 2026-02-06, a liaison agent transitioned a task using `actor=pdsa`, simulating another role. The CLI (`interface-cli.js`) accepts any actor string without verification. This bypasses workflow gates and corrupts coordination state.
+On 2026-02-06, a liaison agent transitioned a task using `actor=pdsa`, simulating another role. The CLI accepts any actor string without verification.
 
-### Investigation Findings
+### Rework v3 Feedback
+Thomas rejected the manual key approach: "Key generation must be fully automatic — zero human involvement." Human only starts agents with a role parameter; everything else is automatic.
 
-**Security boundary analysis:**
-All agents run as the same OS user (`developer`) in the same tmux session. This means:
-
-| Mechanism | Private across panes? | Notes |
-|---|---|---|
-| tmux pane options (`@var`) | NO | Readable via `tmux list-panes -F '#{@var}'` |
-| Environment variables | NO | Readable via `/proc/<pid>/environ` (same user) |
-| File permissions | NO | Same user = same read access |
-| tmux pane labels | NO | Readable via `tmux list-panes` |
-
-**Conclusion:** True cryptographic isolation between agents is impossible with single-user tmux. Any mechanism an agent can read, another agent CAN read if it tries.
-
-**Actual threat model:**
-The threat is NOT malicious agents. Claude agents follow their instructions. The threat is **accidental role confusion** — an agent using the wrong actor name by mistake or because its instructions were ambiguous. The guard rail must catch this failure mode.
-
-### Design Direction
-Environment variable + CLI validation. Simple, effective for the actual threat. Honest about limitations.
+### Security Boundary (unchanged from v1)
+All agents run as same OS user in same tmux session. True isolation impossible. The guard rail catches **accidental role confusion**, not malicious agents.
 
 ---
 
 ## DO
 
-### 1. Agent Key System
+### 1. Agent Self-Registration
 
-**Key generation:** Human generates a random key per role per session.
+**Flow:**
+```
+1. Human starts agent (Claude) in tmux pane with role instruction
+2. Agent's first action: register with the PM system
+3. CLI generates unique key, stores key→role mapping
+4. Agent receives key, exports to its environment
+5. All subsequent CLI calls use this key automatically
+```
+
+**Registration command:**
 ```bash
-# Example: generate 8-char hex keys
-openssl rand -hex 4  # → e.g., a3f7c9d1
+node src/db/interface-cli.js register <role>
+# Returns: {"key":"a3f7c9d1","role":"pdsa","registered_at":"..."}
 ```
 
-**Key distribution:** Human sets env var in each tmux pane at agent startup:
+**What happens internally:**
+1. Generate random 8-char hex key: `crypto.randomBytes(4).toString('hex')`
+2. Store in `data/agent-keys.json` (runtime file, NOT git-tracked):
+   ```json
+   {
+     "keys": {
+       "a3f7c9d1": {"role": "pdsa", "registered_at": "2026-02-06T10:00:00Z", "pane": "%6"},
+       "b2e8d4f0": {"role": "dev", "registered_at": "2026-02-06T10:00:05Z", "pane": "%7"}
+     }
+   }
+   ```
+3. Return the key to the agent
+
+**Agent startup (in CLAUDE.md or agent instructions):**
 ```bash
-export AGENT_KEY=a3f7c9d1
+# Agent registers itself on startup
+AGENT_KEY=$(node src/db/interface-cli.js register pdsa | node -e "process.stdin.on('data',d=>process.stdout.write(JSON.parse(d).key))")
+export AGENT_KEY
 ```
 
-**Key-role mapping (git-tracked):**
-File: `config/agent-keys.json`
-```json
-{
-  "keys": {
-    "a3f7c9d1": "pdsa",
-    "b2e8d4f0": "dev",
-    "c1d9e5a2": "qa",
-    "d0c8f6b3": "liaison"
-  },
-  "generated_at": "2026-02-06T10:00:00Z",
-  "note": "Rotate keys each session. Keys are guard rails, not cryptographic secrets."
-}
-```
-
-### 2. CLI Changes (interface-cli.js)
+### 2. CLI Validation (same as v1, different key source)
 
 **For state-changing operations** (transition, update-dna, create):
 1. Read `$AGENT_KEY` from environment
-2. Look up role in `config/agent-keys.json`
-3. If key not found → reject with error
-4. If key's role doesn't match actor parameter → reject with clear error
+2. Look up role in `data/agent-keys.json`
+3. If key not found → reject: `Unknown AGENT_KEY. Run: register <role>`
+4. If key's role doesn't match actor → reject: `Role mismatch: key grants role=dev, used actor=pdsa`
 5. If valid → proceed
 
-**Read operations** (get, list): No key required. Information is not sensitive.
+**Read operations** (get, list): No key required.
 
 **Error messages:**
 ```
-No AGENT_KEY environment variable set. Set it: export AGENT_KEY=<your-key>
-Unknown key. Check config/agent-keys.json for valid keys.
+No AGENT_KEY set. Register first: AGENT_KEY=$(node src/db/interface-cli.js register <role> | ...)
+Unknown AGENT_KEY. Register: node src/db/interface-cli.js register <role>
 Role mismatch: your key grants role=dev, but you used actor=pdsa. Use actor=dev.
 ```
 
-**Bypass for system actor:** `actor=system` requires a separate system key (or `--force` flag with warning log).
+### 3. Key Storage
 
-### 3. Human Workflow
+**Location:** `data/agent-keys.json` (runtime, gitignored)
+- NOT git-tracked (keys are ephemeral per session)
+- Created automatically on first `register` call
+- Each agent registers independently
+- Multiple agents can register for same role (e.g., two dev panes)
 
-**Session startup:**
-1. Generate keys: `openssl rand -hex 4` (one per role)
-2. Update `config/agent-keys.json` with new keys
-3. Commit and push (keys are git-tracked — they're guard rails, not secrets)
-4. Set env var in each agent's tmux pane before starting Claude:
-   ```bash
-   export AGENT_KEY=a3f7c9d1  # PDSA pane
-   export AGENT_KEY=b2e8d4f0  # Dev pane
-   ```
-5. Optionally set pane title for visual verification:
-   ```bash
-   tmux select-pane -T "PDSA:a3f7c9d1"
-   ```
+### 4. Deregistration (optional)
 
-### 4. Implementation Subtasks
+```bash
+node src/db/interface-cli.js deregister <key>
+```
+Removes key from mapping. Useful for cleanup, but not required — keys file is ephemeral.
 
-1. **ST1:** Create `config/agent-keys.json` schema and initial file
-2. **ST2:** Add key validation to interface-cli.js (transition, update-dna, create commands)
+### 5. Audit Trail
+
+Each registration logged to `data/agent-audit.log`:
+```
+2026-02-06T10:00:00Z REGISTER role=pdsa key=a3f7c9d1 pane=%6
+2026-02-06T10:05:00Z TRANSITION slug=my-task from=ready to=active actor=pdsa key=a3f7c9d1
+```
+
+### 6. Human Workflow (simplified)
+
+**Before (rejected):** Generate keys, update JSON, set env vars per pane.
+**After:** Start Claude agent with role instruction. Agent self-registers. Done.
+
+```
+Human starts agent → Agent reads role from instructions → Agent runs register → Agent has key → Done
+```
+
+### 7. Implementation Subtasks
+
+1. **ST1:** Add `register` command to interface-cli.js (generates key, stores in data/agent-keys.json)
+2. **ST2:** Add key validation to transition/update-dna/create commands
 3. **ST3:** Add clear error messages for missing key, unknown key, role mismatch
-4. **ST4:** Update agent-monitor.cjs to pass through AGENT_KEY (read-only, no key needed)
-5. **ST5:** Write tests for key validation (valid key, missing key, wrong role, unknown key)
-6. **ST6:** Document key generation and distribution process
+4. **ST4:** Add `data/agent-keys.json` to .gitignore
+5. **ST5:** Add audit logging (data/agent-audit.log)
+6. **ST6:** Write tests: register, validate, mismatch, missing key
+7. **ST7:** Update CLAUDE.md with agent startup registration command
 
 ---
 
 ## STUDY
 
-### Why environment variables (despite not being truly private)?
+### v1 vs v2 Comparison
 
-1. **Catches the actual failure mode:** Agent accidentally uses wrong actor name → CLI rejects immediately
-2. **Zero friction for correct use:** Agent's env var is set once, every CLI call auto-validates
-3. **Honest security model:** We acknowledge the limitation rather than building false confidence
-4. **Simple to implement:** ~20 lines of validation code in CLI
-5. **Simple to operate:** Human generates keys, sets env vars, done
+| Aspect | v1 (manual) | v2 (auto-register) |
+|---|---|---|
+| Key generation | Human runs openssl | CLI generates automatically |
+| Key distribution | Human sets env vars | Agent self-registers |
+| Human steps | 4+ per session | 0 (just start agents) |
+| Key storage | git-tracked JSON | runtime file (gitignored) |
+| Rotation | Manual | Automatic per session |
+| Multiple agents same role | One key per role | Each agent gets unique key |
 
-### What this does NOT protect against
-- An agent deliberately reading another pane's /proc/pid/environ (but agents follow instructions)
-- An agent reading config/agent-keys.json and using another role's key (but agents follow instructions)
-- A compromised agent — but if an agent is compromised, we have bigger problems
+### Why auto-registration works
 
-### Trade-offs
-| Pro | Con |
-|---|---|
-| Catches accidental role confusion | Not cryptographically secure |
-| Simple to implement and operate | Requires human key distribution per session |
-| Git-tracked keys = auditable | Extra step in session startup |
-| Clear error messages guide agents | Agents could theoretically bypass |
+1. **Zero friction:** Agent registers on startup, no human steps
+2. **Unique keys per agent:** Two dev agents get different keys (auditable)
+3. **Ephemeral:** Keys don't persist across sessions (data/ file, not git)
+4. **Same guard rail:** Still catches accidental role confusion
+5. **Same limitation:** Not cryptographically secure (same user), but that's honest
 
 ### Risks
-- **Key rotation forgotten:** Human forgets to update keys. Mitigation: keys from last session still work, just update periodically.
-- **Key committed but not distributed:** Human updates JSON but forgets to set env vars. Mitigation: clear error message tells agent exactly what to do.
-- **Over-engineering risk:** This is a guard rail for a 3-agent system on one server. Keep it simple.
+
+- **Race condition:** Two agents register simultaneously. Mitigation: file locking or atomic writes.
+- **Key file corruption:** Mitigation: validate JSON on read, regenerate if corrupt.
+- **Agent forgets to register:** Mitigation: clear error message tells agent exactly how to register.
 
 ---
 
@@ -144,14 +153,15 @@ Role mismatch: your key grants role=dev, but you used actor=pdsa. Use actor=dev.
 
 ### Acceptance Criteria for Dev
 
-- [ ] AC1: `interface-cli.js` reads `$AGENT_KEY` for transition/update-dna/create
-- [ ] AC2: CLI validates key against `config/agent-keys.json`
+- [ ] AC1: `register <role>` command generates key and stores in `data/agent-keys.json`
+- [ ] AC2: `transition`/`update-dna`/`create` validate `$AGENT_KEY` against stored keys
 - [ ] AC3: Role mismatch returns clear error with correct role hint
-- [ ] AC4: Missing/unknown key returns actionable error message
+- [ ] AC4: Missing/unknown key returns actionable error with register command
 - [ ] AC5: Read operations (get, list) work without key
-- [ ] AC6: Tests cover: valid key, missing key, unknown key, role mismatch
-- [ ] AC7: `config/agent-keys.json` exists with documented schema
-- [ ] AC8: Process documented (key generation, distribution, rotation)
+- [ ] AC6: `data/agent-keys.json` is gitignored
+- [ ] AC7: Audit log written to `data/agent-audit.log`
+- [ ] AC8: Tests cover: register, valid key, missing key, unknown key, role mismatch
+- [ ] AC9: CLAUDE.md updated with agent startup registration command
 
 ### Next Steps
 1. Liaison approves this PDSA
