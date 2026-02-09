@@ -271,6 +271,10 @@
       fill: #22c55e;
       stroke: #4ade80;
     }
+    .package-box.status-testing {
+      fill: #10b981;
+      stroke: #34d399;
+    }
 
     .package-box.status-review {
       fill: #f59e0b;
@@ -396,6 +400,7 @@
     .badge.status-pending { background: #6b7280; }
     .badge.status-ready { background: #3b82f6; }
     .badge.status-active { background: #22c55e; }
+    .badge.status-testing { background: #10b981; }
     .badge.status-review { background: #f59e0b; }
     .badge.status-rework { background: #ef4444; }
     .badge.status-complete { background: #14b8a6; }
@@ -598,24 +603,27 @@
       initialViewBox: { x: -20, y: -20, width: 1000, height: 900 }
     };
 
-    // Layout areas - 5 sections for all 10 statuses
+    // Layout areas - 6 sections per WORKFLOW.md Visualization Categories
     const LAYOUT = {
       stationsY: 20,
-      // QUEUE: pending, ready
+      // QUEUE: pending, ready, rework (waiting to be claimed)
       queueY: 250,
       queueHeight: 100,
-      // ACTIVE: active
+      // ACTIVE: active, testing (work in progress)
       activeY: 360,
       activeHeight: 100,
-      // AWAITING: approval, approved
-      awaitingY: 470,
-      awaitingHeight: 100,
-      // IN REVIEW: review, rework
-      inReviewY: 580,
-      inReviewHeight: 100,
-      // DONE: complete, blocked, cancelled
-      doneY: 690,
-      doneHeight: 150
+      // REVIEW: review, approval (being reviewed/approved)
+      reviewY: 470,
+      reviewHeight: 100,
+      // APPROVED: approved (human approved, awaiting next step)
+      approvedY: 580,
+      approvedHeight: 80,
+      // COMPLETE: complete (done)
+      completeY: 670,
+      completeHeight: 80,
+      // BLOCKED: blocked, cancelled (stopped)
+      blockedY: 760,
+      blockedHeight: 80
     };
 
     // State
@@ -831,9 +839,10 @@
       renderStations();
       renderQueue();
       renderActive();
-      renderAwaiting();
-      renderInReview();
-      renderDone();
+      renderReview();
+      renderApproved();
+      renderComplete();
+      renderBlocked();
     }
 
     function renderAreas() {
@@ -858,11 +867,12 @@
       }
 
       // 5 sections for all 10 statuses
-      createArea(LAYOUT.queueY, LAYOUT.queueHeight, 'QUEUE (pending, ready)');
-      createArea(LAYOUT.activeY, LAYOUT.activeHeight, 'ACTIVE (in progress)');
-      createArea(LAYOUT.awaitingY, LAYOUT.awaitingHeight, 'AWAITING (approval, approved)');
-      createArea(LAYOUT.inReviewY, LAYOUT.inReviewHeight, 'IN REVIEW (review, rework)');
-      createArea(LAYOUT.doneY, LAYOUT.doneHeight, 'DONE (complete, blocked, cancelled)');
+      createArea(LAYOUT.queueY, LAYOUT.queueHeight, 'QUEUE (pending, ready, rework)');
+      createArea(LAYOUT.activeY, LAYOUT.activeHeight, 'ACTIVE (active, testing)');
+      createArea(LAYOUT.reviewY, LAYOUT.reviewHeight, 'REVIEW (review, approval)');
+      createArea(LAYOUT.approvedY, LAYOUT.approvedHeight, 'APPROVED');
+      createArea(LAYOUT.completeY, LAYOUT.completeHeight, 'COMPLETE');
+      createArea(LAYOUT.blockedY, LAYOUT.blockedHeight, 'BLOCKED (blocked, cancelled)');
     }
 
     function renderStations() {
@@ -950,7 +960,8 @@
     }
 
     function renderQueue() {
-      renderSection(['pending', 'ready'], LAYOUT.queueY + 40);
+      // QUEUE: pending, ready, rework (per WORKFLOW.md)
+      renderSection(['pending', 'ready', 'rework'], LAYOUT.queueY + 40);
     }
 
     // Helper to render nodes in a section
@@ -1001,19 +1012,28 @@
     }
 
     function renderActive() {
-      renderSection(['active'], LAYOUT.activeY + 30);
+      // ACTIVE: active, testing (per WORKFLOW.md)
+      renderSection(['active', 'testing'], LAYOUT.activeY + 30);
     }
 
-    function renderAwaiting() {
-      renderSection(['approval', 'approved'], LAYOUT.awaitingY + 30);
+    function renderReview() {
+      // REVIEW: review, approval (per WORKFLOW.md)
+      renderSection(['review', 'approval'], LAYOUT.reviewY + 30);
     }
 
-    function renderInReview() {
-      renderSection(['review', 'rework'], LAYOUT.inReviewY + 30);
+    function renderApproved() {
+      // APPROVED: approved (per WORKFLOW.md)
+      renderSection(['approved'], LAYOUT.approvedY + 30);
     }
 
-    function renderDone() {
-      renderSection(['complete', 'completed', 'done', 'blocked', 'cancelled'], LAYOUT.doneY + 30);
+    function renderComplete() {
+      // COMPLETE: complete (per WORKFLOW.md)
+      renderSection(['complete', 'completed', 'done'], LAYOUT.completeY + 30);
+    }
+
+    function renderBlocked() {
+      // BLOCKED: blocked, cancelled (per WORKFLOW.md)
+      renderSection(['blocked', 'cancelled'], LAYOUT.blockedY + 30);
     }
 
     function createSVGElement(tag, attrs) {
@@ -1091,15 +1111,27 @@
               ).join('')}</ul>`
             : '<div class="value" style="color: #666;">None (leaf)</div>'}
         </div>
-        ${dna.pdsa_ref && (dna.pdsa_ref.git || dna.pdsa_ref.workspace) ? `
+        ${dna.pdsa_ref ? `
         <div class="detail-field">
           <label>PDSA</label>
           <div class="dual-links">
-            <div class="dual-link pdsa-name" style="color: #22c55e; font-weight: 500; margin-bottom: 4px;">
-              ${(dna.pdsa_ref.git || dna.pdsa_ref.workspace || '').split('/').pop().replace('.pdsa.md', '') || 'Unknown'}
-            </div>
-            ${dna.pdsa_ref.git ? `<div><a href="${dna.pdsa_ref.git}" target="_blank" class="dual-link git-link">Git: ${dna.pdsa_ref.git.split('/').pop()}</a></div>` : ''}
-            ${dna.pdsa_ref.workspace ? `<div class="dual-link workspace-link">WS: ${dna.pdsa_ref.workspace}</div>` : ''}
+            ${typeof dna.pdsa_ref === 'string' ? `
+              <!-- New string format: git-relative path or GitHub URL -->
+              <div class="dual-link pdsa-name" style="color: #22c55e; font-weight: 500; margin-bottom: 4px;">
+                ${dna.pdsa_ref.split('/').pop().replace('.pdsa.md', '') || 'Unknown'}
+              </div>
+              ${dna.pdsa_ref.startsWith('https://')
+                ? `<div><a href="${dna.pdsa_ref}" target="_blank" class="dual-link git-link">${dna.pdsa_ref}</a></div>`
+                : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.pdsa_ref}</div>`
+              }
+            ` : `
+              <!-- Legacy object format for backward compatibility -->
+              <div class="dual-link pdsa-name" style="color: #22c55e; font-weight: 500; margin-bottom: 4px;">
+                ${(dna.pdsa_ref.git || dna.pdsa_ref.workspace || '').split('/').pop().replace('.pdsa.md', '') || 'Unknown'}
+              </div>
+              ${dna.pdsa_ref.git ? `<div><a href="${dna.pdsa_ref.git}" target="_blank" class="dual-link git-link">Git: ${dna.pdsa_ref.git.split('/').pop()}</a></div>` : ''}
+              ${dna.pdsa_ref.workspace ? `<div class="dual-link workspace-link">WS: ${dna.pdsa_ref.workspace}</div>` : ''}
+            `}
           </div>
         </div>
         ` : ''}

@@ -6,28 +6,41 @@ MCP (Model Context Protocol) server that powers the XPollination content generat
 
 ## Agent Task Monitoring (ALL AGENTS)
 
-**Every agent must use this skill to receive tasks from the PM system.**
+**Every agent must start monitoring to receive tasks from the PM system.**
 
-### Start Monitor (once per agent session)
+### Start Monitor (per WORKFLOW.md v12)
+
+Run the command for YOUR role:
+
 ```bash
-source ~/.nvm/nvm.sh
-# PDSA agent:
-nohup node viz/agent-monitor.cjs pdsa > /tmp/agent-monitor-pdsa.log 2>&1 &
+# LIAISON:
+source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs liaison
 
-# Dev agent:
-nohup node viz/agent-monitor.cjs dev > /tmp/agent-monitor-dev.log 2>&1 &
+# PDSA:
+source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs pdsa
+
+# QA:
+source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs qa
+
+# DEV:
+source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs dev
 ```
 
-### Check for Work (minimal tokens)
-```bash
-# PDSA agent checks:
-stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
+### What Each Role Monitors (State + Role = Context)
 
-# Dev agent checks:
-stat -c%s /tmp/agent-work-dev.json 2>/dev/null || echo 0
+| Role | Monitors |
+|------|----------|
+| LIAISON | approval, review+liaison, complete, rework+liaison, ready+liaison, active+liaison |
+| PDSA | ready+pdsa, active+pdsa, review+pdsa, rework+pdsa |
+| QA | approved, testing, review+qa, rework+qa |
+| DEV | ready+dev, active+dev, rework+dev |
+
+### Check for Work
+```bash
+stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
 ```
 - Returns `0` = no work
-- Returns `>0` = work found, read the file: `cat /tmp/agent-work-{role}.json`
+- Returns `>0` = work found, read: `cat /tmp/agent-work-{role}.json`
 
 ### When Work is Found
 1. Read the work file to get task ID and details
@@ -43,20 +56,19 @@ stat -c%s /tmp/agent-work-dev.json 2>/dev/null || echo 0
 
 ### Monitoring Discipline (CRITICAL)
 
-**After completing ANY task, actively poll for new work. Don't wait to be told.**
+**Poll interval: 30 seconds | Max runtime: 120 minutes** (auto-exits to prevent overnight loops).
 
+**After completing ANY task, check for new work:**
 ```
-Submit task → Wait 30s → Check work file → If 0, repeat → If >0, process
+stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
 ```
 
 **Rules:**
-1. **Never diagnose monitor issues without reading the log first** - `tail -20 /tmp/agent-monitor-{role}.log`
-2. **Never kill the monitor without evidence it's broken** - check if it's still polling (new timestamps)
-3. **After submitting a task, poll the work file every 30-60s** - don't wait to be told
-4. **The monitor works. Trust it.** If you miss work, it's because you stopped checking
-5. **Check the work FILE, not the code** - `stat -c%s /tmp/agent-work-{role}.json`
+1. **Read the log first** - `tail -20 /tmp/agent-monitor-{role}.log`
+2. **Trust the monitor** - if you miss work, it's because you stopped checking the output file
+3. **Check the work FILE** - `stat -c%s /tmp/agent-work-{role}.json`
 
-**Common mistake:** Agent checks once, sees no work (`-`), stops checking. Meanwhile rework arrives and sits unnoticed.
+**Workflow source of truth:** `docs/WORKFLOW.md` (v12)
 
 ### Database Interface CLI (Regulated Access)
 All agents use `src/db/interface-cli.js` for database operations:

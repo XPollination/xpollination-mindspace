@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 /**
- * Agent Monitor - Parameterized for any role (DRY pattern)
+ * Agent Monitor - Per WORKFLOW.md v9
  * Uses interface-cli.js for regulated database access
  *
+ * Key concept: State + Role = Context
+ * Some states are monitored regardless of task role (e.g., liaison monitors 'approval' for any task)
+ * Some states require role match (e.g., 'review+pdsa' means review state with role=pdsa)
+ *
  * Usage:
- *   node agent-monitor.cjs pdsa qa    # PDSA+QA agent
+ *   node agent-monitor.cjs liaison    # Liaison agent
+ *   node agent-monitor.cjs pdsa       # PDSA agent
+ *   node agent-monitor.cjs qa         # QA agent
  *   node agent-monitor.cjs dev        # Dev agent
- *   node agent-monitor.cjs pdsa qa dev # All roles
  *
  * Output:
  *   /tmp/agent-work-{role}.json - created when work found for that role
  *
  * Claude checks (minimal tokens):
- *   stat -c%s /tmp/agent-work-pdsa.json 2>/dev/null || echo 0
+ *   stat -c%s /tmp/agent-work-liaison.json 2>/dev/null || echo 0
  */
 
 const { execSync } = require('child_process');
@@ -20,6 +25,7 @@ const fs = require('fs');
 const path = require('path');
 
 const POLL_INTERVAL = 30000; // 30 seconds
+const MAX_RUNTIME = 7200000; // 120 minutes max, then exit
 
 const projects = [
   {
@@ -34,16 +40,70 @@ const projects = [
   }
 ];
 
+/**
+ * WORKFLOW.md v9 Monitoring Rules
+ * Format: { status, roleFilter } where roleFilter = null means any role
+ *
+ * LIAISON monitors:
+ *   - approval (any) - PDSA submitted, human reviews
+ *   - review+liaison - present to human for final approval
+ *   - complete (any) - oversight
+ *   - rework+liaison - human rejected liaison content
+ *   - ready+liaison, active+liaison - own liaison tasks
+ *
+ * PDSA monitors:
+ *   - ready+pdsa, active+pdsa - own design tasks
+ *   - review+pdsa - verify design match after QA
+ *   - rework+pdsa - design rejected
+ *
+ * QA monitors:
+ *   - approved (any) - human approved, write tests
+ *   - testing (any) - running tests
+ *   - review+qa - review dev implementation
+ *   - rework+qa - human reopened to update tests
+ *
+ * DEV monitors:
+ *   - ready+dev, active+dev - implementation tasks
+ *   - rework+dev - issues found
+ */
+const MONITOR_RULES = {
+  liaison: [
+    { status: 'approval', roleFilter: null },      // Any task in approval
+    { status: 'review', roleFilter: 'liaison' },   // review+liaison
+    { status: 'complete', roleFilter: null },      // Any completed (oversight)
+    { status: 'rework', roleFilter: 'liaison' },   // rework+liaison
+    { status: 'ready', roleFilter: 'liaison' },    // Own tasks
+    { status: 'active', roleFilter: 'liaison' },   // Own tasks (recovery)
+  ],
+  pdsa: [
+    { status: 'ready', roleFilter: 'pdsa' },
+    { status: 'active', roleFilter: 'pdsa' },
+    { status: 'review', roleFilter: 'pdsa' },      // review+pdsa
+    { status: 'rework', roleFilter: 'pdsa' },
+  ],
+  qa: [
+    { status: 'approved', roleFilter: null },      // Any approved task
+    { status: 'testing', roleFilter: null },       // Any testing task
+    { status: 'review', roleFilter: 'qa' },        // review+qa
+    { status: 'rework', roleFilter: 'qa' },
+  ],
+  dev: [
+    { status: 'ready', roleFilter: 'dev' },
+    { status: 'active', roleFilter: 'dev' },
+    { status: 'rework', roleFilter: 'dev' },
+  ],
+};
+
 // Get roles from command line args
 const roles = process.argv.slice(2);
 if (roles.length === 0) {
-  console.error('Usage: node agent-monitor.cjs <role1> [role2] ...');
-  console.error('Example: node agent-monitor.cjs pdsa qa');
+  console.error('Usage: node agent-monitor.cjs <role>');
+  console.error('Roles: liaison, pdsa, qa, dev');
   process.exit(1);
 }
 
 console.log(`Agent Monitor started for roles: ${roles.join(', ')}`);
-console.log(`Poll interval: ${POLL_INTERVAL / 1000}s`);
+console.log(`Poll interval: ${POLL_INTERVAL / 1000}s | Max runtime: ${MAX_RUNTIME / 60000} min`);
 console.log(`Output files: ${roles.map(r => `/tmp/agent-work-${r}.json`).join(', ')}`);
 
 function checkForWork() {
@@ -52,22 +112,15 @@ function checkForWork() {
   roles.forEach(r => workByRole[r] = []);
 
   projects.forEach(proj => {
-    // Query for each role using interface-cli.js
     roles.forEach(role => {
-      // Per WORKFLOW.md v9: State + Role = Context
-      // Each role monitors specific states (all include 'active' for restart recovery)
-      const STATUS_MAP = {
-        pdsa:    ['ready', 'active', 'review', 'rework'],
-        qa:      ['approved', 'testing', 'review', 'rework'],
-        dev:     ['ready', 'active', 'rework'],
-        liaison: ['approval', 'review', 'complete', 'rework', 'ready', 'active'],
-      };
-      const statuses = STATUS_MAP[role] || ['ready', 'active'];
+      const rules = MONITOR_RULES[role] || [];
 
-      statuses.forEach(status => {
+      rules.forEach(({ status, roleFilter }) => {
         try {
+          // Build query - with or without role filter
+          const roleArg = roleFilter ? ` --role=${roleFilter}` : '';
           const result = execSync(
-            `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=${status} --role=${role}`,
+            `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=${status}${roleArg}`,
             { encoding: 'utf-8', timeout: 10000 }
           );
 
@@ -84,7 +137,8 @@ function checkForWork() {
                   slug: n.slug,
                   type: n.type,
                   status: n.status || status,
-                  title: n.title || n.slug
+                  title: n.title || n.slug,
+                  taskRole: n.role || 'unknown'
                 });
               }
             });
@@ -187,3 +241,9 @@ checkForOrphans();
 // Continuous polling
 setInterval(checkForWork, POLL_INTERVAL);
 setInterval(checkForOrphans, POLL_INTERVAL * 10); // Check orphans every 5 minutes
+
+// Auto-exit after MAX_RUNTIME (prevents overnight loops)
+setTimeout(() => {
+  console.log(`[${new Date().toLocaleTimeString()}] MAX_RUNTIME (${MAX_RUNTIME / 60000} min) reached. Exiting.`);
+  process.exit(0);
+}, MAX_RUNTIME);
