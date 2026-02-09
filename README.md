@@ -1,68 +1,77 @@
 # XPollination MCP Server
 
-MCP (Model Context Protocol) server for the XPollination content pipeline.
+MCP server providing two systems: a **content pipeline** (trend discovery → draft → publish) and a **project management tool** (multi-agent workflow with PDSA methodology).
 
-## Purpose
+## Systems
 
-This server exposes tools that Claude uses to orchestrate the content generation pipeline:
+### Content Pipeline
+Tools for Claude to orchestrate content generation:
+- **Frame Management** — define topic frames for trend monitoring
+- **Trend Crawling** — RSS feeds and trend matching
+- **Content Generation** — propose topics, write drafts, iterate
+- **Fact Checking** — verify claims with evidence
+- **Publishing** — commit to site
 
-1. **Frame Management** - Define and manage topic frames for trend monitoring
-2. **Trend Crawling** - Monitor RSS feeds and Google Trends for relevant content
-3. **Content Generation** - Propose topics, write drafts, iterate
-4. **Fact Checking** - Verify claims with evidence
-5. **Publishing** - Commit approved content to Hugo site
+### Project Management
+Multi-agent workflow engine (WORKFLOW.md v12):
+- **Task lifecycle** — pending → ready → active → review → complete
+- **Role-based transitions** — PDSA, QA, Dev, Liaison
+- **Quality gates** — coded acceptance criteria per transition
+- **Visualization** — `node viz/server.js 8080` serves dashboard at http://10.33.33.1:8080
 
 ## Architecture
 
 ```
-Claude (Orchestrator)
+4 Claude Agents (Liaison, PDSA, Dev, QA)
     │
     ▼
-┌─────────────────────────────────┐
-│   XPollination MCP Server       │
-│                                 │
-│   Tools:                        │
-│   • create_frame, list_frames   │
-│   • crawl_trends                │
-│   • propose_topic, write_draft  │
-│   • fact_check, improve_draft   │
-│   • publish_post                │
-│                                 │
-│   State: SQLite                 │
-└─────────────────────────────────┘
+┌─────────────────────────────────────┐
+│   XPollination MCP Server           │
+│                                     │
+│   Content Tools:                    │
+│   • create_frame, list_frames       │
+│   • crawl_trends, propose_topic     │
+│   • write_draft, fact_check         │
+│   • improve_draft, publish_post     │
+│                                     │
+│   PM Tools:                         │
+│   • create, get, list, transition   │
+│   • update-dna                      │
+│                                     │
+│   State: SQLite (data/)             │
+│   Workflow: docs/WORKFLOW.md        │
+└─────────────────────────────────────┘
     │
     ▼
-Hugo Site → xpollination.earth
+xpollination.earth
 ```
 
-## Documentation
+## Key Files
 
-Planning and PDCA documentation is in the separate repository:
-- **HomeAssistant** → `systems/hetzner-cx22-ubuntu/pdca/xpollination-homepage/`
+| Path | Purpose |
+|------|---------|
+| `src/db/interface-cli.js` | CLI for all database operations (agents use this) |
+| `src/db/workflow-engine.js` | Transition rules and validation |
+| `src/db/schema.sql` | Database schema |
+| `docs/WORKFLOW.md` | Workflow source of truth (v12) |
+| `viz/server.js` | Visualization dashboard |
+| `viz/agent-monitor.cjs` | Agent polling monitor |
 
 ## Development
 
 ```bash
-# Install dependencies
+source ~/.nvm/nvm.sh
 npm install
-
-# Run in development mode
-npm run dev
-
-# Build for production
 npm run build
-
-# Run production
 npm start
 ```
 
-## Environment Variables
+## Related Projects
 
-Copy `.env.example` to `.env` and configure:
-
-```bash
-cp .env.example .env
-```
+| Project | What |
+|---------|------|
+| **HomePage** | Website source + deployment. See `HomePage/docs/Knowledge Management/deployment.md` |
+| **HomeAssistant** | Infrastructure scripts (tmux sessions, server setup) |
 
 ## License
 
