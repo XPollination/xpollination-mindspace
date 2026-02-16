@@ -94,6 +94,86 @@ Initial assumption was "Thomas → Server → Agent" (linear trust chain). This 
 
 **Simulation result:** For v1, VPN network trust is sufficient (10.33.33.1 only reachable via WireGuard). Full mutual verification is v2 scope.
 
+### T3: Where is the data? (Thomas zoom-in)
+
+**Thomas's prompt (T3):**
+> "where are the data stored at each moment of the usecase? is the data moving? think about it."
+
+**Trivium Analysis:**
+
+**Grammar (possible data locations):**
+
+| Location | Physical place | Nature |
+|----------|---------------|--------|
+| Thomas's disk | `/data/cells/*.cell.json` | Persistent, Thomas's machine |
+| Server memory | RAM of MCP server process | Volatile, runtime cache |
+| Network | HTTP between server and agent | Transient, milliseconds |
+| Agent context | Claude Code conversation window | Volatile, dies with session |
+
+**Logic (does data move?):**
+
+**No. Data never moves. Only copies travel.**
+
+- Thomas's disk = persisted truth (survives everything)
+- Server memory = live truth (loaded from disk, canonical during runtime)
+- Agent context = working copy (non-authoritative, read-only in canonical terms)
+- Network = transport (data exists here for milliseconds)
+
+The canonical data ALWAYS stays on Thomas's machine. The server process is software managing access to Thomas's files. Agents receive copies over the network. Copies are disposable — if agent crashes, canonical data is safe.
+
+**Data flow per operation:**
+
+| Operation | Agent context | Network | Server memory | Thomas's disk |
+|-----------|---------------|---------|---------------|---------------|
+| `create_cell()` | has input → sends | → POST | receives, validates, creates | ← writes `.cell.json` |
+| `claim()` | receives copy ← | ← response | updates holder | ← writes update |
+| `update_cell()` | sends changes → | → POST | validates, merges | ← writes update |
+| `submit()` | sends results → | → POST | validates gate, transitions, routes | ← writes update |
+| agent crash | **copy lost** | — | canonical intact | persisted intact |
+| server restart | — | — | **reloads from disk** | canonical intact |
+
+**Key insight:** Authority never moves. Copies travel. If anything volatile dies (agent context, server memory), the persisted truth on Thomas's disk survives and everything rebuilds from there.
+
+---
+
+### Updated Simulation Table (with Data Location)
+
+#### T0: Empty System
+
+| Entity | State | Data held | Canonical location |
+|--------|-------|-----------|--------------------|
+| Server | running | no cells | `/data/cells/` empty |
+| Liaison | offline | — | — |
+| PDSA | offline | — | — |
+| Dev | offline | — | — |
+| QA | offline | — | — |
+
+#### T1: Liaison Connects
+
+| Entity | State | Data held | Canonical location |
+|--------|-------|-----------|--------------------|
+| Server | running | session registry: `{liaison: sess-L001}` | server memory only (sessions are volatile) |
+| Liaison | online | session ID in context | agent context (copy) |
+| PDSA | offline | — | — |
+| Dev | offline | — | — |
+| QA | offline | — | — |
+
+Cells: none. No data on disk.
+
+#### T2–T3: After Trust Model + Data Location Analysis
+
+Same as T1 — no state change, only design understanding deepened.
+
+| Entity | State | Data held | Canonical location |
+|--------|-------|-----------|--------------------|
+| Server | running | session registry | server memory |
+| Liaison | online | session ID | agent context (copy) |
+| PDSA | offline | — | — |
+| Dev | offline | — | — |
+| QA | offline | — | — |
+
+Cells: none. `/data/cells/` empty.
+
 ---
 
 ## Use Cases Discovered
@@ -101,6 +181,7 @@ Initial assumption was "Thomas → Server → Agent" (linear trust chain). This 
 | ID | Use Case | Discovered At | Status | V1? |
 |----|----------|---------------|--------|-----|
 | UC-01 | Server Identity Verification (Self-Certified PKI) | T2 | DESIGNED — v2 scope | No |
+| UC-02 | Data Location Tracking (canonical vs copies) | T3 | UNDERSTOOD — design principle | Core |
 
 ---
 
