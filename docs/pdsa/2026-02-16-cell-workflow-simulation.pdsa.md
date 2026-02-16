@@ -49,22 +49,50 @@ Walk through the entire cell-based workflow via interactive simulation with Thom
 > "as i - Thomas - can certify any xpollination-mcp-server, i can verify if the servers where certified by me"
 > "we will need a tooling for that full process in future"
 
-**Design Decision: Thomas = Root of Trust (Self-Sovereign PKI)**
+**Design Decision: Thomas = Root of Authority (Self-Sovereign PKI)**
 
-Trust chain:
+**Thomas's follow-up (T2b):**
+> "explain to me the trust model. i need to zoom in to understand if your assumptions are correct. apply trivium thinking"
+
+**Trivium Analysis — Corrected Model:**
+
+Initial assumption was "Thomas → Server → Agent" (linear trust chain). This was WRONG.
+
+**Grammar (facts):** 5 entities — Thomas (human/owner), Server (software/custodian), Agent (Claude/borrower), Cell (data/work), Certificate (signed claim). Thomas deploys both Server and Agent independently.
+
+**Logic (tested relationships):** There is NO trust between Server and Agent. Neither trusts the other. Both verify the other was authorized by the same root (Thomas). Trust is replaced by enforcement + mutual verification.
+
+**Corrected model — Authorization is a tree, not a chain:**
 ```
-Thomas's Identity Key (root, private, never shared)
-    → signs Server Certificates (one per MCP server instance)
-        → verified by Agents (carry Thomas's public key)
+           Thomas (root of authority)
+          /                          \
+    certifies                    authorizes
+    (server cert)                (delegation token)
+        ↓                            ↓
+     Server ◄── mutual verification ──► Agent
+     (custodian)                      (borrower)
 ```
+
+**Three layers:**
+
+| Layer | Question | Mechanism |
+|-------|----------|-----------|
+| Identity | "Who are you?" | Thomas certifies Server (cert), Thomas authorizes Agent (token) |
+| Verification | "Prove it." | Mutual — Agent checks server cert, Server checks agent token. Both against Thomas's authority. |
+| Authority | "What can you do?" | Server = custodian (hold, validate, persist, route). Agent = borrower (read, work, submit). Server enforces boundaries. |
+
+**Data custodian model:**
+- Thomas = Owner (has authority, holds data ultimately)
+- Server = Custodian (holds/protects data on Thomas's behalf, enforces rules)
+- Agent = Borrower (works with data temporarily, returns to custodian, cannot mutate directly)
+
+**Key insight:** No entity trusts another. Every interaction is verified against Thomas as common root. "Trust" is replaced by "enforcement + verification."
 
 - NOT v1 scope — design only, implementation future
-- Agents trust Thomas, Thomas certifies servers, agents trust certified servers
 - No external CA dependency — full sovereignty
 - Future tooling: `xpollination-cert-tool` (init, sign-server, verify, revoke, list)
-- Connects to: "owner holds data" (certificate = permission), "extension of me" (agents carry Thomas's pubkey)
 
-**Simulation result:** For v1, Liaison trusts server via VPN network trust (10.33.33.1 = Hetzner box, only reachable via WireGuard). Server identity verification is a v2 feature with self-certified PKI.
+**Simulation result:** For v1, VPN network trust is sufficient (10.33.33.1 only reachable via WireGuard). Full mutual verification is v2 scope.
 
 ---
 
