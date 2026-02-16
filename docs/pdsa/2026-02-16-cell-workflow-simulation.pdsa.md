@@ -39,18 +39,40 @@ Walk through the entire cell-based workflow via interactive simulation with Thom
 
 ### T2: Thomas asks Liaison to verify server identity
 - **Action:** Liaison needs to confirm it's connected to verified "xpollination-mcp-server"
-- **Discovery:** MCP `initialize` handshake returns `serverInfo: { name, version }` — this is the protocol-level identity
-- **Gap found:** No cryptographic verification. Server claims a name, but nothing proves it's authentic.
+- **Discovery:** MCP `initialize` handshake returns `serverInfo: { name, version }` — protocol-level identity
+- **Gap found:** No cryptographic verification. Server self-reports name, nothing proves authenticity.
 - **Use case identified:** UC-01 — Server Identity Verification
-- **Decision needed:** Is `serverInfo.name === "xpollination-mcp-server"` sufficient for v1? Or do we need signed identity?
+
+**Thomas's Decision (T2):**
+> "for V1 we do not need this feature at all but i want to design the full process"
+> "the solution needs to be d) identity in our control. self certified."
+> "as i - Thomas - can certify any xpollination-mcp-server, i can verify if the servers where certified by me"
+> "we will need a tooling for that full process in future"
+
+**Design Decision: Thomas = Root of Trust (Self-Sovereign PKI)**
+
+Trust chain:
+```
+Thomas's Identity Key (root, private, never shared)
+    → signs Server Certificates (one per MCP server instance)
+        → verified by Agents (carry Thomas's public key)
+```
+
+- NOT v1 scope — design only, implementation future
+- Agents trust Thomas, Thomas certifies servers, agents trust certified servers
+- No external CA dependency — full sovereignty
+- Future tooling: `xpollination-cert-tool` (init, sign-server, verify, revoke, list)
+- Connects to: "owner holds data" (certificate = permission), "extension of me" (agents carry Thomas's pubkey)
+
+**Simulation result:** For v1, Liaison trusts server via VPN network trust (10.33.33.1 = Hetzner box, only reachable via WireGuard). Server identity verification is a v2 feature with self-certified PKI.
 
 ---
 
 ## Use Cases Discovered
 
-| ID | Use Case | Discovered At | Status |
-|----|----------|---------------|--------|
-| UC-01 | Server Identity Verification | T2 | OPEN — needs decision |
+| ID | Use Case | Discovered At | Status | V1? |
+|----|----------|---------------|--------|-----|
+| UC-01 | Server Identity Verification (Self-Certified PKI) | T2 | DESIGNED — v2 scope | No |
 
 ---
 
