@@ -157,10 +157,22 @@ describe('PDSA Design Path (WORKFLOW.md v12 lines 8-24)', () => {
       expect(result).toContain('pdsa_ref');
     });
 
-    it('passes DNA check when pdsa_ref is set', () => {
-      const dna = { role: 'pdsa', pdsa_ref: 'pdsa/my-design.md' };
+    it('passes DNA check when pdsa_ref is a GitHub link', () => {
+      const dna = { role: 'pdsa', pdsa_ref: 'https://github.com/XPollination/xpollination-mcp-server/blob/main/pdsa/my-design.md' };
       const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
       expect(result).toBeNull();
+    });
+
+    it('rejects local file path as pdsa_ref', () => {
+      const dna = { role: 'pdsa', pdsa_ref: 'pdsa/my-design.md' };
+      const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
+      expect(result).toContain('GitHub link');
+    });
+
+    it('rejects docs/ path as pdsa_ref', () => {
+      const dna = { role: 'pdsa', pdsa_ref: 'docs/my-design.md' };
+      const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
+      expect(result).toContain('GitHub link');
     });
 
     it('rejects empty pdsa_ref', () => {
