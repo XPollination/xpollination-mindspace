@@ -37,6 +37,11 @@ const projects = [
     name: "HomePage",
     dbPath: "/home/developer/workspaces/github/PichlerThomas/HomePage/data/xpollination.db",
     cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
+  },
+  {
+    name: "best-practices",
+    dbPath: "/home/developer/workspaces/github/PichlerThomas/best-practices/data/xpollination.db",
+    cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
   }
 ];
 
