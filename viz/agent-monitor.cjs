@@ -62,6 +62,7 @@ const projects = [
  *   - rework+pdsa - design rejected
  *
  * QA monitors:
+ *   - ready+qa, active+qa - QA assigned tasks (e.g., write tests)
  *   - approved (any) - human approved, write tests
  *   - testing (any) - running tests
  *   - review+qa - review dev implementation
@@ -87,6 +88,8 @@ const MONITOR_RULES = {
     { status: 'rework', roleFilter: 'pdsa' },
   ],
   qa: [
+    { status: 'ready', roleFilter: 'qa' },         // ready+qa (QA writes tests)
+    { status: 'active', roleFilter: 'qa' },        // active+qa (recovery)
     { status: 'approved', roleFilter: null },      // Any approved task
     { status: 'testing', roleFilter: null },       // Any testing task
     { status: 'review', roleFilter: 'qa' },        // review+qa
