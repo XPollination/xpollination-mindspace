@@ -173,6 +173,11 @@ describe('PDSA Design Path (WORKFLOW.md v12 lines 8-24)', () => {
       const result = validateDnaRequirements('task', 'active', 'approval', null, 'pdsa');
       expect(result).toContain('pdsa_ref');
     });
+
+    it('sets role to liaison on active→approval (bug fix verification)', () => {
+      const newRole = getNewRoleForTransition('task', 'active', 'approval');
+      expect(newRole).toBe('liaison');
+    });
   });
 
   // Step 4: approval → approved (Actor: human/liaison, Monitor: qa)
