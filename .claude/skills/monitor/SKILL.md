@@ -54,9 +54,19 @@ stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0
 - If work found: read it, claim the task, do the work (see "How to Work a Task" below)
 - If no work: tell the human you're monitoring and ready. Stay at the prompt.
 
-**To check later** (non-blocking): read the background task output file to see if work was detected.
+## CRITICAL: Proactive Work Checking
 
-When you finish a task, check for more work. Between tasks, stay at the prompt — the human can talk to you and the background loop keeps watching.
+**After EVERY interaction with the human, check the background task output for new work.**
+
+The background loop writes detections to its output file. You MUST read it to notice new tasks. Do not wait for the human to tell you there's work — that defeats the purpose of monitoring.
+
+Pattern:
+1. Human sends a message → you respond
+2. Immediately after responding, check: `stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0`
+3. If new actionable work (non-complete tasks matching your role) → claim and act
+4. Stay at the prompt for the next human message
+
+**You are the active party.** The background loop detects. You act. Never sit idle when the loop has reported work.
 
 ---
 
