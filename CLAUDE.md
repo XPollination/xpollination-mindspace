@@ -26,14 +26,10 @@ source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpo
 source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs dev
 ```
 
-### What Each Role Monitors (State + Role = Context)
-
-| Role | Monitors |
-|------|----------|
-| LIAISON | approval, review+liaison, complete, rework+liaison, ready+liaison, active+liaison |
-| PDSA | ready+pdsa, active+pdsa, review+pdsa, rework+pdsa |
-| QA | approved, testing, review+qa, rework+qa |
-| DEV | ready+dev, active+dev, rework+dev |
+### How Monitoring Works
+Each agent sees all tasks assigned to their role (any non-terminal status).
+The workflow engine validates transitions — the monitor just surfaces work.
+Role-agnostic extras: liaison sees `approval`, QA sees `approved`/`testing`.
 
 ### Check for Work
 ```bash
