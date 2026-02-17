@@ -97,6 +97,9 @@ export const ALLOWED_TRANSITIONS = {
     // Bug path: only liaison can finalize completion (QA reviews but doesn't complete)
     'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
+    // Review chain transitions (QA->PDSA->Liaison) — same as task type
+    'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
+    'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
     'rework->active': { allowedActors: ['dev'] },
     // Per WORKFLOW.md v12: complete->rework (human reopens bug)
     'complete->rework': { allowedActors: ['liaison'] },
