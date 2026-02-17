@@ -1,23 +1,13 @@
 #!/usr/bin/env node
 /**
- * Agent Monitor - Per WORKFLOW.md v9
- * Uses interface-cli.js for regulated database access
+ * Agent Monitor — Role-based work detection
  *
- * Key concept: State + Role = Context
- * Some states are monitored regardless of task role (e.g., liaison monitors 'approval' for any task)
- * Some states require role match (e.g., 'review+pdsa' means review state with role=pdsa)
+ * Simple principle: find tasks assigned to your role + role-agnostic statuses.
+ * The workflow engine validates transitions — the monitor just surfaces work.
  *
- * Usage:
- *   node agent-monitor.cjs liaison    # Liaison agent
- *   node agent-monitor.cjs pdsa       # PDSA agent
- *   node agent-monitor.cjs qa         # QA agent
- *   node agent-monitor.cjs dev        # Dev agent
- *
- * Output:
- *   /tmp/agent-work-{role}.json - created when work found for that role
- *
- * Claude checks (minimal tokens):
- *   stat -c%s /tmp/agent-work-liaison.json 2>/dev/null || echo 0
+ * Usage: node agent-monitor.cjs <role>   (liaison|pdsa|qa|dev)
+ * Output: /tmp/agent-work-{role}.json
+ * Check:  stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
  */
 
 const { execSync } = require('child_process');
@@ -46,60 +36,21 @@ const projects = [
 ];
 
 /**
- * WORKFLOW.md v9 Monitoring Rules
- * Format: { status, roleFilter } where roleFilter = null means any role
+ * Simple monitoring: find tasks assigned to your role.
+ * The workflow engine validates transitions — the monitor just surfaces work.
  *
- * LIAISON monitors:
- *   - approval (any) - PDSA submitted, human reviews
- *   - review+liaison - present to human for final approval
- *   - complete (any) - oversight
- *   - rework+liaison - human rejected liaison content
- *   - ready+liaison, active+liaison - own liaison tasks
+ * Each role sees:
+ *   1. ALL tasks with role={role} (excluding terminal statuses)
+ *   2. Role-agnostic statuses (e.g., liaison sees all 'approval' tasks)
  *
- * PDSA monitors:
- *   - ready+pdsa, active+pdsa - own design tasks
- *   - review+pdsa - verify design match after QA
- *   - rework+pdsa - design rejected
- *
- * QA monitors:
- *   - ready+qa, active+qa - QA assigned tasks (e.g., write tests)
- *   - approved (any) - human approved, write tests
- *   - testing (any) - running tests
- *   - review+qa - review dev implementation
- *   - rework+qa - human reopened to update tests
- *
- * DEV monitors:
- *   - ready+dev, active+dev - implementation tasks
- *   - rework+dev - issues found
+ * Terminal statuses (not actionable): complete, cancelled
  */
-const MONITOR_RULES = {
-  liaison: [
-    { status: 'approval', roleFilter: null },      // Any task in approval
-    { status: 'review', roleFilter: 'liaison' },   // review+liaison
-    { status: 'complete', roleFilter: null },      // Any completed (oversight)
-    { status: 'rework', roleFilter: 'liaison' },   // rework+liaison
-    { status: 'ready', roleFilter: 'liaison' },    // Own tasks
-    { status: 'active', roleFilter: 'liaison' },   // Own tasks (recovery)
-  ],
-  pdsa: [
-    { status: 'ready', roleFilter: 'pdsa' },
-    { status: 'active', roleFilter: 'pdsa' },
-    { status: 'review', roleFilter: 'pdsa' },      // review+pdsa
-    { status: 'rework', roleFilter: 'pdsa' },
-  ],
-  qa: [
-    { status: 'ready', roleFilter: 'qa' },         // ready+qa (QA writes tests)
-    { status: 'active', roleFilter: 'qa' },        // active+qa (recovery)
-    { status: 'approved', roleFilter: null },      // Any approved task
-    { status: 'testing', roleFilter: null },       // Any testing task
-    { status: 'review', roleFilter: 'qa' },        // review+qa
-    { status: 'rework', roleFilter: 'qa' },
-  ],
-  dev: [
-    { status: 'ready', roleFilter: 'dev' },
-    { status: 'active', roleFilter: 'dev' },
-    { status: 'rework', roleFilter: 'dev' },
-  ],
+const TERMINAL_STATUSES = ['complete', 'cancelled'];
+
+// Role-agnostic: statuses a role monitors regardless of task role assignment
+const ROLE_AGNOSTIC = {
+  liaison: ['approval'],        // Human gate — any task needing Thomas's decision
+  qa: ['approved', 'testing'],  // Human approved — QA writes tests / runs tests
 };
 
 // Get roles from command line args
@@ -114,6 +65,30 @@ console.log(`Agent Monitor started for roles: ${roles.join(', ')}`);
 console.log(`Poll interval: ${POLL_INTERVAL / 1000}s | Max runtime: ${MAX_RUNTIME / 60000} min`);
 console.log(`Output files: ${roles.map(r => `/tmp/agent-work-${r}.json`).join(', ')}`);
 
+function addIfNew(list, node, project) {
+  if (!list.some(w => w.id === node.id)) {
+    list.push({
+      project,
+      id: node.id,
+      slug: node.slug,
+      type: node.type,
+      status: node.status,
+      title: node.title || node.slug,
+      taskRole: node.role || 'unknown'
+    });
+  }
+}
+
+function queryList(dbPath, cliPath, args) {
+  try {
+    const result = execSync(
+      `DATABASE_PATH="${dbPath}" node "${cliPath}" list ${args}`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    return JSON.parse(result).nodes || [];
+  } catch { return []; }
+}
+
 function checkForWork() {
   const ts = new Date().toLocaleTimeString();
   const workByRole = {};
@@ -121,39 +96,17 @@ function checkForWork() {
 
   projects.forEach(proj => {
     roles.forEach(role => {
-      const rules = MONITOR_RULES[role] || [];
+      // 1. All tasks assigned to this role (any status, filter out terminal)
+      const roleTasks = queryList(proj.dbPath, proj.cliPath, `--role=${role}`);
+      roleTasks
+        .filter(n => !TERMINAL_STATUSES.includes(n.status))
+        .forEach(n => addIfNew(workByRole[role], n, proj.name));
 
-      rules.forEach(({ status, roleFilter }) => {
-        try {
-          // Build query - with or without role filter
-          const roleArg = roleFilter ? ` --role=${roleFilter}` : '';
-          const result = execSync(
-            `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=${status}${roleArg}`,
-            { encoding: 'utf-8', timeout: 10000 }
-          );
-
-          const data = JSON.parse(result);
-
-          if (data.nodes && data.nodes.length > 0) {
-            data.nodes.forEach(n => {
-              // Avoid duplicates
-              const exists = workByRole[role].some(w => w.id === n.id);
-              if (!exists) {
-                workByRole[role].push({
-                  project: proj.name,
-                  id: n.id,
-                  slug: n.slug,
-                  type: n.type,
-                  status: n.status || status,
-                  title: n.title || n.slug,
-                  taskRole: n.role || 'unknown'
-                });
-              }
-            });
-          }
-        } catch (err) {
-          // Skip errors silently (project may not have DB)
-        }
+      // 2. Role-agnostic statuses (e.g., liaison sees 'approval', QA sees 'approved')
+      const agnostic = ROLE_AGNOSTIC[role] || [];
+      agnostic.forEach(status => {
+        const tasks = queryList(proj.dbPath, proj.cliPath, `--status=${status}`);
+        tasks.forEach(n => addIfNew(workByRole[role], n, proj.name));
       });
     });
   });
@@ -168,12 +121,10 @@ function checkForWork() {
       fs.writeFileSync(file, JSON.stringify({ found_at: new Date().toISOString(), role, work }, null, 2));
       totalWork += work.length;
     } else {
-      // Remove file if no work (so stat returns 0)
       if (fs.existsSync(file)) fs.unlinkSync(file);
     }
   });
 
-  // Log summary
   if (totalWork > 0) {
     console.log(`[${ts}] WORK: ${roles.map(r => `${r}:${workByRole[r].length}`).join(' ')}`);
   } else {
