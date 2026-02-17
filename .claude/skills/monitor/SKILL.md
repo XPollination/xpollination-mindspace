@@ -43,30 +43,22 @@ done
 
 **IMPORTANT:** Use `run_in_background: true` on this Bash call. Report the background task ID.
 
-## Step 3: Check for Work and Act
+## Step 3: Wait for Work (foreground polling)
 
-After starting both background processes, immediately do one check:
+After starting both background processes, enter a **foreground wait-for-work loop**. Each iteration is a single bounded command — NOT an infinite bash loop.
+
+**Pattern — repeat until work is found:**
 
 ```bash
-stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0
+sleep 60 && stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0
 ```
 
-- If work found: read it, claim the task, do the work (see "How to Work a Task" below)
-- If no work: tell the human you're monitoring and ready. Stay at the prompt.
+- If result > 0: read the work file, claim the task, do the work (see "How to Work a Task" below)
+- If result = 0: run the same command again (next iteration)
 
-## CRITICAL: Proactive Work Checking
+**Why this works:** Each `sleep 60` is a single foreground command. Between iterations, you process system reminders and human messages. The human can send you a message while you sleep — you'll see it when the sleep completes (max 60s delay). This is NOT a bash while-loop — YOU decide each iteration.
 
-**After EVERY interaction with the human, check the background task output for new work.**
-
-The background loop writes detections to its output file. You MUST read it to notice new tasks. Do not wait for the human to tell you there's work — that defeats the purpose of monitoring.
-
-Pattern:
-1. Human sends a message → you respond
-2. Immediately after responding, check: `stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0`
-3. If new actionable work (non-complete tasks matching your role) → claim and act
-4. Stay at the prompt for the next human message
-
-**You are the active party.** The background loop detects. You act. Never sit idle when the loop has reported work.
+**After completing a task:** Return to this wait-for-work loop to pick up the next task. Never say "Standing by" and go idle.
 
 ---
 
