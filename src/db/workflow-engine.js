@@ -17,8 +17,8 @@ export const VALID_STATUSES = [
   'review', 'rework', 'complete', 'blocked', 'cancelled'
 ];
 
-// Valid types (simplified: only task and bug)
-export const VALID_TYPES = ['task', 'bug'];
+// Valid types
+export const VALID_TYPES = ['task', 'bug', 'context'];
 
 // Valid roles
 export const VALID_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator'];
@@ -85,6 +85,13 @@ export const ALLOWED_TRANSITIONS = {
     'complete->rework': { allowedActors: ['liaison'] },
 
     // Special transitions
+    'any->blocked': { allowedActors: ['liaison', 'system'] },
+    'any->cancelled': { allowedActors: ['liaison', 'system'] }
+  },
+  // Context flow (lightweight container for grouping work)
+  'context': {
+    'pending->active': { allowedActors: ['liaison', 'system'] },
+    'active->complete': { allowedActors: ['liaison', 'system'] },
     'any->blocked': { allowedActors: ['liaison', 'system'] },
     'any->cancelled': { allowedActors: ['liaison', 'system'] }
   },
