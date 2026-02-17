@@ -499,6 +499,36 @@ describe('Bug Path (simplified, no PDSA gate)', () => {
     });
   });
 
+  describe('review → review:qa (bug, QA forwards to PDSA)', () => {
+    it('qa can forward bug review to pdsa', () => {
+      expectAllowed('bug', 'review', 'review', 'qa', 'qa');
+    });
+
+    it('sets role to pdsa on review→review (role=qa)', () => {
+      const newRole = getNewRoleForTransition('bug', 'review', 'review', 'qa');
+      expect(newRole).toBe('pdsa');
+    });
+
+    it('dev CANNOT forward bug review', () => {
+      expectRejected('bug', 'review', 'review', 'dev', 'qa');
+    });
+  });
+
+  describe('review → review:pdsa (bug, PDSA forwards to Liaison)', () => {
+    it('pdsa can forward bug review to liaison', () => {
+      expectAllowed('bug', 'review', 'review', 'pdsa', 'pdsa');
+    });
+
+    it('sets role to liaison on review→review (role=pdsa)', () => {
+      const newRole = getNewRoleForTransition('bug', 'review', 'review', 'pdsa');
+      expect(newRole).toBe('liaison');
+    });
+
+    it('qa CANNOT use pdsa review forward', () => {
+      expectRejected('bug', 'review', 'review', 'qa', 'pdsa');
+    });
+  });
+
   describe('rework → active (bug)', () => {
     it('dev can reclaim bug rework', () => {
       expectAllowed('bug', 'rework', 'active', 'dev', 'dev');
