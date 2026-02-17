@@ -233,6 +233,10 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
       if (!dna || !dna[field]) {
         return `Transition ${transitionKey} requires dna.${field} to be set. PDSA tasks must have a linked PDSA document before approval.`;
       }
+      // pdsa_ref must be a GitHub link (enforces git protocol)
+      if (field === 'pdsa_ref' && typeof dna[field] === 'string' && !dna[field].startsWith('https://github.com/')) {
+        return `dna.pdsa_ref must be a GitHub link (https://github.com/...). Local file paths are not allowed. Execute git protocol first (git add, git commit, git push), then use the GitHub URL. Current value: "${dna[field]}"`;
+      }
     }
   }
 
