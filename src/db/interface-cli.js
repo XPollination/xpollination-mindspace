@@ -113,22 +113,16 @@ const FIELD_VALIDATORS = {
     return null;
   },
 
-  // Validate pdsa_ref field (must be git-relative path or GitHub URL)
+  // Validate pdsa_ref field (must be a GitHub link — enforces git protocol)
   pdsa_ref: (value) => {
     // Must be a string
     if (typeof value !== 'string') {
-      return `pdsa_ref must be a git-relative path string (e.g., pdsa/filename.md), not ${typeof value}`;
+      return `pdsa_ref must be a GitHub link (https://github.com/...), not ${typeof value}`;
     }
 
-    // Reject filesystem paths
-    if (value.startsWith('/') || value.includes('/home/') || value.includes('workspaces/')) {
-      return `pdsa_ref must be a git-relative path (e.g., pdsa/filename.md) or GitHub URL. Filesystem paths are not allowed. Current value rejected: "${value}"`;
-    }
-
-    // Must match valid patterns: pdsa/, docs/, or https://github.com/
-    const validPattern = /^(pdsa\/|docs\/|https:\/\/github\.com\/)/;
-    if (!validPattern.test(value)) {
-      return `pdsa_ref must start with pdsa/, docs/, or https://github.com/. Current value rejected: "${value}"`;
+    // Must be a GitHub URL — local paths are rejected to enforce git protocol
+    if (!value.startsWith('https://github.com/')) {
+      return `pdsa_ref must be a GitHub link (https://github.com/...). Local file paths are not allowed. Execute git protocol first (git add, git commit, git push), then use the GitHub URL. Current value rejected: "${value}"`;
     }
 
     return null;
