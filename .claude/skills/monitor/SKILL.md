@@ -2,12 +2,12 @@
 name: monitor
 description: Start agent monitoring and load process instructions
 user-invocable: true
-allowed-tools: Bash, Read
+allowed-tools: Bash, Read, TaskStop, TaskOutput
 ---
 
 # Agent Monitor & Process Bootloader
 
-Start monitoring for your role, load operating instructions, and **begin working autonomously**.
+Start monitoring for your role, load operating instructions, and **work autonomously while staying responsive**.
 
 ```
 /monitor <role>
@@ -17,27 +17,46 @@ Where `<role>` is: `liaison`, `pdsa`, `qa`, `dev`
 
 ---
 
-## Step 1: Start Background Monitor
+## Step 1: Start Background Monitor (writes work file)
 
 ```bash
 pkill -f "agent-monitor.cjs $ARGUMENTS" 2>/dev/null || true
 source ~/.nvm/nvm.sh && nohup node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs $ARGUMENTS > /tmp/agent-monitor-$ARGUMENTS.log 2>&1 &
-sleep 2 && tail -5 /tmp/agent-monitor-$ARGUMENTS.log
 ```
 
-## Step 2: Enter Autonomous Work Loop
+## Step 2: Start Background Work Detection Loop
 
-**After starting the monitor, you MUST enter this loop. Do not wait for instructions.**
+Start a **background bash loop** using `run_in_background: true` that polls the work file and logs when work is found. This keeps you responsive to human messages.
 
+```bash
+while true; do
+  SIZE=$(stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0)
+  if [ "$SIZE" -gt 0 ]; then
+    echo "[$(date +%H:%M:%S)] WORK DETECTED ($SIZE bytes)"
+    cat /tmp/agent-work-$ARGUMENTS.json
+  else
+    echo "[$(date +%H:%M:%S)] no work"
+  fi
+  sleep 30
+done
 ```
-REPEAT FOREVER:
-  1. Check for work:  stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0
-  2. If 0 → sleep 30s → goto 1
-  3. If >0 → read the work file → get task DNA → CLAIM IT → DO THE WORK → write results to DNA → transition forward
-  4. After completing → goto 1
+
+**IMPORTANT:** Use `run_in_background: true` on this Bash call. Report the background task ID.
+
+## Step 3: Check for Work and Act
+
+After starting both background processes, immediately do one check:
+
+```bash
+stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0
 ```
 
-**You are autonomous.** When work appears, claim it immediately and do it. Do not ask for permission. Do not wait for instructions. The task DNA contains everything you need.
+- If work found: read it, claim the task, do the work (see "How to Work a Task" below)
+- If no work: tell the human you're monitoring and ready. Stay at the prompt.
+
+**To check later** (non-blocking): read the background task output file to see if work was detected.
+
+When you finish a task, check for more work. Between tasks, stay at the prompt — the human can talk to you and the background loop keeps watching.
 
 ---
 
