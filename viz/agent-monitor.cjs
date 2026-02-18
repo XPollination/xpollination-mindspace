@@ -5,9 +5,11 @@
  * Simple principle: find tasks assigned to your role + role-agnostic statuses.
  * The workflow engine validates transitions — the monitor just surfaces work.
  *
- * Usage: node agent-monitor.cjs <role>   (liaison|pdsa|qa|dev)
+ * Modes:
+ *   Background: node agent-monitor.cjs <role>          Polls DB, writes work files continuously
+ *   Wait:       node agent-monitor.cjs <role> --wait   Blocks until work appears, outputs JSON, exits
+ *
  * Output: /tmp/agent-work-{role}.json
- * Check:  stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
  */
 
 const { execSync } = require('child_process');
@@ -53,17 +55,17 @@ const ROLE_AGNOSTIC = {
   qa: ['approved', 'testing'],  // Human approved — QA writes tests / runs tests
 };
 
-// Get roles from command line args
-const roles = process.argv.slice(2);
+// Parse command line args
+const args = process.argv.slice(2);
+const waitMode = args.includes('--wait');
+const roles = args.filter(a => !a.startsWith('--'));
+
 if (roles.length === 0) {
-  console.error('Usage: node agent-monitor.cjs <role>');
+  console.error('Usage: node agent-monitor.cjs <role> [--wait]');
   console.error('Roles: liaison, pdsa, qa, dev');
+  console.error('--wait: block until work found, output JSON, exit');
   process.exit(1);
 }
-
-console.log(`Agent Monitor started for roles: ${roles.join(', ')}`);
-console.log(`Poll interval: ${POLL_INTERVAL / 1000}s | Max runtime: ${MAX_RUNTIME / 60000} min`);
-console.log(`Output files: ${roles.map(r => `/tmp/agent-work-${r}.json`).join(', ')}`);
 
 function addIfNew(list, node, project) {
   if (!list.some(w => w.id === node.id)) {
@@ -193,16 +195,55 @@ function checkForOrphans() {
   }
 }
 
-// Initial check
-checkForWork();
-checkForOrphans();
+if (waitMode) {
+  // --wait mode: block until work appears, output JSON, exit
+  const role = roles[0];
+  const workFile = `/tmp/agent-work-${role}.json`;
 
-// Continuous polling
-setInterval(checkForWork, POLL_INTERVAL);
-setInterval(checkForOrphans, POLL_INTERVAL * 10); // Check orphans every 5 minutes
+  // Check if work file already has content
+  function checkWorkFile() {
+    try {
+      if (fs.existsSync(workFile) && fs.statSync(workFile).size > 0) {
+        const content = fs.readFileSync(workFile, 'utf-8');
+        process.stdout.write(content);
+        process.exit(0);
+      }
+    } catch {}
+  }
 
-// Auto-exit after MAX_RUNTIME (prevents overnight loops)
-setTimeout(() => {
-  console.log(`[${new Date().toLocaleTimeString()}] MAX_RUNTIME (${MAX_RUNTIME / 60000} min) reached. Exiting.`);
-  process.exit(0);
-}, MAX_RUNTIME);
+  // Immediate check
+  checkWorkFile();
+
+  // Watch for file changes (event-driven, instant reaction)
+  fs.watchFile(workFile, { interval: 1000 }, (curr) => {
+    if (curr.size > 0) {
+      checkWorkFile();
+    }
+  });
+
+  // Safety: auto-exit after MAX_RUNTIME
+  setTimeout(() => {
+    fs.unwatchFile(workFile);
+    process.exit(1);
+  }, MAX_RUNTIME);
+
+} else {
+  // Background mode: continuous polling, writes work files
+  console.log(`Agent Monitor started for roles: ${roles.join(', ')}`);
+  console.log(`Poll interval: ${POLL_INTERVAL / 1000}s | Max runtime: ${MAX_RUNTIME / 60000} min`);
+  console.log(`Output files: ${roles.map(r => `/tmp/agent-work-${r}.json`).join(', ')}`);
+
+  // Initial check
+  checkForWork();
+  checkForOrphans();
+
+  // Continuous polling
+  setInterval(checkForWork, POLL_INTERVAL);
+  setInterval(checkForOrphans, POLL_INTERVAL * 10); // Check orphans every 5 minutes
+
+  // Auto-exit after MAX_RUNTIME (prevents overnight loops)
+  setTimeout(() => {
+    console.log(`[${new Date().toLocaleTimeString()}] MAX_RUNTIME (${MAX_RUNTIME / 60000} min) reached. Exiting.`);
+    process.exit(0);
+  }, MAX_RUNTIME);
+}
