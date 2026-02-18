@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, TaskStop, TaskOutput
 
 # Agent Monitor & Process Bootloader
 
-Start monitoring for your role, load operating instructions, and **work autonomously while staying responsive**.
+Start monitoring for your role, load operating instructions, and **work autonomously**.
 
 ```
 /monitor <role>
@@ -17,48 +17,24 @@ Where `<role>` is: `liaison`, `pdsa`, `qa`, `dev`
 
 ---
 
-## Step 1: Start Background Monitor (writes work file)
+## Step 1: Start Background Monitor (polls DB, writes work files)
 
 ```bash
 pkill -f "agent-monitor.cjs $ARGUMENTS" 2>/dev/null || true
 source ~/.nvm/nvm.sh && nohup node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs $ARGUMENTS > /tmp/agent-monitor-$ARGUMENTS.log 2>&1 &
 ```
 
-## Step 2: Start Background Work Detection Loop
+## Step 2: Wait for Work (foreground, event-driven)
 
-Start a **background bash loop** using `run_in_background: true` that polls the work file and logs when work is found. This keeps you responsive to human messages.
-
-```bash
-while true; do
-  SIZE=$(stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0)
-  if [ "$SIZE" -gt 0 ]; then
-    echo "[$(date +%H:%M:%S)] WORK DETECTED ($SIZE bytes)"
-    cat /tmp/agent-work-$ARGUMENTS.json
-  else
-    echo "[$(date +%H:%M:%S)] no work"
-  fi
-  sleep 30
-done
-```
-
-**IMPORTANT:** Use `run_in_background: true` on this Bash call. Report the background task ID.
-
-## Step 3: Wait for Work (foreground polling)
-
-After starting both background processes, enter a **foreground wait-for-work loop**. Each iteration is a single bounded command — NOT an infinite bash loop.
-
-**Pattern — repeat until work is found:**
+Run `--wait` mode. This blocks until work appears, then outputs the work JSON and exits. React instantly — no polling delay.
 
 ```bash
-sleep 60 && stat -c%s /tmp/agent-work-$ARGUMENTS.json 2>/dev/null || echo 0
+source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs $ARGUMENTS --wait
 ```
 
-- If result > 0: read the work file, claim the task, do the work (see "How to Work a Task" below)
-- If result = 0: run the same command again (next iteration)
-
-**Why this works:** Each `sleep 60` is a single foreground command. Between iterations, you process system reminders and human messages. The human can send you a message while you sleep — you'll see it when the sleep completes (max 60s delay). This is NOT a bash while-loop — YOU decide each iteration.
-
-**After completing a task:** Return to this wait-for-work loop to pick up the next task. Never say "Standing by" and go idle.
+- Output is the work JSON (task slug, project, status)
+- When it returns: parse the output, claim the task, do the work (see "How to Work a Task" below)
+- **After completing a task:** Run `--wait` again to pick up the next task. Never say "Standing by" and go idle.
 
 ---
 
@@ -80,8 +56,7 @@ Task DNA (database) → interface-cli.js → agent-monitor → work file → you
 ```bash
 CLI=/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js
 
-# 1. Read work file to find task slug and DB path
-cat /tmp/agent-work-$ARGUMENTS.json
+# 1. Parse the --wait output for task slug and project DB path
 
 # 2. Get full DNA
 DATABASE_PATH=$DB node $CLI get <slug>
