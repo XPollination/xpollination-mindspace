@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 /**
- * Agent Monitor — Role-based work detection
+ * Agent Monitor v0.0.2 — Role-based work detection
  *
  * Simple principle: find tasks assigned to your role + role-agnostic statuses.
  * The workflow engine validates transitions — the monitor just surfaces work.
  *
  * Modes:
  *   Background: node agent-monitor.cjs <role>          Polls DB, writes work files continuously
- *   Wait:       node agent-monitor.cjs <role> --wait   Blocks until work appears, outputs JSON, exits
+ *   Wait:       node agent-monitor.cjs <role> --wait   Queries DB directly, blocks until actionable work, exits
  *
  * Output: /tmp/agent-work-{role}.json
+ *
+ * v0.0.2 fixes (2026-02-19):
+ *   - --wait mode queries DB directly (no stale file dependency)
+ *   - Added actionable field per task (agent knows what to claim)
+ *   - Cleanup work file on background monitor exit
+ *   - Freshness check on existing work files
+ *   - PDSA trace: HomeAssistant/systems/hetzner-cx22-ubuntu/pdca/monitoring/v0.0.2/
  */
 
 const { execSync } = require('child_process');
@@ -55,6 +62,17 @@ const ROLE_AGNOSTIC = {
   qa: ['approved', 'testing'],  // Human approved — QA writes tests / runs tests
 };
 
+// Actionable statuses: tasks the agent can claim and work on RIGHT NOW
+// Other statuses are visible (for context) but not actionable
+const ACTIONABLE_STATUSES = {
+  pdsa:    ['ready', 'rework'],
+  dev:     ['ready', 'rework'],
+  liaison: ['ready', 'rework', 'approval'],
+  qa:      ['ready', 'rework', 'approved', 'testing', 'review'],
+};
+
+const STALE_THRESHOLD = POLL_INTERVAL * 2; // 60s — reject work files older than this
+
 // Parse command line args
 const args = process.argv.slice(2);
 const waitMode = args.includes('--wait');
@@ -67,8 +85,9 @@ if (roles.length === 0) {
   process.exit(1);
 }
 
-function addIfNew(list, node, project) {
+function addIfNew(list, node, project, role) {
   if (!list.some(w => w.id === node.id)) {
+    const actionableFor = ACTIONABLE_STATUSES[role] || [];
     list.push({
       project,
       id: node.id,
@@ -76,7 +95,8 @@ function addIfNew(list, node, project) {
       type: node.type,
       status: node.status,
       title: node.title || node.slug,
-      taskRole: node.role || 'unknown'
+      taskRole: node.role || 'unknown',
+      actionable: actionableFor.includes(node.status)
     });
   }
 }
@@ -102,13 +122,13 @@ function checkForWork() {
       const roleTasks = queryList(proj.dbPath, proj.cliPath, `--role=${role}`);
       roleTasks
         .filter(n => !TERMINAL_STATUSES.includes(n.status))
-        .forEach(n => addIfNew(workByRole[role], n, proj.name));
+        .forEach(n => addIfNew(workByRole[role], n, proj.name, role));
 
       // 2. Role-agnostic statuses (e.g., liaison sees 'approval', QA sees 'approved')
       const agnostic = ROLE_AGNOSTIC[role] || [];
       agnostic.forEach(status => {
         const tasks = queryList(proj.dbPath, proj.cliPath, `--status=${status}`);
-        tasks.forEach(n => addIfNew(workByRole[role], n, proj.name));
+        tasks.forEach(n => addIfNew(workByRole[role], n, proj.name, role));
       });
     });
   });
@@ -128,10 +148,16 @@ function checkForWork() {
   });
 
   if (totalWork > 0) {
-    console.log(`[${ts}] WORK: ${roles.map(r => `${r}:${workByRole[r].length}`).join(' ')}`);
+    const summary = roles.map(r => {
+      const actionable = workByRole[r].filter(w => w.actionable).length;
+      return `${r}:${workByRole[r].length}(${actionable} actionable)`;
+    }).join(' ');
+    console.log(`[${ts}] WORK: ${summary}`);
   } else {
     console.log(`[${ts}] -`);
   }
+
+  return workByRole;
 }
 
 /**
@@ -196,34 +222,54 @@ function checkForOrphans() {
 }
 
 if (waitMode) {
-  // --wait mode: block until work appears, output JSON, exit
+  // --wait mode: queries DB directly, blocks until actionable work found, exits
+  // v0.0.2: self-sufficient — does NOT depend on background monitor's work file
   const role = roles[0];
   const workFile = `/tmp/agent-work-${role}.json`;
 
-  // Check if work file already has content
-  function checkWorkFile() {
-    try {
-      if (fs.existsSync(workFile) && fs.statSync(workFile).size > 0) {
-        const content = fs.readFileSync(workFile, 'utf-8');
-        process.stdout.write(content);
-        process.exit(0);
-      }
-    } catch {}
+  function queryAndCheck() {
+    // Query DB directly (same as background mode)
+    const workByRole = checkForWork();
+    const work = workByRole[role] || [];
+    const actionable = work.filter(w => w.actionable);
+
+    if (actionable.length > 0) {
+      // Found actionable work — output and exit
+      const output = { found_at: new Date().toISOString(), role, work, actionable_count: actionable.length };
+      const json = JSON.stringify(output, null, 2);
+      // Also write to work file for consistency
+      fs.writeFileSync(workFile, json);
+      process.stdout.write(json);
+      process.exit(0);
+    }
+    // No actionable work yet — will poll again
   }
 
-  // Immediate check
-  checkWorkFile();
-
-  // Watch for file changes (event-driven, instant reaction)
-  fs.watchFile(workFile, { interval: 1000 }, (curr) => {
-    if (curr.size > 0) {
-      checkWorkFile();
+  // Check if existing work file is fresh AND has actionable items
+  try {
+    if (fs.existsSync(workFile) && fs.statSync(workFile).size > 0) {
+      const content = JSON.parse(fs.readFileSync(workFile, 'utf-8'));
+      const age = Date.now() - new Date(content.found_at).getTime();
+      const actionable = (content.work || []).filter(w => w.actionable);
+      if (age < STALE_THRESHOLD && actionable.length > 0) {
+        // Fresh file with actionable work — use it
+        process.stdout.write(JSON.stringify(content, null, 2));
+        process.exit(0);
+      }
+      // Stale or no actionable items — query DB instead
     }
-  });
+  } catch {}
+
+  // Immediate DB query
+  queryAndCheck();
+
+  // Poll DB directly every POLL_INTERVAL until actionable work appears
+  const pollTimer = setInterval(queryAndCheck, POLL_INTERVAL);
 
   // Safety: auto-exit after MAX_RUNTIME
   setTimeout(() => {
-    fs.unwatchFile(workFile);
+    clearInterval(pollTimer);
+    console.error(`[${new Date().toLocaleTimeString()}] --wait: MAX_RUNTIME reached with no actionable work. Exiting.`);
     process.exit(1);
   }, MAX_RUNTIME);
 
@@ -242,8 +288,16 @@ if (waitMode) {
   setInterval(checkForOrphans, POLL_INTERVAL * 10); // Check orphans every 5 minutes
 
   // Auto-exit after MAX_RUNTIME (prevents overnight loops)
+  // v0.0.2: cleanup work files on exit to prevent stale data
   setTimeout(() => {
-    console.log(`[${new Date().toLocaleTimeString()}] MAX_RUNTIME (${MAX_RUNTIME / 60000} min) reached. Exiting.`);
+    console.log(`[${new Date().toLocaleTimeString()}] MAX_RUNTIME (${MAX_RUNTIME / 60000} min) reached. Cleaning up.`);
+    roles.forEach(role => {
+      const file = `/tmp/agent-work-${role}.json`;
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+        console.log(`[${new Date().toLocaleTimeString()}] Deleted stale work file: ${file}`);
+      }
+    });
     process.exit(0);
   }, MAX_RUNTIME);
 }
