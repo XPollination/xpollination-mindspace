@@ -214,9 +214,9 @@ describe('PDSA Design Path (WORKFLOW.md v12 lines 8-24)', () => {
       expectRejected('task', 'approval', 'approved', 'qa', 'pdsa');
     });
 
-    it('sets role to liaison', () => {
+    it('sets role to qa (WORKFLOW.md v12 line 16: approved monitor=qa)', () => {
       const newRole = getNewRoleForTransition('task', 'approval', 'approved');
-      expect(newRole).toBe('liaison');
+      expect(newRole).toBe('qa');
     });
   });
 
