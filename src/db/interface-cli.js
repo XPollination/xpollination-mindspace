@@ -32,6 +32,7 @@ import {
   ALLOWED_TRANSITIONS,
   validateTransition,
   getNewRoleForTransition,
+  getClearsDnaForTransition,
   validateType,
   validateDnaRequirements
 } from './workflow-engine.js';
@@ -278,6 +279,14 @@ function cmdTransition(id, newStatus, actor) {
     error(dnaError);
   }
 
+  // Clear DNA fields if transition requires it (e.g., rework clears memory fields)
+  const fieldsToClear = getClearsDnaForTransition(nodeType, fromStatus, newStatus, currentRole);
+  if (fieldsToClear.length > 0) {
+    for (const field of fieldsToClear) {
+      delete dna[field];
+    }
+  }
+
   // Check if role should change on this transition (currentRole needed for role-specific rules)
   const newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus, currentRole);
   let updatedDna = dna;
@@ -285,8 +294,9 @@ function cmdTransition(id, newStatus, actor) {
     updatedDna = { ...dna, role: newRole };
   }
 
-  // Perform transition (and role update if needed)
-  if (newRole && newRole !== currentRole) {
+  // Perform transition (write DNA if role changed or fields were cleared)
+  const dnaChanged = (newRole && newRole !== currentRole) || fieldsToClear.length > 0;
+  if (dnaChanged) {
     db.prepare(`
       UPDATE mindspace_nodes
       SET status = ?, dna_json = ?, updated_at = datetime('now')
@@ -310,6 +320,10 @@ function cmdTransition(id, newStatus, actor) {
 
   if (newRole && newRole !== currentRole) {
     result.roleChanged = { from: currentRole, to: newRole };
+  }
+
+  if (fieldsToClear.length > 0) {
+    result.dnaCleared = fieldsToClear;
   }
 
   // NotificationService: Write to /tmp/human-notification.json on approval transition
