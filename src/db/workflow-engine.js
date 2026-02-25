@@ -52,6 +52,9 @@ export const ALLOWED_TRANSITIONS = {
     // Per WORKFLOW.md: approval->rework routes to pdsa (design rejected, pdsa reworks)
     'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
 
+    // QA claims approved task into active (WORKFLOW.md: approved monitor=qa)
+    'approved->active': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'qa', requiresDna: ['memory_query_session'] },
+
     // AC6 & AC7: QA testing phase
     'approved->testing': { allowedActors: ['liaison', 'system'], newRole: 'qa' },
     'testing->active': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session'] },
