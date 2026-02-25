@@ -1086,3 +1086,35 @@ describe('Memory enforcement — clearsDna on rework', () => {
     expect(fields).toEqual([]);
   });
 });
+
+// ==========================================================================
+// 17. BUG FIX: approved->active transition for QA (missing-approved-to-active)
+// ==========================================================================
+
+describe('Bug fix: approved->active for QA', () => {
+
+  it('QA can transition approved->active when role=qa', () => {
+    const result = validateTransition('task', 'approved', 'active', 'qa', 'qa');
+    expect(result).toBeNull();
+  });
+
+  it('approved->active requires memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa' }, 'qa');
+    expect(result).toContain('memory_query_session');
+  });
+
+  it('approved->active passes with memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'test' }, 'qa');
+    expect(result).toBeNull();
+  });
+
+  it('non-QA actors cannot use approved->active', () => {
+    const result = validateTransition('task', 'approved', 'active', 'dev', 'qa');
+    expect(result).toContain('not allowed');
+  });
+
+  it('approved->active preserves qa role', () => {
+    const newRole = getNewRoleForTransition('task', 'approved', 'active', 'qa');
+    expect(newRole).toBe('qa');
+  });
+});
