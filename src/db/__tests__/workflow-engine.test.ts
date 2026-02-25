@@ -17,6 +17,7 @@ import {
   ALLOWED_TRANSITIONS,
   validateTransition,
   getNewRoleForTransition,
+  getClearsDnaForTransition,
   validateType,
   validateDnaRequirements
 } from '../workflow-engine.js';
@@ -157,8 +158,8 @@ describe('PDSA Design Path (WORKFLOW.md v12 lines 8-24)', () => {
       expect(result).toContain('pdsa_ref');
     });
 
-    it('passes DNA check when pdsa_ref is a GitHub link', () => {
-      const dna = { role: 'pdsa', pdsa_ref: 'https://github.com/XPollination/xpollination-mcp-server/blob/main/pdsa/my-design.md' };
+    it('passes DNA check when pdsa_ref and memory_contribution_id are present', () => {
+      const dna = { role: 'pdsa', pdsa_ref: 'https://github.com/XPollination/xpollination-mcp-server/blob/main/pdsa/my-design.md', memory_contribution_id: 'test-id' };
       const result = validateDnaRequirements('task', 'active', 'approval', dna, 'pdsa');
       expect(result).toBeNull();
     });
@@ -923,18 +924,18 @@ describe('DNA Requirements — only active→approval requires pdsa_ref', () => 
     expect(result).toBeNull();
   });
 
-  it('ready→active does NOT require pdsa_ref', () => {
-    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'pdsa' }, 'pdsa');
+  it('ready→active does NOT require pdsa_ref (but requires memory_query_session)', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'pdsa', memory_query_session: 'test-session' }, 'pdsa');
     expect(result).toBeNull();
   });
 
-  it('active→review (dev path) does NOT require pdsa_ref', () => {
-    const result = validateDnaRequirements('task', 'active', 'review', { role: 'dev' }, 'dev');
+  it('active→review (dev path) does NOT require pdsa_ref (but requires memory_contribution_id)', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', { role: 'dev', memory_contribution_id: 'test-id' }, 'dev');
     expect(result).toBeNull();
   });
 
-  it('bug active→review does NOT require pdsa_ref', () => {
-    const result = validateDnaRequirements('bug', 'active', 'review', { role: 'dev' }, 'dev');
+  it('bug active→review does NOT require pdsa_ref (but requires memory_contribution_id)', () => {
+    const result = validateDnaRequirements('bug', 'active', 'review', { role: 'dev', memory_contribution_id: 'test-id' }, 'dev');
     expect(result).toBeNull();
   });
 });
@@ -964,5 +965,124 @@ describe('Edge cases', () => {
 
   it('validateDnaRequirements returns null for undefined transition', () => {
     expect(validateDnaRequirements('task', 'pending', 'active', null, null)).toBeNull();
+  });
+});
+
+// ==========================================================================
+// 15. MEMORY ENFORCEMENT (brain is infrastructure — hard gates)
+// ==========================================================================
+
+describe('Memory enforcement — requiresDna gates', () => {
+
+  // --- memory_query_session required on claiming transitions ---
+
+  it('task ready→active blocked without memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev' }, 'dev');
+    expect(result).toContain('memory_query_session');
+  });
+
+  it('task ready→active passes with memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123' }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  it('task rework→active blocked without memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'rework', 'active', { role: 'dev' }, 'dev');
+    expect(result).toContain('memory_query_session');
+  });
+
+  it('task rework→active passes with memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'rework', 'active', { role: 'dev', memory_query_session: 'session-456' }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  it('task testing→active blocked without memory_query_session', () => {
+    const result = validateDnaRequirements('task', 'testing', 'active', { role: 'qa' }, 'qa');
+    expect(result).toContain('memory_query_session');
+  });
+
+  it('bug ready→active blocked without memory_query_session', () => {
+    const result = validateDnaRequirements('bug', 'ready', 'active', { role: 'dev' }, 'dev');
+    expect(result).toContain('memory_query_session');
+  });
+
+  it('bug rework→active blocked without memory_query_session', () => {
+    const result = validateDnaRequirements('bug', 'rework', 'active', { role: 'dev' }, null);
+    expect(result).toContain('memory_query_session');
+  });
+
+  // --- memory_contribution_id required on completion transitions ---
+
+  it('task active→review blocked without memory_contribution_id', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', { role: 'dev' }, 'dev');
+    expect(result).toContain('memory_contribution_id');
+  });
+
+  it('task active→review passes with memory_contribution_id', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', { role: 'dev', memory_contribution_id: 'thought-789' }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  it('task active→approval blocked without memory_contribution_id', () => {
+    const result = validateDnaRequirements('task', 'active', 'approval', { role: 'pdsa', pdsa_ref: 'https://github.com/test/repo' }, 'pdsa');
+    expect(result).toContain('memory_contribution_id');
+  });
+
+  it('task active→approval requires both pdsa_ref and memory_contribution_id', () => {
+    const result = validateDnaRequirements('task', 'active', 'approval', { role: 'pdsa', pdsa_ref: 'https://github.com/test/repo', memory_contribution_id: 'thought-abc' }, 'pdsa');
+    expect(result).toBeNull();
+  });
+
+  it('bug active→review blocked without memory_contribution_id', () => {
+    const result = validateDnaRequirements('bug', 'active', 'review', { role: 'dev' }, null);
+    expect(result).toContain('memory_contribution_id');
+  });
+});
+
+// ==========================================================================
+// 16. MEMORY ENFORCEMENT — clearsDna on rework transitions
+// ==========================================================================
+
+describe('Memory enforcement — clearsDna on rework', () => {
+
+  it('task review→rework clears memory fields', () => {
+    const fields = getClearsDnaForTransition('task', 'review', 'rework', null);
+    expect(fields).toContain('memory_query_session');
+    expect(fields).toContain('memory_contribution_id');
+  });
+
+  it('task approval→rework clears memory fields', () => {
+    const fields = getClearsDnaForTransition('task', 'approval', 'rework', null);
+    expect(fields).toContain('memory_query_session');
+    expect(fields).toContain('memory_contribution_id');
+  });
+
+  it('task review→rework:liaison clears memory fields', () => {
+    const fields = getClearsDnaForTransition('task', 'review', 'rework', 'liaison');
+    expect(fields).toContain('memory_query_session');
+    expect(fields).toContain('memory_contribution_id');
+  });
+
+  it('bug review→rework clears memory fields', () => {
+    const fields = getClearsDnaForTransition('bug', 'review', 'rework', null);
+    expect(fields).toContain('memory_query_session');
+    expect(fields).toContain('memory_contribution_id');
+  });
+
+  it('rework→active after clearsDna requires fresh memory_query_session', () => {
+    // Simulate: fields were cleared by rework transition
+    const dna = { role: 'dev' }; // memory fields deleted by clearsDna
+    const result = validateDnaRequirements('task', 'rework', 'active', dna, 'dev');
+    expect(result).toContain('memory_query_session');
+  });
+
+  it('non-rework transitions do not clear DNA', () => {
+    const fields = getClearsDnaForTransition('task', 'ready', 'active', 'dev');
+    expect(fields).toEqual([]);
+  });
+
+  it('getClearsDnaForTransition returns empty for invalid type', () => {
+    const fields = getClearsDnaForTransition('epic', 'review', 'rework', null);
+    expect(fields).toEqual([]);
   });
 });
