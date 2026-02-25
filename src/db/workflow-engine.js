@@ -32,41 +32,41 @@ export const ALLOWED_TRANSITIONS = {
     'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'] },
 
     // AC2: ready->active allows role-matched claiming
-    'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'] },
-    'ready->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
-    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
-    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
-    'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
+    'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'], requiresDna: ['memory_query_session'] },
+    'ready->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['memory_query_session'] },
+    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session'] },
+    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session'] },
+    'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', requiresDna: ['memory_query_session'] },
 
     // Per WORKFLOW.md v12 line 21: dev sends to review, Monitor=qa (QA reviews dev work)
     // ONLY dev can do active->review. PDSA MUST use active->approval instead.
-    'active->review': { allowedActors: ['dev'], requireRole: 'dev', newRole: 'qa' },
+    'active->review': { allowedActors: ['dev'], requireRole: 'dev', newRole: 'qa', requiresDna: ['memory_contribution_id'] },
     // Liaison content path: liaison sends to review, Monitor=liaison (liaison presents to human)
-    'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
+    'active->review:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison', requiresDna: ['memory_contribution_id'] },
     // Per WORKFLOW.md v12 line 15: only pdsa submits to approval (human gate)
     // Requires pdsa_ref in DNA. Monitor=liaison, so set newRole: liaison
-    'active->approval': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['pdsa_ref'], newRole: 'liaison' },
+    'active->approval': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['pdsa_ref', 'memory_contribution_id'], newRole: 'liaison' },
 
     // Per WORKFLOW.md v12 line 16: approved state monitor=qa
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'qa' },
     // Per WORKFLOW.md: approval->rework routes to pdsa (design rejected, pdsa reworks)
-    'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa' },
+    'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
 
     // AC6 & AC7: QA testing phase
     'approved->testing': { allowedActors: ['liaison', 'system'], newRole: 'qa' },
-    'testing->active': { allowedActors: ['qa'], requireRole: 'qa' },
+    'testing->active': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session'] },
     'testing->ready': { allowedActors: ['qa'], newRole: 'dev' },
 
     // Legacy path (approved->ready for non-TDD flow)
     'approved->ready': { allowedActors: ['liaison', 'system'], newRole: 'dev' },
 
     // AC4: rework->active allows pdsa, dev, qa, liaison (role-matched)
-    'rework->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'] },
-    'rework->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa' },
-    'rework->active:dev': { allowedActors: ['dev'], requireRole: 'dev' },
-    'rework->active:qa': { allowedActors: ['qa'], requireRole: 'qa' },
+    'rework->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'], requiresDna: ['memory_query_session'] },
+    'rework->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['memory_query_session'] },
+    'rework->active:dev': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session'] },
+    'rework->active:qa': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session'] },
     // Per WORKFLOW.md v12: liaison reclaims liaison rework
-    'rework->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison' },
+    'rework->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', requiresDna: ['memory_query_session'] },
 
     // Per WORKFLOW.md v12: QA active->testing transition (only QA actor, sets qa role)
     'active->testing': { allowedActors: ['qa'], newRole: 'qa' },
@@ -74,9 +74,9 @@ export const ALLOWED_TRANSITIONS = {
     // Review flow - per WORKFLOW.md v12: only liaison (human proxy) can complete
     // PDSA forwards via review->review:pdsa, does not complete directly
     'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
-    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
+    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Per WORKFLOW.md v12: review+liaison -> rework routes back to liaison (human rejects final)
-    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison' },
+    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Per WORKFLOW.md v12: review chain transitions (QA->PDSA->Liaison)
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
@@ -91,16 +91,16 @@ export const ALLOWED_TRANSITIONS = {
   // Bug flow (can bypass PDSA, simplified)
   'bug': {
     'pending->ready': { allowedActors: ['liaison', 'pdsa', 'system'], newRole: 'dev' },
-    'ready->active': { allowedActors: ['dev'], requireRole: 'dev' },
+    'ready->active': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session'] },
     // Per WORKFLOW.md: dev sends to review, Monitor=qa (QA reviews)
-    'active->review': { allowedActors: ['dev'], newRole: 'qa' },
+    'active->review': { allowedActors: ['dev'], newRole: 'qa', requiresDna: ['memory_contribution_id'] },
     // Bug path: only liaison can finalize completion (QA reviews but doesn't complete)
     'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
-    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev' },
+    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Review chain transitions (QA->PDSA->Liaison) — same as task type
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
-    'rework->active': { allowedActors: ['dev'] },
+    'rework->active': { allowedActors: ['dev'], requiresDna: ['memory_query_session'] },
     // Per WORKFLOW.md v12: complete->rework (human reopens bug)
     'complete->rework': { allowedActors: ['liaison'] },
     // Special transitions
@@ -188,6 +188,32 @@ export function getNewRoleForTransition(nodeType, fromStatus, toStatus, currentR
   // Fall back to generic transition
   const rule = typeTransitions[transitionKey];
   return rule?.newRole || null;
+}
+
+/**
+ * Get DNA fields that should be cleared on a transition.
+ *
+ * @param {string} nodeType - 'task' or 'bug'
+ * @param {string} fromStatus - Current status
+ * @param {string} toStatus - Target status
+ * @param {string|null} currentRole - Current role (for role-specific transitions)
+ * @returns {string[]} Array of DNA field names to clear, empty if none
+ */
+export function getClearsDnaForTransition(nodeType, fromStatus, toStatus, currentRole = null) {
+  const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
+  if (!typeTransitions) return [];
+
+  const transitionKey = `${fromStatus}->${toStatus}`;
+
+  // Check role-specific transition first
+  if (currentRole) {
+    const roleSpecificRule = typeTransitions[`${transitionKey}:${currentRole}`];
+    if (roleSpecificRule?.clearsDna) return roleSpecificRule.clearsDna;
+  }
+
+  // Fall back to generic transition
+  const rule = typeTransitions[transitionKey];
+  return rule?.clearsDna || [];
 }
 
 /**
