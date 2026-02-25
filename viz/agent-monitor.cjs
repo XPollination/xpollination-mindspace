@@ -65,7 +65,7 @@ const ROLE_AGNOSTIC = {
 // Actionable statuses: tasks the agent can claim and work on RIGHT NOW
 // Other statuses are visible (for context) but not actionable
 const ACTIONABLE_STATUSES = {
-  pdsa:    ['ready', 'rework'],
+  pdsa:    ['ready', 'rework', 'review'],
   dev:     ['ready', 'rework'],
   liaison: ['ready', 'rework', 'approval'],
   qa:      ['ready', 'rework', 'approved', 'testing', 'review'],
