@@ -6,25 +6,16 @@ MCP (Model Context Protocol) server that powers the XPollination content generat
 
 ## Agent Task Monitoring (ALL AGENTS)
 
-**Every agent must start monitoring to receive tasks from the PM system.**
+**Every agent must run `/xpo.monitor {role}` to wake up, recover from memory, and start monitoring.**
 
-### Start Monitor (per WORKFLOW.md v12)
-
-Run the command for YOUR role:
-
-```bash
-# LIAISON:
-source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs liaison
-
-# PDSA:
-source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs pdsa
-
-# QA:
-source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs qa
-
-# DEV:
-source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs dev
 ```
+/xpo.monitor liaison   # or pdsa, qa, dev
+```
+
+This single command: sets identity → queries memory (brain) for recovery → starts background monitor → waits for work.
+
+**Skill source:** `best-practices/.claude/skills/xpo.monitor/SKILL.md` (git-tracked)
+**Install:** `mkdir -p ~/.claude/skills/xpo.monitor && cp best-practices/.claude/skills/xpo.monitor/SKILL.md ~/.claude/skills/xpo.monitor/`
 
 ### How Monitoring Works
 Each agent sees all tasks assigned to their role (any non-terminal status).
