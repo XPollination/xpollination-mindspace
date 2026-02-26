@@ -67,7 +67,7 @@ const ROLE_AGNOSTIC = {
 const ACTIONABLE_STATUSES = {
   pdsa:    ['ready', 'rework', 'review'],
   dev:     ['ready', 'rework'],
-  liaison: ['ready', 'rework', 'approval'],
+  liaison: ['ready', 'rework', 'approval', 'review'],
   qa:      ['ready', 'rework', 'approved', 'testing', 'review'],
 };
 
