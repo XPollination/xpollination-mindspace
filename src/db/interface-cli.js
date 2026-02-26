@@ -426,10 +426,14 @@ function cmdCreate(type, slug, dnaJson, actor) {
 
   const id = randomUUID();
 
+  // Extract parent_ids from DNA into its own column (avoid duplication)
+  const parentIds = dna.parent_ids ? JSON.stringify(dna.parent_ids) : null;
+  if (dna.parent_ids) delete dna.parent_ids;
+
   db.prepare(`
-    INSERT INTO mindspace_nodes (id, type, status, slug, dna_json, created_at, updated_at)
-    VALUES (?, ?, 'pending', ?, ?, datetime('now'), datetime('now'))
-  `).run(id, type, slug, JSON.stringify(dna));
+    INSERT INTO mindspace_nodes (id, type, status, slug, parent_ids, dna_json, created_at, updated_at)
+    VALUES (?, ?, 'pending', ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(id, type, slug, parentIds, JSON.stringify(dna));
 
   output({
     success: true,
