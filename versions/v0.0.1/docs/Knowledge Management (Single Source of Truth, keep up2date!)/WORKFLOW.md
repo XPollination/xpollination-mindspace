@@ -1,7 +1,7 @@
 # Workflow Reference - Source of Truth
 
-**Last Updated:** 2026-02-06
-**Status:** DRAFT v12 - Awaiting Thomas confirmation
+**Last Updated:** 2026-02-26
+**Status:** DRAFT v13 - Blocked state meta-state added
 
 ---
 
@@ -91,6 +91,64 @@ rework+liaison → active+liaison → review+liaison → complete
 
 ---
 
+## Blocked State (Meta-State)
+
+Blocked is a **PAUSE**, not a rework. Tasks resume at the **exact** previous state+role when unblocked.
+
+### Entry: Any State → Blocked
+
+| Who Can Block | When | Required DNA |
+|--------------|------|-------------|
+| Any agent (pdsa, dev, qa, liaison) | Infrastructure failure (brain API down, DB locked, external dependency) | `blocked_reason` |
+| system | Automated health check failure | `blocked_reason` |
+
+**On transition to blocked, DNA stores:**
+- `blocked_from_state` — the status before blocking (e.g., `review`)
+- `blocked_from_role` — the role before blocking (e.g., `pdsa`)
+- `blocked_reason` — why the task was blocked (e.g., `Brain API unavailable`)
+- `blocked_at` — timestamp of when blocking occurred
+
+### Exit: Blocked → Restore (Previous State+Role)
+
+| Who Can Unblock | How |
+|----------------|-----|
+| liaison | After infrastructure is fixed, presents to Thomas, then executes restore |
+| system | Automated recovery after health check passes |
+
+**On restore, the engine:**
+1. Reads `blocked_from_state` and `blocked_from_role` from DNA
+2. Sets status to `blocked_from_state` (NOT to `active`)
+3. Sets role to `blocked_from_role`
+4. Clears `blocked_from_state`, `blocked_from_role`, `blocked_reason`, `blocked_at` from DNA
+
+### Examples
+
+| Before Block | Blocked State | After Unblock |
+|-------------|--------------|---------------|
+| `review+pdsa` | `blocked` (from_state=review, from_role=pdsa) | `review+pdsa` |
+| `active+dev` | `blocked` (from_state=active, from_role=dev) | `active+dev` |
+| `testing+qa` | `blocked` (from_state=testing, from_role=qa) | `testing+qa` |
+| `approval+liaison` | `blocked` (from_state=approval, from_role=liaison) | `approval+liaison` |
+
+### Key Difference from Rework
+
+- **Rework** = "your work needs fixing" → re-enters workflow at defined entry point, may change role
+- **Blocked** = "external failure, pause here" → resumes at exact same point, preserves role
+
+### Brain-Down Escalation Chain
+
+When brain API is unavailable and brain-gated transitions fail:
+1. `cmdTransition()` returns error: "Brain unavailable"
+2. Agent sets DNA: `{ blocked_reason: "Brain API unavailable" }`
+3. Agent transitions to `blocked` (stores from_state + from_role)
+4. Monitor surfaces blocked task with reason
+5. LIAISON presents blocked task to Thomas
+6. Thomas fixes brain infrastructure
+7. LIAISON transitions `blocked → restore` (restores exact previous state+role)
+8. Agent resumes exactly where it was
+
+---
+
 ## Visualization Categories
 
 States grouped for display:
@@ -148,3 +206,4 @@ These transitions require human (Thomas) decision but are executed by liaison:
 | 2026-02-06 | v10 Documented rework re-entry points - role determines flow entry, no duplication | Liaison |
 | 2026-02-06 | v11 Added active+qa state for rework re-entry (active→testing transition) | Liaison |
 | 2026-02-06 | v12 Documented review→review transitions with role change (review chain) | Liaison |
+| 2026-02-26 | v13 Added Blocked State meta-state: PAUSE+RESUME semantics, stores from_state/from_role in DNA, any agent can block, liaison/system restores, brain-down escalation chain | PDSA |
