@@ -173,6 +173,52 @@ const server = http.createServer((req, res) => {
     const projectName = url.searchParams.get('project');
     const projects = discoverProjects();
 
+    // All Projects: merge data from all discovered databases
+    if (projectName === 'all') {
+      try {
+        const mergedNodes = [];
+        const mergedStations = [];
+        let totalQueue = 0, totalActive = 0, totalCompleted = 0;
+
+        for (const proj of projects) {
+          try {
+            const data = exportProjectData(proj.dbPath);
+            // Tag each node with project name
+            for (const node of data.nodes) {
+              if (!node.dna) node.dna = {};
+              node.dna._project = proj.name;
+              mergedNodes.push(node);
+            }
+            // Prefix station IDs to avoid collision
+            for (const s of data.stations) {
+              s.id = `${proj.name}:${s.id}`;
+              s.name = `${s.name} (${proj.name})`;
+              mergedStations.push(s);
+            }
+            totalQueue += data.queue_count;
+            totalActive += data.active_count;
+            totalCompleted += data.completed_count;
+          } catch (err) {
+            console.error(`Skipping project ${proj.name}:`, err.message);
+          }
+        }
+
+        sendJson(res, {
+          exported_at: new Date().toISOString(),
+          project: 'All Projects',
+          node_count: mergedNodes.length,
+          queue_count: totalQueue,
+          active_count: totalActive,
+          completed_count: totalCompleted,
+          stations: mergedStations,
+          nodes: mergedNodes
+        });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
     let targetProject;
     if (projectName) {
       targetProject = projects.find(p => p.name === projectName);
