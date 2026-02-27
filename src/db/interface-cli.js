@@ -23,6 +23,7 @@ import { randomUUID } from 'crypto';
 import { existsSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import http from 'http';
 
 // Import workflow engine (testable module)
 import {
@@ -246,9 +247,69 @@ function cmdList(filters) {
   db.close();
 }
 
-function cmdTransition(id, newStatus, actor) {
-  if (!VALID_STATUSES.includes(newStatus)) {
-    error(`Invalid status: ${newStatus}. Valid: ${VALID_STATUSES.join(', ')}`);
+// --- Brain Gate: transaction integrity for transitions ---
+
+function guessProject(dbPath) {
+  if (!dbPath) return 'unknown';
+  if (dbPath.includes('xpollination-mcp-server')) return 'xpollination-mcp-server';
+  if (dbPath.includes('HomePage')) return 'HomePage';
+  if (dbPath.includes('best-practices')) return 'best-practices';
+  return 'unknown';
+}
+
+function checkBrainHealth(timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    const req = http.get('http://localhost:3200/api/v1/health', { timeout: timeoutMs }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          resolve(data.status === 'ok');
+        } catch { resolve(false); }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+function contributeToBrain(prompt, actor, slug, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const project = guessProject(process.env.DATABASE_PATH);
+    const data = JSON.stringify({
+      prompt,
+      agent_id: `agent-${actor}`,
+      agent_name: actor.toUpperCase(),
+      context: `task: ${slug}`,
+      thought_category: 'transition_marker',
+      topic: slug
+    });
+    const req = http.request('http://localhost:3200/api/v1/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      timeout: timeoutMs
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => resolve(true));
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.write(data);
+    req.end();
+  });
+}
+
+async function cmdTransition(id, newStatus, actor) {
+  if (!VALID_STATUSES.includes(newStatus) && newStatus !== 'restore') {
+    error(`Invalid status: ${newStatus}. Valid: ${VALID_STATUSES.join(', ')}, restore`);
+  }
+
+  // Brain gate: health-check before any DB changes
+  const brainHealthy = await checkBrainHealth();
+  if (!brainHealthy) {
+    error('Brain unavailable — cannot document transition. Wait or escalate. Use blocked state if infrastructure is down.');
   }
 
   const db = getDb();
@@ -263,8 +324,103 @@ function cmdTransition(id, newStatus, actor) {
   const nodeType = node.type;
   const dna = JSON.parse(node.dna_json || '{}');
   const currentRole = dna.role || null;
-  const transition = `${fromStatus}->${newStatus}`;
 
+  // Handle blocked→restore: read stored state from DNA and restore
+  let effectiveNewStatus = newStatus;
+  let restoreRole = null;
+  if (newStatus === 'restore' && fromStatus === 'blocked') {
+    if (!dna.blocked_from_state || !dna.blocked_from_role) {
+      db.close();
+      error('Cannot restore: blocked_from_state or blocked_from_role missing from DNA');
+    }
+    effectiveNewStatus = dna.blocked_from_state;
+    restoreRole = dna.blocked_from_role;
+  }
+
+  const transition = `${fromStatus}->${effectiveNewStatus}`;
+
+  // Handle any→blocked: store current state for later restoration
+  if (effectiveNewStatus === 'blocked') {
+    // any->blocked is allowed for all agents (infrastructure failure)
+    if (!dna.blocked_reason) {
+      db.close();
+      error('blocked_reason required in DNA before transitioning to blocked');
+    }
+    dna.blocked_from_state = fromStatus;
+    dna.blocked_from_role = currentRole;
+    dna.blocked_at = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE mindspace_nodes
+      SET status = 'blocked', dna_json = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(JSON.stringify(dna), node.id);
+
+    const result = {
+      success: true,
+      id: node.id,
+      slug: node.slug,
+      transition: `${fromStatus}->blocked`,
+      actor: actor,
+      blocked: { from_state: fromStatus, from_role: currentRole, reason: dna.blocked_reason }
+    };
+
+    // Brain marker for blocked transition
+    const project = guessProject(process.env.DATABASE_PATH);
+    await contributeToBrain(
+      `TASK BLOCKED: ${actor.toUpperCase()} ${node.slug} (${project}) — ${dna.blocked_reason}`,
+      actor,
+      node.slug
+    );
+
+    output(result);
+    db.close();
+    return;
+  }
+
+  // Handle blocked→restore: restore exact previous state+role
+  if (newStatus === 'restore' && fromStatus === 'blocked') {
+    // Only liaison/system can unblock
+    if (!['liaison', 'system'].includes(actor)) {
+      db.close();
+      error(`Only liaison or system can restore blocked tasks. Actor: ${actor}`);
+    }
+
+    const restoredDna = { ...dna, role: restoreRole };
+    delete restoredDna.blocked_from_state;
+    delete restoredDna.blocked_from_role;
+    delete restoredDna.blocked_reason;
+    delete restoredDna.blocked_at;
+
+    db.prepare(`
+      UPDATE mindspace_nodes
+      SET status = ?, dna_json = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(effectiveNewStatus, JSON.stringify(restoredDna), node.id);
+
+    const result = {
+      success: true,
+      id: node.id,
+      slug: node.slug,
+      transition: `blocked->restore(${effectiveNewStatus})`,
+      actor: actor,
+      restored: { state: effectiveNewStatus, role: restoreRole }
+    };
+
+    // Brain marker for restore
+    const project = guessProject(process.env.DATABASE_PATH);
+    await contributeToBrain(
+      `TASK RESTORED: ${actor.toUpperCase()} ${node.slug} (${project}) — restored to ${effectiveNewStatus}+${restoreRole}`,
+      actor,
+      node.slug
+    );
+
+    output(result);
+    db.close();
+    return;
+  }
+
+  // Standard transition flow
   // Validate transition against whitelist
   const validationError = validateTransition(nodeType, fromStatus, newStatus, actor, currentRole);
   if (validationError) {
@@ -325,6 +481,14 @@ function cmdTransition(id, newStatus, actor) {
   if (fieldsToClear.length > 0) {
     result.dnaCleared = fieldsToClear;
   }
+
+  // Brain marker: contribute transition marker after successful DB update
+  const project = guessProject(process.env.DATABASE_PATH);
+  await contributeToBrain(
+    `TASK ${fromStatus}→${newStatus}: ${actor.toUpperCase()} ${node.slug} (${project})`,
+    actor,
+    node.slug
+  );
 
   // NotificationService: Write to /tmp/human-notification.json on approval transition
   if (newStatus === 'approval') {
@@ -499,7 +663,7 @@ switch (command) {
     if (!args[1] || !args[2] || !args[3]) {
       error('Usage: transition <id|slug> <newStatus> <actor>');
     }
-    cmdTransition(args[1], args[2], args[3]);
+    await cmdTransition(args[1], args[2], args[3]);
     break;
 
   case 'update-dna':
