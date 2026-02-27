@@ -301,6 +301,44 @@ function contributeToBrain(prompt, actor, slug, timeoutMs = 5000) {
   });
 }
 
+async function microGarden(slug, project, dna, timeoutMs = 5000) {
+  const title = dna.title || slug;
+  const findings = dna.findings
+    ? (typeof dna.findings === 'string' ? dna.findings : JSON.stringify(dna.findings)).substring(0, 200)
+    : 'N/A';
+  const impl = dna.implementation?.summary || dna.implementation?.commit || 'N/A';
+  const pdsaVerdict = dna.pdsa_review?.verdict || 'N/A';
+  const qaVerdict = dna.qa_review?.verdict || 'N/A';
+
+  const summary = `TASK SUMMARY: ${title} (${project}). ` +
+    `Findings: ${findings}. Implementation: ${impl}. ` +
+    `Reviews: PDSA=${pdsaVerdict}, QA=${qaVerdict}.`;
+
+  return new Promise((resolve) => {
+    const data = JSON.stringify({
+      prompt: summary,
+      agent_id: 'system',
+      agent_name: 'GARDENER',
+      context: `auto-garden on complete: ${slug}`,
+      thought_category: 'task_summary',
+      topic: slug
+    });
+    const req = http.request('http://localhost:3200/api/v1/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      timeout: timeoutMs
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => resolve({ status: 'ok', summary_contributed: true }));
+    });
+    req.on('error', () => resolve({ status: 'skipped', reason: 'brain error' }));
+    req.on('timeout', () => { req.destroy(); resolve({ status: 'skipped', reason: 'timeout' }); });
+    req.write(data);
+    req.end();
+  });
+}
+
 async function cmdTransition(id, newStatus, actor) {
   if (!VALID_STATUSES.includes(newStatus) && newStatus !== 'restore') {
     error(`Invalid status: ${newStatus}. Valid: ${VALID_STATUSES.join(', ')}, restore`);
@@ -502,6 +540,12 @@ async function cmdTransition(id, newStatus, actor) {
     };
     writeFileSync('/tmp/human-notification.json', JSON.stringify(notification, null, 2));
     result.notification = 'Written to /tmp/human-notification.json';
+  }
+
+  // Auto micro-garden on complete transition (Layer 3)
+  if (newStatus === 'complete') {
+    const gardenResult = await microGarden(node.slug, project, updatedDna);
+    if (gardenResult) result.gardening = gardenResult;
   }
 
   output(result);
