@@ -805,8 +805,8 @@ describe('Special transitions (any→blocked, any→cancelled)', () => {
     }
   );
 
-  it('dev CANNOT block', () => {
-    expectRejected('task', 'active', 'blocked', 'dev', 'dev');
+  it('dev CAN block (any agent can block)', () => {
+    expectAllowed('task', 'active', 'blocked', 'dev', 'dev');
   });
 
   it('dev CANNOT cancel', () => {
