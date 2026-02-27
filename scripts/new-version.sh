@@ -1,72 +1,52 @@
 #!/bin/bash
 #===============================================================================
-# new-version.sh — Create a new version for code+docs projects
+# new-version.sh — Create a new version in a specific work package
 #
-# Adapted from HomePage pattern. Versions knowledge artifacts (docs, pdsa, spec)
-# while source code stays at root.
+# Follows ProfileAssistant tracks/work-packages pattern.
+# Each work package iterates independently.
 #
-# Usage: ./scripts/new-version.sh <new-version>
-#   Example: ./scripts/new-version.sh v0.0.2
+# Usage: ./scripts/new-version.sh <track/work-package> <version>
+#   Example: ./scripts/new-version.sh brain-infrastructure/contribution-quality v0.0.2
 #===============================================================================
 
 set -euo pipefail
 
 REPO=$(git rev-parse --show-toplevel)
-NEW_VER="${1:-}"
+WP_PATH="${1:-}"
+NEW_VER="${2:-}"
 
-if [[ -z "$NEW_VER" ]]; then
-    echo "Usage: ./scripts/new-version.sh <new-version>"
-    echo "  e.g.: ./scripts/new-version.sh v0.0.2"
+if [[ -z "$WP_PATH" ]] || [[ -z "$NEW_VER" ]]; then
+    echo "Usage: ./scripts/new-version.sh <track/work-package> <version>"
+    echo "  e.g.: ./scripts/new-version.sh brain-infrastructure/contribution-quality v0.0.2"
     exit 1
 fi
 
-NEW_DIR="$REPO/versions/$NEW_VER"
+WP_DIR="$REPO/tracks/$WP_PATH"
 
-if [[ -d "$NEW_DIR" ]]; then
-    echo "ERROR: $NEW_DIR already exists"
+if [[ ! -d "$WP_DIR" ]]; then
+    echo "ERROR: Work package not found: $WP_DIR"
     exit 1
 fi
 
-# Determine current version from docs symlink
-if [[ ! -L "$REPO/docs" ]]; then
-    echo "ERROR: $REPO/docs is not a symlink — cannot determine current version"
+if [[ -d "$WP_DIR/$NEW_VER" ]]; then
+    echo "ERROR: $WP_DIR/$NEW_VER already exists"
     exit 1
 fi
 
-CURRENT_TARGET=$(readlink "$REPO/docs")
-CURRENT_VER=$(echo "$CURRENT_TARGET" | sed 's|versions/||; s|/docs||')
+# Create new version structure
+mkdir -p "$WP_DIR/$NEW_VER/pdsa"
+mkdir -p "$WP_DIR/$NEW_VER/deliverables"
 
-if [[ ! -d "$REPO/versions/$CURRENT_VER" ]]; then
-    echo "ERROR: Current version directory not found: $REPO/versions/$CURRENT_VER"
-    exit 1
+# Copy deliverables from previous version as starting point
+PREV_VER=$(ls -d "$WP_DIR"/v0.0.* 2>/dev/null | sort -V | tail -1 | xargs basename 2>/dev/null || true)
+if [ -n "$PREV_VER" ] && [ "$PREV_VER" != "$NEW_VER" ] && [ -d "$WP_DIR/$PREV_VER/deliverables" ]; then
+    cp -r "$WP_DIR/$PREV_VER/deliverables/"* "$WP_DIR/$NEW_VER/deliverables/" 2>/dev/null || true
 fi
+# pdsa/ starts empty (new iteration, new design work)
 
-echo "Creating $NEW_VER from $CURRENT_VER..."
-
-# Create new version with knowledge artifact structure
-mkdir -p "$NEW_DIR/docs"
-mkdir -p "$NEW_DIR/pdsa"
-mkdir -p "$NEW_DIR/spec"
-
-# Copy docs and spec from current version (carry forward knowledge)
-if [ -d "$REPO/versions/$CURRENT_VER/docs" ]; then
-    cp -r "$REPO/versions/$CURRENT_VER/docs/"* "$NEW_DIR/docs/" 2>/dev/null || true
-fi
-if [ -d "$REPO/versions/$CURRENT_VER/spec" ]; then
-    cp -r "$REPO/versions/$CURRENT_VER/spec/"* "$NEW_DIR/spec/" 2>/dev/null || true
-fi
-# pdsa/ starts empty (new version, new work)
-
-# Update symlinks
-ln -sfn "versions/$NEW_VER/docs" "$REPO/docs"
-if [ -L "$REPO/spec" ]; then
-    ln -sfn "versions/$NEW_VER/spec" "$REPO/spec"
-fi
-
-echo "Created $NEW_VER from $CURRENT_VER"
-echo "Symlinks updated -> $NEW_VER"
+echo "Created $WP_PATH/$NEW_VER"
 echo ""
 echo "Next steps:"
-echo "  1. git add versions/$NEW_VER/ docs spec"
-echo "  2. git commit -m 'infra: create $NEW_VER from $CURRENT_VER'"
+echo "  1. git add tracks/$WP_PATH/$NEW_VER/"
+echo "  2. git commit -m 'infra: create $WP_PATH $NEW_VER'"
 echo "  3. git push"

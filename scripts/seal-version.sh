@@ -1,42 +1,30 @@
 #!/bin/bash
 #===============================================================================
-# seal-version.sh — Seal a version with changelog gate and git tag
+# seal-version.sh — Seal a work package version with git tag
 #
-# Gates on CHANGELOG.md having an entry for the version before tagging.
-# No deploy step for code+docs projects (unlike HomePage).
+# Tags the current commit with a work-package-scoped version tag.
+# Follows ProfileAssistant tracks/work-packages pattern.
 #
-# Usage: ./scripts/seal-version.sh <version>
-#   Example: ./scripts/seal-version.sh v0.0.1
+# Usage: ./scripts/seal-version.sh <track/work-package> <version>
+#   Example: ./scripts/seal-version.sh brain-infrastructure/contribution-quality v0.0.1
 #===============================================================================
 
 set -euo pipefail
 
 REPO=$(git rev-parse --show-toplevel)
-VER="${1:-}"
+WP_PATH="${1:-}"
+VER="${2:-}"
 
-if [[ -z "$VER" ]]; then
-    echo "Usage: ./scripts/seal-version.sh <version>"
-    echo "  e.g.: ./scripts/seal-version.sh v0.0.1"
+if [[ -z "$WP_PATH" ]] || [[ -z "$VER" ]]; then
+    echo "Usage: ./scripts/seal-version.sh <track/work-package> <version>"
+    echo "  e.g.: ./scripts/seal-version.sh brain-infrastructure/contribution-quality v0.0.1"
     exit 1
 fi
 
-CHANGELOG="$REPO/CHANGELOG.md"
+WP_DIR="$REPO/tracks/$WP_PATH"
 
-# Gate: CHANGELOG entry must exist
-if [[ ! -f "$CHANGELOG" ]]; then
-    echo "ERROR: CHANGELOG.md not found at $CHANGELOG"
-    exit 1
-fi
-
-if ! grep -q "^\## \[${VER}\]" "$CHANGELOG"; then
-    echo "ERROR: No changelog entry for ${VER} in CHANGELOG.md"
-    echo "Add a section: ## [${VER}] — YYYY-MM-DD"
-    exit 1
-fi
-
-# Gate: version directory must exist
-if [[ ! -d "$REPO/versions/$VER" ]]; then
-    echo "ERROR: Version directory not found: $REPO/versions/$VER"
+if [[ ! -d "$WP_DIR/$VER" ]]; then
+    echo "ERROR: Version directory not found: $WP_DIR/$VER"
     exit 1
 fi
 
@@ -46,10 +34,11 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
-# Tag and push
-git tag -a "$VER" -m "Version $VER sealed"
-git push origin "$VER"
+# Create scoped tag: track-workpackage-version
+TAG="${WP_PATH//\//-}-$VER"
+git tag -a "$TAG" -m "Sealed $WP_PATH $VER"
+git push origin "$TAG"
 
-echo "Version $VER sealed and tagged."
+echo "Sealed $WP_PATH $VER (tag: $TAG)"
 echo ""
-echo "To verify: git tag -l | grep $VER"
+echo "To verify: git tag -l | grep $TAG"
