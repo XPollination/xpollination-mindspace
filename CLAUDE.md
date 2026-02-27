@@ -20,13 +20,19 @@ Mindmap-based project management tool for human-agent alignment. Uses PDSA (Plan
 xpollination-mindspace/
 ├── README.md           # Project overview
 ├── CLAUDE.md           # This file — agent instructions
-└── docs/
-    └── pdsa/           # All PDSA documents
+└── tracks/
+    └── architecture/
+        ├── context/    # Shared reference material
+        ├── research/   # Research PDSAs
+        └── system-design/
+            └── v0.0.1/
+                ├── pdsa/         # Design documents
+                └── deliverables/ # Architecture docs
 ```
 
 ## PDSA Documents
 
-All significant operations documented as PDSA cycles in `docs/pdsa/`.
+PDSAs live in `tracks/{track}/{work-package}/vX.Y.Z/pdsa/`.
 
 **Filename pattern:** `YYYY-MM-DD-UTC-HHMM.<operation-name>.pdsa.md`
 
