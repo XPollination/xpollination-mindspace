@@ -166,6 +166,14 @@ export function validateTransition(nodeType, fromStatus, toStatus, actor, curren
     return `Actor ${actor} not allowed for transition ${transitionKey}. Allowed: ${rule.allowedActors.join(', ')}`;
   }
 
+  // Active status requires a valid role (either already set or will be set by transition)
+  if (toStatus === 'active') {
+    const effectiveRole = rule.newRole || currentRole;
+    if (!effectiveRole || !VALID_ROLES.includes(effectiveRole)) {
+      return `Transition to active requires a valid role. Current role: ${currentRole || 'null'}. Valid roles: ${VALID_ROLES.join(', ')}. Use role-specific transition (e.g., ready->active:dev) or ensure task has a role assigned.`;
+    }
+  }
+
   return null; // Valid
 }
 
