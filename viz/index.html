@@ -664,16 +664,20 @@
     const liaisonModeSelect = document.getElementById('liaison-mode');
 
     // LIAISON approval mode: load current setting and handle changes
+    let suppressModeChange = false;
     async function loadLiaisonMode() {
       try {
         const res = await fetch('/api/settings/liaison-approval-mode');
         if (res.ok) {
           const data = await res.json();
+          suppressModeChange = true;
           liaisonModeSelect.value = data.mode;
+          suppressModeChange = false;
         }
       } catch (e) { /* ignore */ }
     }
     liaisonModeSelect.addEventListener('change', async () => {
+      if (suppressModeChange) return;
       try {
         await fetch('/api/settings/liaison-approval-mode', {
           method: 'PUT',
@@ -836,6 +840,7 @@
         stopPolling();
       } else {
         pollData(); // Immediate refresh when returning
+        loadLiaisonMode(); // Refresh settings to avoid stale tab overwrite
         startPolling();
       }
     });
