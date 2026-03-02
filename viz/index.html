@@ -1208,6 +1208,20 @@
           </div>
         </div>
         ` : ''}
+        ${dna.abstract_ref ? `
+        <div class="detail-field">
+          <label>Abstract</label>
+          <div class="dual-links">
+            <div class="dual-link" style="color: #60a5fa; font-weight: 500; margin-bottom: 4px;">
+              ${dna.abstract_ref.split('/').pop().replace('.abstract.md', '') || 'Completion Abstract'}
+            </div>
+            ${dna.abstract_ref.startsWith('https://')
+              ? `<div><a href="${dna.abstract_ref}" target="_blank" class="dual-link git-link" style="color: #60a5fa;">${dna.abstract_ref}</a></div>`
+              : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.abstract_ref}</div>`
+            }
+          </div>
+        </div>
+        ` : ''}
         <div class="detail-field">
           <label>ID</label>
           <div class="value" style="font-family: monospace; font-size: 10px; color: #666;">${node.id}</div>
