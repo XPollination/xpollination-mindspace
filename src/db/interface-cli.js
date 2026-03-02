@@ -285,9 +285,11 @@ function contributeToBrain(prompt, actor, slug, timeoutMs = 5000) {
       thought_category: 'transition_marker',
       topic: slug
     });
+    const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
+    if (process.env.BRAIN_API_KEY) headers['Authorization'] = `Bearer ${process.env.BRAIN_API_KEY}`;
     const req = http.request('http://localhost:3200/api/v1/memory', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      headers,
       timeout: timeoutMs
     }, (res) => {
       let body = '';
@@ -323,9 +325,11 @@ async function microGarden(slug, project, dna, timeoutMs = 5000) {
       thought_category: 'task_summary',
       topic: slug
     });
+    const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
+    if (process.env.BRAIN_API_KEY) headers['Authorization'] = `Bearer ${process.env.BRAIN_API_KEY}`;
     const req = http.request('http://localhost:3200/api/v1/memory', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      headers,
       timeout: timeoutMs
     }, (res) => {
       let body = '';
