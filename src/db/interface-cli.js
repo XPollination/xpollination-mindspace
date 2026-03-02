@@ -467,7 +467,7 @@ async function cmdTransition(id, newStatus, actor) {
   }
 
   // Validate DNA requirements for this transition (e.g., pdsa_ref required for approval)
-  const dnaError = validateDnaRequirements(nodeType, fromStatus, newStatus, dna, currentRole);
+  const dnaError = validateDnaRequirements(nodeType, fromStatus, newStatus, dna, currentRole, actor);
   if (dnaError) {
     db.close();
     error(dnaError);

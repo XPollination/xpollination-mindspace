@@ -76,7 +76,7 @@ export const ALLOWED_TRANSITIONS = {
 
     // Review flow - per WORKFLOW.md v12: only liaison (human proxy) can complete
     // PDSA forwards via review->review:pdsa, does not complete directly
-    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true },
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true, requiresDna: ['abstract_ref'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Per WORKFLOW.md v12: review+liaison -> rework routes back to liaison (human rejects final)
     'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
@@ -90,7 +90,8 @@ export const ALLOWED_TRANSITIONS = {
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },
-    'any->cancelled': { allowedActors: ['liaison', 'system'] }
+    'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'] },
+    'any->cancelled:system': { allowedActors: ['system'] }
   },
   // Bug flow (can bypass PDSA, simplified)
   'bug': {
@@ -99,7 +100,7 @@ export const ALLOWED_TRANSITIONS = {
     // Per WORKFLOW.md: dev sends to review, Monitor=qa (QA reviews)
     'active->review': { allowedActors: ['dev'], newRole: 'qa', requiresDna: ['memory_contribution_id'] },
     // Bug path: only liaison can finalize completion (QA reviews but doesn't complete)
-    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresDna: ['abstract_ref'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Review chain transitions (QA->PDSA->Liaison) — same as task type
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
@@ -110,7 +111,8 @@ export const ALLOWED_TRANSITIONS = {
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },
-    'any->cancelled': { allowedActors: ['liaison', 'system'] }
+    'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'] },
+    'any->cancelled:system': { allowedActors: ['system'] }
   }
 };
 
@@ -145,6 +147,10 @@ export function validateTransition(nodeType, fromStatus, toStatus, actor, curren
   }
 
   // Check for 'any' transitions (blocked, cancelled)
+  // Try actor-specific variant first (e.g., any->cancelled:system)
+  if (!rule) {
+    rule = typeTransitions[`any->${toStatus}:${actor}`];
+  }
   if (!rule) {
     rule = typeTransitions[`any->${toStatus}`];
   }
@@ -253,7 +259,7 @@ export function validateType(type) {
  * @param {string|null} currentRole - Current role (for role-specific rules)
  * @returns {string|null} Error message if invalid, null if valid
  */
-export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, currentRole = null) {
+export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, currentRole = null, actor = null) {
   const typeTransitions = ALLOWED_TRANSITIONS[nodeType];
   if (!typeTransitions) return null;
 
@@ -267,6 +273,14 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
   if (!rule) {
     rule = typeTransitions[transitionKey];
   }
+  // Check for actor-specific 'any' transitions (e.g., any->cancelled:system)
+  if (!rule && actor) {
+    rule = typeTransitions[`any->${toStatus}:${actor}`];
+  }
+  // Fall back to generic 'any' transition
+  if (!rule) {
+    rule = typeTransitions[`any->${toStatus}`];
+  }
   if (!rule) return null;
 
   // Check DNA requirements
@@ -278,6 +292,10 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
       // pdsa_ref must be a GitHub link (enforces git protocol)
       if (field === 'pdsa_ref' && typeof dna[field] === 'string' && !dna[field].startsWith('https://github.com/')) {
         return `dna.pdsa_ref must be a GitHub link (https://github.com/...). Local file paths are not allowed. Execute git protocol first (git add, git commit, git push), then use the GitHub URL. Current value: "${dna[field]}"`;
+      }
+      // abstract_ref must be a GitHub link (enforces git protocol)
+      if (field === 'abstract_ref' && typeof dna[field] === 'string' && !dna[field].startsWith('https://github.com/')) {
+        return `dna.abstract_ref must be a GitHub link (https://github.com/...). Local file paths are not allowed. Execute git protocol first (git add, git commit, git push), then use the GitHub URL. Current value: "${dna[field]}"`;
       }
     }
   }

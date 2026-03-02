@@ -1,7 +1,7 @@
 # Workflow Reference - Source of Truth
 
-**Last Updated:** 2026-02-26
-**Status:** DRAFT v13 - Blocked state meta-state added
+**Last Updated:** 2026-03-02
+**Status:** DRAFT v14 - Completion documentation gate added
 
 ---
 
@@ -164,6 +164,31 @@ States grouped for display:
 
 ---
 
+## Quality Gates
+
+Certain transitions require DNA fields to be present before the transition is allowed. The workflow engine enforces these as hard gates.
+
+| Transition | Required DNA | Validation | Who Writes |
+|------------|-------------|------------|------------|
+| `active->approval` | `pdsa_ref`, `memory_contribution_id` | `pdsa_ref` must be GitHub URL | PDSA |
+| `review->complete` | `abstract_ref` | `abstract_ref` must be GitHub URL | LIAISON |
+| `any->cancelled` (liaison) | `abstract_ref` | `abstract_ref` must be GitHub URL | LIAISON |
+| `any->cancelled` (system) | _(none)_ | System exempted from abstract gate | System |
+| `any->blocked` | `blocked_reason` | Must be non-empty | Any agent |
+| `ready->active` | `memory_query_session` | Must be non-empty | Claiming agent |
+
+### Completion Documentation Gate (v14)
+
+When a task reaches `complete` or `cancelled`, a completion abstract must exist in git and be linked via `abstract_ref` in DNA. This ensures every completed task has a documented outcome.
+
+- **Location:** `tracks/<domain>/<task-slug>/v0.0.1/abstract/YYYY-MM-DD-<slug>.abstract.md`
+- **Content:** Management summary of outcome, changes, decisions, and learnings
+- **Gate:** `abstract_ref` must be a GitHub URL (hard gate on `review->complete` and liaison `any->cancelled`)
+- **Exemption:** System-initiated cancellations (`any->cancelled:system`) do not require an abstract
+- **Format:** See `tracks/process/context/DOCUMENTATION.md` for template and conventions
+
+---
+
 ## Key Rules
 
 1. **Actor** = who performs the transition
@@ -207,3 +232,4 @@ These transitions require human (Thomas) decision but are executed by liaison:
 | 2026-02-06 | v11 Added active+qa state for rework re-entry (active→testing transition) | Liaison |
 | 2026-02-06 | v12 Documented review→review transitions with role change (review chain) | Liaison |
 | 2026-02-26 | v13 Added Blocked State meta-state: PAUSE+RESUME semantics, stores from_state/from_role in DNA, any agent can block, liaison/system restores, brain-down escalation chain | PDSA |
+| 2026-03-02 | v14 Added completion documentation gate: abstract_ref required on review->complete and liaison any->cancelled. Quality Gates table. System exempted from abstract gate via split transition. DOCUMENTATION.md living doc created | DEV |
