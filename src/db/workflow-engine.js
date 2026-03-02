@@ -49,6 +49,8 @@ export const ALLOWED_TRANSITIONS = {
 
     // Per WORKFLOW.md v12 line 16: approved state monitor=qa
     'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'qa', requiresHumanConfirm: true },
+    // Per WORKFLOW.md v15: research tasks complete directly from approval (skip QA — nothing to test)
+    'approval->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true, requiresDna: ['abstract_ref'] },
     // Per WORKFLOW.md: approval->rework routes to pdsa (design rejected, pdsa reworks)
     'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'], requiresHumanConfirm: true },
 

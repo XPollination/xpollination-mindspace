@@ -1,7 +1,7 @@
 # Workflow Reference - Source of Truth
 
 **Last Updated:** 2026-03-02
-**Status:** DRAFT v14 - Completion documentation gate added
+**Status:** DRAFT v15 - Research task approval→complete transition added
 
 ---
 
@@ -171,6 +171,7 @@ Certain transitions require DNA fields to be present before the transition is al
 | Transition | Required DNA | Validation | Who Writes |
 |------------|-------------|------------|------------|
 | `active->approval` | `pdsa_ref`, `memory_contribution_id` | `pdsa_ref` must be GitHub URL | PDSA |
+| `approval->complete` | `abstract_ref` | `abstract_ref` must be GitHub URL | LIAISON |
 | `review->complete` | `abstract_ref` | `abstract_ref` must be GitHub URL | LIAISON |
 | `any->cancelled` (liaison) | `abstract_ref` | `abstract_ref` must be GitHub URL | LIAISON |
 | `any->cancelled` (system) | _(none)_ | System exempted from abstract gate | System |
@@ -205,7 +206,8 @@ These transitions require human (Thomas) decision but are executed by liaison:
 
 | Transition | Context |
 |------------|---------|
-| approval → approved | Human approves PDSA design |
+| approval → approved | Human approves PDSA design (routes to QA for testing) |
+| approval → complete | Human approves research task that produced sub-tasks (no QA needed) |
 | approval → rework | Human rejects PDSA design |
 | review+liaison → complete | Human approves final result |
 | review+liaison → rework | Human rejects final result |
@@ -233,3 +235,4 @@ These transitions require human (Thomas) decision but are executed by liaison:
 | 2026-02-06 | v12 Documented review→review transitions with role change (review chain) | Liaison |
 | 2026-02-26 | v13 Added Blocked State meta-state: PAUSE+RESUME semantics, stores from_state/from_role in DNA, any agent can block, liaison/system restores, brain-down escalation chain | PDSA |
 | 2026-03-02 | v14 Added completion documentation gate: abstract_ref required on review->complete and liaison any->cancelled. Quality Gates table. System exempted from abstract gate via split transition. DOCUMENTATION.md living doc created | DEV |
+| 2026-03-02 | v15 Added approval→complete transition for research tasks. LIAISON can complete directly from approval when task produced sub-tasks and has no code to test. Requires abstract_ref + human confirmation. Bug type excluded (no approval state in bug flow) | DEV |
