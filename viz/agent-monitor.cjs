@@ -111,6 +111,22 @@ function queryList(dbPath, cliPath, args) {
   } catch { return []; }
 }
 
+function getLiaisonApprovalMode() {
+  try {
+    const Database = require('better-sqlite3');
+    for (const proj of projects) {
+      if (!fs.existsSync(proj.dbPath)) continue;
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        const row = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
+        db.close();
+        if (row) return row.value;
+      } catch { /* try next project */ }
+    }
+  } catch { /* better-sqlite3 not available */ }
+  return 'manual';
+}
+
 function checkForWork() {
   const ts = new Date().toLocaleTimeString();
   const workByRole = {};
@@ -140,7 +156,9 @@ function checkForWork() {
     const work = workByRole[role];
 
     if (work.length > 0) {
-      fs.writeFileSync(file, JSON.stringify({ found_at: new Date().toISOString(), role, work }, null, 2));
+      const output = { found_at: new Date().toISOString(), role, work };
+      if (role === 'liaison') output.liaison_approval_mode = getLiaisonApprovalMode();
+      fs.writeFileSync(file, JSON.stringify(output, null, 2));
       totalWork += work.length;
     } else {
       if (fs.existsSync(file)) fs.unlinkSync(file);
@@ -236,6 +254,7 @@ if (waitMode) {
     if (actionable.length > 0) {
       // Found actionable work — output and exit
       const output = { found_at: new Date().toISOString(), role, work, actionable_count: actionable.length };
+      if (role === 'liaison') output.liaison_approval_mode = getLiaisonApprovalMode();
       const json = JSON.stringify(output, null, 2);
       // Also write to work file for consistency
       fs.writeFileSync(workFile, json);
