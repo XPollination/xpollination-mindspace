@@ -153,7 +153,42 @@ function sendJson(res, data, status = 200) {
 /**
  * Handle HTTP requests
  */
-const server = http.createServer((req, res) => {
+/**
+ * Read request body as JSON
+ */
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (e) {
+        reject(new Error('Invalid JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Get or create system_settings table, return DB handle (writable)
+ */
+function getSettingsDb(dbPath) {
+  const db = new Database(dbPath);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_by TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT OR IGNORE INTO system_settings (key, value, updated_by) VALUES ('liaison_approval_mode', 'manual', 'system');
+  `);
+  return db;
+}
+
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
 
@@ -239,6 +274,107 @@ const server = http.createServer((req, res) => {
       sendJson(res, data);
     } catch (err) {
       sendJson(res, { error: err.message }, 500);
+    }
+    return;
+  }
+
+  // API: Get LIAISON approval mode
+  if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'GET') {
+    const projects = discoverProjects();
+    // Use first project DB for global settings
+    const dbPath = projects[0]?.dbPath;
+    if (!dbPath) {
+      sendJson(res, { error: 'No project database found' }, 500);
+      return;
+    }
+    const db = getSettingsDb(dbPath);
+    try {
+      const row = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
+      sendJson(res, {
+        mode: row?.value || 'manual',
+        updated_by: row?.updated_by || 'system',
+        updated_at: row?.updated_at || null,
+      });
+    } finally {
+      db.close();
+    }
+    return;
+  }
+
+  // API: Set LIAISON approval mode
+  if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'PUT') {
+    try {
+      const body = await readBody(req);
+      if (!body.mode || !['manual', 'auto'].includes(body.mode)) {
+        sendJson(res, { error: 'Invalid mode. Must be "manual" or "auto".' }, 400);
+        return;
+      }
+      const projects = discoverProjects();
+      const dbPath = projects[0]?.dbPath;
+      if (!dbPath) {
+        sendJson(res, { error: 'No project database found' }, 500);
+        return;
+      }
+      const db = getSettingsDb(dbPath);
+      try {
+        db.prepare("INSERT OR REPLACE INTO system_settings (key, value, updated_by, updated_at) VALUES ('liaison_approval_mode', ?, 'thomas', datetime('now'))").run(body.mode);
+        const row = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
+        sendJson(res, {
+          mode: row.value,
+          updated_by: row.updated_by,
+          updated_at: row.updated_at,
+        });
+      } finally {
+        db.close();
+      }
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
+    }
+    return;
+  }
+
+  // API: Confirm task (set human_confirmed in DNA)
+  const confirmMatch = pathname.match(/^\/api\/node\/([^/]+)\/confirm$/);
+  if (confirmMatch && req.method === 'PUT') {
+    try {
+      const slug = confirmMatch[1];
+      const body = await readBody(req);
+      const projectName = body.project;
+
+      const projects = discoverProjects();
+      const targetProject = projectName
+        ? projects.find(p => p.name === projectName)
+        : projects[0];
+
+      if (!targetProject) {
+        sendJson(res, { error: `Project not found: ${projectName}` }, 404);
+        return;
+      }
+
+      const db = new Database(targetProject.dbPath);
+      try {
+        const node = db.prepare('SELECT * FROM mindspace_nodes WHERE slug = ?').get(slug);
+        if (!node) {
+          sendJson(res, { error: `Task not found: ${slug}` }, 404);
+          return;
+        }
+
+        const dna = JSON.parse(node.dna_json || '{}');
+        dna.human_confirmed = true;
+
+        db.prepare('UPDATE mindspace_nodes SET dna_json = ?, updated_at = datetime(\'now\') WHERE id = ?').run(JSON.stringify(dna), node.id);
+
+        sendJson(res, {
+          success: true,
+          slug: node.slug,
+          status: node.status,
+          human_confirmed: true,
+        });
+      } finally {
+        db.close();
+      }
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
     }
     return;
   }

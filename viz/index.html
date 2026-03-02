@@ -548,6 +548,10 @@
         <span id="live-dot" class="live-dot"></span>
         <span>Live</span>
       </span>
+      <select id="liaison-mode" title="LIAISON Approval Mode" style="padding:2px 4px;font-size:11px;border-radius:3px;border:1px solid #555;background:#2a2a2a;color:#ccc;cursor:pointer;">
+        <option value="manual">Manual</option>
+        <option value="auto">Auto</option>
+      </select>
       <span class="stats-bar" id="stats">Loading...</span>
       <div class="zoom-controls">
         <button id="zoom-in" title="Zoom In">+</button>
@@ -656,6 +660,28 @@
     const liveDot = document.getElementById('live-dot');
 
     let currentProject = null;
+    const liaisonModeSelect = document.getElementById('liaison-mode');
+
+    // LIAISON approval mode: load current setting and handle changes
+    async function loadLiaisonMode() {
+      try {
+        const res = await fetch('/api/settings/liaison-approval-mode');
+        if (res.ok) {
+          const data = await res.json();
+          liaisonModeSelect.value = data.mode;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    liaisonModeSelect.addEventListener('change', async () => {
+      try {
+        await fetch('/api/settings/liaison-approval-mode', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: liaisonModeSelect.value })
+        });
+      } catch (e) { /* ignore */ }
+    });
+    loadLiaisonMode();
 
     // Initialize viewBox
     updateViewBox();
@@ -1185,6 +1211,12 @@
           <label>ID</label>
           <div class="value" style="font-family: monospace; font-size: 10px; color: #666;">${node.id}</div>
         </div>
+        ${(node.status === 'approval' || (node.status === 'review' && dna.role === 'liaison')) && liaisonModeSelect.value === 'manual' ? `
+        <div class="detail-field" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
+          <button id="confirm-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Confirm (approve for LIAISON)</button>
+          ${dna.human_confirmed ? '<span style="color:#22c55e;margin-left:8px;font-size:12px;">Confirmed</span>' : ''}
+        </div>
+        ` : ''}
       `;
 
       detailContent.querySelectorAll('.clickable').forEach(el => {
@@ -1193,6 +1225,32 @@
           if (targetNode) showDetail(targetNode, false); // auto-scroll disabled per Thomas
         };
       });
+
+      // Confirm button handler
+      const confirmBtn = document.getElementById('confirm-task-btn');
+      if (confirmBtn) {
+        confirmBtn.onclick = async () => {
+          const slug = confirmBtn.dataset.slug;
+          const project = confirmBtn.dataset.project || undefined;
+          try {
+            const res = await fetch(`/api/node/${slug}/confirm`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project })
+            });
+            if (res.ok) {
+              confirmBtn.textContent = 'Confirmed';
+              confirmBtn.disabled = true;
+              confirmBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to confirm');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
     }
 
     function hideDetail() {

@@ -48,9 +48,9 @@ export const ALLOWED_TRANSITIONS = {
     'active->approval': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['pdsa_ref', 'memory_contribution_id'], newRole: 'liaison' },
 
     // Per WORKFLOW.md v12 line 16: approved state monitor=qa
-    'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'qa' },
+    'approval->approved': { allowedActors: ['liaison', 'thomas'], newRole: 'qa', requiresHumanConfirm: true },
     // Per WORKFLOW.md: approval->rework routes to pdsa (design rejected, pdsa reworks)
-    'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
+    'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'], requiresHumanConfirm: true },
 
     // QA claims approved task into active (WORKFLOW.md: approved monitor=qa)
     'approved->active': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'qa', requiresDna: ['memory_query_session'] },
@@ -76,7 +76,7 @@ export const ALLOWED_TRANSITIONS = {
 
     // Review flow - per WORKFLOW.md v12: only liaison (human proxy) can complete
     // PDSA forwards via review->review:pdsa, does not complete directly
-    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison' },
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Per WORKFLOW.md v12: review+liaison -> rework routes back to liaison (human rejects final)
     'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
@@ -85,7 +85,7 @@ export const ALLOWED_TRANSITIONS = {
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
 
     // Per WORKFLOW.md v12: complete->rework (human reopens task)
-    'complete->rework': { allowedActors: ['liaison'] },
+    'complete->rework': { allowedActors: ['liaison'], requiresHumanConfirm: true },
 
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
@@ -283,4 +283,23 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
   }
 
   return null;
+}
+
+/**
+ * Get all transition keys that require human confirmation.
+ * Used by viz to know which transitions need gating.
+ *
+ * @returns {string[]} Array of transition keys with requiresHumanConfirm: true
+ */
+export function getHumanConfirmTransitions() {
+  const keys = [];
+  for (const [, transitions] of Object.entries(ALLOWED_TRANSITIONS)) {
+    for (const [key, rule] of Object.entries(transitions)) {
+      if (rule.requiresHumanConfirm) {
+        keys.push(key);
+      }
+    }
+  }
+  // Deduplicate (same key may appear in both task and bug types)
+  return [...new Set(keys)];
 }

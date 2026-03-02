@@ -473,6 +473,37 @@ async function cmdTransition(id, newStatus, actor) {
     error(dnaError);
   }
 
+  // LIAISON approval mode enforcement gate
+  const transitionKey = `${fromStatus}->${newStatus}`;
+  const typeTransitions = ALLOWED_TRANSITIONS[nodeType] || {};
+  let transitionRule = currentRole ? typeTransitions[`${transitionKey}:${currentRole}`] : null;
+  if (!transitionRule) transitionRule = typeTransitions[transitionKey];
+  if (!transitionRule) transitionRule = typeTransitions[`any->${newStatus}`];
+
+  if (transitionRule?.requiresHumanConfirm && actor === 'liaison') {
+    // Check global LIAISON approval mode
+    const ensureSettings = db.prepare("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    ensureSettings.run();
+    const mode = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
+    const modeValue = mode?.value || 'manual';
+
+    if (modeValue === 'manual') {
+      // Manual mode: require human_confirmed in DNA
+      if (!dna.human_confirmed) {
+        db.close();
+        error(`LIAISON manual mode active. Set dna.human_confirmed=true via mindspace viz before executing ${transitionKey}. Human must click Confirm in viz UI.`);
+      }
+      // Clear human_confirmed after use (one-time confirmation)
+      delete dna.human_confirmed;
+    } else if (modeValue === 'auto') {
+      // Auto mode: liaison proceeds freely but must document reasoning
+      if (!dna.liaison_reasoning) {
+        db.close();
+        error(`LIAISON auto mode: dna.liaison_reasoning required for ${transitionKey}. Document your approval reasoning in DNA first.`);
+      }
+    }
+  }
+
   // Clear DNA fields if transition requires it (e.g., rework clears memory fields)
   const fieldsToClear = getClearsDnaForTransition(nodeType, fromStatus, newStatus, currentRole);
   if (fieldsToClear.length > 0) {
@@ -566,6 +597,11 @@ function cmdUpdateDna(id, dnaJson, actor) {
   const validationErrors = validateDnaFields(dna);
   if (validationErrors.length > 0) {
     error(`Validation failed:\n${validationErrors.join('\n')}`);
+  }
+
+  // Protection: LIAISON cannot set human_confirmed via CLI
+  if (actor === 'liaison' && dna.human_confirmed !== undefined) {
+    error('human_confirmed can only be set via mindspace viz (human action). LIAISON agents cannot set this field.');
   }
 
   const db = getDb();

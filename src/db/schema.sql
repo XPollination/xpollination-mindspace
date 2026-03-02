@@ -137,3 +137,18 @@ CREATE TABLE IF NOT EXISTS mindspace_nodes (
 CREATE INDEX IF NOT EXISTS idx_mindspace_type ON mindspace_nodes(type);
 CREATE INDEX IF NOT EXISTS idx_mindspace_status ON mindspace_nodes(status);
 CREATE INDEX IF NOT EXISTS idx_mindspace_slug ON mindspace_nodes(slug);
+
+-- ============================================
+-- SYSTEM SETTINGS
+-- ============================================
+
+-- Global persistent settings (e.g., LIAISON approval mode)
+CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_by TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Default: LIAISON approval mode = manual (safe default)
+INSERT OR IGNORE INTO system_settings (key, value, updated_by) VALUES ('liaison_approval_mode', 'manual', 'system');
