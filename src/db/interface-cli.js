@@ -495,13 +495,9 @@ async function cmdTransition(id, newStatus, actor) {
       }
       // Clear human_confirmed after use (one-time confirmation)
       delete dna.human_confirmed;
-    } else if (modeValue === 'auto') {
-      // Auto mode: liaison proceeds freely but must document reasoning
-      if (!dna.liaison_reasoning) {
-        db.close();
-        error(`LIAISON auto mode: dna.liaison_reasoning required for ${transitionKey}. Document your approval reasoning in DNA first.`);
-      }
     }
+    // Semi mode: no engine enforcement (agent protocol handles chat-based confirmation)
+    // Auto mode: no enforcement, liaison proceeds freely
   }
 
   // Clear DNA fields if transition requires it (e.g., rework clears memory fields)
