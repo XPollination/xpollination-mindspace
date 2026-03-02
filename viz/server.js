@@ -310,23 +310,27 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const projects = discoverProjects();
-      const dbPath = projects[0]?.dbPath;
-      if (!dbPath) {
+      if (projects.length === 0) {
         sendJson(res, { error: 'No project database found' }, 500);
         return;
       }
-      const db = getSettingsDb(dbPath);
-      try {
-        db.prepare("INSERT OR REPLACE INTO system_settings (key, value, updated_by, updated_at) VALUES ('liaison_approval_mode', ?, 'thomas', datetime('now'))").run(body.mode);
-        const row = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
-        sendJson(res, {
-          mode: row.value,
-          updated_by: row.updated_by,
-          updated_at: row.updated_at,
-        });
-      } finally {
-        db.close();
+      // Write setting to ALL project DBs (global setting must be visible from any task DB)
+      let lastRow = null;
+      for (const proj of projects) {
+        const db = getSettingsDb(proj.dbPath);
+        try {
+          db.prepare("INSERT OR REPLACE INTO system_settings (key, value, updated_by, updated_at) VALUES ('liaison_approval_mode', ?, 'thomas', datetime('now'))").run(body.mode);
+          lastRow = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
+        } finally {
+          db.close();
+        }
       }
+      sendJson(res, {
+        mode: lastRow.value,
+        updated_by: lastRow.updated_by,
+        updated_at: lastRow.updated_at,
+        synced_to: projects.map(p => p.name),
+      });
     } catch (e) {
       sendJson(res, { error: e.message }, 400);
     }
