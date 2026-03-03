@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = parseInt(process.argv[2]) || 3000;
-const WORKSPACE_PATH = '/home/developer/workspaces/github/PichlerThomas';
+const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || '/home/developer/workspaces/github/PichlerThomas';
 
 // MIME types for static files
 const MIME_TYPES = {

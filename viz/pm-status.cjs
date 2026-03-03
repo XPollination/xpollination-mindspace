@@ -4,12 +4,23 @@ const http = require('http');
 const { execSync } = require('child_process');
 const path = require('path');
 
+const fs = require('fs');
 const CLI = path.join(__dirname, '..', 'src', 'db', 'interface-cli.js');
-const DBS = {
-  'best-practices': '/home/developer/workspaces/github/PichlerThomas/best-practices/data/xpollination.db',
-  'xpollination-mcp-server': '/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/data/xpollination.db',
-  'HomePage': '/home/developer/workspaces/github/PichlerThomas/HomePage/data/xpollination.db'
-};
+
+// Dynamic project discovery — configurable workspace path for multi-user support
+const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || '/home/developer/workspaces/github/PichlerThomas';
+function discoverDatabases() {
+  const dbs = {};
+  try {
+    const dirs = fs.readdirSync(WORKSPACE_PATH);
+    for (const dir of dirs) {
+      const dbPath = path.join(WORKSPACE_PATH, dir, 'data', 'xpollination.db');
+      try { if (fs.existsSync(dbPath)) dbs[dir] = dbPath; } catch {}
+    }
+  } catch (err) { console.error('Discovery failed:', err.message); }
+  return dbs;
+}
+const DBS = discoverDatabases();
 
 const BRAIN_BASE = process.env.BRAIN_URL || 'http://localhost:3200';
 
@@ -19,7 +30,7 @@ async function main() {
   // Scan all project DBs
   for (const [name, dbPath] of Object.entries(DBS)) {
     try {
-      const out = execSync(`DATABASE_PATH="${dbPath}" node ${CLI} list`, { encoding: 'utf8', timeout: 10000 });
+      const out = execSync(`DATABASE_PATH="${dbPath}" node ${CLI} list`, { encoding: 'utf8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] });
       result.projects[name] = JSON.parse(out);
     } catch { result.projects[name] = { error: 'scan failed' }; }
   }

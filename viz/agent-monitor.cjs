@@ -26,8 +26,9 @@ const path = require('path');
 const POLL_INTERVAL = 30000; // 30 seconds
 const MAX_RUNTIME = 7200000; // 120 minutes max, then exit
 
-const WORKSPACE_PATH = "/home/developer/workspaces/github/PichlerThomas";
-const CLI_PATH = `${WORKSPACE_PATH}/xpollination-mcp-server/src/db/interface-cli.js`;
+// Configurable workspace path — supports multi-user setups where each user has their own workspace
+const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || "/home/developer/workspaces/github/PichlerThomas";
+const CLI_PATH = process.env.XPO_CLI_PATH || `${WORKSPACE_PATH}/xpollination-mcp-server/src/db/interface-cli.js`;
 
 /**
  * Discover projects with data/xpollination.db in workspace.
