@@ -14,8 +14,8 @@ MCP (Model Context Protocol) server that powers the XPollination content generat
 
 This single command: sets identity → queries memory (brain) for recovery → starts background monitor → waits for work.
 
-**Skill source:** `xpollination-hive/.claude/skills/xpo.claude.monitor/SKILL.md` (git-tracked)
-**Install:** `mkdir -p ~/.claude/skills/xpo.claude.monitor && cp xpollination-hive/.claude/skills/xpo.claude.monitor/SKILL.md ~/.claude/skills/xpo.claude.monitor/`
+**Skill source:** `xpollination-best-practices/.claude/skills/xpo.claude.monitor/SKILL.md` (git-tracked)
+**Install:** `mkdir -p ~/.claude/skills/xpo.claude.monitor && cp xpollination-best-practices/.claude/skills/xpo.claude.monitor/SKILL.md ~/.claude/skills/xpo.claude.monitor/`
 
 ### How Monitoring Works
 Each agent sees all tasks assigned to their role (any non-terminal status).
