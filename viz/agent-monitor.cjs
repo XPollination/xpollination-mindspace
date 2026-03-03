@@ -26,23 +26,35 @@ const path = require('path');
 const POLL_INTERVAL = 30000; // 30 seconds
 const MAX_RUNTIME = 7200000; // 120 minutes max, then exit
 
-const projects = [
-  {
-    name: "xpollination-mcp-server",
-    dbPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/data/xpollination.db",
-    cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
-  },
-  {
-    name: "HomePage",
-    dbPath: "/home/developer/workspaces/github/PichlerThomas/HomePage/data/xpollination.db",
-    cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
-  },
-  {
-    name: "best-practices",
-    dbPath: "/home/developer/workspaces/github/PichlerThomas/best-practices/data/xpollination.db",
-    cliPath: "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js"
+const WORKSPACE_PATH = "/home/developer/workspaces/github/PichlerThomas";
+const CLI_PATH = `${WORKSPACE_PATH}/xpollination-mcp-server/src/db/interface-cli.js`;
+
+/**
+ * Discover projects with data/xpollination.db in workspace.
+ * Mirrors viz/server.js discoverProjects() to avoid hardcoded lists going stale.
+ */
+function discoverProjects() {
+  const discovered = [];
+  try {
+    const dirs = fs.readdirSync(WORKSPACE_PATH);
+    for (const dir of dirs) {
+      const projectPath = path.join(WORKSPACE_PATH, dir);
+      const dbPath = path.join(projectPath, "data", "xpollination.db");
+      try {
+        const stat = fs.statSync(projectPath);
+        if (!stat.isDirectory()) continue;
+      } catch { continue; }
+      if (fs.existsSync(dbPath)) {
+        discovered.push({ name: dir, dbPath, cliPath: CLI_PATH });
+      }
+    }
+  } catch (err) {
+    console.error("Error discovering projects:", err.message);
   }
-];
+  return discovered;
+}
+
+const projects = discoverProjects();
 
 /**
  * Simple monitoring: find tasks assigned to your role.
@@ -105,7 +117,7 @@ function queryList(dbPath, cliPath, args) {
   try {
     const result = execSync(
       `DATABASE_PATH="${dbPath}" node "${cliPath}" list ${args}`,
-      { encoding: 'utf-8', timeout: 10000 }
+      { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return JSON.parse(result).nodes || [];
   } catch { return []; }
@@ -194,7 +206,7 @@ function checkForOrphans() {
       // Get all active tasks
       const result = execSync(
         `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=active`,
-        { encoding: 'utf-8', timeout: 10000 }
+        { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
       );
 
       const data = JSON.parse(result);
