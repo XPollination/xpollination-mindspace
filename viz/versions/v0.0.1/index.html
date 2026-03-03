@@ -116,6 +116,16 @@
       transition: all 0.2s;
     }
 
+    @keyframes pulseManual {
+      0%, 100% { box-shadow: 0 0 4px #f59e0b; border-color: #f59e0b; }
+      50% { box-shadow: 0 0 12px #fb923c; border-color: #fb923c; }
+    }
+
+    .manual-pulse .package-box {
+      animation: pulseManual 2s infinite;
+      border: 2px solid #f59e0b;
+    }
+
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -1056,7 +1066,9 @@
         const x = startX + col * (CONFIG.queuePackageWidth + 10);
         const y = startY + row * (CONFIG.queuePackageHeight + 8);
 
-        const g = createSVGElement('g', { class: 'package', 'data-id': node.id });
+        const needsManualAction = liaisonModeSelect.value === 'manual' &&
+          (node.status === 'approval' || (node.status === 'review' && node.dna?.role === 'liaison'));
+        const g = createSVGElement('g', { class: 'package' + (needsManualAction ? ' manual-pulse' : ''), 'data-id': node.id });
         g.onclick = () => showDetail(node);
 
         const rect = createSVGElement('rect', {
@@ -1285,6 +1297,15 @@
           <label>Role</label>
           <div class="value">${dna.role ? `<span class="badge role-badge" style="color: ${ROLE_COLORS[dna.role] || '#888'}; border-color: ${ROLE_COLORS[dna.role] || '#888'}; font-weight: 600;">${dna.role.toUpperCase()}</span>` : '-'}</div>
         </div>
+        ${(node.status === 'approval' || (node.status === 'review' && dna.role === 'liaison')) && liaisonModeSelect.value === 'manual' ? `
+        <div class="detail-field" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="approve-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Approve</button>
+            <button id="rework-task-btn" style="background:#ef4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Rework</button>
+          </div>
+          ${dna.human_confirmed ? '<span style="color:#22c55e;margin-top:4px;font-size:12px;">Confirmed (human_confirmed_via: ' + (dna.human_confirmed_via || 'unknown') + ')</span>' : ''}
+        </div>
+        ` : ''}
         ${dna.description ? `
         <div class="detail-field">
           <label>Description</label>
@@ -1357,12 +1378,6 @@
           <label>ID</label>
           <div class="value" style="font-family: monospace; font-size: 10px; color: #666;">${node.id}</div>
         </div>
-        ${(node.status === 'approval' || (node.status === 'review' && dna.role === 'liaison')) && liaisonModeSelect.value === 'manual' ? `
-        <div class="detail-field" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
-          <button id="confirm-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Confirm (approve for LIAISON)</button>
-          ${dna.human_confirmed ? '<span style="color:#22c55e;margin-left:8px;font-size:12px;">Confirmed</span>' : ''}
-        </div>
-        ` : ''}
       `;
 
       detailContent.querySelectorAll('.clickable').forEach(el => {
@@ -1372,25 +1387,53 @@
         };
       });
 
-      // Confirm button handler
-      const confirmBtn = document.getElementById('confirm-task-btn');
-      if (confirmBtn) {
-        confirmBtn.onclick = async () => {
-          const slug = confirmBtn.dataset.slug;
-          const project = confirmBtn.dataset.project || undefined;
+      // Approve button handler — sets human_confirmed_via='viz' in DNA
+      const approveBtn = document.getElementById('approve-task-btn');
+      if (approveBtn) {
+        approveBtn.onclick = async () => {
+          const slug = approveBtn.dataset.slug;
+          const project = approveBtn.dataset.project || undefined;
           try {
             const res = await fetch(`/api/node/${slug}/confirm`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ project })
+              body: JSON.stringify({ project, human_confirmed_via: 'viz' })
             });
             if (res.ok) {
-              confirmBtn.textContent = 'Confirmed';
-              confirmBtn.disabled = true;
-              confirmBtn.style.background = '#666';
+              approveBtn.textContent = 'Approved';
+              approveBtn.disabled = true;
+              approveBtn.style.background = '#666';
             } else {
               const data = await res.json();
-              alert(data.error || 'Failed to confirm');
+              alert(data.error || 'Failed to approve');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
+
+      // Rework button handler — sends task back for rework with reason
+      const reworkBtn = document.getElementById('rework-task-btn');
+      if (reworkBtn) {
+        reworkBtn.onclick = async () => {
+          const slug = reworkBtn.dataset.slug;
+          const project = reworkBtn.dataset.project || undefined;
+          const reason = prompt('Rework reason:');
+          if (!reason) return;
+          try {
+            const res = await fetch(`/api/node/${slug}/rework`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project, rework_reason: reason })
+            });
+            if (res.ok) {
+              reworkBtn.textContent = 'Sent to rework';
+              reworkBtn.disabled = true;
+              reworkBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to rework');
             }
           } catch (e) {
             alert('Error: ' + e.message);

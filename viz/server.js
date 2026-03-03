@@ -365,6 +365,7 @@ const server = http.createServer(async (req, res) => {
 
         const dna = JSON.parse(node.dna_json || '{}');
         dna.human_confirmed = true;
+        dna.human_confirmed_via = 'viz';
 
         db.prepare('UPDATE mindspace_nodes SET dna_json = ?, updated_at = datetime(\'now\') WHERE id = ?').run(JSON.stringify(dna), node.id);
 
@@ -373,6 +374,54 @@ const server = http.createServer(async (req, res) => {
           slug: node.slug,
           status: node.status,
           human_confirmed: true,
+          human_confirmed_via: 'viz',
+        });
+      } finally {
+        db.close();
+      }
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
+    }
+    return;
+  }
+
+  // API: Rework task — PUT /api/node/:slug/rework (set rework_reason in DNA)
+  const reworkMatch = pathname.match(/^\/api\/node\/([^/]+)\/rework$/);
+  if (reworkMatch && req.method === 'PUT') {
+    try {
+      const slug = reworkMatch[1];
+      const body = await readBody(req);
+      const projectName = body.project;
+
+      const projects = discoverProjects();
+      const targetProject = projectName
+        ? projects.find(p => p.name === projectName)
+        : projects[0];
+
+      if (!targetProject) {
+        sendJson(res, { error: `Project not found: ${projectName}` }, 404);
+        return;
+      }
+
+      const db = new Database(targetProject.dbPath);
+      try {
+        const node = db.prepare('SELECT * FROM mindspace_nodes WHERE slug = ?').get(slug);
+        if (!node) {
+          sendJson(res, { error: `Task not found: ${slug}` }, 404);
+          return;
+        }
+
+        const dna = JSON.parse(node.dna_json || '{}');
+        dna.rework_reason = body.rework_reason || body.reason || 'No reason provided';
+        dna.human_confirmed = false;
+
+        db.prepare('UPDATE mindspace_nodes SET dna_json = ?, updated_at = datetime(\'now\') WHERE id = ?').run(JSON.stringify(dna), node.id);
+
+        sendJson(res, {
+          success: true,
+          slug: node.slug,
+          status: node.status,
+          rework_reason: dna.rework_reason,
         });
       } finally {
         db.close();

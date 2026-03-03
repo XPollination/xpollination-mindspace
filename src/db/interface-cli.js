@@ -492,13 +492,18 @@ async function cmdTransition(id, newStatus, actor) {
     const modeValue = mode?.value || 'manual';
 
     if (modeValue === 'manual') {
-      // Manual mode: require human_confirmed in DNA
+      // Manual mode: require human_confirmed AND human_confirmed_via='viz' in DNA
       if (!dna.human_confirmed) {
         db.close();
-        error(`LIAISON manual mode active. Set dna.human_confirmed=true via mindspace viz before executing ${transitionKey}. Human must click Confirm in viz UI.`);
+        error(`LIAISON manual mode active. Set dna.human_confirmed=true via mindspace viz before executing ${transitionKey}. Human must click Approve in viz UI.`);
+      }
+      if (dna.human_confirmed_via !== 'viz') {
+        db.close();
+        error(`LIAISON manual mode requires human_confirmed_via='viz'. Current value: '${dna.human_confirmed_via || 'none'}'. Approval must come through the mindspace viz UI, not via CLI.`);
       }
       // Clear human_confirmed after use (one-time confirmation)
       delete dna.human_confirmed;
+      delete dna.human_confirmed_via;
     }
     // Semi mode: no engine enforcement (agent protocol handles chat-based confirmation)
     // Auto mode: no enforcement, liaison proceeds freely
