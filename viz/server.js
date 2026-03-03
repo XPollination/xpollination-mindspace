@@ -183,6 +183,14 @@ function getSettingsDb(dbPath) {
       updated_by TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS system_settings_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT NOT NULL,
+      changed_by TEXT NOT NULL,
+      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
     INSERT OR IGNORE INTO system_settings (key, value, updated_by) VALUES ('liaison_approval_mode', 'manual', 'system');
   `);
   return db;
@@ -315,16 +323,26 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       // Write setting to ALL project DBs (global setting must be visible from any task DB)
+      const actor = body.actor || body.updated_by || 'viz-ui';
       let lastRow = null;
       for (const proj of projects) {
         const db = getSettingsDb(proj.dbPath);
         try {
-          db.prepare("INSERT OR REPLACE INTO system_settings (key, value, updated_by, updated_at) VALUES ('liaison_approval_mode', ?, 'thomas', datetime('now'))").run(body.mode);
+          // Read old value for audit
+          const oldRow = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
+          const oldValue = oldRow?.value || null;
+
+          // Insert audit record
+          db.prepare("INSERT INTO system_settings_audit (key, old_value, new_value, changed_by, changed_at) VALUES ('liaison_approval_mode', ?, ?, ?, datetime('now'))").run(oldValue, body.mode, actor);
+
+          // Update setting
+          db.prepare("INSERT OR REPLACE INTO system_settings (key, value, updated_by, updated_at) VALUES ('liaison_approval_mode', ?, ?, datetime('now'))").run(body.mode, actor);
           lastRow = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
         } finally {
           db.close();
         }
       }
+      console.error(`[SETTINGS] liaison_approval_mode changed: ${lastRow.value} by ${actor}`);
       sendJson(res, {
         mode: lastRow.value,
         updated_by: lastRow.updated_by,

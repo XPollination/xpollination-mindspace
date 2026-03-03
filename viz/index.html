@@ -682,6 +682,7 @@
 
     // LIAISON approval mode: load current setting and handle changes
     let suppressModeChange = false;
+    let serverMode = 'manual'; // Track server-known mode to prevent phantom writes
     async function loadLiaisonMode() {
       try {
         const res = await fetch('/api/settings/liaison-approval-mode');
@@ -689,18 +690,22 @@
           const data = await res.json();
           suppressModeChange = true;
           liaisonModeSelect.value = data.mode;
+          serverMode = data.mode;
+          liaisonModeSelect.dataset.serverMode = data.mode;
           suppressModeChange = false;
         }
       } catch (e) { /* ignore */ }
     }
     liaisonModeSelect.addEventListener('change', async () => {
       if (suppressModeChange) return;
+      if (liaisonModeSelect.value === serverMode) return; // No change — prevent phantom write
       try {
         await fetch('/api/settings/liaison-approval-mode', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: liaisonModeSelect.value })
         });
+        serverMode = liaisonModeSelect.value;
       } catch (e) { /* ignore */ }
     });
     loadLiaisonMode();
