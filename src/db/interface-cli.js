@@ -477,30 +477,37 @@ async function cmdTransition(id, newStatus, actor) {
     error(dnaError);
   }
 
-  // Rework version enforcement gate: active->approval with liaison_rework_reason
-  // Enforces: version increment in pdsa_ref, rework_context with verbatim human quotes
-  if (fromStatus === 'active' && newStatus === 'approval' && dna.liaison_rework_reason) {
-    // Check pdsa_ref version > 1 (never submit rework on v0.0.1)
+  // Version enforcement gate v2: fires on active→approval and active→review for design tasks
+  // Guard clause: only applies when pdsa_ref exists (design tasks only)
+  if (fromStatus === 'active' && (newStatus === 'approval' || newStatus === 'review') && dna.pdsa_ref) {
     const versionMatch = (dna.pdsa_ref || '').match(/v0\.0\.(\d+)/);
     const currentVersion = versionMatch ? parseInt(versionMatch[1]) : 0;
-    if (currentVersion <= 1) {
-      db.close();
-      error(`Rework version gate: pdsa_ref references v0.0.${currentVersion || '?'}. Rework submissions require a new version (v0.0.2+). Never update v0.0.1 in place — create a new version directory.`);
-    }
+    const isRework = !!(dna.liaison_rework_reason || dna.rework_reason || (dna.rework_count >= 1));
 
-    // Check rework_context exists
-    if (!dna.rework_context) {
-      db.close();
-      error('Rework version gate: rework_context required in DNA when liaison_rework_reason is present. Must contain REWORK CONTEXT section with verbatim human feedback.');
-    }
-
-    // Check rework_context contains verbatim feedback snippet (skip for short feedback <20 chars)
-    const feedback = dna.liaison_rework_reason;
-    if (feedback.length > 20) {
-      const snippet = feedback.substring(0, 50);
-      if (!dna.rework_context.includes(snippet)) {
+    if (isRework) {
+      // Rework: version must be > 1 (never submit rework on v0.0.1)
+      if (currentVersion <= 1) {
         db.close();
-        error(`Rework version gate: rework_context must contain verbatim human feedback quote. Expected substring not found. The human feedback must be quoted exactly, not paraphrased.`);
+        error(`Rework version gate: pdsa_ref references v0.0.${currentVersion || '?'}. Rework submissions require a new version (v0.0.2+). Never update v0.0.1 in place — create a new version directory.`);
+      }
+      // Rework: rework_context required
+      if (!dna.rework_context) {
+        db.close();
+        error('Rework version gate: rework_context required in DNA when rework indicators are present.');
+      }
+      // LIAISON rework: verbatim human quote enforcement (skip for short feedback <20 chars)
+      if (dna.liaison_rework_reason && dna.liaison_rework_reason.length > 20) {
+        const snippet = dna.liaison_rework_reason.substring(0, 50);
+        if (!dna.rework_context.includes(snippet)) {
+          db.close();
+          error('Rework version gate: rework_context must contain verbatim human feedback quote. Expected substring not found.');
+        }
+      }
+    } else {
+      // First submission: must use v0.0.1
+      if (currentVersion !== 1) {
+        db.close();
+        error(`Version gate: first submission pdsa_ref must reference v0.0.1, found v0.0.${currentVersion || '?'}. First submissions always start at v0.0.1.`);
       }
     }
   }
