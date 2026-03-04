@@ -611,9 +611,13 @@ describe('Rework Entry Points (WORKFLOW.md v12 lines 42-56)', () => {
       expectAllowed('task', 'review', 'rework', 'liaison', 'liaison');
     });
 
-    it('routes to liaison (not dev)', () => {
+    it('does not hardcode role — routing deferred to cmdTransition via DNA context', () => {
+      // Per fix 75fade0: review->rework:liaison has no newRole.
+      // Actual routing (pdsa for design tasks, liaison for content) happens
+      // in cmdTransition based on dna.pdsa_ref. getNewRoleForTransition falls
+      // through to generic review->rework (dev), but cmdTransition overrides.
       const newRole = getNewRoleForTransition('task', 'review', 'rework', 'liaison');
-      expect(newRole).toBe('liaison');
+      expect(newRole).toBe('dev'); // generic fallback; cmdTransition overrides
     });
   });
 
