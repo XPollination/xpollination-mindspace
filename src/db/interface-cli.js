@@ -477,6 +477,34 @@ async function cmdTransition(id, newStatus, actor) {
     error(dnaError);
   }
 
+  // Rework version enforcement gate: active->approval with liaison_rework_reason
+  // Enforces: version increment in pdsa_ref, rework_context with verbatim human quotes
+  if (fromStatus === 'active' && newStatus === 'approval' && dna.liaison_rework_reason) {
+    // Check pdsa_ref version > 1 (never submit rework on v0.0.1)
+    const versionMatch = (dna.pdsa_ref || '').match(/v0\.0\.(\d+)/);
+    const currentVersion = versionMatch ? parseInt(versionMatch[1]) : 0;
+    if (currentVersion <= 1) {
+      db.close();
+      error(`Rework version gate: pdsa_ref references v0.0.${currentVersion || '?'}. Rework submissions require a new version (v0.0.2+). Never update v0.0.1 in place — create a new version directory.`);
+    }
+
+    // Check rework_context exists
+    if (!dna.rework_context) {
+      db.close();
+      error('Rework version gate: rework_context required in DNA when liaison_rework_reason is present. Must contain REWORK CONTEXT section with verbatim human feedback.');
+    }
+
+    // Check rework_context contains verbatim feedback snippet (skip for short feedback <20 chars)
+    const feedback = dna.liaison_rework_reason;
+    if (feedback.length > 20) {
+      const snippet = feedback.substring(0, 50);
+      if (!dna.rework_context.includes(snippet)) {
+        db.close();
+        error(`Rework version gate: rework_context must contain verbatim human feedback quote. Expected substring not found. The human feedback must be quoted exactly, not paraphrased.`);
+      }
+    }
+  }
+
   // LIAISON approval mode enforcement gate
   const transitionKey = `${fromStatus}->${newStatus}`;
   const typeTransitions = ALLOWED_TRANSITIONS[nodeType] || {};
