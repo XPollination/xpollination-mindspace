@@ -1574,6 +1574,20 @@
           </div>
         </div>
         ` : ''}
+        ${dna.changelog_ref ? `
+        <div class="detail-field">
+          <label>Changelog</label>
+          <div class="dual-links">
+            <div class="dual-link" style="color: #f59e0b; font-weight: 500; margin-bottom: 4px;">
+              ${dna.changelog_ref.split('/').pop() || 'changelog.md'}
+            </div>
+            ${dna.changelog_ref.startsWith('https://')
+              ? `<div><a href="${dna.changelog_ref}" target="_blank" class="dual-link git-link" style="color: #f59e0b;">${dna.changelog_ref}</a></div>`
+              : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.changelog_ref}</div>`
+            }
+          </div>
+        </div>
+        ` : ''}
         <div class="detail-field">
           <label>ID</label>
           <div class="value" style="font-family: monospace; font-size: 10px; color: #666;">${node.id}</div>
