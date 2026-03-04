@@ -1330,6 +1330,7 @@
             ${currentProject === 'all' && dna._project ? `
               <span class="project-badge" style="color: ${PROJECT_COLORS[dna._project] || '#888'};">${escapeHtml(dna._project)}</span>
             ` : ''}
+            <div class="task-card-slug-display" style="font-family:monospace;font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(node.slug)}</div>
             <div class="task-card-status">
               <span><span class="status-dot ${node.status}"></span>${node.status}</span>
               <span class="task-type-label">${node.type}</span>
@@ -1403,6 +1404,7 @@
                 ${role ? `<span class="role-badge role-${role}">${role.toUpperCase()}</span>` : ''}
               </div>
             </div>
+            <div class="task-card-slug-display" style="font-family:monospace;font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(node.slug)}</div>
             <div class="task-card-status">
               <span><span class="status-dot ${node.status}"></span>${node.status}</span>
               <span class="task-type-label">${node.type}</span>
