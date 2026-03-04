@@ -1184,6 +1184,9 @@
         console.error('Poll failed:', error);
         liveDot.classList.add('error');
       }
+
+      // Check for version updates on every poll cycle
+      checkForUpdate();
     }
 
     function startPolling() {
