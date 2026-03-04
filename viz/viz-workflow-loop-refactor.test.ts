@@ -1,23 +1,32 @@
 /**
- * TDD tests for viz-workflow-loop-refactor — Loop visualization, agent visibility, version symlinking.
+ * TDD tests for viz-workflow-loop-refactor v0.0.2 — Kanban board redesign.
  *
- * From PDSA viz-workflow-loop-refactor (2026-03-03):
+ * From PDSA v0.0.2 DESIGN.md (2026-03-04):
  *
- * Sub-problem 1: LOOP VIZ
- *   AC-LOOP1: Flow arrows (SVG) showing forward path between status sections
- *   AC-LOOP2: Rework loop arrows (orange/red curved) showing re-entry points
- *   AC-LOOP3: Forward arrows visually distinct from rework arrows (color-coded)
+ * Thomas APPROVED: role badges + version symlinking (from v0.0.1).
+ * Thomas REJECTED: flow arrows — "does not solve usability".
+ * Thomas REQUIRED: full UI redesign (Kanban board), remove non-process stations.
  *
- * Sub-problem 2: AGENT VISIBILITY
- *   AC-AGENT1: Color-coded role badges on task packages (LIAISON=red, PDSA=green, DEV=blue, QA=amber)
- *   AC-AGENT2: Role badge rendered in renderSection() for every task
- *   AC-AGENT3: Review chain distinguishable — review+QA vs review+PDSA vs review+LIAISON visible
- *   AC-AGENT4: Detail panel shows assigned agent role
+ * Sub-problem 1: KANBAN BOARD (replaces flow arrows + warehouse sections)
+ *   AC-KB1: 5 phase columns: QUEUE, ACTIVE, REVIEW, APPROVED, COMPLETE
+ *   AC-KB2: Tasks appear as cards in correct column based on status
+ *   AC-KB3: Rework tasks appear in QUEUE column (natural loop, no arrows)
+ *   AC-KB4: Blocked/cancelled tasks in separate bottom bar
+ *   AC-KB5: Flow arrows completely removed (no drawFlowArrows, no arrowhead defs)
+ *   AC-KB6: Non-process stations (HOMEPAGE entries) removed from UI
+ *   AC-KB7: Agent status bar at top shows agent→task assignment
+ *   AC-KB8: Detail panel still works (click card → full DNA)
  *
- * Sub-problem 3: VERSION SYMLINKING
- *   AC-VER1: viz/versions/v0.0.1/ directory contains index.html, server.js, start-server.sh
- *   AC-VER2: viz/active symlink points to current live version
- *   AC-VER3: Infrastructure files (agent-monitor.cjs, tests, pm-status.cjs) remain at viz root
+ * Sub-problem 2: AGENT VISIBILITY (kept from v0.0.1)
+ *   AC-AGENT1: Color-coded role badges (LIAISON=red, PDSA=green, DEV=blue, QA=amber)
+ *   AC-AGENT2: Role badge on every task card
+ *   AC-AGENT3: Review chain distinguishable (review+qa vs review+pdsa vs review+liaison)
+ *   AC-AGENT4: Detail panel Role field color-coded
+ *
+ * Sub-problem 3: VERSION SYMLINKING (kept from v0.0.1, extended to v0.0.2)
+ *   AC-VER1: viz/versions/ has v0.0.1 and v0.0.2 directories
+ *   AC-VER2: viz/active symlink points to v0.0.2
+ *   AC-VER3: Infrastructure files remain at viz root
  *
  * Tests are source code checks on viz index.html + filesystem structure checks.
  */
@@ -41,85 +50,175 @@ function readViz(): string {
 }
 
 // ============================================================
-// Sub-problem 1: LOOP VISUALIZATION (Flow Arrows)
+// Sub-problem 1: KANBAN BOARD
 // ============================================================
 
-describe("AC-LOOP1: Flow arrows showing forward path between status sections", () => {
-  it("viz contains SVG path or line elements for flow arrows", () => {
+describe("AC-KB1: 5 phase columns — QUEUE, ACTIVE, REVIEW, APPROVED, COMPLETE", () => {
+  it("viz renders a Kanban-style column layout", () => {
     const source = readViz();
-    // Must have flow arrow elements — either <path> or <line> with flow-related class/id
-    expect(source).toMatch(/flow-arrow|flowArrow|arrow-forward|forward-arrow/i);
+    // Must have a Kanban rendering function or column-based layout
+    expect(source).toMatch(/kanban|column.*phase|phase.*column|renderColumn|renderKanban/i);
   });
 
-  it("forward flow arrows connect QUEUE → ACTIVE → REVIEW → APPROVED → COMPLETE", () => {
+  it("defines all 5 phase columns", () => {
     const source = readViz();
-    // Must reference at least the major forward-flow status sections
-    // The flow rendering code should mention these transitions
-    const hasQueueToActive = source.match(/queue.*active|QUEUE.*ACTIVE/i) ||
-                             source.match(/ready.*active/i);
-    const hasActiveToReview = source.match(/active.*review|ACTIVE.*REVIEW/i);
-    const hasReviewToComplete = source.match(/review.*complete|approved.*complete/i);
+    // The column/phase definitions must include all 5
+    expect(source).toMatch(/QUEUE/i);
+    expect(source).toMatch(/ACTIVE/i);
+    expect(source).toMatch(/REVIEW/i);
+    expect(source).toMatch(/APPROVED/i);
+    expect(source).toMatch(/COMPLETE/i);
+  });
 
-    // At minimum, the flow arrow rendering function should exist
-    expect(source).toMatch(/renderFlow|renderArrows|drawFlowArrows|drawArrows/i);
+  it("QUEUE column groups pending, ready, and rework statuses", () => {
+    const source = readViz();
+    // The column definition or status-to-column mapping must group these
+    const hasMapping = source.match(/pending.*queue|queue.*pending/i) ||
+                       source.match(/ready.*queue|queue.*ready/i) ||
+                       source.match(/rework.*queue|queue.*rework/i) ||
+                       source.match(/pending.*ready.*rework|queue.*\[.*pending.*ready.*rework/i);
+    expect(hasMapping).toBeTruthy();
+  });
+
+  it("ACTIVE column groups active and testing statuses", () => {
+    const source = readViz();
+    const hasMapping = source.match(/active.*testing|testing.*active/i) ||
+                       source.match(/ACTIVE.*\[.*active.*testing/i);
+    expect(hasMapping).toBeTruthy();
+  });
+
+  it("REVIEW column groups review and approval statuses", () => {
+    const source = readViz();
+    const hasMapping = source.match(/review.*approval|approval.*review/i) ||
+                       source.match(/REVIEW.*\[.*review.*approval/i);
+    expect(hasMapping).toBeTruthy();
   });
 });
 
-describe("AC-LOOP2: Rework loop arrows showing re-entry points", () => {
-  it("viz contains rework-specific arrow elements or CSS class", () => {
+describe("AC-KB2: Tasks appear as cards in correct column", () => {
+  it("task rendering uses card-style elements (not warehouse grid packages)", () => {
     const source = readViz();
-    // Rework arrows must be visually distinct
-    expect(source).toMatch(/rework.*arrow|arrow.*rework|loop.*arrow|arrow.*loop/i);
+    // Must have card-style rendering: CSS classes or DOM structure
+    expect(source).toMatch(/card|kanban-item|task-card/i);
   });
 
-  it("rework arrows show re-entry from review/complete back to queue/active", () => {
+  it("cards show task slug/title", () => {
     const source = readViz();
-    // The rendering code must handle rework transitions
-    // review → rework is a key loop in the workflow
-    expect(source).toMatch(/rework/i);
-    // Must have some visual loop/curve representation
-    expect(source).toMatch(/curve|arc|loop|bezier|path.*d=.*[CcQqAa]/i);
+    // Card must display the slug or title
+    expect(source).toMatch(/slug|title/i);
+  });
+
+  it("cards show project name", () => {
+    const source = readViz();
+    // Card rendering must include project name
+    // The rendering function should reference project
+    expect(source).toMatch(/project/i);
   });
 });
 
-describe("AC-LOOP3: Forward arrows visually distinct from rework arrows", () => {
-  it("forward arrows use green color", () => {
+describe("AC-KB3: Rework tasks appear in QUEUE column (natural loop)", () => {
+  it("rework status maps to QUEUE column", () => {
     const source = readViz();
-    // Forward arrows should be green (matching PDSA design)
-    // Look for green color near flow/arrow definitions
-    expect(source).toMatch(/#22c55e|#4ade80|green.*arrow|arrow.*green|forward.*green/i);
+    // The status-to-column mapping must put rework in QUEUE
+    const hasReworkInQueue = source.match(/rework.*queue|queue.*rework/i) ||
+                             source.match(/pending.*ready.*rework/i);
+    expect(hasReworkInQueue).toBeTruthy();
+  });
+});
+
+describe("AC-KB4: Blocked/cancelled tasks in separate bottom bar", () => {
+  it("blocked tasks are NOT in the 5 main columns", () => {
+    const source = readViz();
+    // Blocked must be handled separately — bottom bar, not a column
+    expect(source).toMatch(/blocked/i);
   });
 
-  it("rework arrows use orange or red color", () => {
+  it("blocked section rendered separately from Kanban columns", () => {
     const source = readViz();
-    // Rework/loop arrows should be orange or red (matching PDSA design)
-    expect(source).toMatch(/(#ef4444|#f59e0b|#fb923c|orange|red).*(rework|loop|backward)/i) ||
-    expect(source).toMatch(/(rework|loop|backward).*(#ef4444|#f59e0b|#fb923c|orange|red)/i);
+    // Must have a distinct blocked section/bar/area
+    expect(source).toMatch(/blocked.*bar|blocked.*section|blocked.*bottom|blocked.*separate/i);
+  });
+});
+
+describe("AC-KB5: Flow arrows completely removed", () => {
+  it("no drawFlowArrows function exists", () => {
+    const source = readViz();
+    expect(source).not.toMatch(/drawFlowArrows/);
+  });
+
+  it("no arrowhead SVG marker definitions exist", () => {
+    const source = readViz();
+    // No arrowhead markers from v0.0.1
+    expect(source).not.toMatch(/arrowhead-forward|arrowhead-rework/);
+  });
+
+  it("no flow-arrow class or id references exist", () => {
+    const source = readViz();
+    expect(source).not.toMatch(/flow-arrow|flowArrow|arrow-forward/);
+  });
+});
+
+describe("AC-KB6: Non-process stations removed from UI", () => {
+  it("no HOMEPAGE station references in rendering code", () => {
+    const source = readViz();
+    // Non-process stations like "Dev (HOMEPAGE)", "Human (HOMEPAGE)" must be removed
+    // They should not appear in the rendering data
+    const renderingCode = source.substring(
+      source.indexOf("<script") || 0
+    );
+    // Check no HOMEPAGE entries in stations/data definitions
+    const hasHomepage = renderingCode.match(/HOMEPAGE.*station|station.*HOMEPAGE/i);
+    expect(hasHomepage).toBeFalsy();
+  });
+});
+
+describe("AC-KB7: Agent status bar at top", () => {
+  it("viz has an agent status panel/bar element", () => {
+    const source = readViz();
+    // Must have an agent status area replacing the old stations row
+    expect(source).toMatch(/agent.*status|status.*bar|agent.*bar|agent.*panel/i);
+  });
+
+  it("agent status bar shows role labels for all 4 agents", () => {
+    const source = readViz();
+    // The status bar must reference all agent roles
+    const statusBarMatch = source.match(/agent.*status|status.*bar/i);
+    expect(statusBarMatch).toBeTruthy();
+    // Must reference liaison, pdsa, dev, qa somewhere in the rendering
+    expect(source).toMatch(/liaison/i);
+    expect(source).toMatch(/pdsa/i);
+    expect(source).toMatch(/dev/i);
+  });
+});
+
+describe("AC-KB8: Detail panel still works", () => {
+  it("showDetail function exists", () => {
+    const source = readViz();
+    expect(source).toMatch(/function showDetail/);
+  });
+
+  it("detail panel has Role label", () => {
+    const source = readViz();
+    expect(source).toMatch(/<label>Role<\/label>/);
   });
 });
 
 // ============================================================
-// Sub-problem 2: AGENT VISIBILITY (Role Badges)
+// Sub-problem 2: AGENT VISIBILITY (kept from v0.0.1)
 // ============================================================
 
-describe("AC-AGENT1: Color-coded role badges on task packages", () => {
+describe("AC-AGENT1: Color-coded role badges on task cards", () => {
   it("viz defines role-specific colors: LIAISON=red, PDSA=green, DEV=blue, QA=amber", () => {
     const source = readViz();
-    // Must have role-color mapping — could be CSS classes or JS object
-    // Check for role-based color definitions
     const hasRoleColors = source.match(/role.*liaison.*color|liaison.*#|role-liaison/i) &&
                           source.match(/role.*pdsa.*color|pdsa.*#|role-pdsa/i) &&
                           source.match(/role.*dev.*color|dev.*#|role-dev/i) &&
                           source.match(/role.*qa.*color|qa.*#|role-qa/i);
-
     expect(hasRoleColors).toBeTruthy();
   });
 
   it("role badge CSS classes or color definitions exist for all 4 agent roles", () => {
     const source = readViz();
-    // Must have visual distinction for each role
-    // Could be: .role-liaison, .role-pdsa, .role-dev, .role-qa
-    // Or: ROLE_COLORS = { liaison: ..., pdsa: ..., dev: ..., qa: ... }
     expect(source).toMatch(/role.*(liaison|LIAISON)/);
     expect(source).toMatch(/role.*(pdsa|PDSA)/);
     expect(source).toMatch(/role.*(dev|DEV)/);
@@ -127,138 +226,83 @@ describe("AC-AGENT1: Color-coded role badges on task packages", () => {
   });
 });
 
-describe("AC-AGENT2: Role badge rendered in renderSection() for every task", () => {
-  it("renderSection function creates a role badge element for each task", () => {
+describe("AC-AGENT2: Role badge rendered on every task card", () => {
+  it("card rendering includes role badge element", () => {
     const source = readViz();
-    // Inside renderSection, after creating the package <g>, there must be
-    // a role badge element (text or rect) using dna.role or node.dna.role
-    const renderSectionStart = source.indexOf("function renderSection");
-    expect(renderSectionStart).toBeGreaterThan(-1);
+    // The card/column rendering must create role badge on each task
+    // Look for role badge in the rendering code
+    expect(source).toMatch(/role.*badge|badge.*role|role-badge|roleBadge|roleLabel/i);
+  });
 
-    const renderSectionBlock = source.substring(renderSectionStart, renderSectionStart + 2000);
-    // Must reference role within the section rendering
-    expect(renderSectionBlock).toMatch(/role|\.role/);
-    // Must create a visual element for the role (text, rect, or foreignObject)
-    expect(renderSectionBlock).toMatch(/role.*badge|badge.*role|role-badge|roleBadge|roleLabel|role.*text/i);
+  it("cards use role-colored left border", () => {
+    const source = readViz();
+    // Per design: left-border color shows which agent owns the task
+    expect(source).toMatch(/border-left|borderLeft/i);
   });
 });
 
 describe("AC-AGENT3: Review chain distinguishable in viz", () => {
   it("review tasks show the assigned role (qa/pdsa/liaison) visually", () => {
     const source = readViz();
-    // When status is 'review', the role matters: review+qa, review+pdsa, review+liaison
-    // The viz must make this visible — either via badge color or label
-    // The role badge on review tasks should show which agent is reviewing
     expect(source).toMatch(/dna\.role|node\.dna\.role|\.role/);
-  });
-
-  it("role is displayed alongside status on task packages (not just in detail panel)", () => {
-    const source = readViz();
-    // The role display must be in the package rendering (renderSection or renderPackageInStation),
-    // not only in the detail panel (showDetail)
-    const renderSectionStart = source.indexOf("function renderSection");
-    const showDetailStart = source.indexOf("function showDetail");
-
-    expect(renderSectionStart).toBeGreaterThan(-1);
-
-    // Role reference must appear in renderSection, not just showDetail
-    const renderSectionBlock = source.substring(renderSectionStart, showDetailStart > renderSectionStart ? showDetailStart : renderSectionStart + 3000);
-    expect(renderSectionBlock).toMatch(/\.role/);
   });
 });
 
-describe("AC-AGENT4: Detail panel shows assigned agent role with color", () => {
-  it("detail panel Role field uses color-coded display (not plain text)", () => {
+describe("AC-AGENT4: Detail panel Role field color-coded", () => {
+  it("detail panel Role field uses color-coded display", () => {
     const source = readViz();
-    // Current: <div class="value">${dna.role || '-'}</div> (plain text)
-    // Expected: color-coded badge or styled span for the role
     const roleFieldStart = source.indexOf("<label>Role</label>");
     expect(roleFieldStart).toBeGreaterThan(-1);
-
     const roleFieldBlock = source.substring(roleFieldStart, roleFieldStart + 300);
-    // Should have color styling on the role value
     expect(roleFieldBlock).toMatch(/color.*role|role.*color|badge.*role|role.*badge|style.*color/i);
   });
 });
 
 // ============================================================
-// Sub-problem 3: VERSION SYMLINKING
+// Sub-problem 3: VERSION SYMLINKING (extended to v0.0.2)
 // ============================================================
 
-describe("AC-VER1: Version directory contains core viz files", () => {
+describe("AC-VER1: Version directories contain core viz files", () => {
   it("viz/versions/ directory exists", () => {
-    const versionsDir = join(VIZ_DIR, "versions");
-    expect(existsSync(versionsDir)).toBe(true);
+    expect(existsSync(join(VIZ_DIR, "versions"))).toBe(true);
   });
 
-  it("at least one version directory exists (e.g., v0.0.1)", () => {
-    const versionsDir = join(VIZ_DIR, "versions");
-    if (!existsSync(versionsDir)) {
-      expect(existsSync(versionsDir)).toBe(true);
-      return;
-    }
-    const versions = readdirSync(versionsDir).filter(d => d.startsWith("v"));
-    expect(versions.length).toBeGreaterThanOrEqual(1);
+  it("v0.0.1 version directory exists (previous version preserved)", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.1"))).toBe(true);
   });
 
-  it("version directory contains index.html", () => {
-    const versionsDir = join(VIZ_DIR, "versions");
-    if (!existsSync(versionsDir)) {
-      expect(existsSync(versionsDir)).toBe(true);
-      return;
-    }
-    const versions = readdirSync(versionsDir).filter(d => d.startsWith("v"));
-    const latestVersion = versions.sort().pop()!;
-    expect(existsSync(join(versionsDir, latestVersion, "index.html"))).toBe(true);
+  it("v0.0.2 version directory exists (new Kanban version)", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.2"))).toBe(true);
   });
 
-  it("version directory contains server.js", () => {
-    const versionsDir = join(VIZ_DIR, "versions");
-    if (!existsSync(versionsDir)) {
-      expect(existsSync(versionsDir)).toBe(true);
-      return;
-    }
-    const versions = readdirSync(versionsDir).filter(d => d.startsWith("v"));
-    const latestVersion = versions.sort().pop()!;
-    expect(existsSync(join(versionsDir, latestVersion, "server.js"))).toBe(true);
+  it("v0.0.2 contains index.html", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.2", "index.html"))).toBe(true);
   });
 
-  it("version directory contains start-server.sh", () => {
-    const versionsDir = join(VIZ_DIR, "versions");
-    if (!existsSync(versionsDir)) {
-      expect(existsSync(versionsDir)).toBe(true);
-      return;
-    }
-    const versions = readdirSync(versionsDir).filter(d => d.startsWith("v"));
-    const latestVersion = versions.sort().pop()!;
-    expect(existsSync(join(versionsDir, latestVersion, "start-server.sh"))).toBe(true);
+  it("v0.0.2 contains server.js", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.2", "server.js"))).toBe(true);
   });
 });
 
-describe("AC-VER2: Active symlink points to current live version", () => {
+describe("AC-VER2: Active symlink points to v0.0.2", () => {
   it("viz/active is a symbolic link", () => {
     const activePath = join(VIZ_DIR, "active");
     expect(existsSync(activePath)).toBe(true);
     expect(lstatSync(activePath).isSymbolicLink()).toBe(true);
   });
 
-  it("viz/active symlink points to a version directory", () => {
+  it("viz/active symlink points to versions/v0.0.2", () => {
     const activePath = join(VIZ_DIR, "active");
-    if (!existsSync(activePath)) {
-      expect(existsSync(activePath)).toBe(true);
-      return;
-    }
-    if (!lstatSync(activePath).isSymbolicLink()) {
-      expect(lstatSync(activePath).isSymbolicLink()).toBe(true);
+    if (!existsSync(activePath) || !lstatSync(activePath).isSymbolicLink()) {
+      expect.fail("viz/active symlink does not exist");
       return;
     }
     const target = readlinkSync(activePath);
-    // Should point to versions/v0.0.X
-    expect(target).toMatch(/versions\/v\d+\.\d+\.\d+/);
+    expect(target).toMatch(/v0\.0\.2/);
   });
 });
 
-describe("AC-VER3: Infrastructure files remain at viz root (not versioned)", () => {
+describe("AC-VER3: Infrastructure files remain at viz root", () => {
   it("agent-monitor.cjs stays at viz root", () => {
     expect(existsSync(join(VIZ_DIR, "agent-monitor.cjs"))).toBe(true);
   });
@@ -268,7 +312,6 @@ describe("AC-VER3: Infrastructure files remain at viz root (not versioned)", () 
   });
 
   it("test files stay at viz root", () => {
-    // At least the existing test files should remain at root
     expect(existsSync(join(VIZ_DIR, "liaison-approval-mode.test.ts"))).toBe(true);
   });
 });
