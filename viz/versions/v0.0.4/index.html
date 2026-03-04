@@ -1461,11 +1461,11 @@
       detailPanel.classList.add('visible');
 
       const parentNodes = (node.parent_ids || []).map(pid =>
-        nodes.find(n => n.id === pid)
+        nodes.find(n => n.id === pid || n.slug === pid)
       ).filter(Boolean);
 
       const childNodes = nodes.filter(n =>
-        n.parent_ids && n.parent_ids.includes(node.id)
+        n.parent_ids && (n.parent_ids.includes(node.id) || n.parent_ids.includes(node.slug))
       );
 
       const dna = node.dna || {};
