@@ -251,9 +251,10 @@ function cmdList(filters) {
 
 function guessProject(dbPath) {
   if (!dbPath) return 'unknown';
-  if (dbPath.includes('xpollination-mcp-server')) return 'xpollination-mcp-server';
-  if (dbPath.includes('HomePage')) return 'HomePage';
-  if (dbPath.includes('best-practices')) return 'best-practices';
+  // Extract project name dynamically from path: .../ProjectName/data/xpollination.db
+  const parts = dbPath.split('/');
+  const dataIdx = parts.lastIndexOf('data');
+  if (dataIdx > 0) return parts[dataIdx - 1];
   return 'unknown';
 }
 
