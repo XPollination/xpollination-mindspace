@@ -683,6 +683,8 @@
     // LIAISON approval mode: load current setting and handle changes
     let suppressModeChange = false;
     let serverMode = 'manual'; // Track server-known mode to prevent phantom writes
+    let modeChangeTimer = null;
+    let modeWriteInFlight = false;
     async function loadLiaisonMode() {
       try {
         const res = await fetch('/api/settings/liaison-approval-mode');
@@ -696,17 +698,25 @@
         }
       } catch (e) { /* ignore */ }
     }
-    liaisonModeSelect.addEventListener('change', async () => {
+    liaisonModeSelect.addEventListener('change', () => {
       if (suppressModeChange) return;
-      if (liaisonModeSelect.value === serverMode) return; // No change — prevent phantom write
-      try {
-        await fetch('/api/settings/liaison-approval-mode', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: liaisonModeSelect.value })
-        });
-        serverMode = liaisonModeSelect.value;
-      } catch (e) { /* ignore */ }
+      // Debounce: wait 300ms for rapid changes (keyboard/scrollwheel) to settle
+      clearTimeout(modeChangeTimer);
+      modeChangeTimer = setTimeout(async () => {
+        const newMode = liaisonModeSelect.value;
+        if (newMode === serverMode) return;
+        if (modeWriteInFlight) return;
+        modeWriteInFlight = true;
+        try {
+          await fetch('/api/settings/liaison-approval-mode', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: newMode })
+          });
+          serverMode = newMode;
+        } catch (e) { /* ignore */ }
+        modeWriteInFlight = false;
+      }, 300);
     });
     loadLiaisonMode();
 
