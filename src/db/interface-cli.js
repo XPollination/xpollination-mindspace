@@ -512,6 +512,14 @@ async function cmdTransition(id, newStatus, actor) {
     }
   }
 
+  // Changelog quality gate: complete transition requires changelog_ref for tasks with pdsa_ref
+  if (newStatus === 'complete' && dna.pdsa_ref) {
+    if (!dna.changelog_ref) {
+      db.close();
+      error('Changelog quality gate: changelog_ref missing in DNA. Every completed design task must include a changelog_ref (git link to changelog.md in the version directory).');
+    }
+  }
+
   // LIAISON approval mode enforcement gate
   const transitionKey = `${fromStatus}->${newStatus}`;
   const typeTransitions = ALLOWED_TRANSITIONS[nodeType] || {};
