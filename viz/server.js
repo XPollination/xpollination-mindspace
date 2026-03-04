@@ -7,14 +7,16 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { createRequire } from 'module';
 import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+const { discoverProjects } = require('./discover-projects.cjs');
 
 const PORT = parseInt(process.argv[2]) || 3000;
-const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || '/home/developer/workspaces/github/PichlerThomas';
 
 // MIME types for static files
 const MIME_TYPES = {
@@ -25,39 +27,6 @@ const MIME_TYPES = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml'
 };
-
-/**
- * Discover projects with xpollination.db in workspace
- */
-function discoverProjects() {
-  const projects = [];
-
-  try {
-    const dirs = fs.readdirSync(WORKSPACE_PATH);
-
-    for (const dir of dirs) {
-      const projectPath = path.join(WORKSPACE_PATH, dir);
-      const dbPath = path.join(projectPath, 'data', 'xpollination.db');
-
-      // Skip if not a directory
-      const stat = fs.statSync(projectPath);
-      if (!stat.isDirectory()) continue;
-
-      // Check if db exists
-      if (fs.existsSync(dbPath)) {
-        projects.push({
-          name: dir,
-          path: projectPath,
-          dbPath: dbPath
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Error discovering projects:', err.message);
-  }
-
-  return projects;
-}
 
 /**
  * Export data from a project's database
