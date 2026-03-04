@@ -5,22 +5,12 @@ const { execSync } = require('child_process');
 const path = require('path');
 
 const fs = require('fs');
+const { discoverProjects } = require('./discover-projects.cjs');
 const CLI = path.join(__dirname, '..', 'src', 'db', 'interface-cli.js');
 
-// Dynamic project discovery — configurable workspace path for multi-user support
-const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || '/home/developer/workspaces/github/PichlerThomas';
-function discoverDatabases() {
-  const dbs = {};
-  try {
-    const dirs = fs.readdirSync(WORKSPACE_PATH);
-    for (const dir of dirs) {
-      const dbPath = path.join(WORKSPACE_PATH, dir, 'data', 'xpollination.db');
-      try { if (fs.existsSync(dbPath)) dbs[dir] = dbPath; } catch {}
-    }
-  } catch (err) { console.error('Discovery failed:', err.message); }
-  return dbs;
-}
-const DBS = discoverDatabases();
+// Convert shared discovery format to {name: dbPath} map for backward compat
+const DBS = {};
+for (const p of discoverProjects()) { DBS[p.name] = p.dbPath; }
 
 const BRAIN_BASE = process.env.BRAIN_URL || 'http://localhost:3200';
 
