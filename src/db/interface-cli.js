@@ -710,6 +710,13 @@ function cmdCreate(type, slug, dnaJson, actor) {
     error(`Validation failed:\n${validationErrors.join('\n')}`);
   }
 
+  // Bug type requires parent_ids — every bug must link to the task it originated from
+  if (type === 'bug') {
+    if (!Array.isArray(dna.parent_ids) || dna.parent_ids.length === 0) {
+      error('Bug type requires parent_ids — every bug must link to the task it originated from. Provide parent_ids as a non-empty array in DNA.');
+    }
+  }
+
   const db = getDb();
 
   // Check slug uniqueness
