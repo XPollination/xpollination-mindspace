@@ -177,7 +177,8 @@ describe("Integration: rework version gate enforcement", () => {
       liaison_rework_reason: feedback,
       rework_context: `REWORK v0.0.2 based on Thomas feedback: "${feedback}" — Redesigned as Kanban board.`,
       pdsa_ref: "https://github.com/test/repo/blob/main/tracks/test/v0.0.2/pdsa/DESIGN.md",
-      memory_query_session: "test-session-id"
+      memory_query_session: "test-session-id",
+      memory_contribution_id: "test-contribution-id"
     });
 
     const result = runTransition("test-rework-pass", "approval", "pdsa");
@@ -192,7 +193,8 @@ describe("Integration: rework version gate enforcement", () => {
       liaison_rework_reason: feedback,
       rework_context: `REWORK v0.0.2: "${feedback}"`,
       pdsa_ref: "https://github.com/test/repo/blob/main/tracks/test/v0.0.1/pdsa/DESIGN.md",
-      memory_query_session: "test-session-id"
+      memory_query_session: "test-session-id",
+      memory_contribution_id: "test-contribution-id"
     });
 
     const result = runTransition("test-rework-v1", "approval", "pdsa");
@@ -207,7 +209,8 @@ describe("Integration: rework version gate enforcement", () => {
       role: "pdsa",
       liaison_rework_reason: feedback,
       pdsa_ref: "https://github.com/test/repo/blob/main/tracks/test/v0.0.2/pdsa/DESIGN.md",
-      memory_query_session: "test-session-id"
+      memory_query_session: "test-session-id",
+      memory_contribution_id: "test-contribution-id"
     });
 
     const result = runTransition("test-rework-no-ctx", "approval", "pdsa");
@@ -223,7 +226,8 @@ describe("Integration: rework version gate enforcement", () => {
       liaison_rework_reason: feedback,
       rework_context: "REWORK v0.0.2: Redesigned the entire UI based on feedback.",
       pdsa_ref: "https://github.com/test/repo/blob/main/tracks/test/v0.0.2/pdsa/DESIGN.md",
-      memory_query_session: "test-session-id"
+      memory_query_session: "test-session-id",
+      memory_contribution_id: "test-contribution-id"
     });
 
     const result = runTransition("test-rework-no-quote", "approval", "pdsa");
@@ -236,7 +240,8 @@ describe("Integration: rework version gate enforcement", () => {
       title: "First submission",
       role: "pdsa",
       pdsa_ref: "https://github.com/test/repo/blob/main/tracks/test/v0.0.1/pdsa/DESIGN.md",
-      memory_query_session: "test-session-id"
+      memory_query_session: "test-session-id",
+      memory_contribution_id: "test-contribution-id"
     });
 
     const result = runTransition("test-first-submit", "approval", "pdsa");
@@ -251,7 +256,8 @@ describe("Integration: rework version gate enforcement", () => {
       liaison_rework_reason: "rejected",
       rework_context: "REWORK v0.0.2: Task was rejected. Redesigned.",
       pdsa_ref: "https://github.com/test/repo/blob/main/tracks/test/v0.0.2/pdsa/DESIGN.md",
-      memory_query_session: "test-session-id"
+      memory_query_session: "test-session-id",
+      memory_contribution_id: "test-contribution-id"
     });
 
     const result = runTransition("test-short-feedback", "approval", "pdsa");
