@@ -1,0 +1,13 @@
+{
+  "version": "v0.0.4",
+  "title": "Light Mode Full Coverage",
+  "date": "2026-03-04",
+  "changes": [
+    "Light mode overrides for project dropdown selector",
+    "Light mode overrides for liaison approval mode selector",
+    "Light mode overrides for header buttons (Refresh, Version History)",
+    "Light mode overrides for changelog modal and past changes popup",
+    "Light mode overrides for update banner, stats bar, live indicator",
+    "Light mode overrides for blocked filter buttons and header subtitle"
+  ]
+}
