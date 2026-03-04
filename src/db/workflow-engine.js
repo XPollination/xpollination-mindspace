@@ -80,14 +80,18 @@ export const ALLOWED_TRANSITIONS = {
     // PDSA forwards via review->review:pdsa, does not complete directly
     'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true, requiresDna: ['abstract_ref'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
-    // Per WORKFLOW.md v12: review+liaison -> rework routes back to liaison (human rejects final)
-    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', newRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
+    // Per WORKFLOW.md rework entry table: review+liaison → rework
+    // Role routing determined by cmdTransition using DNA context:
+    //   Design tasks (has pdsa_ref) → rework+pdsa (designer reworks)
+    //   Liaison content tasks (no pdsa_ref) → rework+liaison (content creator reworks)
+    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Per WORKFLOW.md v12: review chain transitions (QA->PDSA->Liaison)
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
 
     // Per WORKFLOW.md v12: complete->rework (human reopens task)
-    'complete->rework': { allowedActors: ['liaison'], requiresHumanConfirm: true },
+    // rework_target_role in DNA determines re-entry point (pdsa, dev, qa, or liaison)
+    'complete->rework': { allowedActors: ['liaison'], requiresHumanConfirm: true, requiresDna: ['rework_target_role'] },
 
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
@@ -109,7 +113,8 @@ export const ALLOWED_TRANSITIONS = {
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
     'rework->active': { allowedActors: ['dev'], requiresDna: ['memory_query_session'] },
     // Per WORKFLOW.md v12: complete->rework (human reopens bug)
-    'complete->rework': { allowedActors: ['liaison'] },
+    // rework_target_role in DNA determines re-entry point (dev, qa, etc.)
+    'complete->rework': { allowedActors: ['liaison'], requiresDna: ['rework_target_role'] },
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },

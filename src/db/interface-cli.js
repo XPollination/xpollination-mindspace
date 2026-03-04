@@ -518,7 +518,24 @@ async function cmdTransition(id, newStatus, actor) {
   }
 
   // Check if role should change on this transition (currentRole needed for role-specific rules)
-  const newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus, currentRole);
+  let newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus, currentRole);
+
+  // Per WORKFLOW.md rework entry table: review+liaison→rework routing depends on task type
+  // Design tasks (has pdsa_ref) → pdsa reworks the design
+  // Liaison content tasks (no pdsa_ref) → liaison reworks the content
+  if (fromStatus === 'review' && newStatus === 'rework' && currentRole === 'liaison') {
+    newRole = dna.pdsa_ref ? 'pdsa' : 'liaison';
+  }
+
+  // Per WORKFLOW.md: complete->rework uses dna.rework_target_role (human specifies re-entry point)
+  if (fromStatus === 'complete' && newStatus === 'rework' && dna.rework_target_role) {
+    if (!VALID_ROLES.includes(dna.rework_target_role)) {
+      db.close();
+      error(`Invalid rework_target_role: ${dna.rework_target_role}. Valid: ${VALID_ROLES.join(', ')}`);
+    }
+    newRole = dna.rework_target_role;
+  }
+
   let updatedDna = dna;
   if (newRole && newRole !== currentRole) {
     updatedDna = { ...dna, role: newRole };
