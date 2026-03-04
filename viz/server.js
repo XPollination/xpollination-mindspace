@@ -295,7 +295,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
     } catch (e) { /* ignore */ }
-    sendJson(res, { changelogs });
+    sendJson(res, { changelogs: changelogs.slice(0, 33) });
     return;
   }
 

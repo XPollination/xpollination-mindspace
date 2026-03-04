@@ -1758,7 +1758,7 @@
       try {
         const res = await fetch('/api/changelogs');
         const data = await res.json();
-        pastChangesList.innerHTML = (data.changelogs || []).map(cl => `
+        pastChangesList.innerHTML = (data.changelogs || []).slice(0, 33).map(cl => `
           <div class="version-entry">
             <div class="version-title">${cl.version} — ${cl.title || ''}</div>
             <div class="version-date">${cl.date || ''}</div>
