@@ -26,36 +26,13 @@ const path = require('path');
 const POLL_INTERVAL = 30000; // 30 seconds
 const MAX_RUNTIME = 7200000; // 120 minutes max, then exit
 
-// Configurable workspace path — supports multi-user setups where each user has their own workspace
+// Shared project discovery — single source of truth
+const { discoverProjects: _discoverProjects } = require('./discover-projects.cjs');
 const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || "/home/developer/workspaces/github/PichlerThomas";
 const CLI_PATH = process.env.XPO_CLI_PATH || `${WORKSPACE_PATH}/xpollination-mcp-server/src/db/interface-cli.js`;
 
-/**
- * Discover projects with data/xpollination.db in workspace.
- * Mirrors viz/server.js discoverProjects() to avoid hardcoded lists going stale.
- */
-function discoverProjects() {
-  const discovered = [];
-  try {
-    const dirs = fs.readdirSync(WORKSPACE_PATH);
-    for (const dir of dirs) {
-      const projectPath = path.join(WORKSPACE_PATH, dir);
-      const dbPath = path.join(projectPath, "data", "xpollination.db");
-      try {
-        const stat = fs.statSync(projectPath);
-        if (!stat.isDirectory()) continue;
-      } catch { continue; }
-      if (fs.existsSync(dbPath)) {
-        discovered.push({ name: dir, dbPath, cliPath: CLI_PATH });
-      }
-    }
-  } catch (err) {
-    console.error("Error discovering projects:", err.message);
-  }
-  return discovered;
-}
-
-const projects = discoverProjects();
+// Add cliPath to each discovered project for backward compat
+const projects = _discoverProjects().map(p => ({ ...p, cliPath: CLI_PATH }));
 
 /**
  * Simple monitoring: find tasks assigned to your role.
