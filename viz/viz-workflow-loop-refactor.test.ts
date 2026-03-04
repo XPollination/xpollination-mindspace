@@ -284,21 +284,21 @@ describe("AC-VER1: Version directories contain core viz files", () => {
   });
 });
 
-describe("AC-VER2: Active symlink points to v0.0.3", () => {
+describe("AC-VER2: Active symlink points to v0.0.4", () => {
   it("viz/active is a symbolic link", () => {
     const activePath = join(VIZ_DIR, "active");
     expect(existsSync(activePath)).toBe(true);
     expect(lstatSync(activePath).isSymbolicLink()).toBe(true);
   });
 
-  it("viz/active symlink points to versions/v0.0.3", () => {
+  it("viz/active symlink points to versions/v0.0.4", () => {
     const activePath = join(VIZ_DIR, "active");
     if (!existsSync(activePath) || !lstatSync(activePath).isSymbolicLink()) {
       expect.fail("viz/active symlink does not exist");
       return;
     }
     const target = readlinkSync(activePath);
-    expect(target).toMatch(/v0\.0\.3/);
+    expect(target).toMatch(/v0\.0\.4/);
   });
 });
 
@@ -421,5 +421,59 @@ describe("AC-V3-VER: v0.0.3 version directory", () => {
 
   it("v0.0.2 preserved (rollback available)", () => {
     expect(existsSync(join(VIZ_DIR, "versions", "v0.0.2"))).toBe(true);
+  });
+});
+
+// ============================================================
+// v0.0.4: Light Mode CSS Full Coverage
+// ============================================================
+
+describe("AC-V4-1: Light mode covers all UI elements", () => {
+  it("light mode overrides project dropdown/selector", () => {
+    const source = readViz();
+    expect(source).toMatch(/light-mode.*project-dropdown|light-mode.*\.project/s);
+  });
+
+  it("light mode overrides liaison mode selector", () => {
+    const source = readViz();
+    expect(source).toMatch(/light-mode.*liaison-mode|light-mode.*mode-select/s);
+  });
+
+  it("light mode overrides header buttons (refresh, version history)", () => {
+    const source = readViz();
+    // Must override button styling in light mode
+    const hasButtonOverride = source.match(/light-mode.*button|light-mode.*btn/s);
+    expect(hasButtonOverride).toBeTruthy();
+  });
+
+  it("light mode overrides changelog/version history modal", () => {
+    const source = readViz();
+    const hasModalOverride = source.match(/light-mode.*modal|light-mode.*changelog/s);
+    expect(hasModalOverride).toBeTruthy();
+  });
+
+  it("light mode overrides stats bar", () => {
+    const source = readViz();
+    expect(source).toMatch(/light-mode.*stats|light-mode.*header/s);
+  });
+
+  it("light mode overrides update banner", () => {
+    const source = readViz();
+    const hasBannerOverride = source.match(/light-mode.*update-banner|light-mode.*banner/s);
+    expect(hasBannerOverride).toBeTruthy();
+  });
+});
+
+describe("AC-V4-VER: v0.0.4 version directory", () => {
+  it("v0.0.4 version directory exists", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.4"))).toBe(true);
+  });
+
+  it("v0.0.4 contains index.html", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.4", "index.html"))).toBe(true);
+  });
+
+  it("v0.0.3 preserved (rollback available)", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.3"))).toBe(true);
   });
 });
