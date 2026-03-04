@@ -1,0 +1,11 @@
+{
+  "version": "v0.0.3",
+  "title": "Kanban Board Refinements",
+  "date": "2026-03-04",
+  "changes": [
+    "Detail panel auto-refreshes when task state changes in background polls",
+    "Light mode toggle with localStorage persistence",
+    "Blocked/cancelled section is now collapsible with count badges when collapsed",
+    "Blocked/cancelled filter buttons: All, Blocked, Cancelled"
+  ]
+}
