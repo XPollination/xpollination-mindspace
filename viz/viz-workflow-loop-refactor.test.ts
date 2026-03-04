@@ -284,21 +284,21 @@ describe("AC-VER1: Version directories contain core viz files", () => {
   });
 });
 
-describe("AC-VER2: Active symlink points to v0.0.2", () => {
+describe("AC-VER2: Active symlink points to v0.0.3", () => {
   it("viz/active is a symbolic link", () => {
     const activePath = join(VIZ_DIR, "active");
     expect(existsSync(activePath)).toBe(true);
     expect(lstatSync(activePath).isSymbolicLink()).toBe(true);
   });
 
-  it("viz/active symlink points to versions/v0.0.2", () => {
+  it("viz/active symlink points to versions/v0.0.3", () => {
     const activePath = join(VIZ_DIR, "active");
     if (!existsSync(activePath) || !lstatSync(activePath).isSymbolicLink()) {
       expect.fail("viz/active symlink does not exist");
       return;
     }
     const target = readlinkSync(activePath);
-    expect(target).toMatch(/v0\.0\.2/);
+    expect(target).toMatch(/v0\.0\.3/);
   });
 });
 
@@ -313,5 +313,113 @@ describe("AC-VER3: Infrastructure files remain at viz root", () => {
 
   it("test files stay at viz root", () => {
     expect(existsSync(join(VIZ_DIR, "liaison-approval-mode.test.ts"))).toBe(true);
+  });
+});
+
+// ============================================================
+// v0.0.3 Refinements
+// ============================================================
+
+describe("AC-V3-1: Detail panel auto-refresh on poll", () => {
+  it("pollData or data refresh code references selectedNodeId", () => {
+    const source = readViz();
+    expect(source).toMatch(/selectedNodeId/);
+  });
+
+  it("after data refresh, showDetail called for selected node", () => {
+    const source = readViz();
+    // Must call showDetail after render when a node is selected
+    const hasAutoRefresh = source.match(/selectedNodeId.*showDetail|showDetail.*selectedNodeId/s);
+    expect(hasAutoRefresh).toBeTruthy();
+  });
+
+  it("if selected node disappears, detail panel is hidden", () => {
+    const source = readViz();
+    // Must handle case where selected node no longer exists
+    expect(source).toMatch(/hideDetail|selectedNodeId\s*=\s*null/);
+  });
+});
+
+describe("AC-V3-2: Light mode toggle", () => {
+  it("theme toggle button exists in HTML", () => {
+    const source = readViz();
+    expect(source).toMatch(/theme-toggle|themeToggle|light-mode.*toggle|toggle.*theme/i);
+  });
+
+  it("light-mode CSS class defined with background overrides", () => {
+    const source = readViz();
+    expect(source).toMatch(/\.light-mode|body\.light-mode/);
+  });
+
+  it("light mode persists in localStorage", () => {
+    const source = readViz();
+    expect(source).toMatch(/localStorage.*theme|theme.*localStorage/i);
+  });
+
+  it("light mode overrides card backgrounds", () => {
+    const source = readViz();
+    // Must have light-mode overrides for task cards
+    const hasCardOverride = source.match(/light-mode.*card|light-mode.*background/s);
+    expect(hasCardOverride).toBeTruthy();
+  });
+});
+
+describe("AC-V3-3: Blocked/cancelled section collapsible", () => {
+  it("collapsed CSS class hides blocked cards", () => {
+    const source = readViz();
+    expect(source).toMatch(/collapsed/);
+  });
+
+  it("collapse toggle handler exists", () => {
+    const source = readViz();
+    // Must toggle collapsed class
+    expect(source).toMatch(/toggle.*collapsed|classList.*collapsed/i);
+  });
+
+  it("collapse state persists in localStorage", () => {
+    const source = readViz();
+    expect(source).toMatch(/localStorage.*collapsed|collapsed.*localStorage|blocked-collapsed/i);
+  });
+
+  it("collapsed state shows count badges", () => {
+    const source = readViz();
+    // When collapsed, show counts for blocked/cancelled
+    const hasCount = source.match(/blocked.*count|count.*blocked|blocked.*length/i);
+    expect(hasCount).toBeTruthy();
+  });
+});
+
+describe("AC-V3-4: Blocked/cancelled filter", () => {
+  it("filter buttons exist (All, Blocked, Cancelled)", () => {
+    const source = readViz();
+    // Must have filter options
+    expect(source).toMatch(/blockedFilter|blocked-filter|filter.*blocked/i);
+  });
+
+  it("filter logic filters nodes by status", () => {
+    const source = readViz();
+    // Must filter blocked vs cancelled
+    const hasFilter = source.match(/filter.*blocked.*cancelled|status.*===.*blocked|status.*===.*cancelled/);
+    expect(hasFilter).toBeTruthy();
+  });
+
+  it("active filter gets visual highlight", () => {
+    const source = readViz();
+    // Active filter button must be visually distinguished
+    expect(source).toMatch(/active.*filter|filter.*active|selected.*filter/i);
+  });
+});
+
+describe("AC-V3-VER: v0.0.3 version directory", () => {
+  it("v0.0.3 version directory exists", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.3"))).toBe(true);
+  });
+
+  it("v0.0.3 contains index.html", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.3", "index.html"))).toBe(true);
+  });
+
+  it("v0.0.2 preserved (rollback available)", () => {
+    expect(existsSync(join(VIZ_DIR, "versions", "v0.0.2"))).toBe(true);
   });
 });
