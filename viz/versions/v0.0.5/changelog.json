@@ -1,0 +1,14 @@
+{
+  "version": "v0.0.5",
+  "title": "Complete Column Improvements + Accumulated Fixes",
+  "date": "2026-03-04",
+  "changes": [
+    "Complete column sorted by completion date (newest first)",
+    "Time filter on complete column: 1d/1w/1m/All (default: 1 week)",
+    "Created and Updated timestamps in object detail panel",
+    "Changelog link in object detail panel",
+    "Parent/child lookup matches by slug in addition to UUID",
+    "Light mode fix: liaison selector and version history button",
+    "Light mode: select option styling"
+  ]
+}
