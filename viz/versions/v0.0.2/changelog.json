@@ -1,0 +1,16 @@
+{
+  "version": "v0.0.2",
+  "title": "Kanban Board Redesign",
+  "date": "2026-03-04",
+  "changes": [
+    "Replaced SVG warehouse with Kanban board layout (5 columns: Queue, Active, Review, Approved, Complete)",
+    "Task cards with role-colored left borders replace warehouse packages",
+    "Rework tasks appear naturally in Queue column — no flow arrows needed",
+    "Blocked/cancelled tasks in separate bottom bar",
+    "All flow arrows and arrowhead markers removed",
+    "Non-process stations (HOMEPAGE entries) removed from UI",
+    "Agent status bar at top shows agent-to-task assignment",
+    "Debounced approval mode dropdown to prevent phantom writes",
+    "Search with live filtering across task cards"
+  ]
+}

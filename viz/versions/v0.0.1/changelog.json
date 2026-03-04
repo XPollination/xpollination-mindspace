@@ -1,0 +1,13 @@
+{
+  "version": "v0.0.1",
+  "title": "Initial Visualization",
+  "date": "2026-03-03",
+  "changes": [
+    "SVG warehouse-style task visualization with stations and flow arrows",
+    "Color-coded role badges for LIAISON, PDSA, DEV, QA agents",
+    "Detail panel with full DNA view on task click",
+    "Live polling with 5-second auto-refresh",
+    "Multi-project support with project selector",
+    "LIAISON approval mode dropdown (manual/semi/auto)"
+  ]
+}

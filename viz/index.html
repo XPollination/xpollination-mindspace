@@ -631,9 +631,131 @@
     .kanban-board::-webkit-scrollbar-thumb:hover {
       background: #1a4a8a;
     }
+    /* Update banner */
+    .update-banner {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #0f3460, #1a4a8a);
+      color: #fff;
+      padding: 10px 20px;
+      z-index: 1000;
+      text-align: center;
+      font-size: 13px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .update-banner.show { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .update-banner button {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .update-banner button.primary { background: #e94560; border-color: #e94560; }
+
+    /* Changelog modal */
+    .changelog-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1001;
+      align-items: center;
+      justify-content: center;
+    }
+    .changelog-modal.show { display: flex; }
+    .changelog-modal-content {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .changelog-modal h2 { margin-bottom: 4px; font-size: 18px; }
+    .changelog-modal .changelog-version { color: #e94560; font-size: 13px; margin-bottom: 12px; }
+    .changelog-modal .changelog-list { list-style: disc; padding-left: 20px; }
+    .changelog-modal .changelog-list li { margin-bottom: 6px; font-size: 13px; line-height: 1.4; color: #ccc; }
+    .changelog-modal button.close-btn {
+      margin-top: 16px;
+      padding: 6px 16px;
+      border-radius: 4px;
+      border: 1px solid #0f3460;
+      background: #0f3460;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    /* Past changes section */
+    .past-changes {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1001;
+      align-items: center;
+      justify-content: center;
+    }
+    .past-changes.show { display: flex; }
+    .past-changes-content {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .past-changes h2 { margin-bottom: 16px; }
+    .past-changes .version-entry { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #0f3460; }
+    .past-changes .version-entry:last-child { border-bottom: none; }
+    .past-changes .version-title { font-size: 14px; font-weight: bold; color: #e94560; }
+    .past-changes .version-date { font-size: 11px; color: #888; margin-bottom: 6px; }
+    .past-changes .version-changes { list-style: disc; padding-left: 20px; }
+    .past-changes .version-changes li { font-size: 12px; color: #ccc; margin-bottom: 3px; }
   </style>
 </head>
 <body>
+  <!-- Update notification banner -->
+  <div id="update-banner" class="update-banner">
+    <span>A new version is available!</span>
+    <button onclick="showChangelogModal()">View Changes</button>
+    <button class="primary" onclick="acceptUpdate()">Update Now</button>
+  </div>
+
+  <!-- Changelog modal -->
+  <div id="changelog-modal" class="changelog-modal" onclick="if(event.target===this)hideChangelogModal()">
+    <div class="changelog-modal-content">
+      <h2>What's New</h2>
+      <div id="changelog-version" class="changelog-version"></div>
+      <ul id="changelog-list" class="changelog-list"></ul>
+      <button class="close-btn" onclick="hideChangelogModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Past changes panel -->
+  <div id="past-changes" class="past-changes" onclick="if(event.target===this)hidePastChanges()">
+    <div class="past-changes-content">
+      <h2>Version History</h2>
+      <div id="past-changes-list"></div>
+      <button class="close-btn" onclick="hidePastChanges()">Close</button>
+    </div>
+  </div>
+
   <div class="header">
     <select id="project-selector" class="project-dropdown">
       <option value="">Loading...</option>
@@ -655,6 +777,7 @@
       </select>
       <span class="stats-bar" id="stats">Loading...</span>
       <button id="refresh-btn">Refresh</button>
+      <button id="version-history-btn" style="padding:2px 8px;font-size:11px;border-radius:3px;border:1px solid #555;background:#2a2a2a;color:#ccc;cursor:pointer;" onclick="showPastChanges()">Version History</button>
     </div>
   </div>
 
@@ -1424,11 +1547,93 @@
       await loadData();
     };
 
+    // ============================================================
+    // Update notification and changelog
+    // ============================================================
+
+    const updateBanner = document.getElementById('update-banner');
+    const changelogModal = document.getElementById('changelog-modal');
+    const changelogVersion = document.getElementById('changelog-version');
+    const changelogList = document.getElementById('changelog-list');
+    const pastChangesPanel = document.getElementById('past-changes');
+    const pastChangesList = document.getElementById('past-changes-list');
+    let pendingVersion = null;
+
+    async function checkForUpdate() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        if (!data.version) return;
+        const acceptedVersion = localStorage.getItem('acceptedVersion');
+        if (acceptedVersion !== data.version) {
+          pendingVersion = data.version;
+          updateBanner.classList.add('show');
+          document.body.style.paddingTop = '40px';
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function acceptUpdate() {
+      if (pendingVersion) {
+        localStorage.setItem('acceptedVersion', pendingVersion);
+      }
+      updateBanner.classList.remove('show');
+      document.body.style.paddingTop = '0';
+      location.reload();
+    }
+    window.acceptUpdate = acceptUpdate;
+
+    async function showChangelogModal() {
+      const version = pendingVersion || localStorage.getItem('acceptedVersion') || 'v0.0.2';
+      try {
+        const res = await fetch(`/api/changelog/${version}`);
+        const data = await res.json();
+        changelogVersion.textContent = `${data.version || version} — ${data.title || ''} (${data.date || ''})`;
+        changelogList.innerHTML = (data.changes || []).map(c => `<li>${c}</li>`).join('');
+      } catch (e) {
+        changelogVersion.textContent = version;
+        changelogList.innerHTML = '<li>Could not load changelog</li>';
+      }
+      changelogModal.classList.add('show');
+    }
+    window.showChangelogModal = showChangelogModal;
+
+    function hideChangelogModal() {
+      changelogModal.classList.remove('show');
+    }
+    window.hideChangelogModal = hideChangelogModal;
+
+    async function showPastChanges() {
+      try {
+        const res = await fetch('/api/changelogs');
+        const data = await res.json();
+        pastChangesList.innerHTML = (data.changelogs || []).map(cl => `
+          <div class="version-entry">
+            <div class="version-title">${cl.version} — ${cl.title || ''}</div>
+            <div class="version-date">${cl.date || ''}</div>
+            <ul class="version-changes">
+              ${(cl.changes || []).map(c => `<li>${c}</li>`).join('')}
+            </ul>
+          </div>
+        `).join('');
+      } catch (e) {
+        pastChangesList.innerHTML = '<p>Could not load version history</p>';
+      }
+      pastChangesPanel.classList.add('show');
+    }
+    window.showPastChanges = showPastChanges;
+
+    function hidePastChanges() {
+      pastChangesPanel.classList.remove('show');
+    }
+    window.hidePastChanges = hidePastChanges;
+
     // Initial load and start polling
     loadProjects().then(() => {
       lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
       startPolling();
     });
+    checkForUpdate();
   </script>
 </body>
 </html>

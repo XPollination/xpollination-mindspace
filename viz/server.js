@@ -286,6 +286,50 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API: Get current viz version from active symlink
+  if (pathname === '/api/version' && req.method === 'GET') {
+    try {
+      const activePath = path.join(__dirname, 'active');
+      const target = fs.readlinkSync(activePath);
+      const versionMatch = target.match(/v(\d+\.\d+\.\d+)/);
+      sendJson(res, { version: versionMatch ? `v${versionMatch[1]}` : target });
+    } catch (e) {
+      sendJson(res, { version: null, error: 'Could not read active symlink' });
+    }
+    return;
+  }
+
+  // API: Get changelog for specific version
+  const changelogMatch = pathname.match(/^\/api\/changelog\/(.+)$/);
+  if (changelogMatch && req.method === 'GET') {
+    const version = changelogMatch[1];
+    const changelogPath = path.join(__dirname, 'versions', version, 'changelog.json');
+    try {
+      const changelog = JSON.parse(fs.readFileSync(changelogPath, 'utf-8'));
+      sendJson(res, changelog);
+    } catch (e) {
+      sendJson(res, { error: `Changelog not found for ${version}` }, 404);
+    }
+    return;
+  }
+
+  // API: Get all changelogs across versions
+  if (pathname === '/api/changelogs' && req.method === 'GET') {
+    const versionsDir = path.join(__dirname, 'versions');
+    const changelogs = [];
+    try {
+      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort().reverse();
+      for (const dir of dirs) {
+        const changelogPath = path.join(versionsDir, dir, 'changelog.json');
+        if (fs.existsSync(changelogPath)) {
+          changelogs.push(JSON.parse(fs.readFileSync(changelogPath, 'utf-8')));
+        }
+      }
+    } catch (e) { /* ignore */ }
+    sendJson(res, { changelogs });
+    return;
+  }
+
   // API: Get LIAISON approval mode
   if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'GET') {
     const projects = discoverProjects();
