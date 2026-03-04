@@ -617,10 +617,13 @@ async function cmdTransition(id, newStatus, actor) {
     result.dnaCleared = fieldsToClear;
   }
 
-  // Brain marker: contribute transition marker after successful DB update
+  // Brain marker: contribute transition marker with context after successful DB update
   const project = guessProject(process.env.DATABASE_PATH);
+  const title = updatedDna.title || node.slug;
+  const outcome = updatedDna.implementation || updatedDna.findings || updatedDna.qa_review || '';
+  const outcomeSummary = outcome ? ` — ${String(outcome).substring(0, 120)}` : '';
   await contributeToBrain(
-    `TASK ${fromStatus}→${newStatus}: ${actor.toUpperCase()} ${node.slug} (${project})`,
+    `TASK ${fromStatus}→${newStatus}: ${actor.toUpperCase()} ${node.slug} (${project}) — ${title}${outcomeSummary}`,
     actor,
     node.slug
   );
