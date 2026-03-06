@@ -508,8 +508,10 @@ const server = http.createServer(async (req, res) => {
   serveStatic(res, filePath);
 });
 
-server.listen(PORT, () => {
-  console.log(`Viz server running at http://localhost:${PORT}`);
+const BIND_HOST = process.env.VIZ_BIND || undefined;
+server.listen(PORT, BIND_HOST, () => {
+  const host = BIND_HOST || '0.0.0.0';
+  console.log(`Viz server running at http://${host}:${PORT}`);
   console.log(`Workspace: ${WORKSPACE_PATH}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
