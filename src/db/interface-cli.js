@@ -83,6 +83,49 @@ const PERMISSIONS = {
   }
 };
 
+// Brain-write quality validation
+const KNOWN_QUERY_PATTERNS = [
+  /^Recovery protocol/i,
+  /^Current task state/i,
+  /TASK START or TASK BLOCKED markers/i,
+  /What are my responsibilities/i
+];
+
+export function validateBrainWrite(prompt, slug) {
+  if (typeof prompt !== 'string') {
+    return { valid: false, reason: 'Prompt must be a string' };
+  }
+
+  const trimmed = prompt.trim();
+
+  // Rule 4: slug near-duplicate (check before length rule)
+  if (slug) {
+    const withoutSlug = trimmed.replace(new RegExp(slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
+    if (withoutSlug.length < 50) {
+      return { valid: false, reason: 'Rejected: near-duplicate of slug — add substantive content beyond the task name' };
+    }
+  }
+
+  // Rule 2: too short
+  if (trimmed.length < 50) {
+    return { valid: false, reason: 'Rejected: too short (< 50 chars) — brain writes must be substantive' };
+  }
+
+  // Rule 1: interrogative
+  if (trimmed.endsWith('?')) {
+    return { valid: false, reason: 'Rejected: interrogative (ends with ?) — queries are reads, not writes' };
+  }
+
+  // Rule 3: known query patterns
+  for (const pattern of KNOWN_QUERY_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return { valid: false, reason: 'Rejected: matches known query pattern — only contribute conclusions, not search queries' };
+    }
+  }
+
+  return { valid: true };
+}
+
 // DNA Field Validators - reject invalid data at write time
 const FIELD_VALIDATORS = {
   // Validate status field
@@ -276,6 +319,11 @@ function checkBrainHealth(timeoutMs = 3000) {
 }
 
 function contributeToBrain(prompt, actor, slug, timeoutMs = 5000) {
+  const validation = validateBrainWrite(prompt, slug);
+  if (!validation.valid) {
+    console.error(`[brain-write-quality] ${validation.reason}: "${prompt.substring(0, 80)}..."`);
+    return Promise.resolve(false);
+  }
   return new Promise((resolve) => {
     const project = guessProject(process.env.DATABASE_PATH);
     const data = JSON.stringify({
@@ -767,7 +815,14 @@ function cmdCreate(type, slug, dnaJson, actor) {
   db.close();
 }
 
-// Main
+// Main — guarded so import doesn't trigger CLI execution
+const __isMainCli = process.argv[1] && (
+  process.argv[1].includes('interface-cli') ||
+  fileURLToPath(import.meta.url) === process.argv[1]
+);
+
+if (__isMainCli) {
+
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -839,3 +894,5 @@ switch (command) {
   default:
     error(`Unknown command: ${command}`);
 }
+
+} // end __isMainCli guard
