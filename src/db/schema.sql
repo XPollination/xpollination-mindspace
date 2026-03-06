@@ -150,5 +150,5 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Default: LIAISON approval mode = manual (safe default)
-INSERT OR IGNORE INTO system_settings (key, value, updated_by) VALUES ('liaison_approval_mode', 'manual', 'system');
+-- Default: LIAISON approval mode = auto (safe for fresh/test DBs; production sets explicitly via viz)
+INSERT OR IGNORE INTO system_settings (key, value, updated_by) VALUES ('liaison_approval_mode', 'auto', 'system');

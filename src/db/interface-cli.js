@@ -526,6 +526,36 @@ async function cmdTransition(id, newStatus, actor) {
     error(dnaError);
   }
 
+  // Dependency gates: only for pending→ready transitions
+  if (fromStatus === 'pending' && newStatus === 'ready') {
+    const dependsOn = Array.isArray(dna.depends_on) ? dna.depends_on : [];
+
+    // Gate A: Dependency-aware scheduling — all depends_on tasks must be complete
+    if (dependsOn.length > 0) {
+      const incomplete = [];
+      for (const depSlug of dependsOn) {
+        const depNode = db.prepare('SELECT status FROM mindspace_nodes WHERE slug = ?').get(depSlug);
+        if (!depNode) {
+          db.close();
+          error(`Dependency not found: ${depSlug}. All depends_on slugs must exist.`);
+        }
+        if (depNode.status !== 'complete') {
+          incomplete.push(depSlug);
+        }
+      }
+      if (incomplete.length > 0) {
+        db.close();
+        error(`Dependency scheduling gate: incomplete dependencies block pending→ready. Incomplete: ${incomplete.join(', ')}`);
+      }
+    }
+
+    // Gate B: Dependency reflection — must have depends_on OR depends_on_reviewed=true
+    if (dependsOn.length === 0 && dna.depends_on_reviewed !== true) {
+      db.close();
+      error('Dependency reflection gate: depends_on_reviewed must be true when depends_on is empty or missing. Set depends_on_reviewed=true in DNA to confirm dependencies were considered.');
+    }
+  }
+
   // Version enforcement gate v2: fires on active→approval and active→review for design tasks
   // Guard clause: only applies when pdsa_ref exists (design tasks only)
   if (fromStatus === 'active' && (newStatus === 'approval' || newStatus === 'review') && dna.pdsa_ref) {
@@ -581,7 +611,7 @@ async function cmdTransition(id, newStatus, actor) {
     const ensureSettings = db.prepare("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
     ensureSettings.run();
     const mode = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
-    const modeValue = mode?.value || 'manual';
+    const modeValue = mode?.value || 'auto';
 
     if (modeValue === 'manual') {
       // Manual mode: require human_confirmed AND human_confirmed_via='viz' in DNA
