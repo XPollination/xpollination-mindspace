@@ -160,6 +160,27 @@ npm start
 
 5. **Ask before destructive operations** - Never force push, reset --hard, etc.
 
+## Branching Rules (Interim)
+
+**NEVER commit directly to `main`.** All agent work goes on `develop` or feature branches.
+
+| Branch | Purpose | Who merges |
+|--------|---------|------------|
+| `main` | Production — frozen | Thomas only |
+| `develop` | Integration — default work branch | Agents (via merge) |
+| `feature/cap-*` | Per-capability feature branches | DEV agent creates, merges to develop |
+
+**Workflow:**
+1. Start on `develop`: `git checkout develop && git pull`
+2. For capability work (multi-task): create feature branch: `git checkout -b feature/cap-<capability-slug>`
+3. For single-task fixes: commit directly to `develop`
+4. When feature is complete: merge to develop: `git checkout develop && git merge feature/cap-<slug>`
+5. **Never** merge to `main` — Thomas handles main releases
+
+**Branch naming:** `feature/cap-<capability-slug>` (e.g., `feature/cap-foundation`)
+**Test system:** Verify on `http://10.33.33.1:4200` before merging to develop.
+**If unsure which branch:** Default to `develop`.
+
 ## Architecture
 
 ```
