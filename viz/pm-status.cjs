@@ -13,6 +13,7 @@ const DBS = {};
 for (const p of discoverProjects()) { DBS[p.name] = p.dbPath; }
 
 const BRAIN_BASE = process.env.BRAIN_URL || 'http://localhost:3200';
+const BRAIN_API_KEY = process.env.BRAIN_API_KEY || '';
 
 async function main() {
   const result = { timestamp: new Date().toISOString(), projects: {}, brain_health: null, gardening: null };
@@ -52,7 +53,11 @@ async function brainHealth() {
     });
     const req = http.request(url.href, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data),
+        ...(BRAIN_API_KEY ? { 'Authorization': `Bearer ${BRAIN_API_KEY}` } : {})
+      },
       timeout: 5000
     }, (res) => {
       let body = '';
@@ -143,7 +148,11 @@ function postConsolidation(ids, contentPreview) {
     });
     const req = http.request(url.href, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data),
+        ...(BRAIN_API_KEY ? { 'Authorization': `Bearer ${BRAIN_API_KEY}` } : {})
+      },
       timeout: 5000
     }, (res) => {
       let body = '';
