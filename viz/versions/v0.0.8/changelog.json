@@ -1,0 +1,9 @@
+{
+  "version": "v0.0.8",
+  "title": "Version Display + Queue Column Labels",
+  "date": "2026-03-06",
+  "changes": [
+    "Add version display element (viz-version) showing current version",
+    "Add queue column state grouping with sub-headers (ready, rework, pending)"
+  ]
+}
