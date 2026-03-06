@@ -1,0 +1,173 @@
+{
+  "snapshot_timestamp": "2026-03-06T05:03:01Z",
+  "snapshot_version": "1.0",
+  "server": {
+    "hostname": "ubuntu-4gb-fsn1-2",
+    "provider": "Hetzner CX22",
+    "os": "Ubuntu 24.04",
+    "ipv4": "142.132.190.254",
+    "vpn_ip": "10.33.33.1",
+    "ram": "8GB",
+    "vcpu": 2
+  },
+  "listening_ports": [
+    { "port": 22, "bind": "0.0.0.0", "service": "ssh" },
+    { "port": 53, "bind": "127.0.0.53", "service": "systemd-resolved" },
+    { "port": 53, "bind": "127.0.0.54", "service": "systemd-resolved" },
+    { "port": 80, "bind": "0.0.0.0", "service": "nginx" },
+    { "port": 443, "bind": "0.0.0.0", "service": "nginx (ssl)" },
+    { "port": 3000, "bind": "127.0.0.1", "service": "umami (Docker)" },
+    { "port": 3001, "bind": "10.33.33.1", "service": "uptime-kuma (Docker, VPN-only)" },
+    { "port": 3200, "bind": "0.0.0.0", "service": "brain API (xpollination-hive, Fastify)" },
+    { "port": 3201, "bind": "0.0.0.0", "service": "brain MCP transport (xpollination-hive)" },
+    { "port": 3210, "bind": "127.0.0.1", "service": "review-server" },
+    { "port": 5005, "bind": "0.0.0.0", "service": "unknown" },
+    { "port": 6333, "bind": "0.0.0.0", "service": "qdrant (Docker)" },
+    { "port": 8000, "bind": "127.0.0.1", "service": "paperless-ngx (Docker)" },
+    { "port": 8080, "bind": "*", "service": "viz server (xpollination-mcp-server v0.0.4)" },
+    { "port": 8901, "bind": "127.0.0.1", "service": "parental-control (python3)" }
+  ],
+  "git_repos": {
+    "HomeAssistant": {
+      "branch": "main",
+      "head": "b62d5ef",
+      "message": "feat: add xpollination services to disaster recovery (runbook + backup)"
+    },
+    "HomePage": {
+      "branch": "main",
+      "head": "4b0162b",
+      "message": "license: standardize to AGPL-3.0 + dual licensing across all XPollination projects"
+    },
+    "ProfileAssistant": {
+      "branch": "main",
+      "head": "c6d3102",
+      "message": "fix: v0.0.8 — 1-row table layout, text alignment, ready_for_review status"
+    },
+    "xpollination-best-practices": {
+      "branch": "main",
+      "head": "0e96d82",
+      "message": "fix: add BRAIN_API_KEY auth headers to all skill curl commands"
+    },
+    "xpollination-hive": {
+      "branch": "master",
+      "head": "55ac8d0",
+      "message": "docs: PDSA design for dual-access brain — private/public domain routing with MCP space parameter"
+    },
+    "xpollination-mcp-server": {
+      "branch": "main",
+      "head": "d389c1f",
+      "message": "fix: add BRAIN_API_KEY auth to pm-status brain health queries"
+    },
+    "xpollination-mindspace": {
+      "branch": "main",
+      "head": "4357421",
+      "message": "license: standardize to AGPL-3.0 + dual licensing across all XPollination projects"
+    }
+  },
+  "symlinks": [
+    {
+      "path": "/home/developer/workspaces/github/PichlerThomas/HomePage/site",
+      "target": "versions/v0.3.4/site"
+    }
+  ],
+  "qdrant_collections": [
+    { "name": "thought_space", "points": 2566, "status": "green" },
+    { "name": "thought_space_shared", "points": 62, "status": "green" },
+    { "name": "thought_space_maria", "points": 6, "status": "green" },
+    { "name": "best_practices", "points": 46, "status": "green" },
+    { "name": "queries", "points": 32, "status": "green" }
+  ],
+  "nginx_sites_enabled": {
+    "xpollination": {
+      "domains": ["xpollination.earth", "www.xpollination.earth"],
+      "ssl": true,
+      "root": "/var/www/html",
+      "proxies": {
+        "/parental/*": "http://127.0.0.1:8901",
+        "/review/api/": "http://127.0.0.1:3210"
+      }
+    },
+    "bestpractice": {
+      "domains": ["bestpractice.xpollination.earth"],
+      "ssl": true,
+      "proxies": {
+        "/mcp": "http://127.0.0.1:3201",
+        "/": "http://127.0.0.1:3200"
+      }
+    },
+    "paperless": {
+      "domains": ["paperless.xpollination.earth"],
+      "ssl": true,
+      "proxies": {
+        "/": "http://127.0.0.1:8000"
+      }
+    },
+    "umami": {
+      "domains": ["analytics.xpollination.earth"],
+      "ssl": true,
+      "proxies": {
+        "/": "http://127.0.0.1:3000"
+      }
+    },
+    "internal-tools": {
+      "domains": ["_ (default)"],
+      "ssl": false,
+      "root": "/home/developer/workspaces/github/PichlerThomas/HomePage/site",
+      "proxies": {}
+    }
+  },
+  "systemd_services": {
+    "running": [
+      "nginx",
+      "ssh",
+      "docker",
+      "containerd",
+      "fail2ban",
+      "cron",
+      "paperless-share-webhook",
+      "paperless-title-generator",
+      "parental-control",
+      "review-server"
+    ]
+  },
+  "docker_containers": [
+    { "name": "umami", "image": "docker.umami.is/umami-software/umami:postgresql-latest", "status": "Up 7 days", "ports": "127.0.0.1:3000->3000/tcp" },
+    { "name": "api-qdrant-1", "image": "qdrant/qdrant:latest", "status": "Up 2 weeks", "ports": "0.0.0.0:6333->6333/tcp, 6334/tcp" },
+    { "name": "umami-postgres", "image": "postgres:16-alpine", "status": "Up 2 weeks (healthy)", "ports": "5432/tcp" },
+    { "name": "paperless-ngx", "image": "ghcr.io/paperless-ngx/paperless-ngx:latest", "status": "Up 2 weeks (healthy)", "ports": "127.0.0.1:8000->8000/tcp" },
+    { "name": "paperless-postgres", "image": "postgres:16-alpine", "status": "Up 2 weeks", "ports": "5432/tcp" },
+    { "name": "paperless-redis", "image": "redis:7-alpine", "status": "Up 2 weeks", "ports": "6379/tcp" },
+    { "name": "uptime-kuma", "image": "louislam/uptime-kuma:2", "status": "Up 2 weeks (healthy)", "ports": "10.33.33.1:3001->3001/tcp" }
+  ],
+  "non_systemd_services": [
+    {
+      "name": "brain-api",
+      "pid": 1449913,
+      "command": "node --require tsx api/src/index.ts",
+      "cwd": "/home/developer/workspaces/github/PichlerThomas/xpollination-hive",
+      "ports": [3200, 3201],
+      "note": "Not managed by systemd — started manually or via tmux"
+    },
+    {
+      "name": "viz-server",
+      "pid": 37191,
+      "command": "node xpollination-mcp-server/viz/versions/v0.0.4/server.js 8080",
+      "ports": [8080],
+      "note": "Not managed by systemd — started manually"
+    },
+    {
+      "name": "review-server",
+      "pid": 1430208,
+      "command": "node /var/www/html/review/api/review-server.js",
+      "ports": [3210],
+      "note": "Also has systemd unit (review-server.service)"
+    }
+  ],
+  "vpn": {
+    "interface": "wg0",
+    "type": "WireGuard",
+    "ip": "10.33.33.1/24",
+    "state": "UP"
+  },
+  "node_version": "v22.22.0"
+}
