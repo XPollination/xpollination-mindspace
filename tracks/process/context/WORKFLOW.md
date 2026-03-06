@@ -1,7 +1,7 @@
 # Workflow Reference - Source of Truth
 
-**Last Updated:** 2026-03-02
-**Status:** DRAFT v15 - Research task approval→complete transition added
+**Last Updated:** 2026-03-06
+**Status:** DRAFT v16 - Explicit rework target role routing
 
 ---
 
@@ -51,6 +51,21 @@ These are `review → review` transitions where the role changes. The workflow e
 | rework | human | qa | human reopens to update tests first |
 | rework | human | dev | human reopens completed PDSA task |
 | rework | human | liaison | human rejects or reopens liaison content |
+
+### Rework Target Role (Engine Routing Rule)
+
+When LIAISON/human reworks from `review+liaison`, the engine must route to the correct role. The rework target depends on **what needs fixing**:
+
+| What needs fixing | Target role | DNA signal |
+|-------------------|-------------|------------|
+| Implementation | dev | `rework_target_role: "dev"` |
+| Design | pdsa | `rework_target_role: "pdsa"` |
+| Tests | qa | `rework_target_role: "qa"` |
+| Liaison content | liaison | `rework_target_role: "liaison"` |
+
+**Rule:** When transitioning `review+liaison → rework`, `dna.rework_target_role` MUST be set. The engine reads this field to assign the correct role. If not set, the engine MUST reject the transition (no guessing).
+
+This also applies to `complete → rework` (human reopens) and `approval → rework` (human rejects design, always routes to pdsa).
 
 **Rework exit:** `rework → active` - assigned role reclaims, then normal flow continues.
 
@@ -236,3 +251,4 @@ These transitions require human (Thomas) decision but are executed by liaison:
 | 2026-02-26 | v13 Added Blocked State meta-state: PAUSE+RESUME semantics, stores from_state/from_role in DNA, any agent can block, liaison/system restores, brain-down escalation chain | PDSA |
 | 2026-03-02 | v14 Added completion documentation gate: abstract_ref required on review->complete and liaison any->cancelled. Quality Gates table. System exempted from abstract gate via split transition. DOCUMENTATION.md living doc created | DEV |
 | 2026-03-02 | v15 Added approval→complete transition for research tasks. LIAISON can complete directly from approval when task produced sub-tasks and has no code to test. Requires abstract_ref + human confirmation. Bug type excluded (no approval state in bug flow) | DEV |
+| 2026-03-06 | v16 Explicit rework target role routing: review+liaison→rework and complete→rework require dna.rework_target_role (dev/pdsa/qa/liaison). Engine must not guess — reject if missing. Fixes bug where binary pdsa_ref check routed to rework+liaison instead of rework+dev | Liaison |
