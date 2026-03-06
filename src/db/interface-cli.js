@@ -612,11 +612,18 @@ async function cmdTransition(id, newStatus, actor) {
   // Check if role should change on this transition (currentRole needed for role-specific rules)
   let newRole = getNewRoleForTransition(nodeType, fromStatus, newStatus, currentRole);
 
-  // Per WORKFLOW.md rework entry table: review+liaison→rework routing depends on task type
-  // Design tasks (has pdsa_ref) → pdsa reworks the design
-  // Liaison content tasks (no pdsa_ref) → liaison reworks the content
+  // Per WORKFLOW.md rework entry table: review+liaison→rework uses explicit rework_target_role
+  // rework_target_role is required in DNA (enforced by workflow-engine requiresDna gate)
   if (fromStatus === 'review' && newStatus === 'rework' && currentRole === 'liaison') {
-    newRole = dna.pdsa_ref ? 'pdsa' : 'liaison';
+    if (!dna.rework_target_role) {
+      db.close();
+      error('rework_target_role required in DNA for review+liaison→rework. LIAISON must specify which role reworks: dev, pdsa, qa, or liaison.');
+    }
+    if (!VALID_ROLES.includes(dna.rework_target_role)) {
+      db.close();
+      error(`Invalid rework_target_role: ${dna.rework_target_role}. Valid: ${VALID_ROLES.join(', ')}`);
+    }
+    newRole = dna.rework_target_role;
   }
 
   // Per WORKFLOW.md: complete->rework uses dna.rework_target_role (human specifies re-entry point)

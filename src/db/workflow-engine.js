@@ -84,7 +84,7 @@ export const ALLOWED_TRANSITIONS = {
     // Role routing determined by cmdTransition using DNA context:
     //   Design tasks (has pdsa_ref) → rework+pdsa (designer reworks)
     //   Liaison content tasks (no pdsa_ref) → rework+liaison (content creator reworks)
-    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
+    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'], requiresDna: ['rework_target_role'] },
     // Per WORKFLOW.md v12: review chain transitions (QA->PDSA->Liaison)
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
