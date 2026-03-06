@@ -2,6 +2,9 @@
 # drift-check.sh — Verify production state matches baseline snapshot
 # Usage: bash scripts/drift-check.sh [snapshot.json]
 # Exit code: 0 = no drift, 1 = drift detected
+#
+# Reads ports, repos, services, and Qdrant collections from the snapshot JSON.
+# No hardcoded values — all checks derived from snapshot baseline.
 
 set -euo pipefail
 
@@ -29,13 +32,25 @@ check() {
   fi
 }
 
+# Helper: extract values from snapshot JSON via python3
+json_query() {
+  python3 -c "import json,sys; data=json.load(open('$SNAPSHOT')); $1"
+}
+
 echo "=== Drift Check: $(date -Iseconds) ==="
 echo "Snapshot: $SNAPSHOT"
+SNAP_TS=$(json_query "print(data.get('snapshot_timestamp','unknown'))")
+echo "Snapshot timestamp: $SNAP_TS"
 echo ""
 
-# --- 1. Listening ports ---
+# --- 1. Listening ports (from snapshot) ---
 echo "[Ports]"
-for port in 22 80 443 3200 3201 3210 5005 6333 8080; do
+PORTS=$(json_query "
+for p in data.get('listening_ports', []):
+    print(p['port'])
+" | sort -n | uniq)
+
+for port in $PORTS; do
   if ss -tlnH | grep -q ":${port} "; then
     check "port $port listening" "ok"
   else
@@ -43,11 +58,16 @@ for port in 22 80 443 3200 3201 3210 5005 6333 8080; do
   fi
 done
 
-# --- 2. Git repos ---
+# --- 2. Git repos (from snapshot) ---
 echo ""
 echo "[Git Repos]"
 REPOS_DIR="/home/developer/workspaces/github/PichlerThomas"
+REPO_ENTRIES=$(json_query "
+for name, info in data.get('git_repos', {}).items():
+    print(f\"{name}|{info['branch']}\")")
+
 while IFS='|' read -r name branch; do
+  [ -z "$name" ] && continue
   repo_dir="$REPOS_DIR/$name"
   if [ ! -d "$repo_dir/.git" ]; then
     check "repo $name exists" "missing"
@@ -59,34 +79,40 @@ while IFS='|' read -r name branch; do
       check "repo $name on $branch" "on $current_branch"
     fi
   fi
-done <<'REPOS'
-HomeAssistant|main
-HomePage|main
-ProfileAssistant|main
-xpollination-best-practices|main
-xpollination-hive|master
-xpollination-mcp-server|main
-xpollination-mindspace|main
-REPOS
+done <<< "$REPO_ENTRIES"
 
 # --- 3. Docker containers (verified via ports, docker socket needs root) ---
 echo ""
 echo "[Docker Services (port-based)]"
-# umami: 3000, qdrant: 6333, paperless-ngx: 8000, uptime-kuma: 3001
-for entry in "umami:3000" "qdrant:6333" "paperless-ngx:8000" "uptime-kuma:3001"; do
-  name="${entry%%:*}"
-  port="${entry##*:}"
+DOCKER_ENTRIES=$(json_query "
+for p in data.get('listening_ports', []):
+    svc = p.get('service', '')
+    if 'Docker' in svc or 'docker' in svc:
+        name = svc.split('(')[0].strip().split(' ')[0]
+        print(f\"{name}|{p['port']}\")")
+
+while IFS='|' read -r name port; do
+  [ -z "$name" ] && continue
   if ss -tlnH | grep -q ":${port} "; then
     check "docker $name (port $port)" "ok"
   else
     check "docker $name (port $port)" "not listening"
   fi
-done
+done <<< "$DOCKER_ENTRIES"
 
-# --- 4. Systemd services ---
+# --- 4. Systemd services (from snapshot) ---
 echo ""
 echo "[Systemd Services]"
-for svc in nginx ssh docker fail2ban cron paperless-share-webhook paperless-title-generator parental-control review-server; do
+SYSTEMD_SVCS=$(json_query "
+ss = data.get('systemd_services', {})
+if isinstance(ss, dict):
+    for s in ss.get('running', []):
+        print(s)
+else:
+    for s in ss:
+        print(s.get('name', s) if isinstance(s, dict) else s)")
+
+for svc in $SYSTEMD_SVCS; do
   if systemctl is-active --quiet "$svc" 2>/dev/null; then
     check "systemd $svc active" "ok"
   else
@@ -94,33 +120,48 @@ for svc in nginx ssh docker fail2ban cron paperless-share-webhook paperless-titl
   fi
 done
 
-# --- 5. VPN ---
+# --- 5. VPN (from snapshot) ---
 echo ""
 echo "[VPN]"
-if ip link show wg0 >/dev/null 2>&1; then
-  check "wg0 interface up" "ok"
+VPN_IFACE=$(json_query "
+vpn = data.get('vpn', {})
+print(vpn.get('interface', 'wg0'))" 2>/dev/null || echo "wg0")
+
+if ip link show "$VPN_IFACE" >/dev/null 2>&1; then
+  check "$VPN_IFACE interface up" "ok"
 else
-  check "wg0 interface up" "not found"
+  check "$VPN_IFACE interface up" "not found"
 fi
 
-# --- 6. Non-systemd services (brain-api, viz-server) ---
+# --- 6. Non-systemd services (from snapshot) ---
 echo ""
 echo "[Non-systemd Services]"
-if ss -tlnH | grep -q ":3200 "; then
-  check "brain-api (port 3200)" "ok"
-else
-  check "brain-api (port 3200)" "not listening"
-fi
-if ss -tlnH | grep -q ":8080 "; then
-  check "viz-server (port 8080)" "ok"
-else
-  check "viz-server (port 8080)" "not listening"
-fi
+NON_SYSTEMD=$(json_query "
+for s in data.get('non_systemd_services', []):
+    ports = s.get('ports', [s.get('port', '')])
+    if isinstance(ports, list) and ports:
+        for p in ports:
+            print(f\"{s['name']}|{p}\")
+    else:
+        print(f\"{s['name']}|{ports}\")" 2>/dev/null || echo "")
 
-# --- 7. Qdrant collections ---
+while IFS='|' read -r name port; do
+  [ -z "$name" ] && continue
+  if [ -n "$port" ] && ss -tlnH | grep -q ":${port} "; then
+    check "$name (port $port)" "ok"
+  elif [ -n "$port" ]; then
+    check "$name (port $port)" "not listening"
+  fi
+done <<< "$NON_SYSTEMD"
+
+# --- 7. Qdrant collections (from snapshot) ---
 echo ""
 echo "[Qdrant Collections]"
-for coll in thought_space thought_space_shared thought_space_maria best_practices queries; do
+QDRANT_COLLS=$(json_query "
+for c in data.get('qdrant_collections', []):
+    print(c['name'])")
+
+for coll in $QDRANT_COLLS; do
   status=$(curl -s "http://localhost:6333/collections/$coll" 2>/dev/null | grep -o '"status":"[^"]*"' | head -1 || echo "")
   if echo "$status" | grep -q '"green"'; then
     check "qdrant $coll" "ok"
