@@ -1,0 +1,16 @@
+[Unit]
+Description=XPollination Mindspace Test Server (viz v0.0.9, port 4200, VPN-only)
+After=network.target
+
+[Service]
+Type=simple
+User=developer
+WorkingDirectory=/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server
+EnvironmentFile=/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/.env.test
+ExecStart=/home/developer/.nvm/versions/node/v22.22.0/bin/node viz/versions/v0.0.9/server.js 4200
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=test
+
+[Install]
+WantedBy=multi-user.target
