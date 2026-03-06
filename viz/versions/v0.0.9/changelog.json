@@ -1,0 +1,10 @@
+{
+  "version": "v0.0.9",
+  "title": "Dependency Detail + Queue Filters",
+  "date": "2026-03-06",
+  "changes": [
+    "Show depends_on section in task detail panel with status badges",
+    "Dependencies are clickable to navigate to the dependency task",
+    "Add queue column filter toggles (All/Ready/Pending/Rework) with localStorage persistence"
+  ]
+}
