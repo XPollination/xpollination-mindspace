@@ -21,7 +21,7 @@
     { "port": 3200, "bind": "0.0.0.0", "service": "brain API (xpollination-hive, Fastify)" },
     { "port": 3201, "bind": "0.0.0.0", "service": "brain MCP transport (xpollination-hive)" },
     { "port": 3210, "bind": "127.0.0.1", "service": "review-server" },
-    { "port": 5005, "bind": "0.0.0.0", "service": "unknown" },
+    { "port": 5005, "bind": "0.0.0.0", "service": "paperless-share-webhook (python3, systemd: paperless-share-webhook.service, LISTEN_PORT=5005)" },
     { "port": 6333, "bind": "0.0.0.0", "service": "qdrant (Docker)" },
     { "port": 8000, "bind": "127.0.0.1", "service": "paperless-ngx (Docker)" },
     { "port": 8080, "bind": "*", "service": "viz server (xpollination-mcp-server v0.0.4)" },
@@ -146,23 +146,23 @@
       "command": "node --require tsx api/src/index.ts",
       "cwd": "/home/developer/workspaces/github/PichlerThomas/xpollination-hive",
       "ports": [3200, 3201],
-      "note": "Not managed by systemd — started manually or via tmux"
+      "started_via": "tmux session (TMUX=/tmp/tmux-1001/default), npm script in xpollination-hive (best-practices/api)",
+      "survives_reboot": false,
+      "restart_procedure": "cd /home/developer/workspaces/github/PichlerThomas/xpollination-hive && npx tsx api/src/index.ts",
+      "risk": "Does not survive reboot. Must be manually restarted or added to systemd."
     },
     {
       "name": "viz-server",
       "pid": 37191,
       "command": "node xpollination-mcp-server/viz/versions/v0.0.4/server.js 8080",
       "ports": [8080],
-      "note": "Not managed by systemd — started manually"
-    },
-    {
-      "name": "review-server",
-      "pid": 1430208,
-      "command": "node /var/www/html/review/api/review-server.js",
-      "ports": [3210],
-      "note": "Also has systemd unit (review-server.service)"
+      "started_via": "tmux session (claude-agents), launched by claude-session.sh",
+      "survives_reboot": false,
+      "restart_procedure": "node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/versions/v0.0.4/server.js 8080",
+      "risk": "Does not survive reboot. Must be manually restarted or added to systemd."
     }
   ],
+  "systemd_managed_services_note": "review-server (port 3210) was previously listed here but is actually systemd-managed (review-server.service, enabled, auto-starts on boot).",
   "vpn": {
     "interface": "wg0",
     "type": "WireGuard",
