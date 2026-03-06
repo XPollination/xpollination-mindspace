@@ -13,7 +13,7 @@ const DBS = {};
 for (const p of discoverProjects()) { DBS[p.name] = p.dbPath; }
 
 const BRAIN_BASE = process.env.BRAIN_URL || 'http://localhost:3200';
-const BRAIN_API_KEY = process.env.BRAIN_API_KEY || '';
+const BRAIN_API_KEY = process.env.BRAIN_API_KEY || (() => { try { return fs.readFileSync(path.join(require('os').homedir(), '.brain-api-key'), 'utf8').trim(); } catch { return ''; } })();
 
 async function main() {
   const result = { timestamp: new Date().toISOString(), projects: {}, brain_health: null, gardening: null };
