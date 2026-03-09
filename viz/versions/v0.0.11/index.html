@@ -930,7 +930,7 @@
       <option value="">Loading...</option>
     </select>
     <span class="header-subtitle">Kanban</span>
-    <span class="viz-version">v0.0.10</span>
+    <span class="viz-version"></span>
     <div class="search-container">
       <input type="text" id="node-search" class="search-input" placeholder="Search nodes...">
       <span id="search-count" class="search-count"></span>
@@ -1872,6 +1872,19 @@
     const pastChangesList = document.getElementById('past-changes-list');
     let pendingVersion = null;
 
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        if (data.version) {
+          const el = document.querySelector('.viz-version');
+          if (el) el.textContent = data.version;
+        }
+      } catch (err) {
+        console.warn('Failed to load version:', err);
+      }
+    }
+
     async function checkForUpdate() {
       try {
         const res = await fetch('/api/version');
@@ -1999,6 +2012,7 @@
       lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
       startPolling();
     });
+    loadVersion();
     checkForUpdate();
   </script>
 </body>

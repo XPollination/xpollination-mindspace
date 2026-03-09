@@ -8,7 +8,7 @@
  * - Add loadVersion() function that fetches /api/version and sets .viz-version textContent
  * - Replace hardcoded version in .viz-version span with empty string
  * - Call loadVersion() during page initialization
- * - Apply to BOTH xpollination-mcp-server and xpollination-mcp-server-test viz/versions/v0.0.10/index.html
+ * - Apply to BOTH xpollination-mcp-server and xpollination-mcp-server-test viz/versions/v0.0.11/index.html
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -17,11 +17,11 @@ import { resolve } from "node:path";
 const BASE = "/home/developer/workspaces/github/PichlerThomas";
 const PROD_INDEX = resolve(
   BASE,
-  "xpollination-mcp-server/viz/versions/v0.0.10/index.html"
+  "xpollination-mcp-server/viz/versions/v0.0.11/index.html"
 );
 const TEST_INDEX = resolve(
   BASE,
-  "xpollination-mcp-server-test/viz/versions/v0.0.10/index.html"
+  "xpollination-mcp-server-test/viz/versions/v0.0.11/index.html"
 );
 
 function getIndexContent(path: string): string {
