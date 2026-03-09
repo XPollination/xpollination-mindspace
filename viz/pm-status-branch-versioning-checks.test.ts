@@ -13,6 +13,13 @@
  * - Update good example to include the three headers
  * - Route VIOLATION/WARN to RECOMMENDATION section
  * - Do NOT change existing structure (approval mode check, DNA retrieval, transition execution)
+ *
+ * v0.0.6 ADDITIONS:
+ * - Remove all references to skill split (pm.scan / pm.drill)
+ * - PROD deployment port = 8080 (not 4100)
+ * - TEST deployment port = 4200
+ * - Document port migration 8080→4100 as future work
+ * - Deployment action guidance with symlink + service restart
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -119,6 +126,58 @@ describe("pm-status-branch-versioning-checks", () => {
 
     it("routes WARN findings to RECOMMENDATION section", () => {
       expect(content).toMatch(/WARN[\s\S]*?RECOMMENDATION|RECOMMENDATION[\s\S]*?WARN/i);
+    });
+  });
+
+  // --- v0.0.6 Requirement 1: No skill split references ---
+  describe("v0.0.6: no skill split", () => {
+    it("does not reference pm.scan or pm.drill as separate skills", () => {
+      expect(content).not.toMatch(/pm\.scan/);
+      expect(content).not.toMatch(/pm\.drill/);
+    });
+
+    it("does not recommend splitting the skill", () => {
+      expect(content).not.toMatch(/split.*skill|skill.*split/i);
+    });
+  });
+
+  // --- v0.0.6 Requirement 2: Deployment action guidance ---
+  describe("v0.0.6: deployment action guidance", () => {
+    it("PROD deployment shows port 8080", () => {
+      expect(content).toMatch(/PROD.*8080|8080.*PROD/i);
+    });
+
+    it("TEST deployment shows port 4200", () => {
+      expect(content).toMatch(/TEST.*4200|4200.*TEST/i);
+    });
+
+    it("does NOT show port 4100 as current PROD", () => {
+      // 4100 may appear only in future migration context, not as current prod
+      const prodLines = content.split("\n").filter(
+        (l) => /deploy.*prod|prod.*deploy/i.test(l) && /4100/.test(l)
+      );
+      expect(prodLines.length).toBe(0);
+    });
+
+    it("documents port migration 8080→4100 as future/planned", () => {
+      expect(content).toMatch(/8080.*4100|migration.*4100|planned.*4100/i);
+    });
+
+    it("includes symlink update for deployment", () => {
+      expect(content).toMatch(/ln\s+-sfn|symlink/i);
+    });
+
+    it("includes service restart for deployment", () => {
+      expect(content).toMatch(/systemctl.*restart|restart.*service/i);
+    });
+
+    it("documents current infrastructure (PROD=8080, TEST=4200)", () => {
+      expect(content).toMatch(/PROD.*8080/i);
+      expect(content).toMatch(/TEST.*4200/i);
+    });
+
+    it("verification curl uses port 8080 for PROD", () => {
+      expect(content).toMatch(/curl.*8080|localhost:8080/);
     });
   });
 
