@@ -181,6 +181,108 @@ describe("pm-status-branch-versioning-checks", () => {
     });
   });
 
+  // --- v0.0.7: Rendering Style Guide ---
+  describe("v0.0.7: rendering style guide", () => {
+    it("has Rendering Style Guide section", () => {
+      expect(content).toMatch(/Rendering Style Guide/);
+    });
+  });
+
+  // --- v0.0.7: HUMAN APPROVAL rename ---
+  describe("v0.0.7: HUMAN APPROVAL", () => {
+    it("status-to-phase table uses HUMAN APPROVAL (not just APPROVAL)", () => {
+      expect(content).toMatch(/HUMAN APPROVAL/);
+    });
+
+    it("breadcrumb uses HUMAN APPROVAL", () => {
+      // Breadcrumb line should contain HUMAN APPROVAL
+      const breadcrumbLines = content.split("\n").filter(
+        (l) => /DESIGN QUEUE.*COMPLETE/.test(l)
+      );
+      expect(breadcrumbLines.length).toBeGreaterThan(0);
+      expect(breadcrumbLines[0]).toMatch(/HUMAN APPROVAL/);
+    });
+  });
+
+  // --- v0.0.7: Visual hierarchy ---
+  describe("v0.0.7: visual hierarchy", () => {
+    it("drill-down template has slug on own line", () => {
+      expect(content).toMatch(/\*\*Slug:\*\*.*`.*`/);
+    });
+
+    it("drill-down template has phase callout on own line", () => {
+      expect(content).toMatch(/\*\*Phase:\*\*.*YOU ARE HERE/);
+    });
+
+    it("current phase is bolded in breadcrumb", () => {
+      expect(content).toMatch(/>>>\*\*.*\*\*<<</);
+    });
+  });
+
+  // --- v0.0.7: AskUserQuestion for SEMI mode ---
+  describe("v0.0.7: SEMI mode AskUserQuestion", () => {
+    it("SEMI mode uses AskUserQuestion", () => {
+      expect(content).toMatch(/AskUserQuestion/);
+    });
+
+    it("does NOT say Do NOT use AskUserQuestion", () => {
+      expect(content).not.toMatch(/Do NOT use AskUserQuestion|do not use AskUserQuestion/i);
+    });
+  });
+
+  // --- v0.0.7: DEPLOYMENT VERIFICATION check ---
+  describe("v0.0.7: deployment verification", () => {
+    it("has DEPLOYMENT VERIFICATION as 4th check", () => {
+      expect(content).toMatch(/DEPLOYMENT.*VERIFICATION|DEPLOYMENT/);
+    });
+
+    it("reads viz/active symlink", () => {
+      expect(content).toMatch(/viz\/active|readlink/);
+    });
+
+    it("compares active version to latest version directory", () => {
+      expect(content).toMatch(/latest.*version|deployment.*gap/i);
+    });
+
+    it("DEPLOYMENT header in presentation template", () => {
+      expect(content).toMatch(/DEPLOYMENT:.*OK|WARN|N\/A/);
+    });
+  });
+
+  // --- v0.0.7: Good example updated ---
+  describe("v0.0.7: good example format", () => {
+    it("good example has slug on own line", () => {
+      const goodExample = content.match(/Good [Ee]xample[\s\S]*?```[\s\S]*?```/);
+      expect(goodExample).not.toBeNull();
+      expect(goodExample![0]).toMatch(/\*\*Slug:\*\*/);
+    });
+
+    it("good example has phase callout", () => {
+      const goodExample = content.match(/Good [Ee]xample[\s\S]*?```[\s\S]*?```/);
+      expect(goodExample).not.toBeNull();
+      expect(goodExample![0]).toMatch(/\*\*Phase:\*\*/);
+    });
+
+    it("good example uses HUMAN APPROVAL in breadcrumb", () => {
+      const goodExample = content.match(/Good [Ee]xample[\s\S]*?```[\s\S]*?```/);
+      expect(goodExample).not.toBeNull();
+      expect(goodExample![0]).toMatch(/HUMAN APPROVAL/);
+    });
+
+    it("good example includes DEPLOYMENT header", () => {
+      const goodExample = content.match(/Good [Ee]xample[\s\S]*?```[\s\S]*?```/);
+      expect(goodExample).not.toBeNull();
+      expect(goodExample![0]).toMatch(/DEPLOYMENT/);
+    });
+  });
+
+  // --- v0.0.7: No cross-version references ---
+  describe("v0.0.7: self-contained", () => {
+    it("no see v0.0.X references", () => {
+      expect(content).not.toMatch(/see v0\.0\.[0-9]/);
+    });
+  });
+
   // --- Requirement 7: Existing structure unchanged ---
   describe("existing structure preserved", () => {
     it("still checks LIAISON approval mode before each task", () => {
