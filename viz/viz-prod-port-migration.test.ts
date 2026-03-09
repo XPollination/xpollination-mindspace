@@ -16,9 +16,14 @@
  * - Requires thomas user for systemd/UFW operations
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { execSync } from "node:child_process";
+
+const SSH_PASSWORD = process.env.SSH_ADMIN_PASSWORD;
+const hasSSH = !!SSH_PASSWORD;
+const sshCmd = (remoteCmd: string) =>
+  `sshpass -p '${SSH_PASSWORD}' ssh -o StrictHostKeyChecking=no thomas@localhost "${remoteCmd}"`;
 
 const BASE = "/home/developer/workspaces/github/PichlerThomas";
 const MCP_DIR = resolve(BASE, "xpollination-mcp-server");
@@ -127,80 +132,56 @@ describe("viz-prod-port-migration: infrastructure", () => {
   });
 });
 
-// --- Tests 6-8: Service configuration ---
+// --- Tests 6-8: Service configuration (requires SSH_ADMIN_PASSWORD env var) ---
 describe("viz-prod-port-migration: service config", () => {
-  it("mindspace.service uses viz/active symlink", () => {
-    try {
-      const result = execSync(
-        'sshpass -p "$(cat /home/developer/workspaces/github/PichlerThomas/HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md 2>/dev/null | grep -oP \'Password: \\K.*\' | head -1)" ssh thomas@localhost "cat /etc/systemd/system/mindspace.service"',
-        { encoding: "utf-8" }
-      );
-      expect(result).toMatch(/viz\/active\/server\.js/);
-      expect(result).toMatch(/4100/);
-    } catch {
-      expect.fail("Cannot read mindspace.service");
-    }
+  it.skipIf(!hasSSH)("mindspace.service uses viz/active symlink", () => {
+    const result = execSync(sshCmd("cat /etc/systemd/system/mindspace.service"), {
+      encoding: "utf-8",
+    });
+    expect(result).toMatch(/viz\/active\/server\.js/);
+    expect(result).toMatch(/4100/);
   });
 
-  it("mindspace-test.service uses viz/active symlink (not hardcoded)", () => {
-    try {
-      const result = execSync(
-        'sshpass -p "$(cat /home/developer/workspaces/github/PichlerThomas/HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md 2>/dev/null | grep -oP \'Password: \\K.*\' | head -1)" ssh thomas@localhost "cat /etc/systemd/system/mindspace-test.service"',
-        { encoding: "utf-8" }
-      );
-      expect(result).toMatch(/viz\/active\/server\.js/);
-      expect(result).not.toMatch(/viz\/versions\/v0\.0\.\d+\/server\.js/);
-    } catch {
-      expect.fail("Cannot read mindspace-test.service");
-    }
+  it.skipIf(!hasSSH)("mindspace-test.service uses viz/active symlink (not hardcoded)", () => {
+    const result = execSync(sshCmd("cat /etc/systemd/system/mindspace-test.service"), {
+      encoding: "utf-8",
+    });
+    expect(result).toMatch(/viz\/active\/server\.js/);
+    expect(result).not.toMatch(/viz\/versions\/v0\.0\.\d+\/server\.js/);
   });
 
-  it("VIZ_BIND=10.33.33.1 in both services", () => {
-    try {
-      const prod = execSync(
-        'sshpass -p "$(cat /home/developer/workspaces/github/PichlerThomas/HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md 2>/dev/null | grep -oP \'Password: \\K.*\' | head -1)" ssh thomas@localhost "cat /etc/systemd/system/mindspace.service"',
-        { encoding: "utf-8" }
-      );
-      expect(prod).toMatch(/VIZ_BIND=10\.33\.33\.1/);
+  it.skipIf(!hasSSH)("VIZ_BIND=10.33.33.1 in both services", () => {
+    const prod = execSync(sshCmd("cat /etc/systemd/system/mindspace.service"), {
+      encoding: "utf-8",
+    });
+    expect(prod).toMatch(/VIZ_BIND=10\.33\.33\.1/);
 
-      const test = execSync(
-        'sshpass -p "$(cat /home/developer/workspaces/github/PichlerThomas/HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md 2>/dev/null | grep -oP \'Password: \\K.*\' | head -1)" ssh thomas@localhost "cat /etc/systemd/system/mindspace-test.service"',
-        { encoding: "utf-8" }
-      );
-      expect(test).toMatch(/VIZ_BIND=10\.33\.33\.1/);
-    } catch {
-      expect.fail("Cannot read service files");
-    }
+    const test = execSync(sshCmd("cat /etc/systemd/system/mindspace-test.service"), {
+      encoding: "utf-8",
+    });
+    expect(test).toMatch(/VIZ_BIND=10\.33\.33\.1/);
   });
 });
 
-// --- Tests 9-10: UFW firewall ---
+// --- Tests 9-10: UFW firewall (requires SSH_ADMIN_PASSWORD env var) ---
 describe("viz-prod-port-migration: firewall", () => {
-  it("UFW allows 4100 from VPN subnet", () => {
-    try {
-      const result = execSync(
-        'sshpass -p "$(cat /home/developer/workspaces/github/PichlerThomas/HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md 2>/dev/null | grep -oP \'Password: \\K.*\' | head -1)" ssh thomas@localhost "ufw status"',
-        { encoding: "utf-8" }
-      );
-      expect(result).toMatch(/4100.*ALLOW.*10\.33\.33/);
-    } catch {
-      expect.fail("Cannot check UFW status");
-    }
+  it.skipIf(!hasSSH)("UFW allows 4100 from VPN subnet", () => {
+    const result = execSync(
+      sshCmd(`echo '${SSH_PASSWORD}' | sudo -S ufw status`),
+      { encoding: "utf-8" }
+    );
+    expect(result).toMatch(/4100.*ALLOW.*10\.33\.33/);
   });
 
-  it("UFW does not allow 8080", () => {
-    try {
-      const result = execSync(
-        'sshpass -p "$(cat /home/developer/workspaces/github/PichlerThomas/HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md 2>/dev/null | grep -oP \'Password: \\K.*\' | head -1)" ssh thomas@localhost "ufw status"',
-        { encoding: "utf-8" }
-      );
-      const allow8080 = result
-        .split("\n")
-        .filter((l) => /8080.*ALLOW/.test(l));
-      expect(allow8080.length).toBe(0);
-    } catch {
-      expect.fail("Cannot check UFW status");
-    }
+  it.skipIf(!hasSSH)("UFW does not allow 8080", () => {
+    const result = execSync(
+      sshCmd(`echo '${SSH_PASSWORD}' | sudo -S ufw status`),
+      { encoding: "utf-8" }
+    );
+    const allow8080 = result
+      .split("\n")
+      .filter((l) => /8080.*ALLOW/.test(l));
+    expect(allow8080.length).toBe(0);
   });
 });
 
