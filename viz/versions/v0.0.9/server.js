@@ -289,7 +289,11 @@ const server = http.createServer(async (req, res) => {
   // API: Get current viz version from active symlink
   if (pathname === '/api/version' && req.method === 'GET') {
     try {
-      const activePath = path.join(__dirname, 'active');
+      // Try viz/active relative to cwd first (for systemd/symlink-based deployment),
+      // then fall back to __dirname/active (for direct execution from viz/)
+      const cwdActivePath = path.join(process.cwd(), 'viz', 'active');
+      const dirActivePath = path.join(__dirname, 'active');
+      const activePath = fs.existsSync(cwdActivePath) ? cwdActivePath : dirActivePath;
       const target = fs.readlinkSync(activePath);
       const versionMatch = target.match(/v(\d+\.\d+\.\d+)/);
       sendJson(res, { version: versionMatch ? `v${versionMatch[1]}` : target });
