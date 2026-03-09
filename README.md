@@ -13,7 +13,7 @@ Tools for Claude to orchestrate content generation:
 - **Publishing** — commit to site
 
 ### Project Management
-Multi-agent workflow engine (WORKFLOW.md v12):
+Multi-agent workflow engine (WORKFLOW.md v16):
 - **Task lifecycle** — pending → ready → active → review → complete
 - **Role-based transitions** — PDSA, QA, Dev, Liaison
 - **Quality gates** — coded acceptance criteria per transition
@@ -39,7 +39,8 @@ Multi-agent workflow engine (WORKFLOW.md v12):
 │   • update-dna                      │
 │                                     │
 │   State: SQLite (data/)             │
-│   Workflow: docs/WORKFLOW.md        │
+│   Workflow: tracks/process/context/  │
+│     workflow/v0.0.16/WORKFLOW.md    │
 └─────────────────────────────────────┘
     │
     ▼
@@ -53,7 +54,7 @@ xpollination.earth
 | `src/db/interface-cli.js` | CLI for all database operations (agents use this) |
 | `src/db/workflow-engine.js` | Transition rules and validation |
 | `src/db/schema.sql` | Database schema |
-| `docs/WORKFLOW.md` | Workflow source of truth (v12) |
+| `tracks/process/context/workflow/v0.0.16/WORKFLOW.md` | Workflow source of truth (v16) |
 | `viz/server.js` | Visualization dashboard |
 | `viz/agent-monitor.cjs` | Agent polling monitor |
 
