@@ -180,6 +180,7 @@ npm start
 **Branch naming:** `feature/cap-<capability-slug>` (e.g., `feature/cap-foundation`)
 **Test system:** Verify on `http://10.33.33.1:4200` before merging to develop.
 **If unsure which branch:** Default to `develop`.
+**Traceability:** See `AGENTS.md` and `CONTRIBUTING.md` for code annotation and commit message conventions.
 
 ## Architecture
 
