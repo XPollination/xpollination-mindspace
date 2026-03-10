@@ -30,6 +30,8 @@ export const ALLOWED_TRANSITIONS = {
   'task': {
     // AC1: pending->ready preserves original role (no automatic override)
     'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'] },
+    // Design gate: dev tasks require PDSA design before becoming ready
+    'pending->ready:dev': { allowedActors: ['liaison', 'system', 'pdsa'], requireRole: 'dev', requiresDna: ['pdsa_ref'] },
 
     // AC2: ready->active allows role-matched claiming
     'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'], requiresDna: ['memory_query_session'] },
