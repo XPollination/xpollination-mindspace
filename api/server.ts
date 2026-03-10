@@ -1,6 +1,7 @@
 import express from 'express';
 import { healthRouter } from './routes/health.js';
 import { a2aStreamRouter } from './routes/a2a-stream.js';
+import { agentCardRouter } from './routes/agent-card.js';
 import { getDb, closeDb } from './db/connection.js';
 
 const app = express();
@@ -14,6 +15,7 @@ console.log(`Database connected (WAL mode, migrations table ready)`);
 
 app.use('/health', healthRouter);
 app.use('/a2a/stream', a2aStreamRouter);
+app.use('/.well-known/agent.json', agentCardRouter);
 
 const server = app.listen(PORT, () => {
   console.log(`Mindspace API server listening on port ${PORT}`);
