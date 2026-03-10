@@ -10,6 +10,7 @@ export const oauthRouter = Router();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || '/api/auth/oauth/google/callback';
+const FRONTEND_URL = process.env.FRONTEND_URL || '';
 
 // Conditionally register Google strategy if credentials are configured
 if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
@@ -55,7 +56,7 @@ oauthRouter.get('/google', passport.authenticate('google', { scope: ['profile', 
 
 // GET /google/callback — handle OAuth callback
 oauthRouter.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  passport.authenticate('google', { session: false, failureRedirect: '/google/failure' }),
   (req: Request, res: Response) => {
     const user = req.user as any;
     const secret = process.env.JWT_SECRET;
@@ -71,6 +72,11 @@ oauthRouter.get('/google/callback',
       { expiresIn: process.env.JWT_EXPIRY || '24h' }
     );
 
-    res.redirect(`/?token=${token}`);
+    res.redirect(`${FRONTEND_URL}/?token=${token}`);
   }
 );
+
+// GET /google/failure — dedicated OAuth failure route
+oauthRouter.get('/google/failure', (_req: Request, res: Response) => {
+  res.status(401).json({ error: 'Google OAuth authentication failed' });
+});
