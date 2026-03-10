@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
+import { getConnectionCount } from '../lib/sse-manager.js';
 
 const healthRouter = Router();
 
@@ -19,7 +20,8 @@ healthRouter.get('/', (_req, res) => {
     status,
     version: '0.0.7',
     uptime: process.uptime(),
-    database: dbStatus
+    database: dbStatus,
+    sse_connections: getConnectionCount()
   });
 });
 
