@@ -6,6 +6,7 @@ import { twinSchemaRouter } from './routes/twin-schema.js';
 import { authRouter } from './routes/auth.js';
 import { keysRouter } from './routes/keys.js';
 import { oauthRouter } from './routes/oauth.js';
+import { projectsRouter } from './routes/projects.js';
 import { getDb, closeDb } from './db/connection.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -29,6 +30,7 @@ app.use('/schemas/digital-twin-v1.json', twinSchemaRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/keys', keysRouter);
 app.use('/api/auth/oauth', oauthRouter);
+app.use('/api/projects', projectsRouter);
 
 // Error handling (after routes)
 app.use(notFoundHandler);
