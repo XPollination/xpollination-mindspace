@@ -5,6 +5,7 @@ import { agentCardRouter } from './routes/agent-card.js';
 import { twinSchemaRouter } from './routes/twin-schema.js';
 import { authRouter } from './routes/auth.js';
 import { keysRouter } from './routes/keys.js';
+import { oauthRouter } from './routes/oauth.js';
 import { getDb, closeDb } from './db/connection.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -27,6 +28,7 @@ app.use('/.well-known/agent.json', agentCardRouter);
 app.use('/schemas/digital-twin-v1.json', twinSchemaRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/keys', keysRouter);
+app.use('/api/auth/oauth', oauthRouter);
 
 // Error handling (after routes)
 app.use(notFoundHandler);
