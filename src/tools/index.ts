@@ -28,6 +28,7 @@ import { publishPostTool, handlePublishPost, PublishPostInput } from './publishi
 
 // Mindspace tools
 import { listProjectsTool, handleListProjects } from './mindspace/listProjects.js';
+import { getProjectStatusTool, handleGetProjectStatus } from './mindspace/getProjectStatus.js';
 
 // PM (Project Management) tools
 import {
@@ -98,6 +99,10 @@ export const tools: ToolDefinition[] = [
   {
     definition: listProjectsTool,
     handler: async (_args, _db, _pipeline) => handleListProjects()
+  },
+  {
+    definition: getProjectStatusTool,
+    handler: async (args, _db, _pipeline) => handleGetProjectStatus(args as { project_slug: string })
   },
 
   // PM (Project Management) tools
