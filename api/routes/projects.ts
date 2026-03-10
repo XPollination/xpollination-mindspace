@@ -4,6 +4,7 @@ import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
 import { membersRouter } from './members.js';
 import { brainRouter } from './brain.js';
+import { agentPoolRouter } from './agent-pool.js';
 
 export const projectsRouter = Router();
 
@@ -17,6 +18,9 @@ projectsRouter.use('/:slug/members', membersRouter);
 
 // Nested brain routes
 projectsRouter.use('/:slug/brain', brainRouter);
+
+// Nested agent pool routes
+projectsRouter.use('/:slug/agents', agentPoolRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {
