@@ -23,7 +23,7 @@ import { resolve } from "node:path";
 import http from "node:http";
 
 const PROJECT_ROOT = resolve(
-  "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server"
+  "/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server-test"
 );
 const API_DIR = resolve(PROJECT_ROOT, "api");
 
