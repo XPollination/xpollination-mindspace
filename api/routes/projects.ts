@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
 import { membersRouter } from './members.js';
+import { brainRouter } from './brain.js';
 
 export const projectsRouter = Router();
 
@@ -13,6 +14,9 @@ projectsRouter.use(requireApiKeyOrJwt);
 
 // Nested members routes
 projectsRouter.use('/:slug/members', membersRouter);
+
+// Nested brain routes
+projectsRouter.use('/:slug/brain', brainRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {
