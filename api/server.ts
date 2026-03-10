@@ -8,6 +8,7 @@ import { keysRouter } from './routes/keys.js';
 import { oauthRouter } from './routes/oauth.js';
 import { projectsRouter } from './routes/projects.js';
 import { agentsRouter } from './routes/agents.js';
+import { a2aConnectRouter } from './routes/a2a-connect.js';
 import { getDb, closeDb } from './db/connection.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -26,6 +27,7 @@ logger.info('Database connected (WAL mode, migrations table ready)');
 
 app.use('/health', healthRouter);
 app.use('/a2a/stream', a2aStreamRouter);
+app.use('/a2a/connect', a2aConnectRouter);
 app.use('/.well-known/agent.json', agentCardRouter);
 app.use('/schemas/digital-twin-v1.json', twinSchemaRouter);
 app.use('/api/auth', authRouter);
