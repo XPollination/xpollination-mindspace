@@ -13,7 +13,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "viz": "node viz/server.js",
     "api": "node dist/api/server.js",
-    "api:dev": "tsx watch api/server.ts"
+    "api:dev": "tsx watch api/server.ts",
+    "api:migrate": "tsx api/db/migrate.ts"
   },
   "keywords": [
     "mcp",
