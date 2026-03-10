@@ -80,7 +80,7 @@ export const ALLOWED_TRANSITIONS = {
 
     // Review flow - per WORKFLOW.md v12: only liaison (human proxy) can complete
     // PDSA forwards via review->review:pdsa, does not complete directly
-    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true, requiresDna: ['abstract_ref'] },
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true, requiresDna: ['abstract_ref', 'test_pass_count', 'test_total_count'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Per WORKFLOW.md rework entry table: review+liaison → rework
     // Role routing determined by cmdTransition using DNA context:
@@ -108,7 +108,7 @@ export const ALLOWED_TRANSITIONS = {
     // Per WORKFLOW.md: dev sends to review, Monitor=qa (QA reviews)
     'active->review': { allowedActors: ['dev'], newRole: 'qa', requiresDna: ['memory_contribution_id'] },
     // Bug path: only liaison can finalize completion (QA reviews but doesn't complete)
-    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresDna: ['abstract_ref'] },
+    'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresDna: ['abstract_ref', 'test_pass_count', 'test_total_count'] },
     'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
     // Review chain transitions (QA->PDSA->Liaison) — same as task type
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
@@ -305,6 +305,20 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
       // abstract_ref must be a GitHub link (enforces git protocol)
       if (field === 'abstract_ref' && typeof dna[field] === 'string' && !dna[field].startsWith('https://github.com/')) {
         return `dna.abstract_ref must be a GitHub link (https://github.com/...). Local file paths are not allowed. Execute git protocol first (git add, git commit, git push), then use the GitHub URL. Current value: "${dna[field]}"`;
+      }
+    }
+
+    // Test pass gate: validate test_pass_count === test_total_count and test_total_count > 0
+    if (rule.requiresDna.includes('test_pass_count') && rule.requiresDna.includes('test_total_count')) {
+      const test_total_count = dna.test_total_count;
+      const test_pass_count = dna.test_pass_count;
+
+      if (test_total_count <= 0) {
+        return `Test gate blocked: test_total_count must be positive (> 0), got ${test_total_count}. Tasks must have tests before completion.`;
+      }
+
+      if (test_pass_count !== test_total_count) {
+        return `Test gate blocked: 100% test pass required. test_pass_count=${test_pass_count} but test_total_count=${test_total_count}. All tests must pass before completion.`;
       }
     }
   }

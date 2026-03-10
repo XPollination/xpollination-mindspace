@@ -172,6 +172,24 @@ const FIELD_VALIDATORS = {
     }
 
     return null;
+  },
+
+  // Validate test_pass_count (non-negative integer)
+  test_pass_count: (value) => {
+    const num = Number(value);
+    if (!Number.isInteger(num) || num < 0) {
+      return `test_pass_count must be a non-negative integer (>= 0), got: "${value}"`;
+    }
+    return null;
+  },
+
+  // Validate test_total_count (positive integer, must have tests)
+  test_total_count: (value) => {
+    const num = Number(value);
+    if (!Number.isInteger(num) || num <= 0) {
+      return `test_total_count must be a positive integer (> 0), got: "${value}"`;
+    }
+    return null;
   }
 };
 
