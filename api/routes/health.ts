@@ -1,12 +1,25 @@
 import { Router } from 'express';
+import { getDb } from '../db/connection.js';
 
 const healthRouter = Router();
 
 healthRouter.get('/', (_req, res) => {
-  res.json({
-    status: 'ok',
+  let dbStatus = 'ok';
+  try {
+    const db = getDb();
+    // Quick integrity check — ensures DB is readable
+    db.prepare('SELECT 1').get();
+  } catch {
+    dbStatus = 'error';
+  }
+
+  const status = dbStatus === 'ok' ? 'ok' : 'degraded';
+
+  res.status(status === 'ok' ? 200 : 503).json({
+    status,
     version: '0.0.7',
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    database: dbStatus
   });
 });
 
