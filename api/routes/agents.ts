@@ -71,6 +71,58 @@ agentsRouter.post('/register', (req: Request, res: Response) => {
   res.status(201).json({ agent_id: id, ...(agent as any) });
 });
 
+// POST /api/agents/:id/heartbeat — update last_seen, reactivate idle agents
+agentsRouter.post('/:id/heartbeat', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const db = getDb();
+
+  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as any;
+  if (!agent) {
+    res.status(404).json({ error: 'Agent not found' });
+    return;
+  }
+
+  if (agent.status === 'disconnected') {
+    res.status(409).json({ error: 'Disconnected agents must re-register' });
+    return;
+  }
+
+  // Reactivate idle agents on heartbeat
+  const newStatus = agent.status === 'idle' ? 'active' : agent.status;
+  db.prepare("UPDATE agents SET last_seen = datetime('now'), status = ? WHERE id = ?")
+    .run(newStatus, id);
+
+  res.status(200).json({ agent_id: id, status: newStatus, last_seen: new Date().toISOString() });
+});
+
+// PATCH /api/agents/:id/status — manual status change (graceful disconnect)
+agentsRouter.patch('/:id/status', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status || !VALID_STATUSES.includes(status)) {
+    res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
+    return;
+  }
+
+  const db = getDb();
+  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as any;
+  if (!agent) {
+    res.status(404).json({ error: 'Agent not found' });
+    return;
+  }
+
+  if (status === 'disconnected') {
+    db.prepare("UPDATE agents SET status = ?, disconnected_at = datetime('now'), last_seen = datetime('now') WHERE id = ?")
+      .run(status, id);
+  } else {
+    db.prepare("UPDATE agents SET status = ?, last_seen = datetime('now') WHERE id = ?")
+      .run(status, id);
+  }
+
+  res.status(200).json({ agent_id: id, previous_status: agent.status, status });
+});
+
 // GET /api/agents — list agents (optional filters: project_slug, status)
 agentsRouter.get('/', (req: Request, res: Response) => {
   const { project_slug, status } = req.query;

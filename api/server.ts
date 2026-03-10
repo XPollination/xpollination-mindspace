@@ -9,6 +9,7 @@ import { oauthRouter } from './routes/oauth.js';
 import { projectsRouter } from './routes/projects.js';
 import { agentsRouter } from './routes/agents.js';
 import { a2aConnectRouter } from './routes/a2a-connect.js';
+import { startAgentSweep } from './routes/agent-status-sweep.js';
 import { getDb, closeDb } from './db/connection.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -42,6 +43,7 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Mindspace API server listening');
+  startAgentSweep();
 });
 
 // Graceful shutdown
