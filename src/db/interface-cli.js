@@ -35,7 +35,8 @@ import {
   getNewRoleForTransition,
   getClearsDnaForTransition,
   validateType,
-  validateDnaRequirements
+  validateDnaRequirements,
+  validateRoleConsistency
 } from './workflow-engine.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -663,6 +664,14 @@ async function cmdTransition(id, newStatus, actor) {
       error(`Invalid rework_target_role: ${dna.rework_target_role}. Valid: ${VALID_ROLES.join(', ')}`);
     }
     newRole = dna.rework_target_role;
+  }
+
+  // Role consistency enforcement: reject transitions that produce wrong role for fixed-role states
+  const effectiveRole = newRole || currentRole;
+  const consistencyError = validateRoleConsistency(newStatus, effectiveRole);
+  if (consistencyError) {
+    db.close();
+    error(consistencyError);
   }
 
   let updatedDna = dna;

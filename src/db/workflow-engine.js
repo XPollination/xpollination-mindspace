@@ -97,7 +97,7 @@ export const ALLOWED_TRANSITIONS = {
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },
     'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'] },
-    'any->cancelled:system': { allowedActors: ['system'] }
+    'any->cancelled:system': { allowedActors: ['system'], newRole: 'liaison' }
   },
   // Bug flow (can bypass PDSA, simplified)
   'bug': {
@@ -119,7 +119,7 @@ export const ALLOWED_TRANSITIONS = {
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },
     'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'] },
-    'any->cancelled:system': { allowedActors: ['system'] }
+    'any->cancelled:system': { allowedActors: ['system'], newRole: 'liaison' }
   }
 };
 
@@ -308,6 +308,31 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
   }
 
   return null;
+}
+
+// Expected roles by state - fixed-role states per WORKFLOW.md
+// Variable-role states (active, review, ready, rework, pending, blocked) are NOT checked
+export const EXPECTED_ROLES_BY_STATE = {
+  'complete': 'liaison',
+  'approval': 'liaison',
+  'approved': 'qa',
+  'testing': 'qa',
+  'cancelled': 'liaison'
+};
+
+/**
+ * Validate that a transition produces the correct role for fixed-role states.
+ * Returns null if OK (or state is variable-role), error string if wrong role.
+ *
+ * @param {string} targetStatus - The status being transitioned to
+ * @param {string} effectiveRole - The role that would result from the transition
+ * @returns {string|null} Error message if violation, null if valid
+ */
+export function validateRoleConsistency(targetStatus, effectiveRole) {
+  const expected = EXPECTED_ROLES_BY_STATE[targetStatus];
+  if (!expected) return null;
+  if (effectiveRole === expected) return null;
+  return `Role consistency violation: ${targetStatus} requires role=${expected} (per WORKFLOW.md), but transition would set role=${effectiveRole || 'null'}. Fix the transition rule to include newRole: '${expected}', or check rework_target_role configuration.`;
 }
 
 /**

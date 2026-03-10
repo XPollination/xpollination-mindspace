@@ -55,7 +55,7 @@ stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
 2. **Trust the monitor** - if you miss work, it's because you stopped checking the output file
 3. **Check the work FILE** - `stat -c%s /tmp/agent-work-{role}.json`
 
-**Workflow source of truth:** `docs/WORKFLOW.md` (v12)
+**Workflow source of truth:** `tracks/process/context/WORKFLOW.md`
 
 ### Database Interface CLI (Regulated Access)
 All agents use `src/db/interface-cli.js` for database operations:
@@ -180,6 +180,7 @@ npm start
 **Branch naming:** `feature/cap-<capability-slug>` (e.g., `feature/cap-foundation`)
 **Test system:** Verify on `http://10.33.33.1:4200` before merging to develop.
 **If unsure which branch:** Default to `develop`.
+**Traceability:** See `AGENTS.md` and `CONTRIBUTING.md` for code annotation and commit message conventions.
 
 ## Architecture
 
