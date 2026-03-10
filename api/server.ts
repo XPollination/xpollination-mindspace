@@ -4,6 +4,7 @@ import { a2aStreamRouter } from './routes/a2a-stream.js';
 import { agentCardRouter } from './routes/agent-card.js';
 import { twinSchemaRouter } from './routes/twin-schema.js';
 import { authRouter } from './routes/auth.js';
+import { keysRouter } from './routes/keys.js';
 import { getDb, closeDb } from './db/connection.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -25,6 +26,7 @@ app.use('/a2a/stream', a2aStreamRouter);
 app.use('/.well-known/agent.json', agentCardRouter);
 app.use('/schemas/digital-twin-v1.json', twinSchemaRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/keys', keysRouter);
 
 // Error handling (after routes)
 app.use(notFoundHandler);
