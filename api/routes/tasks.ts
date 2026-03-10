@@ -1,0 +1,127 @@
+import { Router, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { getDb } from '../db/connection.js';
+import { requireProjectAccess } from '../middleware/require-project-access.js';
+
+export const tasksRouter = Router({ mergeParams: true });
+
+const VALID_STATUSES = ['pending', 'ready', 'active', 'review', 'approval', 'approved', 'testing', 'rework', 'blocked', 'complete'];
+const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison'];
+
+// POST / — create task (requires contributor role)
+tasksRouter.post('/', requireProjectAccess('contributor'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const user = (req as any).user;
+  const { title, description, requirement_id, status, current_role, feature_flag_name } = req.body;
+
+  if (!title) {
+    res.status(400).json({ error: 'Missing required field: title' });
+    return;
+  }
+
+  const taskStatus = status || 'pending';
+  if (!VALID_STATUSES.includes(taskStatus)) {
+    res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
+    return;
+  }
+
+  if (current_role && !VALID_ROLES.includes(current_role)) {
+    res.status(400).json({ error: `Invalid current_role. Must be one of: ${VALID_ROLES.join(', ')}` });
+    return;
+  }
+
+  const db = getDb();
+  const id = randomUUID();
+
+  db.prepare(
+    `INSERT INTO tasks (id, project_slug, requirement_id, title, description, status, current_role, feature_flag_name, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, slug, requirement_id || null, title, description || null, taskStatus, current_role || null, feature_flag_name || null, user.id);
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  res.status(201).json(task);
+});
+
+// GET / — list tasks for project (optional filters: status, current_role)
+tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const { status, current_role } = req.query;
+  const db = getDb();
+
+  let sql = 'SELECT * FROM tasks WHERE project_slug = ?';
+  const params: any[] = [slug];
+
+  if (status) {
+    sql += ' AND status = ?';
+    params.push(status);
+  }
+  if (current_role) {
+    sql += ' AND current_role = ?';
+    params.push(current_role);
+  }
+
+  sql += ' ORDER BY created_at DESC';
+  const tasks = db.prepare(sql).all(...params);
+  res.status(200).json(tasks);
+});
+
+// GET /:taskId — get single task
+tasksRouter.get('/:taskId', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug, taskId } = req.params;
+  const db = getDb();
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug);
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  res.status(200).json(task);
+});
+
+// PUT /:taskId — update task metadata (NOT status)
+tasksRouter.put('/:taskId', requireProjectAccess('contributor'), (req: Request, res: Response) => {
+  const { slug, taskId } = req.params;
+  const { title, description, requirement_id, current_role, feature_flag_name } = req.body;
+  const db = getDb();
+
+  const existing = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug) as any;
+  if (!existing) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  if (current_role !== undefined && current_role !== null && !VALID_ROLES.includes(current_role)) {
+    res.status(400).json({ error: `Invalid current_role. Must be one of: ${VALID_ROLES.join(', ')}` });
+    return;
+  }
+
+  const updatedTitle = title || existing.title;
+  const updatedDescription = description !== undefined ? description : existing.description;
+  const updatedRequirementId = requirement_id !== undefined ? requirement_id : existing.requirement_id;
+  const updatedRole = current_role !== undefined ? current_role : existing.current_role;
+  const updatedFlag = feature_flag_name !== undefined ? feature_flag_name : existing.feature_flag_name;
+
+  db.prepare(
+    `UPDATE tasks SET title = ?, description = ?, requirement_id = ?, current_role = ?, feature_flag_name = ?, updated_at = datetime('now')
+     WHERE id = ? AND project_slug = ?`
+  ).run(updatedTitle, updatedDescription, updatedRequirementId, updatedRole, updatedFlag, taskId, slug);
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  res.status(200).json(task);
+});
+
+// DELETE /:taskId — delete task (requires admin role)
+tasksRouter.delete('/:taskId', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, taskId } = req.params;
+  const db = getDb();
+
+  const existing = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug);
+  if (!existing) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  db.prepare('DELETE FROM tasks WHERE id = ? AND project_slug = ?').run(taskId, slug);
+  res.status(204).send();
+});
