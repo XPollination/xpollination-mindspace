@@ -1,0 +1,68 @@
+# Mindspace API — mindspace.xpollination.earth
+# Deployed from: xpollination-mcp-server/deploy/nginx/mindspace.xpollination.earth
+# Express backend on port 3100
+
+# HTTP → HTTPS redirect (enabled after ms-a0-4-dns-ssl)
+# server {
+#     listen 80;
+#     server_name mindspace.xpollination.earth;
+#     return 301 https://$host$request_uri;
+# }
+
+# Temporary: HTTP-only until SSL is configured
+server {
+    listen 80;
+    server_name mindspace.xpollination.earth;
+
+    # Rate limiting zone (10 req/s per IP, burst 20)
+    limit_req zone=mindspace_api burst=20 nodelay;
+
+    # API proxy
+    location / {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $request_id;
+
+        # WebSocket/SSE upgrade headers (for future A2A protocol)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        # SSE: disable buffering for streaming responses
+        proxy_buffering off;
+        proxy_cache off;
+
+        # Timeouts
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 300s;  # Long for SSE connections
+
+        # Request size limit
+        client_max_body_size 10M;
+    }
+
+    # Health check — no rate limiting
+    location = /health {
+        limit_req off;
+        proxy_pass http://127.0.0.1:3100/health;
+        proxy_set_header Host $host;
+    }
+}
+
+# HTTPS version (enabled after ms-a0-4-dns-ssl sets up certificates)
+# server {
+#     listen 443 ssl;
+#     server_name mindspace.xpollination.earth;
+#
+#     ssl_certificate /etc/letsencrypt/live/mindspace.xpollination.earth/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/mindspace.xpollination.earth/privkey.pem;
+#     include /etc/letsencrypt/options-ssl-nginx.conf;
+#     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+#
+#     # ... same location blocks as above ...
+# }
