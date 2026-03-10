@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
+import { createBond } from './agent-bond.js';
 
 export const agentsRouter = Router();
 
@@ -56,6 +57,7 @@ agentsRouter.post('/register', (req: Request, res: Response) => {
       "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = ? WHERE id = ?"
     ).run(agentSessionId, current_role || null, capabilitiesJson, 'active', existing.id);
 
+    createBond(existing.id, agentSessionId);
     const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(existing.id);
     res.status(200).json({ agent_id: (agent as any).id, ...(agent as any) });
     return;
@@ -67,6 +69,7 @@ agentsRouter.post('/register', (req: Request, res: Response) => {
     'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(id, user.id, name, current_role || null, capabilitiesJson, project_slug || null, agentSessionId, 'active');
 
+  createBond(id, agentSessionId);
   const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
   res.status(201).json({ agent_id: id, ...(agent as any) });
 });
