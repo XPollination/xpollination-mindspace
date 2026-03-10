@@ -26,6 +26,9 @@ import { improveDraftTool, handleImproveDraft, ImproveDraftInput } from './verif
 // Publishing tools
 import { publishPostTool, handlePublishPost, PublishPostInput } from './publishing/publishPost.js';
 
+// Mindspace tools
+import { listProjectsTool, handleListProjects } from './mindspace/listProjects.js';
+
 // PM (Project Management) tools
 import {
   pmCreateNodeTool, handlePmCreateNode,
@@ -89,6 +92,12 @@ export const tools: ToolDefinition[] = [
   {
     definition: publishPostTool,
     handler: async (args, db, _pipeline) => handlePublishPost(args as PublishPostInput, db)
+  },
+
+  // Mindspace tools
+  {
+    definition: listProjectsTool,
+    handler: async (_args, _db, _pipeline) => handleListProjects()
   },
 
   // PM (Project Management) tools
