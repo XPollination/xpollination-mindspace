@@ -193,7 +193,11 @@ function validateDnaFields(dna) {
 
 function getDb() {
   const dbPath = process.env.DATABASE_PATH || join(__dirname, '../../data/xpollination.db');
-  return new Database(dbPath);
+  const db = new Database(dbPath);
+  // Set busy_timeout = 5000ms to handle WAL contention gracefully
+  // Without this, concurrent writes fail immediately with SQLITE_BUSY
+  db.pragma('busy_timeout = 5000');
+  return db;
 }
 
 function output(data) {
@@ -679,20 +683,55 @@ async function cmdTransition(id, newStatus, actor) {
     updatedDna = { ...dna, role: newRole };
   }
 
-  // Perform transition (write DNA if role changed or fields were cleared)
+  // Perform transition inside db.transaction() to prevent TOCTOU race conditions
+  // between the read (line ~410) and write — ensures atomic read-modify-write
   const dnaChanged = (newRole && newRole !== currentRole) || fieldsToClear.length > 0;
-  if (dnaChanged) {
-    db.prepare(`
-      UPDATE mindspace_nodes
-      SET status = ?, dna_json = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(newStatus, JSON.stringify(updatedDna), node.id);
-  } else {
-    db.prepare(`
-      UPDATE mindspace_nodes
-      SET status = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(newStatus, node.id);
+
+  const performTransition = db.transaction(() => {
+    let updateResult;
+    if (dnaChanged) {
+      updateResult = db.prepare(`
+        UPDATE mindspace_nodes
+        SET status = ?, dna_json = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(newStatus, JSON.stringify(updatedDna), node.id);
+    } else {
+      updateResult = db.prepare(`
+        UPDATE mindspace_nodes
+        SET status = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(newStatus, node.id);
+    }
+
+    // Check .changes — if 0 rows affected, the UPDATE silently failed
+    if (updateResult.changes === 0) {
+      throw new Error(`Transition UPDATE affected 0 rows for node ${node.id}. Possible SQLITE_BUSY lock contention or node was deleted.`);
+    }
+
+    // Verification read-back: confirm role persisted correctly after UPDATE
+    const verifyNode = db.prepare('SELECT status, dna_json FROM mindspace_nodes WHERE id = ?').get(node.id);
+    if (!verifyNode) {
+      throw new Error(`Verification read-back failed: node ${node.id} not found after UPDATE`);
+    }
+    if (verifyNode.status !== newStatus) {
+      throw new Error(`Verification read-back failed: expected status="${newStatus}" but got "${verifyNode.status}"`);
+    }
+    if (dnaChanged) {
+      const verifyDna = JSON.parse(verifyNode.dna_json);
+      const expectedRole = newRole || currentRole;
+      if (verifyDna.role !== expectedRole) {
+        throw new Error(`Verification read-back failed: expected role="${expectedRole}" but got "${verifyDna.role}". Role change did not persist.`);
+      }
+    }
+
+    return updateResult;
+  });
+
+  try {
+    performTransition();
+  } catch (err) {
+    db.close();
+    error(`Transition failed: ${err.message}`);
   }
 
   const result = {
