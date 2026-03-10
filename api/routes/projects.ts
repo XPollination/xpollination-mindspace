@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
+import { membersRouter } from './members.js';
 
 export const projectsRouter = Router();
 
@@ -9,6 +10,9 @@ export const projectsRouter = Router();
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$/;
 
 projectsRouter.use(requireApiKeyOrJwt);
+
+// Nested members routes
+projectsRouter.use('/:slug/members', membersRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {
