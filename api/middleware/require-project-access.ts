@@ -36,6 +36,19 @@ export function requireProjectAccess(minRole: string) {
       return;
     }
 
+    // System admin bypass — check users table
+    const userRow = db.prepare('SELECT is_system_admin FROM users WHERE id = ?').get(user.id) as any;
+    if (userRow?.is_system_admin === 1) {
+      (req as any).projectAccess = {
+        role: 'admin',
+        level: ROLE_HIERARCHY['admin'],
+        project_slug: slug,
+        is_system_admin: true
+      };
+      next();
+      return;
+    }
+
     // Check project_access for membership
     const access = db.prepare(
       'SELECT role FROM project_access WHERE user_id = ? AND project_slug = ?'
