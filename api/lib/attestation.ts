@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { sendToAgent } from '../lib/sse-manager.js';
+import { SUGGESTION_MAP } from '../services/attestation-rules.js';
 
 /**
  * Request an attestation from an agent before allowing a transition.
@@ -88,4 +89,50 @@ export function getPendingAttestations(agent_id: string): any[] {
   return db.prepare(
     "SELECT * FROM attestations WHERE agent_id = ? AND status = 'pending' ORDER BY created_at DESC"
   ).all(agent_id);
+}
+
+/**
+ * Reject an attestation with structured feedback.
+ * Stores JSON rejection_reason with failed checks + suggestions, emits ATTESTATION_REJECTED SSE.
+ */
+export function rejectWithFeedback(
+  attestation_id: string,
+  validationResults: Array<{ rule: string; passed: boolean; message?: string }>
+): any {
+  const db = getDb();
+
+  const checksFailed = validationResults
+    .filter(r => !r.passed)
+    .map(r => ({
+      rule: r.rule,
+      passed: r.passed,
+      message: r.message,
+      suggestion: SUGGESTION_MAP[r.rule] || 'No suggestion available.'
+    }));
+
+  const total = validationResults.length;
+  const failedCount = checksFailed.length;
+  const summary = `${failedCount} of ${total} checks failed`;
+
+  const rejectionReason = JSON.stringify({ checks_failed: checksFailed, summary });
+
+  db.prepare(
+    `UPDATE attestations SET status = 'rejected', rejection_reason = ?, updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(rejectionReason, attestation_id);
+
+  const attestation = db.prepare('SELECT * FROM attestations WHERE id = ?').get(attestation_id) as any;
+
+  // Emit ATTESTATION_REJECTED SSE event
+  if (attestation?.agent_id) {
+    sendToAgent(attestation.agent_id, 'attestation', {
+      type: 'ATTESTATION_REJECTED',
+      attestation_id,
+      task_id: attestation.task_id,
+      checks_failed: checksFailed,
+      summary
+    });
+  }
+
+  return attestation;
 }

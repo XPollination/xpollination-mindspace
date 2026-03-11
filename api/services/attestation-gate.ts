@@ -34,6 +34,25 @@ export function checkAttestationGate(
   ).get(taskSlug, projectSlug) as any;
 
   if (!attestation) {
+    // Check if there's a rejected attestation with structured feedback
+    const rejected = db.prepare(
+      "SELECT * FROM attestations WHERE task_slug = ? AND project_slug = ? AND status = 'rejected' ORDER BY updated_at DESC LIMIT 1"
+    ).get(taskSlug, projectSlug) as any;
+
+    if (rejected?.rejection_reason) {
+      // Include structured rejection details in gate reason
+      try {
+        const parsed = JSON.parse(rejected.rejection_reason);
+        const failedRules = parsed.checks_failed?.map((c: any) => c.rule).join(', ') || '';
+        return {
+          allowed: false,
+          reason: `Attestation rejected: ${parsed.summary}. Failed: ${failedRules}`
+        };
+      } catch {
+        // Fall through to generic message if JSON parse fails
+      }
+    }
+
     return {
       allowed: false,
       reason: `Attestation required for transition ${fromStatus}->${toStatus} but no valid attestation found`

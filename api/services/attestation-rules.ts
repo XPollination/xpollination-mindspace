@@ -79,6 +79,16 @@ const rules: Rule[] = [
  * Validate an attestation against all rules.
  * Returns { valid: boolean, results: RuleResult[] }
  */
+/**
+ * Suggestion map: human-readable fix suggestions for each rule.
+ */
+export const SUGGESTION_MAP: Record<string, string> = {
+  tags_present: 'Ensure both req_id and task_id are set on the attestation payload.',
+  refs_valid: 'Verify the task_id references an existing task in the database.',
+  tests_tagged: 'Add a test_id to every entry in the test_results array.',
+  commits_formatted: 'Use conventional commit format: type(scope): description (e.g., feat: add login).'
+};
+
 export function validateAttestation(
   db: Database.Database,
   attestation: any
