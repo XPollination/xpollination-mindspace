@@ -63,6 +63,32 @@ featureFlagsRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: 
   res.status(200).json(flags);
 });
 
+// GET /export — export all flags for project (YAML or JSON)
+featureFlagsRouter.get('/export', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const { format } = req.query;
+  const db = getDb();
+
+  const flags = db.prepare('SELECT * FROM feature_flags WHERE project_slug = ? ORDER BY flag_name').all(slug) as any[];
+
+  if (format === 'json') {
+    res.status(200).json(flags);
+    return;
+  }
+
+  // Default: YAML output
+  let yaml = `# Feature flags for project: ${slug}\nflags:\n`;
+  for (const flag of flags) {
+    yaml += `  - flag_name: ${flag.flag_name}\n`;
+    yaml += `    state: ${flag.state}\n`;
+    yaml += `    task_id: ${flag.task_id || 'null'}\n`;
+    if (flag.expires_at) yaml += `    expires_at: ${flag.expires_at}\n`;
+  }
+
+  res.setHeader('Content-Type', 'text/yaml');
+  res.status(200).send(yaml);
+});
+
 // GET /:flagId — get single flag (viewer)
 featureFlagsRouter.get('/:flagId', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { slug, flagId } = req.params;

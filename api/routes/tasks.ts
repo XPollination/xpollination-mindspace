@@ -45,13 +45,24 @@ tasksRouter.post('/', requireProjectAccess('contributor'), (req: Request, res: R
   const db = getDb();
   const id = randomUUID();
 
+  // Auto-generate feature flag name if not provided: XPO_FEATURE_ + 8 random hex chars
+  const autoFlagName = feature_flag_name || `XPO_FEATURE_${randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase()}`;
+
   db.prepare(
     `INSERT INTO tasks (id, project_slug, requirement_id, title, description, status, current_role, feature_flag_name, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, slug, requirement_id || null, title, description || null, taskStatus, current_role || null, feature_flag_name || null, user.id);
+  ).run(id, slug, requirement_id || null, title, description || null, taskStatus, current_role || null, autoFlagName, user.id);
+
+  // Auto-create feature_flag entry linked to this task
+  const flagId = randomUUID();
+  db.prepare(
+    `INSERT OR IGNORE INTO feature_flags (id, project_slug, flag_name, state, task_id, toggled_by)
+     VALUES (?, ?, ?, 'off', ?, ?)`
+  ).run(flagId, slug, autoFlagName, id, user.id);
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  res.status(201).json(task);
+  const feature_flag = db.prepare('SELECT * FROM feature_flags WHERE task_id = ?').get(id);
+  res.status(201).json({ ...task as any, feature_flag });
 });
 
 // GET / — list tasks for project (optional filters: status, current_role, claimed, blocked, available_only)

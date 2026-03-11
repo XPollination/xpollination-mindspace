@@ -2,8 +2,12 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
+import { requirementApprovalsRouter } from './requirement-approvals.js';
 
 export const requirementsRouter = Router({ mergeParams: true });
+
+// Nested approval routes
+requirementsRouter.use(requirementApprovalsRouter);
 
 const VALID_STATUSES = ['draft', 'active', 'deprecated'];
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'];
