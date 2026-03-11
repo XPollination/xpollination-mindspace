@@ -60,3 +60,71 @@ marketplaceCommunityRouter.get('/community-needs', async (req: Request, res: Res
     res.status(200).json([]);
   }
 });
+
+// POST /digest — agent-assisted digest generation
+// Accepts { topic } or { thought_ids }, queries brain for cluster, produces summary,
+// stores as domain_summary brain thought, returns { summary, brain_thought_id }
+marketplaceCommunityRouter.post('/digest', async (req: Request, res: Response) => {
+  const { topic, thought_ids } = req.body;
+
+  if (!topic && (!thought_ids || !Array.isArray(thought_ids) || thought_ids.length === 0)) {
+    res.status(400).json({ error: 'Missing required field: topic or thought_ids' });
+    return;
+  }
+
+  try {
+    // Query brain/memory for related thoughts in cluster
+    const queryPrompt = topic
+      ? `Summarize all knowledge about: ${topic}`
+      : `Summarize thoughts: ${thought_ids.join(', ')}`;
+
+    const queryResponse = await fetch(`${BRAIN_API_URL}/api/v1/memory`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${BRAIN_API_KEY}`
+      },
+      body: JSON.stringify({
+        prompt: queryPrompt,
+        agent_id: 'system',
+        agent_name: 'SYSTEM',
+        read_only: true
+      })
+    });
+
+    const queryData = await queryResponse.json() as any;
+    const sources = queryData?.result?.sources || [];
+
+    // Template-based summary generation
+    const topicLabel = topic || 'cluster';
+    const sourceCount = sources.length;
+    const keyInsights = sources.slice(0, 5).map((s: any) => s.content_preview || '').filter(Boolean);
+
+    const summary = `Digest for "${topicLabel}": ${sourceCount} related thoughts found. ` +
+      `Key insights: ${keyInsights.length > 0 ? keyInsights.join('; ') : 'No detailed insights available.'}`;
+
+    // Store summary as domain_summary brain thought
+    const contributeResponse = await fetch(`${BRAIN_API_URL}/api/v1/memory`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${BRAIN_API_KEY}`
+      },
+      body: JSON.stringify({
+        prompt: summary,
+        agent_id: 'system',
+        agent_name: 'SYSTEM',
+        thought_category: 'domain_summary',
+        topic: topicLabel,
+        context: `digest from ${sourceCount} sources`
+      })
+    });
+
+    const contributeData = await contributeResponse.json() as any;
+    const brain_thought_id = contributeData?.result?.sources?.[0]?.thought_id || null;
+
+    res.status(200).json({ summary, brain_thought_id });
+  } catch (err) {
+    res.status(500).json({ error: 'Digest generation failed' });
+  }
+});
