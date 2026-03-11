@@ -54,10 +54,10 @@ tasksRouter.post('/', requireProjectAccess('contributor'), (req: Request, res: R
   res.status(201).json(task);
 });
 
-// GET / — list tasks for project (optional filters: status, current_role)
+// GET / — list tasks for project (optional filters: status, current_role, claimed, blocked, available_only)
 tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { slug } = req.params;
-  const { status, current_role } = req.query;
+  const { status, current_role, claimed, blocked, available_only } = req.query;
   const db = getDb();
 
   let sql = 'SELECT * FROM tasks WHERE project_slug = ?';
@@ -70,6 +70,23 @@ tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Respons
   if (current_role) {
     sql += ' AND current_role = ?';
     params.push(current_role);
+  }
+  if (available_only === 'true') {
+    sql += ' AND claimed_by IS NULL AND status != ?';
+    params.push('blocked');
+  } else {
+    if (claimed === 'true') {
+      sql += ' AND claimed_by IS NOT NULL';
+    } else if (claimed === 'false') {
+      sql += ' AND claimed_by IS NULL';
+    }
+    if (blocked === 'true') {
+      sql += ' AND status = ?';
+      params.push('blocked');
+    } else if (blocked === 'false') {
+      sql += ' AND status != ?';
+      params.push('blocked');
+    }
   }
 
   sql += ' ORDER BY created_at DESC';
