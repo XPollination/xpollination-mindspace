@@ -65,10 +65,10 @@ tasksRouter.post('/', requireProjectAccess('contributor'), (req: Request, res: R
   res.status(201).json({ ...task as any, feature_flag });
 });
 
-// GET / — list tasks for project (optional filters: status, current_role, claimed, blocked, available_only)
+// GET / — list tasks for project (optional filters: status, current_role, claimed, blocked, available_only, blocked_only)
 tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { slug } = req.params;
-  const { status, current_role, claimed, blocked, available_only, focus } = req.query;
+  const { status, current_role, claimed, blocked, available_only, blocked_only, focus } = req.query;
   const db = getDb();
 
   let sql = 'SELECT * FROM tasks WHERE project_slug = ?';
@@ -83,8 +83,20 @@ tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Respons
     params.push(current_role);
   }
   if (available_only === 'true') {
-    sql += ' AND claimed_by IS NULL AND status != ?';
-    params.push('blocked');
+    // Dependency-aware: exclude tasks with incomplete dependencies via task_dependencies LEFT JOIN
+    sql += ` AND claimed_by IS NULL AND status != 'blocked'
+      AND id NOT IN (
+        SELECT td.task_id FROM task_dependencies td
+        LEFT JOIN tasks t2 ON t2.id = td.blocked_by_task_id
+        WHERE t2.status != 'complete'
+      )`;
+  } else if (blocked_only === 'true') {
+    // Show only tasks with incomplete dependencies
+    sql += ` AND id IN (
+      SELECT td.task_id FROM task_dependencies td
+      LEFT JOIN tasks t2 ON t2.id = td.blocked_by_task_id
+      WHERE t2.status != 'complete'
+    )`;
   } else {
     if (claimed === 'true') {
       sql += ' AND claimed_by IS NOT NULL';
@@ -122,8 +134,23 @@ tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Respons
   }
 
   sql += ' ORDER BY created_at DESC';
-  const tasks = db.prepare(sql).all(...params);
-  res.status(200).json(tasks);
+  const tasks = db.prepare(sql).all(...params) as any[];
+
+  // Enrich each task with is_blocked and blocking_tasks from task_dependencies
+  const enriched = tasks.map(task => {
+    const blocking_tasks = db.prepare(
+      `SELECT t.id, t.title, t.status FROM task_dependencies td
+       LEFT JOIN tasks t ON t.id = td.blocked_by_task_id
+       WHERE td.task_id = ? AND t.status != 'complete'`
+    ).all(task.id) as any[];
+    return {
+      ...task,
+      is_blocked: blocking_tasks.length > 0,
+      blocking_tasks,
+    };
+  });
+
+  res.status(200).json(enriched);
 });
 
 // GET /:taskId — get single task

@@ -4,6 +4,7 @@ import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
 import { validateTransition, computeRole } from '../services/task-state-machine.js';
 import { checkAndUnblock } from '../services/blocked-status.js';
+import { broadcastTaskAvailable } from '../services/task-broadcast.js';
 
 export const taskTransitionsRouter = Router({ mergeParams: true });
 
@@ -62,6 +63,19 @@ taskTransitionsRouter.post('/', requireProjectAccess('contributor'), (req: Reque
     db.prepare(
       'INSERT INTO approval_requests (id, task_id, project_slug, requested_by, status) VALUES (?, ?, ?, ?, ?)'
     ).run(approval_request_id, taskId, slug, user?.id || null, 'pending');
+  }
+
+  // Broadcast TASK_AVAILABLE when task enters ready or unclaimed state
+  if (to_status === 'ready' || to_status === 'rework') {
+    broadcastTaskAvailable(taskId, slug, newRole || task.current_role, task.title);
+  }
+
+  // Also broadcast for auto-unblocked tasks
+  for (const unblockedId of auto_unblocked) {
+    const unblockedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(unblockedId) as any;
+    if (unblockedTask) {
+      broadcastTaskAvailable(unblockedId, slug, unblockedTask.current_role, unblockedTask.title);
+    }
   }
 
   const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);

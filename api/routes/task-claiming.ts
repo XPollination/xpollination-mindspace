@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
+import { createLease } from '../services/lease-service.js';
+import { broadcastTaskAvailable } from '../services/task-broadcast.js';
 
 export const taskClaimingRouter = Router({ mergeParams: true });
 
@@ -26,8 +28,11 @@ taskClaimingRouter.post('/:taskId/claim', requireProjectAccess('contributor'), (
      WHERE id = ? AND project_slug = ?`
   ).run(user.id, taskId, slug);
 
+  // Create lease on claim with role-based duration
+  const lease = createLease(db, taskId, user.id, task.current_role || 'dev');
+
   const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
-  res.status(200).json(updated);
+  res.status(200).json({ ...updated as any, lease });
 });
 
 // DELETE /:taskId/claim — unclaim a task
@@ -45,6 +50,9 @@ taskClaimingRouter.delete('/:taskId/claim', requireProjectAccess('contributor'),
     `UPDATE tasks SET claimed_by = NULL, claimed_at = NULL, updated_at = datetime('now')
      WHERE id = ? AND project_slug = ?`
   ).run(taskId, slug);
+
+  // Broadcast TASK_AVAILABLE on unclaim
+  broadcastTaskAvailable(taskId, slug, task.current_role || 'dev');
 
   const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   res.status(200).json(updated);
