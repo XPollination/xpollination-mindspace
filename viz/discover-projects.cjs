@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const Database = require('better-sqlite3');
 
 const DEFAULT_WORKSPACE = '/home/developer/workspaces/github/PichlerThomas';
 
@@ -37,6 +38,17 @@ function discoverProjects(workspacePath) {
         try {
           const dbStat = fs.statSync(dbPath);
           if (dbStat.size === 0) continue;
+        } catch { continue; }
+
+        // Validate DB has mindspace_nodes table
+        try {
+          const db = new Database(dbPath, { readonly: true });
+          const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mindspace_nodes'").get();
+          db.close();
+          if (!table) {
+            // DB exists but has no mindspace_nodes — skip this project
+            continue;
+          }
         } catch { continue; }
 
         projects.push({
