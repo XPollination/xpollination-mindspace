@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
+import { requireProjectAccess } from '../middleware/require-project-access.js';
 import { membersRouter } from './members.js';
 import { brainRouter } from './brain.js';
 import { agentPoolRouter } from './agent-pool.js';
@@ -57,6 +58,28 @@ projectsRouter.use('/:slug/capabilities', capabilitiesRouter);
 
 // Nested missions routes
 projectsRouter.use('/:slug/missions', missionsRouter);
+
+// GET /:slug/deployment-readiness — check if project is ready for deployment
+projectsRouter.get('/:slug/deployment-readiness', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const db = getDb();
+
+  const openSuspects = db.prepare(
+    "SELECT COUNT(*) as count FROM suspect_links WHERE project_slug = ? AND status = 'suspect'"
+  ).get(slug) as any;
+
+  const totalSuspects = db.prepare(
+    "SELECT COUNT(*) as count FROM suspect_links WHERE project_slug = ?"
+  ).get(slug) as any;
+
+  const ready = openSuspects.count === 0;
+
+  res.status(200).json({
+    ready,
+    open_suspects: openSuspects.count,
+    total_suspects: totalSuspects.count
+  });
+});
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {

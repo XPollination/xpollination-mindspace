@@ -153,9 +153,30 @@ releasesRouter.post('/:releaseId/seal', requireProjectAccess('admin'), (req: Req
     return;
   }
 
-  if (release.status !== 'testing') {
-    res.status(400).json({ error: `Cannot seal: release must be in 'testing' status, currently '${release.status}'` });
+  if (release.status === 'sealed') {
+    res.status(400).json({ error: 'Release is already sealed' });
     return;
+  }
+
+  // Deployment gate: check for unresolved suspect links
+  const gateFlag = db.prepare(
+    "SELECT state FROM feature_flags WHERE project_slug = ? AND flag_name = 'deployment_gate_enabled'"
+  ).get(slug) as any;
+
+  const gateEnabled = gateFlag?.state === 'on';
+
+  if (gateEnabled) {
+    const openSuspects = db.prepare(
+      "SELECT COUNT(*) as count FROM suspect_links WHERE project_slug = ? AND status = 'suspect'"
+    ).get(slug) as any;
+
+    if (openSuspects.count > 0) {
+      res.status(409).json({
+        error: `Cannot seal: ${openSuspects.count} unresolved suspect link(s) exist. Clear all suspects before sealing.`,
+        open_suspects: openSuspects.count
+      });
+      return;
+    }
   }
 
   // Seal the release: set status and sealed_at timestamp
