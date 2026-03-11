@@ -644,6 +644,18 @@ async function cmdTransition(id, newStatus, actor) {
       // Clear human_confirmed after use (one-time confirmation)
       delete dna.human_confirmed;
       delete dna.human_confirmed_via;
+    } else if (modeValue === 'auto-approval') {
+      // Auto-approval mode: approval→approved passes freely, but review→complete requires human_confirmed
+      if (fromStatus === 'review' && newStatus === 'complete') {
+        if (!dna.human_confirmed) {
+          db.close();
+          error(`LIAISON auto-approval mode: review→complete requires human_confirmed. Approval transitions pass freely, but completion review still needs human confirmation via viz UI.`);
+        }
+        // Clear human_confirmed after use (one-time confirmation)
+        delete dna.human_confirmed;
+        delete dna.human_confirmed_via;
+      }
+      // approval→approved passes freely in auto-approval mode (no enforcement)
     }
     // Semi mode: no engine enforcement (agent protocol handles chat-based confirmation)
     // Auto mode: no enforcement, liaison proceeds freely

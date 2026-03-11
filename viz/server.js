@@ -326,8 +326,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'PUT') {
     try {
       const body = await readBody(req);
-      if (!body.mode || !['manual', 'semi', 'auto'].includes(body.mode)) {
-        sendJson(res, { error: 'Invalid mode. Must be "manual", "semi", or "auto".' }, 400);
+      if (!body.mode || !['manual', 'semi', 'auto-approval', 'auto'].includes(body.mode)) {
+        sendJson(res, { error: 'Invalid mode. Must be "manual", "semi", "auto-approval", or "auto".' }, 400);
         return;
       }
       const projects = discoverProjects();
