@@ -891,6 +891,16 @@ function cmdCreate(type, slug, dnaJson, actor) {
 function cmdCapabilityStatus() {
   const db = getDb();
 
+  // Check if capabilities table exists
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='capabilities'"
+  ).get();
+  if (!tableExists) {
+    output({ capabilities: [], message: 'capabilities table not found' });
+    db.close();
+    return;
+  }
+
   const capabilities = db.prepare(
     'SELECT c.id, c.title, c.status, c.mission_id, m.title AS mission_title FROM capabilities c LEFT JOIN missions m ON c.mission_id = m.id ORDER BY c.sort_order'
   ).all();
