@@ -1,23 +1,23 @@
 {
-  "name": "Image to Favicon From Poper",
-  "short_name": "Image to Favicon From Poper",
-  "description": null,
+  "name": "Mindspace",
+  "short_name": "Mindspace",
+  "description": "Mindspace Flow Visualization",
   "dir": "auto",
   "lang": "en-US",
   "display": "standalone",
   "orientation": "any",
-  "start_url": "/?homescreen=1",
-  "background_color": "#fff",
-  "theme_color": "#fff",
+  "start_url": "/",
+  "background_color": "#1a1a2e",
+  "theme_color": "#16213e",
   "icons": [
     {
-      "src": "/android-chrome-192x192.png",
+      "src": "/assets/favicons/android-chrome-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/android-chrome-512x512.png",
+      "src": "/assets/favicons/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
