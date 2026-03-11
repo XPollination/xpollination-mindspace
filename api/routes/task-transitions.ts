@@ -5,6 +5,7 @@ import { requireProjectAccess } from '../middleware/require-project-access.js';
 import { validateTransition, computeRole } from '../services/task-state-machine.js';
 import { checkAndUnblock } from '../services/blocked-status.js';
 import { broadcastTaskAvailable } from '../services/task-broadcast.js';
+import { contributeTaskCompletion } from '../services/brain-contribution.js';
 
 export const taskTransitionsRouter = Router({ mergeParams: true });
 
@@ -53,6 +54,8 @@ taskTransitionsRouter.post('/', requireProjectAccess('contributor'), (req: Reque
   let auto_unblocked: string[] = [];
   if (to_status === 'complete') {
     auto_unblocked = checkAndUnblock(db, taskId);
+    // Auto-contribute to org brain (best-effort)
+    contributeTaskCompletion(task, slug).catch(() => {});
   }
 
   // Auto-create approval_request on approval transition
