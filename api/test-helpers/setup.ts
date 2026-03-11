@@ -43,6 +43,7 @@ export async function createTestApp() {
   const { requireAuth } = await import('../middleware/auth.js');
   const { requireApiKeyOrJwt } = await import('../middleware/require-auth.js');
   const { projectsRouter } = await import('../routes/projects.js');
+  const { dataRouter } = await import('../routes/data.js');
 
   const app = express();
   app.use(express.json());
@@ -53,6 +54,9 @@ export async function createTestApp() {
 
   // Mount project routes (includes capabilities, missions, etc.)
   app.use('/api/v1/projects', projectsRouter);
+
+  // Mount data route (ETag-enabled project data for viz)
+  app.use('/api/data', dataRouter);
 
   // Test-only protected routes for verifying middleware
   app.get('/api/protected', requireAuth, (req, res) => {

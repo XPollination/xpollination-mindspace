@@ -1,0 +1,11 @@
+{
+  "version": "v0.0.17",
+  "date": "2026-03-11",
+  "title": "Adaptive polling with ETag conditional fetching",
+  "changes": [
+    "ETag-based conditional fetch: sends If-None-Match, handles 304 Not Modified",
+    "Adaptive polling interval: 5s when active, 30s after 6 idle cycles",
+    "Reset to fast polling on data changes or tab focus",
+    "New /api/data route with ETag header support"
+  ]
+}
