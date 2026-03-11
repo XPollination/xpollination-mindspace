@@ -54,7 +54,7 @@ describe('Batched mission overview API', () => {
   it('GET /missions/:id/overview returns all capabilities with progress', async () => {
     const res = await request(app)
       .get('/api/v1/projects/test-proj/missions/mission-1/overview')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     expect(res.status).toBe(200);
     expect(res.body.capabilities).toBeDefined();
@@ -65,7 +65,7 @@ describe('Batched mission overview API', () => {
   it('each capability includes progress_percent and task counts', async () => {
     const res = await request(app)
       .get('/api/v1/projects/test-proj/missions/mission-1/overview')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     const cap = res.body.capabilities.find((c: any) => c.id === 'cap-1');
     expect(cap).toBeDefined();
@@ -78,7 +78,7 @@ describe('Batched mission overview API', () => {
   it('each capability includes dependency_ids for graph rendering', async () => {
     const res = await request(app)
       .get('/api/v1/projects/test-proj/missions/mission-1/overview')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     const capAuth = res.body.capabilities.find((c: any) => c.id === 'cap-2');
     expect(capAuth).toBeDefined();
