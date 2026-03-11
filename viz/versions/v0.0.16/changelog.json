@@ -1,0 +1,11 @@
+{
+  "version": "v0.0.16",
+  "date": "2026-03-11",
+  "title": "Mission dashboard with capability dependency graph",
+  "changes": [
+    "Add mission dashboard view (toggle from Kanban header)",
+    "Capability cards in 2-column grid with progress bars",
+    "SVG dependency arrows between capability nodes",
+    "New batched API: GET /missions/:id/overview"
+  ]
+}

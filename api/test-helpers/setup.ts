@@ -42,6 +42,7 @@ export async function createTestApp() {
   const { keysRouter } = await import('../routes/keys.js');
   const { requireAuth } = await import('../middleware/auth.js');
   const { requireApiKeyOrJwt } = await import('../middleware/require-auth.js');
+  const { projectsRouter } = await import('../routes/projects.js');
 
   const app = express();
   app.use(express.json());
@@ -49,6 +50,9 @@ export async function createTestApp() {
   // Mount auth routes
   app.use('/api/auth', authRouter);
   app.use('/api/keys', keysRouter);
+
+  // Mount project routes (includes capabilities, missions, etc.)
+  app.use('/api/v1/projects', projectsRouter);
 
   // Test-only protected routes for verifying middleware
   app.get('/api/protected', requireAuth, (req, res) => {

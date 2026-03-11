@@ -13,6 +13,7 @@ import { bugReportsRouter } from './bug-reports.js';
 import { releasesRouter } from './releases.js';
 import { approvalRequestsRouter } from './approval-requests.js';
 import { capabilitiesRouter } from './capabilities.js';
+import { missionsRouter } from './missions.js';
 
 export const projectsRouter = Router();
 
@@ -53,6 +54,9 @@ projectsRouter.use('/:slug/approvals', approvalRequestsRouter);
 
 // Nested capabilities routes
 projectsRouter.use('/:slug/capabilities', capabilitiesRouter);
+
+// Nested missions routes
+projectsRouter.use('/:slug/missions', missionsRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {
