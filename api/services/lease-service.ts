@@ -38,7 +38,7 @@ export function renewLease(
   hours: number = 4
 ): any {
   db.prepare(
-    `UPDATE leases SET expires_at = datetime('now', '+${hours} hours') WHERE id = ?`
+    `UPDATE leases SET expires_at = datetime('now', '+${hours} hours'), warning_sent = 0 WHERE id = ?`
   ).run(leaseId);
 
   return db.prepare('SELECT * FROM leases WHERE id = ?').get(leaseId);
