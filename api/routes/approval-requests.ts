@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
 import { checkExpiredApprovals } from '../services/approval-expiry.js';
+import { sendToAgent, broadcast } from '../lib/sse-manager.js';
 
 export const approvalRequestsRouter = Router({ mergeParams: true });
 
@@ -94,6 +95,24 @@ approvalRequestsRouter.put('/:approvalId/approve', requireProjectAccess('admin')
 
   const approval = db.prepare('SELECT * FROM approval_requests WHERE id = ?').get(approvalId);
   const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(request.task_id);
+
+  // Emit TASK_APPROVED SSE event to requesting agent
+  const task_slug = task?.slug || null;
+  const approvalEvent = {
+    event: 'TASK_APPROVED',
+    approval_request_id: approvalId,
+    task_slug,
+    task_id: request.task_id,
+    decision: 'approved',
+    actor: approved_by
+  };
+  // Try sendToAgent for direct delivery, fallback to broadcast
+  if (request.requesting_agent) {
+    sendToAgent(request.requesting_agent, 'TASK_APPROVED', approvalEvent);
+  } else {
+    broadcast('TASK_APPROVED', approvalEvent);
+  }
+
   res.status(200).json({ approval, task: updatedTask });
 });
 
@@ -135,5 +154,24 @@ approvalRequestsRouter.put('/:approvalId/reject', requireProjectAccess('admin'),
 
   const approval = db.prepare('SELECT * FROM approval_requests WHERE id = ?').get(approvalId);
   const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(request.task_id);
+
+  // Emit TASK_REJECTED SSE event to requesting agent
+  const reject_task_slug = task?.slug || null;
+  const rejectionEvent = {
+    event: 'TASK_REJECTED',
+    approval_request_id: approvalId,
+    task_slug: reject_task_slug,
+    task_id: request.task_id,
+    decision: 'rejected',
+    reason,
+    actor: user?.id || null
+  };
+  // Try sendToAgent for direct delivery, fallback to broadcast
+  if (request.requesting_agent) {
+    sendToAgent(request.requesting_agent, 'TASK_REJECTED', rejectionEvent);
+  } else {
+    broadcast('TASK_REJECTED', rejectionEvent);
+  }
+
   res.status(200).json({ approval, task: updatedTask });
 });
