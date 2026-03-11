@@ -40,7 +40,7 @@ describe('Server ETag support', () => {
   it('GET /api/data returns ETag header', async () => {
     const res = await request(app)
       .get('/api/data?project=test-proj')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     // Should return ETag header (even if 200 or 404 for route)
     expect(res.headers['etag']).toBeDefined();
@@ -49,7 +49,7 @@ describe('Server ETag support', () => {
   it('returns 304 Not Modified when ETag matches', async () => {
     const first = await request(app)
       .get('/api/data?project=test-proj')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     const etag = first.headers['etag'];
     expect(etag).toBeDefined();
