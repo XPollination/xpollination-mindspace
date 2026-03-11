@@ -4,6 +4,7 @@ import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
 import { taskDependenciesRouter } from './task-dependencies.js';
 import { taskTransitionsRouter } from './task-transitions.js';
+import { taskClaimingRouter } from './task-claiming.js';
 
 export const tasksRouter = Router({ mergeParams: true });
 
@@ -12,6 +13,9 @@ tasksRouter.use('/:taskId', taskDependenciesRouter);
 
 // Nested transition routes at /:taskId/transition
 tasksRouter.use('/:taskId/transition', taskTransitionsRouter);
+
+// Nested claiming routes at /:taskId/claim
+tasksRouter.use(taskClaimingRouter);
 
 const VALID_STATUSES = ['pending', 'ready', 'active', 'review', 'approval', 'approved', 'testing', 'rework', 'blocked', 'complete'];
 const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison'];
