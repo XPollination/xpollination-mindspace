@@ -99,6 +99,34 @@ requirementsRouter.get('/:reqId', requireProjectAccess('viewer'), (req: Request,
   res.status(200).json(requirement);
 });
 
+// GET /:reqId/tasks — list tasks linked to this requirement
+requirementsRouter.get('/:reqId/tasks', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug, reqId } = req.params;
+  const db = getDb();
+
+  // Dual lookup
+  let requirement = db.prepare(
+    'SELECT * FROM requirements WHERE id = ? AND project_slug = ?'
+  ).get(reqId, slug) as any;
+
+  if (!requirement) {
+    requirement = db.prepare(
+      'SELECT * FROM requirements WHERE req_id_human = ? AND project_slug = ?'
+    ).get(reqId, slug) as any;
+  }
+
+  if (!requirement) {
+    res.status(404).json({ error: 'Requirement not found' });
+    return;
+  }
+
+  const tasks = db.prepare(
+    'SELECT * FROM tasks WHERE requirement_id = ? AND project_slug = ? ORDER BY created_at DESC'
+  ).all(requirement.id, slug);
+
+  res.status(200).json(tasks);
+});
+
 // PUT /:reqId — update requirement (requires contributor role)
 // No DELETE — use status='deprecated' for traceability
 requirementsRouter.put('/:reqId', requireProjectAccess('contributor'), (req: Request, res: Response) => {

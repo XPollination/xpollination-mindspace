@@ -74,13 +74,21 @@ tasksRouter.get('/:taskId', requireProjectAccess('viewer'), (req: Request, res: 
   const { slug, taskId } = req.params;
   const db = getDb();
 
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug) as any;
   if (!task) {
     res.status(404).json({ error: 'Task not found' });
     return;
   }
 
-  res.status(200).json(task);
+  // Enrich with requirement info if requirement_id is set
+  let requirement = null;
+  if (task.requirement_id) {
+    requirement = db.prepare(
+      'SELECT id, req_id_human, title, status, priority FROM requirements WHERE id = ?'
+    ).get(task.requirement_id);
+  }
+
+  res.status(200).json({ ...task, requirement });
 });
 
 // PUT /:taskId — update task metadata (NOT status)
