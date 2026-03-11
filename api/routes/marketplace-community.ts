@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
 
 export const marketplaceCommunityRouter = Router();
@@ -126,5 +128,53 @@ marketplaceCommunityRouter.post('/digest', async (req: Request, res: Response) =
     res.status(200).json({ summary, brain_thought_id });
   } catch (err) {
     res.status(500).json({ error: 'Digest generation failed' });
+  }
+});
+
+// GET /community-needs/stats — counts by status
+marketplaceCommunityRouter.get('/community-needs/stats', async (_req: Request, res: Response) => {
+  try {
+    const db = getDb();
+    const rows = db.prepare(
+      'SELECT status, COUNT(*) as count FROM community_needs GROUP BY status'
+    ).all() as Array<{ status: string; count: number }>;
+
+    const stats: Record<string, number> = {};
+    for (const row of rows) {
+      stats[row.status] = row.count;
+    }
+    res.status(200).json(stats);
+  } catch {
+    res.status(200).json({});
+  }
+});
+
+// PUT /community-needs/:id — update status
+marketplaceCommunityRouter.put('/community-needs/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const validStatuses = ['unharvested', 'under_consideration', 'planned', 'implemented', 'declined'];
+  if (!status || !validStatuses.includes(status)) {
+    res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    return;
+  }
+
+  try {
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM community_needs WHERE id = ?').get(id);
+    if (!existing) {
+      res.status(404).json({ error: 'Community need not found' });
+      return;
+    }
+
+    db.prepare(
+      "UPDATE community_needs SET status = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(status, id);
+
+    const updated = db.prepare('SELECT * FROM community_needs WHERE id = ?').get(id);
+    res.status(200).json(updated);
+  } catch {
+    res.status(500).json({ error: 'Update failed' });
   }
 });
