@@ -60,3 +60,80 @@ approvalRequestsRouter.get('/:approvalId', requireProjectAccess('viewer'), (req:
 
   res.status(200).json(request);
 });
+
+// PUT /:approvalId/approve — approve a pending request (admin only)
+approvalRequestsRouter.put('/:approvalId/approve', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, approvalId } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const request = db.prepare('SELECT * FROM approval_requests WHERE id = ? AND project_slug = ?').get(approvalId, slug) as any;
+  if (!request) {
+    res.status(404).json({ error: 'Approval request not found' });
+    return;
+  }
+
+  if (request.status !== 'pending') {
+    res.status(400).json({ error: `Cannot approve: request is already ${request.status}` });
+    return;
+  }
+
+  // Set approval status to approved, record approved_by
+  const approved_by = user?.id || null;
+  db.prepare(
+    "UPDATE approval_requests SET status = 'approved', decided_by = ?, decided_at = datetime('now') WHERE id = ?"
+  ).run(approved_by, approvalId);
+
+  // Transition the task from approval to approved
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(request.task_id) as any;
+  if (task) {
+    db.prepare(
+      "UPDATE tasks SET status = 'approved', updated_at = datetime('now') WHERE id = ?"
+    ).run(request.task_id);
+  }
+
+  const approval = db.prepare('SELECT * FROM approval_requests WHERE id = ?').get(approvalId);
+  const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(request.task_id);
+  res.status(200).json({ approval, task: updatedTask });
+});
+
+// PUT /:approvalId/reject — reject a pending request (admin only)
+approvalRequestsRouter.put('/:approvalId/reject', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, approvalId } = req.params;
+  const user = (req as any).user;
+  const { reason } = req.body;
+  const db = getDb();
+
+  if (!reason) {
+    res.status(400).json({ error: 'Missing required field: reason' });
+    return;
+  }
+
+  const request = db.prepare('SELECT * FROM approval_requests WHERE id = ? AND project_slug = ?').get(approvalId, slug) as any;
+  if (!request) {
+    res.status(404).json({ error: 'Approval request not found' });
+    return;
+  }
+
+  if (request.status !== 'pending') {
+    res.status(400).json({ error: `Cannot reject: request is already ${request.status}` });
+    return;
+  }
+
+  // Set approval status to rejected with reason
+  db.prepare(
+    "UPDATE approval_requests SET status = 'rejected', decided_by = ?, decided_at = datetime('now'), reason = ? WHERE id = ?"
+  ).run(user?.id || null, reason, approvalId);
+
+  // Transition task to rework
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(request.task_id) as any;
+  if (task) {
+    db.prepare(
+      "UPDATE tasks SET status = 'rework', updated_at = datetime('now') WHERE id = ?"
+    ).run(request.task_id);
+  }
+
+  const approval = db.prepare('SELECT * FROM approval_requests WHERE id = ?').get(approvalId);
+  const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(request.task_id);
+  res.status(200).json({ approval, task: updatedTask });
+});
