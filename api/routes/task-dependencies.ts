@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
+import { detectCycle } from '../services/cycle-detection.js';
 
 export const taskDependenciesRouter = Router({ mergeParams: true });
 
@@ -76,6 +77,13 @@ taskDependenciesRouter.post('/dependencies', requireProjectAccess('contributor')
   const blockedBy = db.prepare('SELECT id FROM tasks WHERE id = ?').get(blocked_by_task_id);
   if (!blockedBy) {
     res.status(404).json({ error: 'Blocked-by task not found' });
+    return;
+  }
+
+  // Cycle detection: check if adding this edge would create a cycle
+  const cycleResult = detectCycle(db, taskId, blocked_by_task_id);
+  if (cycleResult.hasCycle) {
+    res.status(409).json({ error: 'Circular dependency detected', cycle_path: cycleResult.path });
     return;
   }
 
