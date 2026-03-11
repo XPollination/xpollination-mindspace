@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db/connection.js';
 import { renewBond, getActiveBond, expireBond } from './agent-bond.js';
+import { getAttestation, resolveAttestation } from '../lib/attestation.js';
 
 export const a2aMessageRouter = Router();
 
@@ -15,6 +16,7 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   CLAIM_TASK: handleStub,
   TRANSITION: handleStub,
   RELEASE_TASK: handleStub,
+  ATTESTATION_SUBMITTED: handleAttestationSubmitted,
 };
 
 // POST / — unified A2A message endpoint
@@ -132,6 +134,53 @@ function handleDisconnect(agent: any, _body: any, res: Response): void {
     original_type: 'DISCONNECT',
     agent_id: agent.id,
     status: 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+}
+
+function handleAttestationSubmitted(agent: any, body: any, res: Response): void {
+  const { attestation_id, submitted_checks } = body;
+
+  if (!attestation_id) {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: attestation_id' });
+    return;
+  }
+
+  if (!submitted_checks) {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: submitted_checks' });
+    return;
+  }
+
+  const attestation = getAttestation(attestation_id);
+  if (!attestation) {
+    res.status(404).json({ type: 'ERROR', error: 'Attestation not found' });
+    return;
+  }
+
+  // Check attestation belongs to the requesting agent
+  if (attestation.agent_id !== agent.id) {
+    res.status(403).json({ type: 'ERROR', error: 'Attestation does not belong to this agent' });
+    return;
+  }
+
+  // Check attestation is still pending
+  if (attestation.status !== 'pending') {
+    res.status(409).json({ type: 'ERROR', error: `Attestation is not pending (current status: ${attestation.status})` });
+    return;
+  }
+
+  const resolved = resolveAttestation({
+    attestation_id,
+    status: 'submitted',
+    submitted_checks
+  });
+
+  res.status(200).json({
+    type: 'ACK',
+    original_type: 'ATTESTATION_SUBMITTED',
+    agent_id: agent.id,
+    attestation_id,
+    attestation: resolved,
     timestamp: new Date().toISOString()
   });
 }
