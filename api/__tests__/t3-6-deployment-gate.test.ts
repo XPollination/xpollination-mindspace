@@ -46,7 +46,7 @@ describe('Deployment gate on release sealing', () => {
   it('POST /:releaseId/seal returns 409 when unresolved suspect links exist', async () => {
     const res = await request(app)
       .post('/api/v1/projects/test-proj/releases/rel-1/seal')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/suspect|unresolved/i);
@@ -58,7 +58,7 @@ describe('Deployment gate on release sealing', () => {
 
     const res = await request(app)
       .post('/api/v1/projects/test-proj/releases/rel-1/seal')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     expect(res.status).toBe(200);
 
@@ -72,7 +72,7 @@ describe('Deployment readiness endpoint', () => {
   it('GET /deployment-readiness returns suspect counts and ready boolean', async () => {
     const res = await request(app)
       .get('/api/v1/projects/test-proj/deployment-readiness')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     expect(res.status).toBe(200);
     expect(typeof res.body.ready).toBe('boolean');
@@ -88,7 +88,7 @@ describe('Feature flag bypass', () => {
 
     const res = await request(app)
       .post('/api/v1/projects/test-proj/releases/rel-1/seal')
-      .set('Authorization', `Bearer ${apiKey}`);
+      .set('x-api-key', apiKey);
 
     // Should succeed (gate bypassed)
     expect(res.status).toBe(200);
