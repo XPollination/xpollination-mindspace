@@ -1,0 +1,9 @@
+{
+  "version": "v0.0.14",
+  "date": "2026-03-11",
+  "title": "Add auto-approval mode to dropdown",
+  "changes": [
+    "Added 'Auto-Approval' option to LIAISON approval mode dropdown (value: auto-approval)",
+    "Auto-Approval mode: only approval→approved passes freely, all other human-gate transitions require viz confirmation"
+  ]
+}
