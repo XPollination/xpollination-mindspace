@@ -934,10 +934,10 @@
   </div>
 
   <div class="header">
-    <img src="/assets/mindspace-logo.png" alt="Mindspace" class="mindspace-logo" style="height:28px;margin-right:12px;">
     <select id="project-selector" class="project-dropdown">
       <option value="">Loading...</option>
     </select>
+    <img src="/assets/mindspace-logo-56.png" alt="Mindspace" class="mindspace-logo" style="height:28px;margin-left:12px;">
     <span class="viz-version"></span>
     <span class="header-subtitle">Kanban</span>
     <div class="search-container">
@@ -2026,6 +2026,8 @@
     loadVersion();
 
     // PWA install prompt
+    // NOTE: PWA install requires HTTPS. On HTTP (dev/VPN), beforeinstallprompt won't fire
+    // and serviceWorker.register will fail. This is expected — PWA activates on HTTPS deploy.
     let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -2033,7 +2035,7 @@
       console.log('PWA install available');
     });
 
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   </script>
