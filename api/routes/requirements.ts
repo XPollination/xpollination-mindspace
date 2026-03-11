@@ -143,11 +143,21 @@ requirementsRouter.put('/:reqId', requireProjectAccess('contributor'), (req: Req
     }
   }
 
+  // Snapshot current state into requirement_versions before update
+  const currentVersionNum = parseInt(existing.current_version || '0', 10);
+  const newVersionNum = currentVersionNum + 1;
+  const user = (req as any).user;
+
+  db.prepare(
+    `INSERT INTO requirement_versions (id, requirement_id, version_number, title, description, status, priority, change_summary, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(randomUUID(), existing.id, currentVersionNum || 1, existing.title, existing.description, existing.status, existing.priority, req.body.change_summary || null, user?.id || null);
+
   const updatedTitle = title || existing.title;
   const updatedDescription = description !== undefined ? description : existing.description;
   const updatedStatus = status || existing.status;
   const updatedPriority = priority || existing.priority;
-  const updatedVersion = current_version !== undefined ? current_version : existing.current_version;
+  const updatedVersion = String(newVersionNum);
   const updatedReqId = req_id_human || existing.req_id_human;
 
   db.prepare(
@@ -157,4 +167,32 @@ requirementsRouter.put('/:reqId', requireProjectAccess('contributor'), (req: Req
 
   const requirement = db.prepare('SELECT * FROM requirements WHERE id = ?').get(existing.id);
   res.status(200).json(requirement);
+});
+
+// GET /:reqId/history — version history for a requirement
+requirementsRouter.get('/:reqId/history', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug, reqId } = req.params;
+  const db = getDb();
+
+  // Dual lookup
+  let requirement = db.prepare(
+    'SELECT * FROM requirements WHERE id = ? AND project_slug = ?'
+  ).get(reqId, slug) as any;
+
+  if (!requirement) {
+    requirement = db.prepare(
+      'SELECT * FROM requirements WHERE req_id_human = ? AND project_slug = ?'
+    ).get(reqId, slug) as any;
+  }
+
+  if (!requirement) {
+    res.status(404).json({ error: 'Requirement not found' });
+    return;
+  }
+
+  const versions = db.prepare(
+    'SELECT * FROM requirement_versions WHERE requirement_id = ? ORDER BY version_number DESC'
+  ).all(requirement.id);
+
+  res.status(200).json(versions);
 });
