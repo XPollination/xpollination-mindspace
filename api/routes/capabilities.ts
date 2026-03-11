@@ -189,6 +189,77 @@ capabilitiesRouter.delete('/:capId/requirements/:reqRef', requireProjectAccess('
   res.status(200).json({ deleted: true });
 });
 
+// --- Progress computation ---
+
+// GET /:capId/progress — compute capability progress from linked tasks
+capabilitiesRouter.get('/:capId/progress', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug, capId } = req.params;
+  const db = getDb();
+
+  const capability = db.prepare('SELECT id, title, status FROM capabilities WHERE id = ?').get(capId) as any;
+  if (!capability) {
+    res.status(404).json({ error: 'Capability not found' });
+    return;
+  }
+
+  // Get linked tasks with their statuses
+  const tasks = db.prepare(
+    `SELECT ct.task_slug, t.id, t.title, t.status
+     FROM capability_tasks ct
+     LEFT JOIN tasks t ON t.id = ct.task_slug AND t.project_slug = ?
+     WHERE ct.capability_id = ?`
+  ).all(slug, capId) as any[];
+
+  const total = tasks.length;
+  if (total === 0) {
+    res.status(200).json({
+      capability_id: capId,
+      capability_title: capability.title,
+      capability_status: capability.status,
+      total: 0,
+      complete: 0,
+      active: 0,
+      pending: 0,
+      blocked: 0,
+      other: 0,
+      progress_percent: 0,
+      breakdown: {},
+      tasks: []
+    });
+    return;
+  }
+
+  // Count by status
+  const breakdown: Record<string, number> = {};
+  for (const task of tasks) {
+    const status = task.status || 'unknown';
+    breakdown[status] = (breakdown[status] || 0) + 1;
+  }
+
+  const completeCount = (breakdown['complete'] || 0);
+  const activeCount = (breakdown['active'] || 0);
+  const pendingCount = (breakdown['pending'] || 0) + (breakdown['ready'] || 0);
+  const blockedCount = (breakdown['blocked'] || 0);
+  const otherCount = total - completeCount - activeCount - pendingCount - blockedCount;
+
+  const progressPercent = total > 0 ? Math.round((completeCount / total) * 100) : 0;
+
+  res.status(200).json({
+    capability_id: capId,
+    capability_title: capability.title,
+    capability_status: capability.status,
+    total,
+    complete: completeCount,
+    active: activeCount,
+    pending: pendingCount,
+    blocked: blockedCount,
+    other: otherCount,
+    progress_percent: progressPercent,
+    breakdown,
+    tasks: tasks.map(t => ({ task_slug: t.task_slug, status: t.status || 'unknown', title: t.title }))
+  });
+});
+
 // --- Task linking ---
 
 // GET /:capId/tasks — list linked tasks
@@ -205,7 +276,7 @@ capabilitiesRouter.get('/:capId/tasks', requireProjectAccess('viewer'), (req: Re
   const links = db.prepare(
     `SELECT ct.task_slug, t.id, t.title, t.status, t.current_role
      FROM capability_tasks ct
-     LEFT JOIN tasks t ON t.slug = ct.task_slug AND t.project_slug = ?
+     LEFT JOIN tasks t ON t.id = ct.task_slug AND t.project_slug = ?
      WHERE ct.capability_id = ?
      ORDER BY ct.task_slug`
   ).all(slug, capId);
