@@ -287,7 +287,12 @@ const server = http.createServer(async (req, res) => {
     const versionsDir = path.join(__dirname, 'versions');
     const changelogs = [];
     try {
-      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort().reverse();
+      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort((a, b) => {
+        const pa = a.replace('v', '').split('.').map(Number);
+        const pb = b.replace('v', '').split('.').map(Number);
+        for (let i = 0; i < 3; i++) { if ((pb[i] || 0) !== (pa[i] || 0)) return (pb[i] || 0) - (pa[i] || 0); }
+        return 0;
+      });
       for (const dir of dirs) {
         const changelogPath = path.join(versionsDir, dir, 'changelog.json');
         if (fs.existsSync(changelogPath)) {
