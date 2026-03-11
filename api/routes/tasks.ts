@@ -57,7 +57,7 @@ tasksRouter.post('/', requireProjectAccess('contributor'), (req: Request, res: R
 // GET / — list tasks for project (optional filters: status, current_role, claimed, blocked, available_only)
 tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { slug } = req.params;
-  const { status, current_role, claimed, blocked, available_only } = req.query;
+  const { status, current_role, claimed, blocked, available_only, focus } = req.query;
   const db = getDb();
 
   let sql = 'SELECT * FROM tasks WHERE project_slug = ?';
@@ -86,6 +86,27 @@ tasksRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Respons
     } else if (blocked === 'false') {
       sql += ' AND status != ?';
       params.push('blocked');
+    }
+  }
+
+  // Focus filter: when focus=true, only return tasks within the project_focus scope
+  if (focus === 'true') {
+    const focusRow = db.prepare('SELECT scope, task_ids FROM project_focus WHERE project_slug = ?').get(slug) as any;
+    if (focusRow && focusRow.task_ids) {
+      try {
+        const focusTaskIds: string[] = JSON.parse(focusRow.task_ids);
+        if (focusTaskIds.length > 0) {
+          const placeholders = focusTaskIds.map(() => '?').join(',');
+          sql += ` AND id IN (${placeholders})`;
+          params.push(...focusTaskIds);
+        } else {
+          sql += ' AND 1 = 0'; // No focus tasks — return empty
+        }
+      } catch {
+        sql += ' AND 1 = 0'; // Invalid JSON — return empty
+      }
+    } else {
+      sql += ' AND 1 = 0'; // No focus set — return empty
     }
   }
 
