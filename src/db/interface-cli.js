@@ -644,21 +644,22 @@ async function cmdTransition(id, newStatus, actor) {
       // Clear human_confirmed after use (one-time confirmation)
       delete dna.human_confirmed;
       delete dna.human_confirmed_via;
-    } else if (modeValue === 'auto-approval') {
-      // Auto-approval mode: approval→approved passes freely, but review→complete requires human_confirmed
-      if (fromStatus === 'review' && newStatus === 'complete') {
+    } else if (modeValue === 'auto-approval' || modeValue === 'auto') {
+      // Auto/auto-approval mode: ONLY approval→approved passes freely.
+      // All other human-gate transitions (review→complete, approval→rework) require human_confirmed.
+      const isApprovalGrant = (fromStatus === 'approval' && newStatus === 'approved');
+      if (!isApprovalGrant) {
         if (!dna.human_confirmed) {
           db.close();
-          error(`LIAISON auto-approval mode: review→complete requires human_confirmed. Approval transitions pass freely, but completion review still needs human confirmation via viz UI.`);
+          error(`LIAISON ${modeValue} mode: ${fromStatus}→${newStatus} requires human_confirmed. Only approval→approved passes freely in auto mode. Set dna.human_confirmed=true via mindspace viz.`);
         }
         // Clear human_confirmed after use (one-time confirmation)
         delete dna.human_confirmed;
         delete dna.human_confirmed_via;
       }
-      // approval→approved passes freely in auto-approval mode (no enforcement)
+      // approval→approved passes freely in auto/auto-approval mode
     }
     // Semi mode: no engine enforcement (agent protocol handles chat-based confirmation)
-    // Auto mode: no enforcement, liaison proceeds freely
   }
 
   // Clear DNA fields if transition requires it (e.g., rework clears memory fields)
