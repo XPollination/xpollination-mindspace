@@ -2,8 +2,12 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
+import { taskDependenciesRouter } from './task-dependencies.js';
 
 export const tasksRouter = Router({ mergeParams: true });
+
+// Nested dependency routes at /:taskId/dependencies and /:taskId/dependents
+tasksRouter.use('/:taskId', taskDependenciesRouter);
 
 const VALID_STATUSES = ['pending', 'ready', 'active', 'review', 'approval', 'approved', 'testing', 'rework', 'blocked', 'complete'];
 const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison'];
