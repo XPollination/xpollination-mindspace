@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
 
@@ -119,6 +120,12 @@ releasesRouter.put('/:releaseId', requireProjectAccess('admin'), (req: Request, 
     return;
   }
 
+  // Immutability guard: cannot modify sealed releases
+  if (existing.status === 'sealed') {
+    res.status(403).json({ error: 'Cannot modify a sealed release — immutable after sealing' });
+    return;
+  }
+
   if (status === 'sealed') {
     db.prepare(
       `UPDATE releases SET status = 'sealed', sealed_at = datetime('now'), sealed_by = ?, updated_at = datetime('now') WHERE id = ?`
@@ -131,4 +138,39 @@ releasesRouter.put('/:releaseId', requireProjectAccess('admin'), (req: Request, 
 
   const release = db.prepare('SELECT * FROM releases WHERE id = ?').get(releaseId);
   res.status(200).json(release);
+});
+
+// POST /:releaseId/seal — seal a release (human gate)
+// Release must be in 'testing' status to seal
+releasesRouter.post('/:releaseId/seal', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, releaseId } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const release = db.prepare('SELECT * FROM releases WHERE id = ? AND project_slug = ?').get(releaseId, slug) as any;
+  if (!release) {
+    res.status(404).json({ error: 'Release not found' });
+    return;
+  }
+
+  if (release.status !== 'testing') {
+    res.status(400).json({ error: `Cannot seal: release must be in 'testing' status, currently '${release.status}'` });
+    return;
+  }
+
+  // Seal the release: set status and sealed_at timestamp
+  db.prepare(
+    `UPDATE releases SET status = 'sealed', sealed_at = datetime('now'), sealed_by = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(user?.id || null, releaseId);
+
+  // Best-effort git tag creation (non-blocking)
+  const tagName = release.version || `release-${releaseId}`;
+  try {
+    execSync(`git tag -a "${tagName}" -m "Release sealed: ${release.version || tagName}"`, { timeout: 5000 });
+  } catch (err) {
+    console.warn(`[release-seal] Failed to create git tag "${tagName}":`, err);
+  }
+
+  const sealed = db.prepare('SELECT * FROM releases WHERE id = ?').get(releaseId);
+  res.status(200).json(sealed);
 });
