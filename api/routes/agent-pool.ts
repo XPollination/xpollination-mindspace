@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
+import { buildWelcomeContext } from '../services/welcome-context.js';
 
 export const agentPoolRouter = Router({ mergeParams: true });
 
@@ -80,11 +81,14 @@ agentPoolRouter.post('/connect', (req: Request, res: Response) => {
     "UPDATE agents SET session_id = ?, project_slug = ?, current_role = COALESCE(?, current_role), status = 'active', connected_at = datetime('now'), last_seen = datetime('now') WHERE id = ?"
   ).run(sessionId, slug, role || null, agent_id);
 
+  const context = buildWelcomeContext(slug, role);
+
   res.status(200).json({
     session_id: sessionId,
     type: 'WELCOME',
     agent_id,
-    project_slug: slug
+    project_slug: slug,
+    context
   });
 });
 
