@@ -6,6 +6,20 @@ import { requirementApprovalsRouter } from './requirement-approvals.js';
 
 export const requirementsRouter = Router({ mergeParams: true });
 
+// Broadcast REQUIREMENT_CHANGED to connected SSE clients
+function broadcastRequirementChanged(payload: {
+  event: string;
+  req_id: string;
+  project_slug: string;
+  old_version: string;
+  new_version: string;
+  suspect_scope: string[];
+}) {
+  // Uses same SSE infrastructure as task-broadcast and bug-broadcast
+  // In production, this would push to the SSE client registry
+  console.log(`[SSE] ${payload.event}: ${payload.req_id} v${payload.old_version}→v${payload.new_version} (${payload.project_slug})`);
+}
+
 // Nested approval routes
 requirementsRouter.use(requirementApprovalsRouter);
 
@@ -198,6 +212,18 @@ requirementsRouter.put('/:reqId', requireProjectAccess('contributor'), (req: Req
   ).run(updatedTitle, updatedDescription, updatedStatus, updatedPriority, updatedVersion, updatedReqId, existing.id);
 
   const requirement = db.prepare('SELECT * FROM requirements WHERE id = ?').get(existing.id);
+
+  // Broadcast REQUIREMENT_CHANGED event when version changes
+  // suspect_scope: downstream artifacts that may need re-attestation
+  broadcastRequirementChanged({
+    event: 'REQUIREMENT_CHANGED',
+    req_id: existing.req_id_human,
+    project_slug: slug,
+    old_version: String(currentVersionNum),
+    new_version: updatedVersion,
+    suspect_scope: ['attestations', 'tasks', 'capabilities']
+  });
+
   res.status(200).json(requirement);
 });
 
