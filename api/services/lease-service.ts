@@ -28,3 +28,18 @@ export function createLease(
 
   return db.prepare('SELECT * FROM leases WHERE id = ?').get(id);
 }
+
+/**
+ * Renew a lease by resetting expires_at to now + given hours.
+ */
+export function renewLease(
+  db: Database.Database,
+  leaseId: string,
+  hours: number = 4
+): any {
+  db.prepare(
+    `UPDATE leases SET expires_at = datetime('now', '+${hours} hours') WHERE id = ?`
+  ).run(leaseId);
+
+  return db.prepare('SELECT * FROM leases WHERE id = ?').get(leaseId);
+}
