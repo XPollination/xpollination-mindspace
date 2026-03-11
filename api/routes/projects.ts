@@ -7,6 +7,7 @@ import { brainRouter } from './brain.js';
 import { agentPoolRouter } from './agent-pool.js';
 import { tasksRouter } from './tasks.js';
 import { requirementsRouter } from './requirements.js';
+import { focusRouter } from './focus.js';
 
 export const projectsRouter = Router();
 
@@ -29,6 +30,9 @@ projectsRouter.use('/:slug/tasks', tasksRouter);
 
 // Nested requirements routes
 projectsRouter.use('/:slug/requirements', requirementsRouter);
+
+// Nested focus routes
+projectsRouter.use('/:slug/focus', focusRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {
