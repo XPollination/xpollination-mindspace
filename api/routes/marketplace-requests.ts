@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
+import { contributeMarketplaceItem } from '../services/marketplace-brain.js';
 
 export const marketplaceRequestsRouter = Router();
 
@@ -81,7 +82,11 @@ marketplaceRequestsRouter.post('/', (req: Request, res: Response) => {
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(id, project_slug, title, description || null, category, user.id);
 
-  const request = db.prepare('SELECT * FROM marketplace_requests WHERE id = ?').get(id);
+  const request = db.prepare('SELECT * FROM marketplace_requests WHERE id = ?').get(id) as any;
+
+  // Auto-contribute to brain (best-effort)
+  contributeMarketplaceItem('request', { id, title, description, category }, project_slug).catch(() => {});
+
   res.status(201).json(request);
 });
 

@@ -79,6 +79,37 @@ bugReportsRouter.get('/:bugId', requireProjectAccess('viewer'), (req: Request, r
   res.status(200).json(bug);
 });
 
+// POST /:bugId/create-task — convert bug to task (admin only)
+bugReportsRouter.post('/:bugId/create-task', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, bugId } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const bug = db.prepare('SELECT * FROM bug_reports WHERE id = ? AND project_slug = ?').get(bugId, slug) as any;
+  if (!bug) {
+    res.status(404).json({ error: 'Bug report not found' });
+    return;
+  }
+
+  // Pre-fill task from bug data
+  const taskTitle = `Bug: ${bug.title}`;
+  const taskDescription = [bug.description, bug.steps_to_reproduce].filter(Boolean).join('\n\n');
+  const taskId = randomUUID();
+
+  db.prepare(
+    `INSERT INTO tasks (id, project_slug, title, description, status, current_role, bug_id, created_by)
+     VALUES (?, ?, ?, ?, 'pending', 'pdsa', ?, ?)`
+  ).run(taskId, slug, taskTitle, taskDescription || null, bugId, user.id);
+
+  // Update bug status to triaged
+  db.prepare(
+    "UPDATE bug_reports SET status = 'triaged', updated_at = datetime('now') WHERE id = ? AND project_slug = ?"
+  ).run(bugId, slug);
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  res.status(201).json({ task, bug_id: bugId });
+});
+
 // PUT /:bugId — update bug (contributor required). Use closed status instead of DELETE
 bugReportsRouter.put('/:bugId', requireProjectAccess('contributor'), (req: Request, res: Response) => {
   const { slug, bugId } = req.params;
