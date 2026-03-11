@@ -888,6 +888,47 @@ function cmdCreate(type, slug, dnaJson, actor) {
   db.close();
 }
 
+function cmdCapabilityStatus() {
+  const db = getDb();
+
+  const capabilities = db.prepare(
+    'SELECT c.id, c.title, c.status, c.mission_id, m.title AS mission_title FROM capabilities c LEFT JOIN missions m ON c.mission_id = m.id ORDER BY c.sort_order'
+  ).all();
+
+  const result = capabilities.map(cap => {
+    const taskSlugs = db.prepare(
+      'SELECT task_slug FROM capability_tasks WHERE capability_id = ?'
+    ).all(cap.id).map(r => r.task_slug);
+
+    let completeCount = 0;
+    for (const slug of taskSlugs) {
+      const node = db.prepare(
+        'SELECT status FROM mindspace_nodes WHERE slug = ?'
+      ).get(slug);
+      if (node && node.status === 'complete') {
+        completeCount++;
+      }
+    }
+
+    const taskCount = taskSlugs.length;
+    const progressPercent = taskCount > 0 ? Math.round((completeCount / taskCount) * 100) : 0;
+
+    return {
+      id: cap.id,
+      title: cap.title,
+      status: cap.status,
+      mission_id: cap.mission_id,
+      mission_title: cap.mission_title,
+      task_count: taskCount,
+      complete_count: completeCount,
+      progress_percent: progressPercent
+    };
+  });
+
+  output({ capabilities: result });
+  db.close();
+}
+
 // Main — guarded so import doesn't trigger CLI execution
 const __isMainCli = process.argv[1] && (
   process.argv[1].includes('interface-cli') ||
@@ -962,6 +1003,10 @@ switch (command) {
       error('Usage: create <type> <slug> <dnaJson> <actor>');
     }
     cmdCreate(args[1], args[2], args[3], args[4]);
+    break;
+
+  case 'capability-status':
+    cmdCapabilityStatus();
     break;
 
   default:
