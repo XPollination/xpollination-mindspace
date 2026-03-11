@@ -1,11 +1,13 @@
 CREATE TABLE IF NOT EXISTS attestations (
   id TEXT PRIMARY KEY,
   task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  task_slug TEXT,
   project_slug TEXT NOT NULL REFERENCES projects(slug),
   agent_id TEXT NOT NULL REFERENCES agents(id),
   from_status TEXT NOT NULL,
   to_status TEXT NOT NULL,
   rules_version TEXT,
+  valid INTEGER NOT NULL DEFAULT 0,
   required_checks TEXT NOT NULL DEFAULT '[]',
   submitted_checks TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'submitted', 'accepted', 'rejected')),

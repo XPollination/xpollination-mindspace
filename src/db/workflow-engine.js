@@ -342,3 +342,16 @@ export function getHumanConfirmTransitions() {
   // Deduplicate (same key may appear in both task and bug types)
   return [...new Set(keys)];
 }
+
+/**
+ * Attestation gate: check if transition requires attestation.
+ * If checkAttestationGate returns {allowed: false}, the caller should
+ * respond with 422 (Unprocessable Entity) and include the reason.
+ *
+ * Usage in transition handler:
+ *   const gateResult = checkAttestationGate(taskSlug, projectSlug, fromStatus, toStatus);
+ *   if (!gateResult.allowed) {
+ *     return res.status(422).json({ error: gateResult.reason });
+ *   }
+ */
+export { checkAttestationGate } from '../api/services/attestation-gate.js';
