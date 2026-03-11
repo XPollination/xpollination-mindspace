@@ -1,0 +1,14 @@
+{
+  "version": "v0.0.12",
+  "date": "2026-03-11",
+  "changes": [
+    "Resolve root/versioned file divergence — snapshot root files into v0.0.12",
+    "server.js: use createRequire + discover-projects.cjs instead of inline function",
+    "server.js: VIZ_BIND defaults to 0.0.0.0 for remote access",
+    "server.js: __dirname for active symlink path (no cwd fallback)",
+    "server.js: add auto-approval mode to liaison approval validation",
+    "server.js: truncate changelogs to 33 entries",
+    "index.html: sync all CSS/JS changes from root (badge colors, queue styles, filter buttons)",
+    "Fix version display by updating active symlink to v0.0.12"
+  ]
+}
