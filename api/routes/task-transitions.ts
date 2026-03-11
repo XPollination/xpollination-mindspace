@@ -54,12 +54,23 @@ taskTransitionsRouter.post('/', requireProjectAccess('contributor'), (req: Reque
     auto_unblocked = checkAndUnblock(db, taskId);
   }
 
+  // Auto-create approval_request on approval transition
+  let approval_request_id: string | null = null;
+  if (to_status === 'approval') {
+    const user = (req as any).user;
+    approval_request_id = randomUUID();
+    db.prepare(
+      'INSERT INTO approval_requests (id, task_id, project_slug, requested_by, status) VALUES (?, ?, ?, ?, ?)'
+    ).run(approval_request_id, taskId, slug, user?.id || null, 'pending');
+  }
+
   const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   res.status(200).json({
     transition: { from: task.status, to: to_status },
     role: newRole || task.current_role,
     task: updatedTask,
-    auto_unblocked
+    auto_unblocked,
+    approval_request_id
   });
 });
 

@@ -11,6 +11,7 @@ import { focusRouter } from './focus.js';
 import { featureFlagsRouter } from './feature-flags.js';
 import { bugReportsRouter } from './bug-reports.js';
 import { releasesRouter } from './releases.js';
+import { approvalRequestsRouter } from './approval-requests.js';
 
 export const projectsRouter = Router();
 
@@ -45,6 +46,9 @@ projectsRouter.use('/:slug/bugs', bugReportsRouter);
 
 // Nested releases routes
 projectsRouter.use('/:slug/releases', releasesRouter);
+
+// Nested approval requests routes
+projectsRouter.use('/:slug/approvals', approvalRequestsRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {
