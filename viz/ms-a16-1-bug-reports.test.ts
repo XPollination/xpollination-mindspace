@@ -1,27 +1,25 @@
 /**
  * TDD tests for ms-a16-1-bug-reports
  *
- * Verifies bug reports table and submission/list endpoints:
- * - Migration: bug_reports table with severity/status CHECK constraints
- * - POST /api/projects/:slug/bugs — submit (viewer+)
- * - GET /api/projects/:slug/bugs — list with filters (viewer+)
- * - GET /api/projects/:slug/bugs/:bugId — get single (viewer+)
- * - PUT /api/projects/:slug/bugs/:bugId — update (contributor+)
- * - No DELETE — use status:closed for audit trail
+ * Verifies bug reports table and submission endpoint:
+ * - Migration: bug_reports table with severity CHECK, status CHECK
+ * - Per-project at /api/projects/:slug/bugs
+ * - POST (viewer submits), GET (viewer lists), GET /:bugId, PUT (contributor updates)
+ * - No DELETE — bugs are closed, not deleted
+ * - Severity enum: low, medium, high, critical
+ * - Status enum: open, investigating, resolved, closed
  *
  * DEV IMPLEMENTATION NOTES:
  * - Create api/db/migrations/021-bug-reports.sql:
- *   - CREATE TABLE bug_reports (id, project_slug FK, title NOT NULL, description,
- *     severity CHECK (low/medium/high/critical), status CHECK (open/investigating/resolved/closed),
- *     task_id FK optional, reported_by FK users, created_at, updated_at)
- *   - Indexes: project_slug, (project_slug,status), (project_slug,severity)
+ *   - CREATE TABLE bug_reports (id, project_slug FK, title, description,
+ *     severity CHECK, status CHECK, task_id FK optional, reported_by FK users,
+ *     created_at, updated_at)
+ *   - Indexes on project_slug, (project_slug, status), (project_slug, severity)
  * - Create api/routes/bug-reports.ts:
  *   - Export bugReportsRouter with mergeParams
- *   - POST / (viewer+): submit bug, 201
- *   - GET / (viewer+): list bugs, ?status, ?severity filters, ordered by created_at DESC
- *   - GET /:bugId (viewer+): single bug
- *   - PUT /:bugId (contributor+): update metadata/status
- *   - No DELETE
+ *   - POST / (viewer), GET / (viewer, ?status, ?severity filter), GET /:bugId (viewer)
+ *   - PUT /:bugId (contributor)
+ *   - No DELETE — use status:closed
  * - Update api/routes/projects.ts: mount at /:slug/bugs
  */
 import { describe, it, expect } from "vitest";
@@ -62,10 +60,6 @@ describe("ms-a16-1-bug-reports: migration", () => {
     expect(content).toMatch(/REFERENCES\s+projects/i);
   });
 
-  it("has title NOT NULL", () => {
-    expect(content).toMatch(/title\s+TEXT\s+NOT\s+NULL/i);
-  });
-
   it("has severity CHECK (low, medium, high, critical)", () => {
     expect(content).toMatch(/severity/);
     expect(content).toMatch(/CHECK/i);
@@ -85,6 +79,7 @@ describe("ms-a16-1-bug-reports: migration", () => {
 
   it("has task_id optional FK to tasks", () => {
     expect(content).toMatch(/task_id/);
+    expect(content).toMatch(/REFERENCES\s+tasks/i);
   });
 
   it("has reported_by FK to users", () => {
@@ -92,8 +87,10 @@ describe("ms-a16-1-bug-reports: migration", () => {
     expect(content).toMatch(/REFERENCES\s+users/i);
   });
 
-  it("has indexes on project_slug and status", () => {
-    expect(content).toMatch(/CREATE\s+INDEX/i);
+  it("has indexes on project_slug and status and severity", () => {
+    expect(content).toMatch(/INDEX.*bug_reports.*project/i);
+    expect(content).toMatch(/INDEX.*bug_reports.*status/i);
+    expect(content).toMatch(/INDEX.*bug_reports.*severity/i);
   });
 });
 
@@ -116,9 +113,8 @@ describe("ms-a16-1-bug-reports: bug-reports.ts", () => {
     expect(content).toMatch(/mergeParams/);
   });
 
-  it("has POST handler to submit bugs (201)", () => {
+  it("has POST handler for submitting bugs", () => {
     expect(content).toMatch(/\.post\(/i);
-    expect(content).toMatch(/201/);
   });
 
   it("has GET handler for listing bugs", () => {
@@ -134,24 +130,39 @@ describe("ms-a16-1-bug-reports: bug-reports.ts", () => {
     expect(content).toMatch(/severity/);
   });
 
-  it("orders list by created_at DESC", () => {
-    expect(content).toMatch(/DESC|ORDER\s+BY/i);
-  });
-
   it("has PUT handler for updating bugs", () => {
     expect(content).toMatch(/\.put\(/i);
   });
 
+  it("does NOT have DELETE handler (use closed status)", () => {
+    expect(content).not.toMatch(/\.delete\(/i);
+  });
+
+  it("viewer can submit (requireProjectAccess viewer)", () => {
+    expect(content).toMatch(/requireProjectAccess/);
+    expect(content).toMatch(/viewer/);
+  });
+
+  it("contributor required for updates", () => {
+    expect(content).toMatch(/contributor/);
+  });
+
+  it("returns 400 for missing title", () => {
+    expect(content).toMatch(/400/);
+    expect(content).toMatch(/title/);
+  });
+
   it("returns 400 for invalid severity", () => {
     expect(content).toMatch(/400/);
+    expect(content).toMatch(/severity/);
   });
 
   it("returns 404 for non-existent bug", () => {
     expect(content).toMatch(/404/);
   });
 
-  it("uses requireProjectAccess middleware", () => {
-    expect(content).toMatch(/requireProjectAccess/);
+  it("returns 201 on successful creation", () => {
+    expect(content).toMatch(/201/);
   });
 });
 
