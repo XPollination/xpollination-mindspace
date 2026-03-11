@@ -6,8 +6,10 @@ import { broadcastBugReported } from '../services/bug-broadcast.js';
 
 export const bugReportsRouter = Router({ mergeParams: true });
 
+const BRAIN_API_URL = process.env.BRAIN_API_URL || 'http://localhost:3200';
+const BRAIN_API_KEY = process.env.BRAIN_API_KEY || '';
 const VALID_SEVERITIES = ['low', 'medium', 'high', 'critical'];
-const VALID_STATUSES = ['open', 'investigating', 'resolved', 'closed'];
+const VALID_STATUSES = ['open', 'investigating', 'resolved', 'closed', 'digested'];
 
 // POST / — submit bug report (viewer can submit)
 bugReportsRouter.post('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
@@ -108,6 +110,80 @@ bugReportsRouter.post('/:bugId/create-task', requireProjectAccess('admin'), (req
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   res.status(201).json({ task, bug_id: bugId });
+});
+
+// POST /:bugId/digest — agent bug digestion: query brain, produce assessment, store as brain thought
+bugReportsRouter.post('/:bugId/digest', requireProjectAccess('contributor'), async (req: Request, res: Response) => {
+  const { slug, bugId } = req.params;
+  const db = getDb();
+
+  const bug = db.prepare('SELECT * FROM bug_reports WHERE id = ? AND project_slug = ?').get(bugId, slug) as any;
+  if (!bug) {
+    res.status(404).json({ error: 'Bug report not found' });
+    return;
+  }
+
+  try {
+    // Query brain/memory for related thoughts about this bug
+    const queryResponse = await fetch(`${BRAIN_API_URL}/api/v1/memory`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${BRAIN_API_KEY}`
+      },
+      body: JSON.stringify({
+        prompt: `Bug assessment: ${bug.title}. ${bug.description || ''}`,
+        agent_id: 'system',
+        agent_name: 'SYSTEM',
+        read_only: true
+      })
+    });
+
+    const queryData = await queryResponse.json() as any;
+    const relatedThoughts = queryData?.result?.sources || [];
+
+    // Produce assessment
+    const assessment = {
+      bug_id: bugId,
+      related_thoughts: relatedThoughts.slice(0, 5).map((t: any) => ({
+        thought_id: t.thought_id,
+        preview: t.content_preview
+      })),
+      flag_context: [],
+      recommendation: relatedThoughts.length > 0
+        ? `Found ${relatedThoughts.length} related thoughts. Likely related to existing knowledge.`
+        : 'No related thoughts found. May be a new issue area.'
+    };
+
+    // Contribute assessment as brain thought (POST to memory)
+    const contributeResponse = await fetch(`${BRAIN_API_URL}/api/v1/memory`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${BRAIN_API_KEY}`
+      },
+      body: JSON.stringify({
+        prompt: `Bug assessment for "${bug.title}": ${assessment.recommendation}`,
+        agent_id: 'system',
+        agent_name: 'SYSTEM',
+        thought_category: 'bug_assessment',
+        topic: `bug-${bugId}`,
+        context: `bug digest for ${slug}`
+      })
+    });
+
+    const contributeData = await contributeResponse.json() as any;
+    const brain_thought_id = contributeData?.result?.sources?.[0]?.thought_id || null;
+
+    // Update bug status to digested
+    db.prepare(
+      "UPDATE bug_reports SET status = 'digested', updated_at = datetime('now') WHERE id = ? AND project_slug = ?"
+    ).run(bugId, slug);
+
+    res.status(200).json({ assessment, brain_thought_id });
+  } catch {
+    res.status(500).json({ error: 'Bug digestion failed' });
+  }
 });
 
 // PUT /:bugId — update bug (contributor required). Use closed status instead of DELETE
