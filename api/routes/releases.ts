@@ -1,0 +1,93 @@
+import { Router, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { getDb } from '../db/connection.js';
+import { requireProjectAccess } from '../middleware/require-project-access.js';
+
+export const releasesRouter = Router({ mergeParams: true });
+
+// POST / — create release (admin only)
+releasesRouter.post('/', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const user = (req as any).user;
+  const { version } = req.body;
+
+  if (!version) {
+    res.status(400).json({ error: 'Missing required field: version' });
+    return;
+  }
+
+  const db = getDb();
+  const existing = db.prepare('SELECT id FROM releases WHERE project_slug = ? AND version = ?').get(slug, version);
+  if (existing) {
+    res.status(409).json({ error: 'Release version already exists' });
+    return;
+  }
+
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO releases (id, project_slug, version, status, created_by) VALUES (?, ?, ?, 'draft', ?)`
+  ).run(id, slug, version, user.id);
+
+  const release = db.prepare('SELECT * FROM releases WHERE id = ?').get(id);
+  res.status(201).json(release);
+});
+
+// GET / — list releases for project
+releasesRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const { status } = req.query;
+  const db = getDb();
+
+  let sql = 'SELECT * FROM releases WHERE project_slug = ?';
+  const params: any[] = [slug];
+
+  if (status) {
+    sql += ' AND status = ?';
+    params.push(status);
+  }
+
+  sql += ' ORDER BY created_at DESC';
+  const releases = db.prepare(sql).all(...params);
+  res.status(200).json(releases);
+});
+
+// GET /:releaseId — get single release
+releasesRouter.get('/:releaseId', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug, releaseId } = req.params;
+  const db = getDb();
+
+  const release = db.prepare('SELECT * FROM releases WHERE id = ? AND project_slug = ?').get(releaseId, slug);
+  if (!release) {
+    res.status(404).json({ error: 'Release not found' });
+    return;
+  }
+
+  res.status(200).json(release);
+});
+
+// PUT /:releaseId — update release (admin only)
+releasesRouter.put('/:releaseId', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, releaseId } = req.params;
+  const user = (req as any).user;
+  const { status } = req.body;
+  const db = getDb();
+
+  const existing = db.prepare('SELECT * FROM releases WHERE id = ? AND project_slug = ?').get(releaseId, slug) as any;
+  if (!existing) {
+    res.status(404).json({ error: 'Release not found' });
+    return;
+  }
+
+  if (status === 'sealed') {
+    db.prepare(
+      `UPDATE releases SET status = 'sealed', sealed_at = datetime('now'), sealed_by = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(user.id, releaseId);
+  } else if (status) {
+    db.prepare(
+      `UPDATE releases SET status = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(status, releaseId);
+  }
+
+  const release = db.prepare('SELECT * FROM releases WHERE id = ?').get(releaseId);
+  res.status(200).json(release);
+});
