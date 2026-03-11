@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
 import { validateTransition, computeRole } from '../services/task-state-machine.js';
+import { checkAndUnblock } from '../services/blocked-status.js';
 
 export const taskTransitionsRouter = Router({ mergeParams: true });
 
@@ -47,11 +48,18 @@ taskTransitionsRouter.post('/', requireProjectAccess('contributor'), (req: Reque
     ).run(to_status, taskId);
   }
 
+  // Auto-unblock: when task completes, check dependents and unblock if all deps satisfied
+  let auto_unblocked: string[] = [];
+  if (to_status === 'complete') {
+    auto_unblocked = checkAndUnblock(db, taskId);
+  }
+
   const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   res.status(200).json({
     transition: { from: task.status, to: to_status },
     role: newRole || task.current_role,
-    task: updatedTask
+    task: updatedTask,
+    auto_unblocked
   });
 });
 
