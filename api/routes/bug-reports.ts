@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
+import { broadcastBugReported } from '../services/bug-broadcast.js';
 
 export const bugReportsRouter = Router({ mergeParams: true });
 
@@ -33,7 +34,11 @@ bugReportsRouter.post('/', requireProjectAccess('viewer'), (req: Request, res: R
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(id, slug, title, description || null, bugSeverity, task_id || null, user.id);
 
-  const bug = db.prepare('SELECT * FROM bug_reports WHERE id = ?').get(id);
+  const bug = db.prepare('SELECT * FROM bug_reports WHERE id = ?').get(id) as any;
+
+  // Broadcast BUG_REPORTED event to connected agents
+  broadcastBugReported(id, slug, title, bugSeverity);
+
   res.status(201).json(bug);
 });
 

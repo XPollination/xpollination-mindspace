@@ -32,6 +32,9 @@ import { getProjectStatusTool, handleGetProjectStatus } from './mindspace/getPro
 import { getTaskTool, handleGetTask } from './mindspace/getTask.js';
 import { createTaskTool, handleCreateTask } from './mindspace/createTask.js';
 import { createRequirementTool, handleCreateRequirement } from './mindspace/createRequirement.js';
+import { listTasksTool, handleListTasks } from './mindspace/listTasks.js';
+import { transitionTaskTool, handleTransitionTask } from './mindspace/transitionTask.js';
+import { setFocusTool, handleSetFocus } from './mindspace/setFocus.js';
 
 // PM (Project Management) tools
 import {
@@ -118,6 +121,18 @@ export const tools: ToolDefinition[] = [
   {
     definition: createRequirementTool,
     handler: async (args, _db, _pipeline) => handleCreateRequirement(args as any)
+  },
+  {
+    definition: listTasksTool,
+    handler: async (args, _db, _pipeline) => handleListTasks(args as any)
+  },
+  {
+    definition: transitionTaskTool,
+    handler: async (args, _db, _pipeline) => handleTransitionTask(args as any)
+  },
+  {
+    definition: setFocusTool,
+    handler: async (args, _db, _pipeline) => handleSetFocus(args as any)
   },
 
   // PM (Project Management) tools

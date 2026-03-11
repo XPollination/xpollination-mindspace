@@ -140,6 +140,48 @@ featureFlagsRouter.put('/:flagId', requireProjectAccess('contributor'), (req: Re
   res.status(200).json(flag);
 });
 
+// PUT /:flagId/toggle — toggle flag with human gate for ON
+featureFlagsRouter.put('/:flagId/toggle', requireProjectAccess('contributor'), (req: Request, res: Response) => {
+  const { slug, flagId } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const existing = db.prepare('SELECT * FROM feature_flags WHERE id = ? AND project_slug = ?').get(flagId, slug) as any;
+  if (!existing) {
+    res.status(404).json({ error: 'Flag not found' });
+    return;
+  }
+
+  const targetState = existing.state === 'on' ? 'off' : 'on';
+
+  // Toggle OFF: immediate (emergency rollback)
+  if (targetState === 'off') {
+    db.prepare(
+      `UPDATE feature_flags SET state = 'off', toggled_by = ?, toggled_at = datetime('now')
+       WHERE id = ? AND project_slug = ?`
+    ).run(user.id, flagId, slug);
+
+    const flag = db.prepare('SELECT * FROM feature_flags WHERE id = ?').get(flagId);
+    res.status(200).json(flag);
+    return;
+  }
+
+  // Toggle ON: create approval_request with type flag_toggle, return 202
+  const approvalId = randomUUID();
+  db.prepare(
+    `INSERT INTO approval_requests (id, task_id, project_slug, requested_by, status, type)
+     VALUES (?, ?, ?, ?, 'pending', 'flag_toggle')`
+  ).run(approvalId, existing.task_id || null, slug, user.id);
+
+  res.status(202).json({
+    message: 'Flag toggle ON requires approval',
+    approval_request_id: approvalId,
+    flag_id: flagId,
+    current_state: 'off',
+    requested_state: 'on'
+  });
+});
+
 // DELETE /:flagId — remove flag (admin only)
 featureFlagsRouter.delete('/:flagId', requireProjectAccess('admin'), (req: Request, res: Response) => {
   const { slug, flagId } = req.params;

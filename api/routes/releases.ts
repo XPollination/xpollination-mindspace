@@ -65,6 +65,47 @@ releasesRouter.get('/:releaseId', requireProjectAccess('viewer'), (req: Request,
   res.status(200).json(release);
 });
 
+// GET /:releaseId/manifest — generate release manifest
+releasesRouter.get('/:releaseId/manifest', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug, releaseId } = req.params;
+  const db = getDb();
+
+  const release = db.prepare('SELECT * FROM releases WHERE id = ? AND project_slug = ?').get(releaseId, slug) as any;
+  if (!release) {
+    res.status(404).json({ error: 'Release not found' });
+    return;
+  }
+
+  // Get complete tasks for the project
+  const tasks = db.prepare(
+    "SELECT * FROM tasks WHERE project_slug = ? AND status = 'complete'"
+  ).all(slug) as any[];
+
+  // Aggregate linked requirements (deduped)
+  const reqIds = [...new Set(tasks.map(t => t.requirement_id).filter(Boolean))];
+  const requirements = reqIds.length > 0
+    ? db.prepare(
+        `SELECT * FROM requirements WHERE id IN (${reqIds.map(() => '?').join(',')})`
+      ).all(...reqIds)
+    : [];
+
+  // Include all feature flags with states
+  const flags = db.prepare(
+    'SELECT * FROM feature_flags WHERE project_slug = ?'
+  ).all(slug);
+
+  const git_tag = `v${release.version}`;
+  const generated_at = new Date().toISOString();
+
+  res.status(200).json({
+    release,
+    tasks,
+    requirements,
+    flags,
+    metadata: { git_tag, generated_at }
+  });
+});
+
 // PUT /:releaseId — update release (admin only)
 releasesRouter.put('/:releaseId', requireProjectAccess('admin'), (req: Request, res: Response) => {
   const { slug, releaseId } = req.params;
