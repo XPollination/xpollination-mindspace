@@ -1,0 +1,19 @@
+{
+  "version": "v0.0.13",
+  "date": "2026-03-11",
+  "title": "Cherry-pick v0.0.11 features lost in v0.0.12",
+  "changes": [
+    "Restored version display in header (viz-version span + loadVersion())",
+    "Restored queue column filter (All/Ready/Pending/Rework buttons with localStorage persistence)",
+    "Restored complete column time filter (1d/1w/1m/All buttons with localStorage persistence)",
+    "Restored queue column grouping by status with sub-headers",
+    "Restored complete column sort by updated_at descending",
+    "Restored depends_on display in detail panel with clickable dependency links",
+    "Restored changelog_ref display in detail panel",
+    "Restored Created/Updated timestamps in detail panel using formatDate()",
+    "Restored slug-based parent/child lookup (n.id === pid || n.slug === pid)",
+    "Replaced inline styles with CSS classes for #liaison-mode and #version-history-btn",
+    "Restored detail-actions-divider CSS class usage",
+    "Restored checkForUpdate() call in poll cycle"
+  ]
+}
