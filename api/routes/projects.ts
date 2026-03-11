@@ -8,6 +8,8 @@ import { agentPoolRouter } from './agent-pool.js';
 import { tasksRouter } from './tasks.js';
 import { requirementsRouter } from './requirements.js';
 import { focusRouter } from './focus.js';
+import { featureFlagsRouter } from './feature-flags.js';
+import { bugReportsRouter } from './bug-reports.js';
 
 export const projectsRouter = Router();
 
@@ -33,6 +35,12 @@ projectsRouter.use('/:slug/requirements', requirementsRouter);
 
 // Nested focus routes
 projectsRouter.use('/:slug/focus', focusRouter);
+
+// Nested feature flags routes
+projectsRouter.use('/:slug/flags', featureFlagsRouter);
+
+// Nested bug reports routes
+projectsRouter.use('/:slug/bugs', bugReportsRouter);
 
 // POST / — create project
 projectsRouter.post('/', (req: Request, res: Response) => {

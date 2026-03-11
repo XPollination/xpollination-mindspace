@@ -11,6 +11,8 @@ import { agentsRouter } from './routes/agents.js';
 import { a2aConnectRouter } from './routes/a2a-connect.js';
 import { startAgentSweep } from './routes/agent-status-sweep.js';
 import { a2aMessageRouter } from './routes/a2a-message.js';
+import { marketplaceAnnouncementsRouter } from './routes/marketplace-announcements.js';
+import { marketplaceRequestsRouter } from './routes/marketplace-requests.js';
 import { getDb, closeDb } from './db/connection.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -38,6 +40,8 @@ app.use('/api/auth/oauth', oauthRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/agents', agentsRouter);
 app.use('/a2a/message', a2aMessageRouter);
+app.use('/api/marketplace/announcements', marketplaceAnnouncementsRouter);
+app.use('/api/marketplace/requests', marketplaceRequestsRouter);
 
 // Error handling (after routes)
 app.use(notFoundHandler);
