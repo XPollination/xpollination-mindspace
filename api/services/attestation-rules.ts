@@ -4,6 +4,7 @@
  */
 
 import type Database from 'better-sqlite3';
+import { getRulesForCapability } from './rules-config.js';
 
 interface RuleResult {
   rule: string;
