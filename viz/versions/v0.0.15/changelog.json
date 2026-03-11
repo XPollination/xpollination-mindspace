@@ -1,0 +1,11 @@
+{
+  "version": "v0.0.15",
+  "date": "2026-03-11",
+  "title": "Mindspace logo, favicons, and PWA install",
+  "changes": [
+    "Add Mindspace logo (28px) in header bar before project selector",
+    "Add favicon references in HTML head (ico, png 16/32/48, apple-touch-icon)",
+    "Add manifest.webmanifest link for PWA support",
+    "Add beforeinstallprompt listener and service worker registration for PWA install"
+  ]
+}
