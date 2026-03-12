@@ -1,0 +1,18 @@
+{
+  "version": "v0.0.22",
+  "title": "Incremental Sync + DNA-Lite Polling Architecture",
+  "date": "2026-03-12",
+  "task": "viz-data-polling-architecture",
+  "changes": [
+    "Server: incremental sync via ?since= parameter (returns only changed nodes)",
+    "Server: DNA-lite mode strips heavy fields (findings, implementation, reviews) for bulk responses",
+    "Server: ?dna=full parameter for full DNA when needed",
+    "Server: change_seq watermark in response for client sync tracking",
+    "Server: compact JSON (no pretty-printing) reduces payload ~7%",
+    "Server: stats (queue_count, active_count, completed_count) merged into /api/data response",
+    "Client: incremental merge (mergeIncrementalData) — updates/inserts changed nodes",
+    "Client: lastSeq tracking for incremental polling",
+    "Client: error recovery resets to full bootstrap",
+    "Estimated: bootstrap ~100KB (from 2MB), typical update <1KB"
+  ]
+}
