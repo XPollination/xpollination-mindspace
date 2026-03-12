@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/tsdoc/v0/tsdoc.schema.json",
+  "tagDefinitions": [
+    { "tagName": "@capability", "syntaxKind": "block" },
+    { "tagName": "@requirement", "syntaxKind": "block" },
+    { "tagName": "@satisfies", "syntaxKind": "block" },
+    { "tagName": "@decision", "syntaxKind": "block" }
+  ]
+}

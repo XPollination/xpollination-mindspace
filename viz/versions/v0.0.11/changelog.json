@@ -1,0 +1,10 @@
+{
+  "version": "v0.0.10",
+  "title": "Badge Color Contrast Fix",
+  "date": "2026-03-09",
+  "changes": [
+    "Fix badge color contrast: darken backgrounds for WCAG AA compliance with white text",
+    "Add explicit color: #fff to all 13 status badge classes",
+    "Darkened colors: active (#166534), testing (#065f46), review/approval (#92400e), complete/done (#115e59), rework/blocked (#991b1b), approved (#5b21b6)"
+  ]
+}
