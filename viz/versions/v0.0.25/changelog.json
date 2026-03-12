@@ -1,0 +1,10 @@
+{
+  "version": "v0.0.25",
+  "title": "Fix: Detail panel invisible after drill-down — CSS class mismatch",
+  "date": "2026-03-12",
+  "task": "viz-detail-panel-visibility",
+  "changes": [
+    "Client: fix classList.add('open') to classList.add('visible') in showCapabilityDetail()",
+    "Client: fix classList.add('open') to classList.add('visible') in showTaskDetail()"
+  ]
+}
