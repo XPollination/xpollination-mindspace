@@ -642,12 +642,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static files
+  // Static files — serve from active/ symlink directory
+  const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+    ? path.resolve(path.join(__dirname, 'active'))
+    : __dirname;
   let filePath = pathname === '/' ? '/index.html' : pathname;
-  filePath = path.join(__dirname, filePath);
+  filePath = path.join(staticRoot, filePath);
 
   // Security: prevent directory traversal
-  if (!filePath.startsWith(__dirname)) {
+  if (!filePath.startsWith(staticRoot)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end('Forbidden');
     return;
