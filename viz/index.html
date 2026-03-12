@@ -1128,11 +1128,30 @@
       });
     }
 
+    let lastEtag = null;
+
     async function pollData() {
       try {
         const projectParam = currentProject ? `?project=${currentProject}` : '';
-        const response = await fetch('/api/data' + projectParam);
+        const headers = {};
+        if (lastEtag) {
+          headers['If-None-Match'] = lastEtag;
+        }
+        const response = await fetch('/api/data' + projectParam, { headers });
+
+        // 304 Not Modified — data unchanged, skip processing
+        if (response.status === 304) {
+          liveDot.classList.remove('error');
+          return;
+        }
+
         const data = await response.json();
+
+        // Store ETag for next request
+        const newEtag = response.headers.get('ETag');
+        if (newEtag) {
+          lastEtag = newEtag;
+        }
 
         const newHash = computeDataHash(data);
         if (newHash !== lastDataHash) {

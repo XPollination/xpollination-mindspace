@@ -7,6 +7,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { createRequire } from 'module';
 import Database from 'better-sqlite3';
@@ -215,7 +216,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        sendJson(res, {
+        const responseData = {
           exported_at: new Date().toISOString(),
           project: 'All Projects',
           node_count: mergedNodes.length,
@@ -224,7 +225,22 @@ const server = http.createServer(async (req, res) => {
           completed_count: totalCompleted,
           stations: mergedStations,
           nodes: mergedNodes
+        };
+        const responseBody = JSON.stringify(responseData, null, 2);
+        const etag = '"' + crypto.createHash('md5').update(responseBody).digest('hex') + '"';
+        const ifNoneMatch = req.headers['if-none-match'];
+        if (ifNoneMatch === etag) {
+          res.writeHead(304, { 'ETag': etag, 'Access-Control-Allow-Origin': '*' });
+          res.end();
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'ETag': etag,
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache'
         });
+        res.end(responseBody);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -248,7 +264,21 @@ const server = http.createServer(async (req, res) => {
     try {
       const data = exportProjectData(targetProject.dbPath);
       data.project = targetProject.name;
-      sendJson(res, data);
+      const responseBody = JSON.stringify(data, null, 2);
+      const etag = '"' + crypto.createHash('md5').update(responseBody).digest('hex') + '"';
+      const ifNoneMatch = req.headers['if-none-match'];
+      if (ifNoneMatch === etag) {
+        res.writeHead(304, { 'ETag': etag, 'Access-Control-Allow-Origin': '*' });
+        res.end();
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'ETag': etag,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache'
+      });
+      res.end(responseBody);
     } catch (err) {
       sendJson(res, { error: err.message }, 500);
     }
