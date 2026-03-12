@@ -670,7 +670,7 @@ const server = http.createServer(async (req, res) => {
 const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
-  console.log(`Workspace: ${WORKSPACE_PATH}`);
+  console.log(`Workspace: ${__dirname}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
 });
