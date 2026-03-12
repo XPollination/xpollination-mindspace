@@ -181,6 +181,109 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API: Mission overview (capabilities with progress)
+  if (pathname === '/api/mission-overview') {
+    const projectName = url.searchParams.get('project');
+    const projects = discoverProjects();
+    const capabilities = [];
+
+    const targetProjects = projectName === 'all' ? projects :
+      projects.filter(p => p.name === projectName);
+
+    for (const proj of (targetProjects.length ? targetProjects : projects)) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try {
+          const caps = db.prepare('SELECT * FROM capabilities').all();
+          for (const cap of caps) {
+            const taskRows = db.prepare(
+              `SELECT t.status FROM capability_tasks ct
+               LEFT JOIN mindspace_nodes t ON t.slug = ct.task_slug
+               WHERE ct.capability_id = ?`
+            ).all(cap.id);
+            const task_count = taskRows.length;
+            const complete_count = taskRows.filter(t => t.status === 'complete').length;
+            const progress_percent = task_count > 0 ? Math.round((complete_count / task_count) * 100) : 0;
+            capabilities.push({
+              id: cap.id,
+              title: cap.title,
+              description: cap.description,
+              status: cap.status,
+              mission_id: cap.mission_id,
+              task_count,
+              complete_count,
+              progress_percent,
+              _project: proj.name
+            });
+          }
+        } catch (err) { /* tables may not exist */ }
+        db.close();
+      } catch (err) { /* skip project */ }
+    }
+    sendJson(res, { capabilities });
+    return;
+  }
+
+  // API: Capability detail — GET /api/capabilities/:capId
+  if (pathname.match(/^\/api\/capabilities\/([^/]+)$/)) {
+    const capId = pathname.split('/')[3];
+    const projectName = url.searchParams.get('project');
+    const projects = discoverProjects();
+    const targetProjects = projectName ? projects.filter(p => p.name === projectName) : projects;
+
+    for (const proj of (targetProjects.length ? targetProjects : projects)) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try {
+          const cap = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capId);
+          if (cap) {
+            const requirements = db.prepare(
+              `SELECT r.id, r.req_id_human, r.title, r.status, r.priority
+               FROM capability_requirements cr
+               JOIN requirements r ON r.id = cr.requirement_ref
+               WHERE cr.capability_id = ?
+               ORDER BY r.req_id_human ASC`
+            ).all(capId);
+
+            const tasks = db.prepare(
+              `SELECT ct.task_slug, t.id, t.status, t.dna_json
+               FROM capability_tasks ct
+               LEFT JOIN mindspace_nodes t ON t.slug = ct.task_slug
+               WHERE ct.capability_id = ?
+               ORDER BY t.status ASC`
+            ).all(capId);
+
+            const enrichedTasks = tasks.map(t => {
+              const dna = t.dna_json ? JSON.parse(t.dna_json) : {};
+              return {
+                slug: t.task_slug,
+                title: dna.title || t.task_slug,
+                status: t.status || 'unknown',
+                role: dna.role || null
+              };
+            });
+
+            db.close();
+            sendJson(res, {
+              id: cap.id,
+              title: cap.title,
+              description: cap.description,
+              status: cap.status,
+              requirements,
+              tasks: enrichedTasks,
+              task_count: enrichedTasks.length,
+              complete_count: enrichedTasks.filter(t => t.status === 'complete').length
+            });
+            return;
+          }
+        } catch (err) { /* tables may not exist */ }
+        db.close();
+      } catch (err) { /* skip project */ }
+    }
+    sendJson(res, { error: 'Capability not found' }, 404);
+    return;
+  }
+
   // API: Suspect links stats
   if (pathname === '/api/suspect-links/stats') {
     const projectName = url.searchParams.get('project');
