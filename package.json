@@ -11,7 +11,11 @@
     "lint": "eslint src/",
     "test": "vitest",
     "db:migrate": "tsx src/db/migrate.ts",
-    "viz": "node viz/server.js"
+    "viz": "node viz/server.js",
+    "api": "node dist/api/server.js",
+    "api:dev": "tsx watch api/server.ts",
+    "api:migrate": "tsx api/db/migrate.ts",
+    "start:api": "tsx api/db/migrate.ts && tsx api/server.ts"
   },
   "keywords": [
     "mcp",
