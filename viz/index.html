@@ -1026,6 +1026,11 @@
           serverMode = data.mode;
           liaisonModeSelect.dataset.serverMode = data.mode;
           suppressModeChange = false;
+          // Re-render detail panel if mode changed
+          if (selectedNodeId) {
+            const selectedNode = nodes.find(n => n.id === selectedNodeId);
+            if (selectedNode) showDetail(selectedNode, false);
+          }
         }
       } catch (e) { /* ignore */ }
     }
@@ -1045,6 +1050,11 @@
             body: JSON.stringify({ mode: newMode })
           });
           serverMode = newMode;
+          // Re-render detail panel to update buttons for new mode
+          if (selectedNodeId) {
+            const selectedNode = nodes.find(n => n.id === selectedNodeId);
+            if (selectedNode) showDetail(selectedNode, false);
+          }
         } catch (e) { /* ignore */ }
         modeWriteInFlight = false;
       }, 300);
@@ -1643,7 +1653,7 @@
         ${(() => {
           const isApprovalLiaison = (node.status === 'approval' && dna.role === 'liaison');
           const isReviewLiaison = (node.status === 'review' && dna.role === 'liaison');
-          const mode = liaisonModeSelect.value;
+          const mode = serverMode || liaisonModeSelect.value;
           const showComplete = (isApprovalLiaison || isReviewLiaison) && (mode === 'manual' || mode === 'auto-approval');
           const showApproveRework = (isApprovalLiaison || isReviewLiaison) && mode === 'manual';
           if (!showComplete && !showApproveRework) return '';
