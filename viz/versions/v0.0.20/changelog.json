@@ -1,0 +1,14 @@
+{
+  "version": "v0.0.20",
+  "title": "Suspect Status Visualization",
+  "date": "2026-03-12",
+  "task": "t3-7-suspect-viz",
+  "changes": [
+    "Add suspect-status-bar HTML in kanban header (suspect/cleared/accepted_risk counts)",
+    "Add loadSuspectStats() function fetching /api/suspect-links/stats",
+    "Progress bar showing clearance percentage (cleared + accepted_risk / total)",
+    "Bar auto-hides when total=0, color palette: red/green/amber",
+    "Called on init and each poll data change cycle",
+    "Server: /api/suspect-links/stats endpoint already in server.js from v0.0.18"
+  ]
+}
