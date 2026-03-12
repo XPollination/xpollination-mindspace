@@ -26,7 +26,10 @@ const MIME_TYPES = {
   '.js': 'application/javascript',
   '.json': 'application/json',
   '.png': 'image/png',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json',
+  '.webp': 'image/webp'
 };
 
 /**
@@ -466,7 +469,12 @@ const server = http.createServer(async (req, res) => {
     const versionsDir = path.join(__dirname, 'versions');
     const changelogs = [];
     try {
-      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort().reverse();
+      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort((a, b) => {
+        const pa = a.replace('v', '').split('.').map(Number);
+        const pb = b.replace('v', '').split('.').map(Number);
+        for (let i = 0; i < 3; i++) { if ((pb[i] || 0) !== (pa[i] || 0)) return (pb[i] || 0) - (pa[i] || 0); }
+        return 0;
+      });
       for (const dir of dirs) {
         const changelogPath = path.join(versionsDir, dir, 'changelog.json');
         if (fs.existsSync(changelogPath)) {
@@ -659,8 +667,9 @@ const server = http.createServer(async (req, res) => {
   serveStatic(res, filePath);
 });
 
-server.listen(PORT, () => {
-  console.log(`Viz server running at http://localhost:${PORT}`);
+const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
+server.listen(PORT, BIND_HOST, () => {
+  console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
   console.log(`Workspace: ${WORKSPACE_PATH}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
