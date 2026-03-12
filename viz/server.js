@@ -181,6 +181,52 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API: Suspect links stats
+  if (pathname === '/api/suspect-links/stats') {
+    const projectName = url.searchParams.get('project');
+    const projects = discoverProjects();
+
+    const merged = { suspect: 0, cleared: 0, accepted_risk: 0, total: 0, by_source_type: {} };
+
+    const targetProjects = projectName === 'all' ? projects :
+      projects.filter(p => p.name === projectName).slice(0, 1);
+
+    if (targetProjects.length === 0 && projectName !== 'all') {
+      // Default to current project
+      const currentName = path.basename(__dirname.replace('/viz', ''));
+      const current = projects.find(p => p.name === currentName);
+      if (current) targetProjects.push(current);
+    }
+
+    for (const proj of (targetProjects.length ? targetProjects : projects)) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try {
+          const rows = db.prepare(
+            'SELECT status, source_type, COUNT(*) as count FROM suspect_links GROUP BY status, source_type'
+          ).all();
+          for (const row of rows) {
+            if (merged[row.status] !== undefined) merged[row.status] += row.count;
+            merged.total += row.count;
+            if (!merged.by_source_type[row.source_type]) {
+              merged.by_source_type[row.source_type] = { suspect: 0, cleared: 0, accepted_risk: 0 };
+            }
+            if (merged.by_source_type[row.source_type][row.status] !== undefined) {
+              merged.by_source_type[row.source_type][row.status] += row.count;
+            }
+          }
+        } catch (err) {
+          // Table doesn't exist in this project — skip
+        }
+        db.close();
+      } catch (err) {
+        // DB open error — skip project
+      }
+    }
+    sendJson(res, merged);
+    return;
+  }
+
   // API: Get project data
   if (pathname === '/api/data') {
     const projectName = url.searchParams.get('project');

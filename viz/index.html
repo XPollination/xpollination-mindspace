@@ -897,6 +897,18 @@
   <div class="main-container">
     <div class="viz-container">
       <div id="kanban-board" class="kanban-board">
+        <!-- Suspect Status Bar -->
+        <div id="suspect-status-bar" style="display:none; padding: 8px 16px; background: #1a1e2e; border-bottom: 1px solid #333; font-size: 12px;">
+          <span style="color: #ef4444;">&#9679; <span id="suspect-count">0</span> suspect</span>
+          <span style="color: #22c55e; margin-left: 12px;">&#9679; <span id="cleared-count">0</span> cleared</span>
+          <span style="color: #f59e0b; margin-left: 12px;">&#9679; <span id="risk-count">0</span> accepted risk</span>
+          <span style="margin-left: 16px;">
+            <span id="suspect-progress-bar" style="display:inline-block; width: 100px; height: 6px; background: #333; border-radius: 3px; vertical-align: middle;">
+              <span id="suspect-progress-fill" style="display:block; height:100%; background: #22c55e; border-radius: 3px; width: 0%;"></span>
+            </span>
+            <span id="suspect-progress-pct" style="color: #888; margin-left: 4px;">0%</span> cleared
+          </span>
+        </div>
         <!-- Agent Status Bar -->
         <div id="agent-status-bar" class="agent-status-bar"></div>
         <!-- Kanban Columns -->
@@ -1070,6 +1082,36 @@
       }
     }
 
+    // ============================================================
+    // Suspect links status bar
+    // ============================================================
+
+    async function loadSuspectStats() {
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const res = await fetch('/api/suspect-links/stats' + projectParam);
+        const stats = await res.json();
+
+        if (stats.total === 0) {
+          document.getElementById('suspect-status-bar').style.display = 'none';
+          return;
+        }
+
+        document.getElementById('suspect-status-bar').style.display = '';
+        document.getElementById('suspect-count').textContent = stats.suspect || 0;
+        document.getElementById('cleared-count').textContent = stats.cleared || 0;
+        document.getElementById('risk-count').textContent = stats.accepted_risk || 0;
+
+        const resolvedPct = stats.total > 0
+          ? Math.round(((stats.cleared + stats.accepted_risk) / stats.total) * 100)
+          : 0;
+        document.getElementById('suspect-progress-fill').style.width = resolvedPct + '%';
+        document.getElementById('suspect-progress-pct').textContent = resolvedPct + '%';
+      } catch (e) {
+        document.getElementById('suspect-status-bar').style.display = 'none';
+      }
+    }
+
     async function loadData() {
       try {
         const projectParam = currentProject ? `?project=${currentProject}` : '';
@@ -1184,6 +1226,7 @@
         }
 
         liveDot.classList.remove('error');
+        loadSuspectStats();
       } catch (error) {
         console.error('Poll failed:', error);
         liveDot.classList.add('error');
@@ -1875,6 +1918,7 @@
     // Initial load and start polling
     loadProjects().then(() => {
       lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
+      loadSuspectStats();
       startPolling();
     });
     checkForUpdate();
