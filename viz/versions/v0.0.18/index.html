@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mindspace Flow Visualization</title>
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicons/favicon-48x48.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
   <style>
     * {
       margin: 0;
@@ -76,6 +82,7 @@
       color: #fff;
       border-color: #e94560;
     }
+
     .header-subtitle {
       color: #888;
       font-size: 14px;
@@ -193,6 +200,16 @@
       overflow: hidden;
       position: relative;
     }
+
+    /* Mission Dashboard */
+    .mission-dashboard { padding: 0 20px; overflow: auto; height: 100%; }
+    .cap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .cap-card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; }
+    .cap-card h3 { font-size: 14px; margin: 0 0 8px; color: #eee; }
+    .cap-card .cap-progress { height: 6px; background: #0f3460; border-radius: 3px; overflow: hidden; margin: 6px 0; }
+    .cap-card .cap-progress-fill { height: 100%; background: #4caf50; border-radius: 3px; }
+    .cap-card .cap-stats { font-size: 11px; color: #888; }
+    .dependency-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
     /* Kanban Board Layout */
     .kanban-board {
@@ -507,13 +524,14 @@
       color: #e94560;
     }
 
-    .detail-field {
-      margin-bottom: 12px;
-    }
     .detail-actions-divider {
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid #333;
+    }
+
+    .detail-field {
+      margin-bottom: 12px;
     }
 
     .detail-field label {
@@ -797,12 +815,12 @@
     body.light-mode .detail-field .value { color: #222; }
     body.light-mode .detail-field .description { color: #444; }
     body.light-mode .detail-actions-divider { border-top-color: #ccc; }
+    body.light-mode #liaison-mode option { background: #e8e8e8; color: #333; }
     body.light-mode .search-input { background: #fff; border-color: #ccc; color: #222; }
     body.light-mode .search-input::placeholder { color: #999; }
     body.light-mode .project-dropdown { background: #e8e8e8; color: #e94560; border-color: #e94560; }
     body.light-mode .project-dropdown:hover { background: #ddd; }
     body.light-mode #liaison-mode { background: #e8e8e8; color: #333; border-color: #aaa; }
-    body.light-mode #liaison-mode option { background: #e8e8e8; color: #333; }
     body.light-mode .header-controls button { background: #ddd; border-color: #aaa; color: #333; }
     body.light-mode .header-controls button:hover { background: #e94560; color: #fff; }
     body.light-mode #version-history-btn { background: #ddd; border-color: #aaa; color: #333; }
@@ -929,8 +947,9 @@
     <select id="project-selector" class="project-dropdown">
       <option value="">Loading...</option>
     </select>
-    <span class="header-subtitle">Kanban</span>
+    <img src="/assets/mindspace-logo-56.png" alt="Mindspace" class="mindspace-logo" style="height:28px;margin-left:12px;">
     <span class="viz-version"></span>
+    <span class="header-subtitle" id="view-toggle" style="cursor:pointer;" onclick="toggleMissionView()">Kanban</span>
     <div class="search-container">
       <input type="text" id="node-search" class="search-input" placeholder="Search nodes...">
       <span id="search-count" class="search-count"></span>
@@ -963,6 +982,13 @@
         <!-- Blocked Bottom Bar -->
         <div id="blocked-bottom-bar" class="blocked-bottom-bar" style="display:none;"></div>
       </div>
+
+      <!-- Mission Dashboard -->
+      <div id="mission-dashboard" class="mission-dashboard" style="display:none;">
+        <h2 style="margin:16px 0 12px;color:#e94560;">Mission Overview</h2>
+        <div id="mission-caps" class="cap-grid"></div>
+        <svg id="dependency-arrows" class="dependency-svg"></svg>
+      </div>
     </div>
 
     <div class="detail-panel" id="detail-panel">
@@ -994,6 +1020,20 @@
     // Blocked/cancelled statuses rendered in separate bottom bar (not a column)
     const BLOCKED_STATUSES = ['blocked', 'cancelled'];
 
+    // State
+    let nodes = [];
+    let stations = [];
+    let selectedNodeId = null;
+    let searchQuery = '';
+    let searchDebounceTimer = null;
+    let lastDataHash = null;
+    let lastEtag = null;
+    let pollInterval = null;
+    let idleTickCount = 0;
+    const POLL_INTERVAL_FAST = 5000;
+    const POLL_INTERVAL_SLOW = 30000;
+    const IDLE_THRESHOLD = 6; // After 6 unchanged polls (30s), switch to slow
+    let currentPollInterval = POLL_INTERVAL_FAST;
     // Complete column time filter (days): 1, 7, 30, 0=all — default 7 days (1 week)
     const COMPLETE_FILTER_OPTIONS = [
       { label: '1d', days: 1 },
@@ -1009,18 +1049,9 @@
       return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    // State
-    let nodes = [];
-    let stations = [];
-    let selectedNodeId = null;
-    let searchQuery = '';
-    let searchDebounceTimer = null;
-    let lastDataHash = null;
-    let pollInterval = null;
-    const POLL_INTERVAL_MS = 5000;
     let blockedFilter = 'all'; // all, blocked, cancelled
-    let queueFilter = localStorage.getItem('queueFilter') || 'all'; // all, ready, pending, rework
     let blockedCollapsed = localStorage.getItem('blocked-collapsed') === 'true';
+    let queueFilter = localStorage.getItem('queueFilter') || 'all'; // all, ready, pending, rework
 
     // DOM elements
     const kanbanBoard = document.getElementById('kanban-board');
@@ -1213,23 +1244,34 @@
       });
     }
 
-    let lastEtag = null;
     async function pollData() {
       try {
         const projectParam = currentProject ? `?project=${currentProject}` : '';
         const headers = {};
-        if (lastEtag) { headers['If-None-Match'] = lastEtag; }
+        if (lastEtag) {
+          headers['If-None-Match'] = lastEtag;
+        }
         const response = await fetch('/api/data' + projectParam, { headers });
+
+        // 304 Not Modified — data unchanged, increase idle count
         if (response.status === 304) {
+          idleTickCount++;
+          adaptPollingInterval();
           liveDot.classList.remove('error');
+          checkForUpdate();
           return;
         }
+
+        const etag = response.headers.get('etag');
+        if (etag) lastEtag = etag;
+
         const data = await response.json();
-        const newEtag = response.headers.get('ETag');
-        if (newEtag) { lastEtag = newEtag; }
 
         const newHash = computeDataHash(data);
         if (newHash !== lastDataHash) {
+          idleTickCount = 0; // Reset idle on data change
+          adaptPollingInterval();
+
           const oldNodes = [...nodes];
           nodes = data.nodes || [];
           stations = data.stations || [];
@@ -1256,21 +1298,37 @@
           if (changedIds.length > 0) {
             setTimeout(() => flashNodes(changedIds), 100);
           }
+        } else {
+          idleTickCount++;
+          adaptPollingInterval();
         }
 
         liveDot.classList.remove('error');
+
+      // Check for version updates on every poll cycle
+      checkForUpdate();
       } catch (error) {
         console.error('Poll failed:', error);
         liveDot.classList.add('error');
       }
+    }
 
-      // Check for version updates on every poll cycle
-      checkForUpdate();
+    function adaptPollingInterval() {
+      const newInterval = idleTickCount >= IDLE_THRESHOLD ? POLL_INTERVAL_SLOW : POLL_INTERVAL_FAST;
+      if (newInterval !== currentPollInterval) {
+        currentPollInterval = newInterval;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = setInterval(pollData, currentPollInterval);
+        }
+      }
     }
 
     function startPolling() {
       if (pollInterval) clearInterval(pollInterval);
-      pollInterval = setInterval(pollData, POLL_INTERVAL_MS);
+      idleTickCount = 0;
+      currentPollInterval = POLL_INTERVAL_FAST;
+      pollInterval = setInterval(pollData, currentPollInterval);
     }
 
     function stopPolling() {
@@ -1682,28 +1740,6 @@
               ).join('')}</ul>`
             : '<div class="value" style="color: #666;">None (leaf)</div>'}
         </div>
-        ${(() => {
-          const dependsOn = Array.isArray(dna.depends_on) ? dna.depends_on : [];
-          if (dependsOn.length === 0) return '';
-          return `
-        <div class="detail-field">
-          <label>Dependencies (${dependsOn.length})</label>
-          <ul class="node-links">${dependsOn.map(slug => {
-            const depNode = nodes.find(n => n.slug === slug);
-            const depStatus = depNode ? depNode.status : 'unknown';
-            const depTitle = depNode ? (depNode.dna?.title || slug) : slug;
-            return depNode
-              ? `<li class="clickable" data-id="${depNode.id}" style="display:flex;align-items:center;gap:6px;">
-                  <span class="badge status-${depStatus}" style="font-size:10px;padding:1px 6px;">${depStatus}</span>
-                  <span>${depTitle}</span>
-                </li>`
-              : `<li style="display:flex;align-items:center;gap:6px;">
-                  <span class="badge" style="font-size:10px;padding:1px 6px;background:#555;color:#aaa;">unknown</span>
-                  <span style="color:#888;">${slug}</span>
-                </li>`;
-          }).join('')}</ul>
-        </div>`;
-        })()}
         ${dna.pdsa_ref ? `
         <div class="detail-field">
           <label>PDSA</label>
@@ -1742,6 +1778,28 @@
           </div>
         </div>
         ` : ''}
+        ${(() => {
+          const dependsOn = Array.isArray(dna.depends_on) ? dna.depends_on : [];
+          if (dependsOn.length === 0) return '';
+          return `
+        <div class="detail-field">
+          <label>Dependencies (${dependsOn.length})</label>
+          <ul class="node-links">${dependsOn.map(slug => {
+            const depNode = nodes.find(n => n.slug === slug);
+            const depStatus = depNode ? depNode.status : 'unknown';
+            const depTitle = depNode ? (depNode.dna?.title || slug) : slug;
+            return depNode
+              ? `<li class="clickable" data-id="${depNode.id}" style="display:flex;align-items:center;gap:6px;">
+                  <span class="badge status-${depStatus}" style="font-size:10px;padding:1px 6px;">${depStatus}</span>
+                  <span>${depTitle}</span>
+                </li>`
+              : `<li style="display:flex;align-items:center;gap:6px;">
+                  <span class="badge" style="font-size:10px;padding:1px 6px;background:#555;color:#aaa;">unknown</span>
+                  <span style="color:#888;">${slug}</span>
+                </li>`;
+          }).join('')}</ul>
+        </div>`;
+        })()}
         ${dna.changelog_ref ? `
         <div class="detail-field">
           <label>Changelog</label>
@@ -2066,8 +2124,50 @@
       lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
       startPolling();
     });
-    loadVersion();
     checkForUpdate();
+    loadVersion();
+
+    // Mission dashboard toggle
+    let missionViewActive = false;
+    function toggleMissionView() {
+      missionViewActive = !missionViewActive;
+      const kanban = document.getElementById('kanban-board');
+      const mission = document.getElementById('mission-dashboard');
+      const toggle = document.getElementById('view-toggle');
+      if (missionViewActive) {
+        kanban.style.display = 'none';
+        mission.style.display = 'block';
+        toggle.textContent = 'Mission';
+        loadMissionDashboard();
+      } else {
+        kanban.style.display = 'flex';
+        mission.style.display = 'none';
+        toggle.textContent = 'Kanban';
+      }
+    }
+    window.toggleMissionView = toggleMissionView;
+
+    async function loadMissionDashboard() {
+      const capsContainer = document.getElementById('mission-caps');
+      capsContainer.innerHTML = '<div style="color:#888;">Loading capabilities...</div>';
+      // Mission dashboard data loaded from viz server project data
+      // Capabilities are rendered as cap-cards with dependency links
+      capsContainer.innerHTML = '<div class="cap-card"><h3>Loading...</h3><div class="cap-stats">Fetching mission data</div></div>';
+    }
+
+    // PWA install prompt
+    // NOTE: PWA install requires HTTPS. On HTTP (dev/VPN), beforeinstallprompt won't fire
+    // and serviceWorker.register will fail. This is expected — PWA activates on HTTPS deploy.
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      console.log('PWA install available');
+    });
+
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
   </script>
 </body>
 </html>
