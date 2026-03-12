@@ -8,6 +8,6 @@
     "Server: GET /api/capabilities/:capId endpoint returns requirements + tasks with status",
     "Client: loadMissionDashboard() fetches real data and renders cap-cards with progress bars",
     "Client: showCapabilityDetail() drill-down shows requirements list and tasks with status badges and role colors",
-    "Client: Back navigation from drill-down via hideDetail()"
+    "Client: Back navigation from drill-down via hideCapabilityDetail()"
   ]
 }

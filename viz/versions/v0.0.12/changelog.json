@@ -4,7 +4,6 @@
   "date": "2026-03-12",
   "task": "wf-v18-approval-mode-enforcement",
   "changes": [
-    "Rewrite gate logic with matrix-based requiresVizConfirm — manual gates all, auto-approval gates completions only, auto/semi free",
     "Add auto-approval option to liaison mode dropdown",
     "Add Complete button on review+liaison and approval+liaison cards in manual+auto-approval modes",
     "Approve/Rework buttons shown only in manual mode",
