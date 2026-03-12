@@ -770,32 +770,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static files — serve from active/ symlink directory, fallback to root for shared assets
+  // Static files — serve from active/ symlink directory
   const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
     ? path.resolve(path.join(__dirname, 'active'))
     : __dirname;
   let filePath = pathname === '/' ? '/index.html' : pathname;
-  let resolvedPath = path.join(staticRoot, filePath);
-
-  // Fallback to root dir for shared assets (e.g., /assets/favicons/)
-  if (!fs.existsSync(resolvedPath) && staticRoot !== __dirname) {
-    resolvedPath = path.join(__dirname, filePath);
-  }
+  filePath = path.join(staticRoot, filePath);
 
   // Security: prevent directory traversal
-  if (!resolvedPath.startsWith(staticRoot) && !resolvedPath.startsWith(__dirname)) {
+  if (!filePath.startsWith(staticRoot)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end('Forbidden');
     return;
   }
 
-  serveStatic(res, resolvedPath);
+  serveStatic(res, filePath);
 });
 
 const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
-  console.log(`Workspace: ${__dirname}`);
+  console.log(`Workspace: ${WORKSPACE_PATH}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
 });

@@ -1,0 +1,16 @@
+{
+  "version": "v0.0.23",
+  "title": "Breadcrumb Navigation (Mission > Capability > Task)",
+  "date": "2026-03-12",
+  "task": "h1-7-viz-breadcrumb-nav",
+  "changes": [
+    "Server: new GET /api/tasks/:slug endpoint with parent hierarchy for breadcrumb",
+    "Server: /api/capabilities/:capId now includes mission_id and mission_title",
+    "Client: breadcrumb bar replaces Back button in capability and task detail views",
+    "Client: navStack-based navigation state management",
+    "Client: navigateTo() for clickable breadcrumb segments (Missions > Mission > Capability > Task)",
+    "Client: showTaskDetail() renders task DNA summary (slug, title, status, role, description, depends_on, pdsa_ref)",
+    "Client: task rows in capability detail are clickable to drill into task detail",
+    "Client: hideDetail() resets navStack"
+  ]
+}
