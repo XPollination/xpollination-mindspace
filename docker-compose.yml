@@ -1,0 +1,26 @@
+# Mindspace Docker Compose — Production
+#
+# Start the full Mindspace system:
+#   docker compose up --build
+#
+# Services:
+#   mindspace — API (3100) + viz (4200) + SQLite
+#
+# Data persists via named volume (survives container restarts).
+
+services:
+  mindspace:
+    build: .
+    ports:
+      - "3100:3100"   # Mindspace API
+      - "4200:4200"   # Mindspace viz dashboard
+    volumes:
+      - mindspace-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/mindspace.db
+    restart: unless-stopped
+
+volumes:
+  mindspace-data:
+    driver: local

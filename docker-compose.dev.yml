@@ -1,0 +1,17 @@
+# Mindspace Docker Compose — Development Override
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Mounts source directories for hot-reload during development.
+# Changes to api/, viz/, or src/ are reflected immediately.
+
+services:
+  mindspace:
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./api:/app/api
+      - ./viz:/app/viz
+      - ./src:/app/src
+      - mindspace-data:/app/data
