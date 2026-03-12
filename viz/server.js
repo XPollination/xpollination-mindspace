@@ -650,21 +650,26 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static files — serve from active/ symlink directory
+  // Static files — serve from active/ symlink directory, fallback to root for shared assets
   const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
     ? path.resolve(path.join(__dirname, 'active'))
     : __dirname;
   let filePath = pathname === '/' ? '/index.html' : pathname;
-  filePath = path.join(staticRoot, filePath);
+  let resolvedPath = path.join(staticRoot, filePath);
+
+  // Fallback to root dir for shared assets (e.g., /assets/favicons/)
+  if (!fs.existsSync(resolvedPath) && staticRoot !== __dirname) {
+    resolvedPath = path.join(__dirname, filePath);
+  }
 
   // Security: prevent directory traversal
-  if (!filePath.startsWith(staticRoot)) {
+  if (!resolvedPath.startsWith(staticRoot) && !resolvedPath.startsWith(__dirname)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end('Forbidden');
     return;
   }
 
-  serveStatic(res, filePath);
+  serveStatic(res, resolvedPath);
 });
 
 const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
