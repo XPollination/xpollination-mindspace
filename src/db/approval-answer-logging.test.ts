@@ -237,7 +237,7 @@ describe('approval-answer-logging: human answer audit trail gate', () => {
     });
 
     it('DEV transition should not require human_answer fields', () => {
-      insertTask('gate6-dev', 'active', 'dev');
+      insertTask('gate6-dev', 'active', 'dev', { memory_contribution_id: 'test-id' });
       const result = cli('transition gate6-dev review dev');
       const parsed = JSON.parse(result);
       expect(parsed.success).toBe(true);
