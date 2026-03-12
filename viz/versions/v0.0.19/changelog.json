@@ -1,0 +1,12 @@
+{
+  "version": "v0.0.19",
+  "title": "ETag/304 Polling Fix v2",
+  "date": "2026-03-12",
+  "task": "ms-viz-polling-fix-v2",
+  "changes": [
+    "ETag/304 features already present from v0.0.17 base (client If-None-Match, server MD5 ETag, 304 responses)",
+    "Adaptive polling (5s fast / 30s slow) already present from v0.0.17 base",
+    "Cache-Control: no-cache headers on /api/data responses",
+    "Version bump only — no new code changes needed on develop base"
+  ]
+}
