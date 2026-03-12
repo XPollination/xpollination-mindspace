@@ -650,12 +650,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static files
+  // Static files — serve from active/ symlink directory
+  const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+    ? path.resolve(path.join(__dirname, 'active'))
+    : __dirname;
   let filePath = pathname === '/' ? '/index.html' : pathname;
-  filePath = path.join(__dirname, filePath);
+  filePath = path.join(staticRoot, filePath);
 
   // Security: prevent directory traversal
-  if (!filePath.startsWith(__dirname)) {
+  if (!filePath.startsWith(staticRoot)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end('Forbidden');
     return;
@@ -667,7 +670,7 @@ const server = http.createServer(async (req, res) => {
 const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
-  console.log(`Workspace: ${__dirname}`);
+  console.log(`Workspace: ${WORKSPACE_PATH}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
 });
