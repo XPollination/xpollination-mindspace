@@ -1,0 +1,14 @@
+{
+  "version": "v0.0.13",
+  "title": "ETag/304 Conditional Polling",
+  "date": "2026-03-12",
+  "task": "ms-viz-polling-fix-v2",
+  "changes": [
+    "Server: ETag generation via MD5 hash on /api/data response body",
+    "Server: If-None-Match handling returns 304 when data unchanged",
+    "Server: Cache-Control: no-cache header on /api/data",
+    "Client: lastEtag variable stores ETag from responses",
+    "Client: pollData() sends If-None-Match header with stored ETag",
+    "Client: 304 response skips JSON parsing and re-rendering"
+  ]
+}
