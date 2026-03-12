@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mindspace Flow Visualization</title>
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicons/favicon-48x48.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .header {
+      background: #16213e;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    .project-dropdown {
+      background: #16213e;
+      color: #e94560;
+      border: 1px solid #e94560;
+      padding: 6px 12px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .project-dropdown:hover {
+      background: #1a2744;
+    }
+
+    .project-dropdown:focus {
+      box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.3);
+    }
+
+    .viz-version {
+      font-size: 11px;
+      color: #666;
+      margin-left: 8px;
+      opacity: 0.7;
+    }
+    .queue-group-header {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 6px 8px 2px;
+      margin-top: 4px;
+    }
+    .queue-filter-btn {
+      padding: 1px 6px;
+      font-size: 10px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+    }
+    .queue-filter-btn.active-filter {
+      background: #e94560;
+      color: #fff;
+      border-color: #e94560;
+    }
+
+    .header-subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+
+    .search-container {
+      flex: 1;
+      max-width: 300px;
+      margin: 0 20px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 6px 12px;
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      color: #eee;
+      font-size: 13px;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: #e94560;
+    }
+
+    .search-input::placeholder {
+      color: #666;
+    }
+
+    .search-count {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #666;
+      font-size: 11px;
+    }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #888;
+      font-size: 12px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+
+    .live-dot.error {
+      background: #ef4444;
+      animation: none;
+    }
+
+    .live-dot.flash {
+      background: #60a5fa;
+      transform: scale(1.5);
+      transition: all 0.2s;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes nodeFlash {
+      0% { filter: brightness(1.5); }
+      100% { filter: brightness(1); }
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .header-controls button {
+      background: #0f3460;
+      border: 1px solid #e94560;
+      color: #e94560;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .header-controls button:hover {
+      background: #e94560;
+      color: #fff;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* Main layout */
+    .main-container {
+      display: flex;
+      height: calc(100vh - 50px);
+    }
+
+    .viz-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Mission Dashboard */
+    .mission-dashboard { padding: 0 20px; overflow: auto; height: 100%; }
+    .cap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .cap-card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; }
+    .cap-card h3 { font-size: 14px; margin: 0 0 8px; color: #eee; }
+    .cap-card .cap-progress { height: 6px; background: #0f3460; border-radius: 3px; overflow: hidden; margin: 6px 0; }
+    .cap-card .cap-progress-fill { height: 100%; background: #4caf50; border-radius: 3px; }
+    .cap-card .cap-stats { font-size: 11px; color: #888; }
+    .dependency-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    /* Kanban Board Layout */
+    .kanban-board {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: auto;
+      padding: 12px;
+      gap: 12px;
+    }
+
+    /* Agent Status Bar - horizontal bar at top showing 4 agent status boxes */
+    .agent-status-bar {
+      display: flex;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .agent-status-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #1a1a2e;
+      border-radius: 6px;
+      border: 1px solid #0f3460;
+      min-width: 0;
+    }
+
+    .agent-status-box.has-task {
+      border-color: #22c55e;
+    }
+
+    .agent-role-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .agent-task-name {
+      font-size: 12px;
+      color: #ccc;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .agent-task-name.idle {
+      color: #555;
+      font-style: italic;
+    }
+
+    .agent-status-label {
+      font-size: 10px;
+      color: #888;
+      white-space: nowrap;
+    }
+
+    /* Kanban Columns - 5 equal columns in a row */
+    .kanban-columns {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .kanban-column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .column-phase-header {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      border-bottom: 1px solid #0f3460;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .column-count {
+      background: #0f3460;
+      color: #888;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .column-cards {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Task Card */
+    .task-card {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 4px solid #555;
+    }
+
+    .task-card:hover {
+      border-color: #e94560;
+      background: #1e2640;
+    }
+
+    .task-card.selected {
+      border-color: #e94560;
+      box-shadow: 0 0 12px rgba(233, 69, 96, 0.3);
+    }
+
+    .task-card.updated {
+      animation: nodeFlash 0.5s ease-out;
+    }
+
+    .task-card.manual-pulse {
+      animation: pulseManual 2s infinite;
+    }
+
+    @keyframes pulseManual {
+      0%, 100% { box-shadow: 0 0 4px #f59e0b; border-color: #f59e0b; }
+      50% { box-shadow: 0 0 12px #fb923c; border-color: #fb923c; }
+    }
+
+    .task-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .task-card-slug {
+      font-size: 12px;
+      font-weight: 600;
+      color: #eee;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .task-card-badges {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .role-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border: 1px solid;
+      background: transparent;
+    }
+
+    .role-liaison { color: #ef4444; border-color: #ef4444; }
+    .role-pdsa { color: #22c55e; border-color: #22c55e; }
+    .role-dev { color: #3b82f6; border-color: #3b82f6; }
+    .role-qa { color: #f59e0b; border-color: #f59e0b; }
+
+    .project-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .task-card-title {
+      font-size: 11px;
+      color: #aaa;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .task-card-status {
+      font-size: 10px;
+      margin-top: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    .status-dot.pending { background: #6b7280; }
+    .status-dot.ready { background: #3b82f6; }
+    .status-dot.active { background: #22c55e; }
+    .status-dot.testing { background: #10b981; }
+    .status-dot.review { background: #f59e0b; }
+    .status-dot.approval { background: #f59e0b; }
+    .status-dot.approved { background: #8b5cf6; }
+    .status-dot.complete { background: #14b8a6; }
+    .status-dot.rework { background: #ef4444; }
+    .status-dot.blocked { background: #dc2626; }
+    .status-dot.cancelled { background: #9ca3af; }
+
+    .task-type-label {
+      font-size: 9px;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    /* Blocked Bottom Bar - separate section for blocked/cancelled tasks */
+    .blocked-bottom-bar {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 10px 12px;
+      flex-shrink: 0;
+    }
+
+    .blocked-bottom-bar .bar-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #dc2626;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .blocked-cards {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .blocked-cards .task-card {
+      width: 180px;
+      flex-shrink: 0;
+      border-left-color: #dc2626;
+      opacity: 0.7;
+    }
+
+    .blocked-cards .task-card:hover {
+      opacity: 1;
+    }
+
+    /* Detail panel */
+    .detail-panel {
+      width: 350px;
+      background: #16213e;
+      border-left: 1px solid #0f3460;
+      padding: 20px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .detail-panel.visible {
+      display: block;
+    }
+
+    .detail-panel h2 {
+      font-size: 16px;
+      color: #e94560;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    .detail-panel .close-btn {
+      float: right;
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .detail-panel .close-btn:hover {
+      color: #e94560;
+    }
+
+    .detail-actions-divider {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+    }
+
+    .detail-field {
+      margin-bottom: 12px;
+    }
+
+    .detail-field label {
+      display: block;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .detail-field .value {
+      font-size: 14px;
+      color: #eee;
+    }
+
+    .detail-field .description {
+      font-size: 13px;
+      color: #ccc;
+      line-height: 1.5;
+    }
+
+    .detail-field .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge.type-requirement { background: #3b82f6; }
+    .badge.type-design { background: #22c55e; }
+    .badge.type-task { background: #eab308; color: #000; }
+    .badge.type-test { background: #a855f7; }
+
+    .badge.status-pending { background: #6b7280; color: #fff; }
+    .badge.status-ready { background: #3b82f6; color: #fff; }
+    .badge.status-active { background: #166534; color: #fff; }
+    .badge.status-testing { background: #065f46; color: #fff; }
+    .badge.status-review { background: #92400e; color: #fff; }
+    .badge.status-rework { background: #991b1b; color: #fff; }
+    .badge.status-complete { background: #115e59; color: #fff; }
+    .badge.status-done { background: #115e59; color: #fff; }
+    .badge.status-completed { background: #115e59; color: #fff; }
+    .badge.status-blocked { background: #991b1b; color: #fff; }
+    .badge.status-cancelled { background: #6b7280; color: #fff; }
+    .badge.status-approval { background: #92400e; color: #fff; }
+    .badge.status-approved { background: #5b21b6; color: #fff; }
+
+    .badge.role-liaison { color: #ef4444; border: 1px solid #ef4444; background: transparent; }
+    .badge.role-pdsa { color: #22c55e; border: 1px solid #22c55e; background: transparent; }
+    .badge.role-dev { color: #3b82f6; border: 1px solid #3b82f6; background: transparent; }
+    .badge.role-qa { color: #f59e0b; border: 1px solid #f59e0b; background: transparent; }
+
+    .detail-field .criteria-list {
+      list-style: none;
+      margin-top: 8px;
+    }
+
+    .detail-field .criteria-list li {
+      padding: 4px 0;
+      font-size: 12px;
+      color: #ccc;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .detail-field .criteria-list li::before {
+      content: 'o';
+      color: #e94560;
+      flex-shrink: 0;
+    }
+
+    .detail-field .node-links {
+      list-style: none;
+      margin-top: 4px;
+    }
+
+    .detail-field .node-links li {
+      padding: 4px 0;
+      font-size: 13px;
+      color: #ccc;
+    }
+
+    .detail-field .node-links li.clickable {
+      cursor: pointer;
+      color: #60a5fa;
+    }
+
+    .detail-field .node-links li.clickable:hover {
+      color: #e94560;
+      text-decoration: underline;
+    }
+
+    .detail-field .node-links li.parent::before {
+      content: '^ ';
+      color: #e94560;
+    }
+
+    .detail-field .node-links li.child::before {
+      content: 'v ';
+      color: #22c55e;
+    }
+
+    .dual-links {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .dual-link {
+      padding: 2px 0;
+      font-family: monospace;
+      word-break: break-all;
+    }
+
+    .dual-link.git-link {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    .dual-link.git-link:hover {
+      text-decoration: underline;
+    }
+
+    .dual-link.workspace-link {
+      color: #888;
+      font-size: 11px;
+    }
+
+    /* Scrollbar styling */
+    .column-cards::-webkit-scrollbar,
+    .kanban-board::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .column-cards::-webkit-scrollbar-track,
+    .kanban-board::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .column-cards::-webkit-scrollbar-thumb,
+    .kanban-board::-webkit-scrollbar-thumb {
+      background: #0f3460;
+      border-radius: 3px;
+    }
+
+    .column-cards::-webkit-scrollbar-thumb:hover,
+    .kanban-board::-webkit-scrollbar-thumb:hover {
+      background: #1a4a8a;
+    }
+    /* Update banner */
+    .update-banner {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #0f3460, #1a4a8a);
+      color: #fff;
+      padding: 10px 20px;
+      z-index: 1000;
+      text-align: center;
+      font-size: 13px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .update-banner.show { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .update-banner button {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .update-banner button.primary { background: #e94560; border-color: #e94560; }
+
+    /* Changelog modal */
+    .changelog-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1001;
+      align-items: center;
+      justify-content: center;
+    }
+    .changelog-modal.show { display: flex; }
+    .changelog-modal-content {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .changelog-modal h2 { margin-bottom: 4px; font-size: 18px; }
+    .changelog-modal .changelog-version { color: #e94560; font-size: 13px; margin-bottom: 12px; }
+    .changelog-modal .changelog-list { list-style: disc; padding-left: 20px; }
+    .changelog-modal .changelog-list li { margin-bottom: 6px; font-size: 13px; line-height: 1.4; color: #ccc; }
+    .changelog-modal button.close-btn {
+      margin-top: 16px;
+      padding: 6px 16px;
+      border-radius: 4px;
+      border: 1px solid #0f3460;
+      background: #0f3460;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    /* Past changes section */
+    .past-changes {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1001;
+      align-items: center;
+      justify-content: center;
+    }
+    .past-changes.show { display: flex; }
+    .past-changes-content {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .past-changes h2 { margin-bottom: 16px; }
+    .past-changes .version-entry { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #0f3460; }
+    .past-changes .version-entry:last-child { border-bottom: none; }
+    .past-changes .version-title { font-size: 14px; font-weight: bold; color: #e94560; }
+    .past-changes .version-date { font-size: 11px; color: #888; margin-bottom: 6px; }
+    .past-changes .version-changes { list-style: disc; padding-left: 20px; }
+    .past-changes .version-changes li { font-size: 12px; color: #ccc; margin-bottom: 3px; }
+
+    /* Light mode overrides */
+    body.light-mode {
+      background: #f5f5f5;
+      color: #222;
+    }
+    body.light-mode .header {
+      background: #e8e8e8;
+      border-bottom-color: #ccc;
+    }
+    body.light-mode .kanban-column {
+      background: #e8e8e8;
+      border-color: #ccc;
+    }
+    body.light-mode .task-card {
+      background: #fff;
+      border-color: #ccc;
+      color: #222;
+    }
+    body.light-mode .task-card:hover {
+      background: #f0f0f0;
+    }
+    body.light-mode .task-card-slug { color: #222; }
+    body.light-mode .task-card-title { color: #555; }
+    body.light-mode .column-phase-header { color: #555; border-bottom-color: #ccc; }
+    body.light-mode .column-count { background: #ddd; color: #555; }
+    body.light-mode .agent-status-bar { background: #e8e8e8; border-color: #ccc; }
+    body.light-mode .agent-status-box { background: #fff; border-color: #ccc; }
+    body.light-mode .agent-task-name { color: #333; }
+    body.light-mode .agent-task-name.idle { color: #999; }
+    body.light-mode .blocked-bottom-bar { background: #e8e8e8; border-color: #ccc; }
+    body.light-mode .detail-panel { background: #e8e8e8; border-left-color: #ccc; }
+    body.light-mode .detail-panel h2 { color: #e94560; }
+    body.light-mode .detail-field label { color: #666; }
+    body.light-mode .detail-field .value { color: #222; }
+    body.light-mode .detail-field .description { color: #444; }
+    body.light-mode .detail-actions-divider { border-top-color: #ccc; }
+    body.light-mode #liaison-mode option { background: #e8e8e8; color: #333; }
+    body.light-mode .search-input { background: #fff; border-color: #ccc; color: #222; }
+    body.light-mode .search-input::placeholder { color: #999; }
+    body.light-mode .project-dropdown { background: #e8e8e8; color: #e94560; border-color: #e94560; }
+    body.light-mode .project-dropdown:hover { background: #ddd; }
+    body.light-mode #liaison-mode { background: #e8e8e8; color: #333; border-color: #aaa; }
+    body.light-mode .header-controls button { background: #ddd; border-color: #aaa; color: #333; }
+    body.light-mode .header-controls button:hover { background: #e94560; color: #fff; }
+    body.light-mode #version-history-btn { background: #ddd; border-color: #aaa; color: #333; }
+    body.light-mode .stats-bar { color: #555; }
+    body.light-mode .header-subtitle { color: #666; }
+    body.light-mode .changelog-modal-content { background: #f5f5f5; border-color: #ccc; color: #222; }
+    body.light-mode .changelog-modal h2 { color: #222; }
+    body.light-mode .changelog-modal .changelog-version { color: #e94560; }
+    body.light-mode .changelog-modal .changelog-list li { color: #444; }
+    body.light-mode .changelog-modal button.close-btn { background: #ddd; border-color: #aaa; color: #333; }
+    body.light-mode .past-changes-content { background: #f5f5f5; border-color: #ccc; color: #222; }
+    body.light-mode .past-changes h2 { color: #222; }
+    body.light-mode .past-changes .version-title { color: #e94560; }
+    body.light-mode .past-changes .version-date { color: #666; }
+    body.light-mode .past-changes .version-changes li { color: #444; }
+    body.light-mode .past-changes .version-entry { border-bottom-color: #ccc; }
+    body.light-mode .past-changes button.close-btn { background: #ddd; border-color: #aaa; color: #333; }
+    body.light-mode .update-banner { background: linear-gradient(135deg, #e0e0e0, #d0d0d0); color: #222; }
+    body.light-mode .update-banner button { background: rgba(0,0,0,0.1); border-color: #aaa; color: #222; }
+    body.light-mode .update-banner button.primary { background: #e94560; color: #fff; border-color: #e94560; }
+    body.light-mode .blocked-filter-btn { border-color: #aaa; color: #555; }
+    body.light-mode .live-indicator { color: #555; }
+
+    /* Liaison mode select */
+    #liaison-mode {
+      padding: 2px 4px;
+      font-size: 11px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: #2a2a2a;
+      color: #ccc;
+      cursor: pointer;
+    }
+    #liaison-mode option { background: #2a2a2a; color: #ccc; }
+
+    /* Version history button */
+    #version-history-btn {
+      padding: 2px 8px;
+      font-size: 11px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: #2a2a2a;
+      color: #ccc;
+      cursor: pointer;
+    }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      padding: 2px 8px;
+      font-size: 11px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: #2a2a2a;
+      color: #ccc;
+      cursor: pointer;
+    }
+    body.light-mode .theme-toggle { background: #ddd; border-color: #aaa; color: #333; }
+
+    /* Collapsible blocked section */
+    .blocked-bottom-bar.collapsed .blocked-cards { display: none; }
+    .blocked-bottom-bar .collapse-toggle {
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+      margin-right: 8px;
+    }
+
+    /* Blocked filter buttons */
+    .blocked-filter-buttons {
+      display: flex;
+      gap: 4px;
+      margin-left: 8px;
+    }
+    .blocked-filter-btn {
+      padding: 1px 6px;
+      font-size: 9px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    .blocked-filter-btn.active-filter {
+      background: #dc2626;
+      color: #fff;
+      border-color: #dc2626;
+    }
+    .blocked-filter-btn.selected-filter {
+      background: #dc2626;
+      color: #fff;
+      border-color: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <!-- Update notification banner -->
+  <div id="update-banner" class="update-banner">
+    <span>A new version is available!</span>
+    <button onclick="showChangelogModal()">View Changes</button>
+    <button class="primary" onclick="acceptUpdate()">Update Now</button>
+  </div>
+
+  <!-- Changelog modal -->
+  <div id="changelog-modal" class="changelog-modal" onclick="if(event.target===this)hideChangelogModal()">
+    <div class="changelog-modal-content">
+      <h2>What's New</h2>
+      <div id="changelog-version" class="changelog-version"></div>
+      <ul id="changelog-list" class="changelog-list"></ul>
+      <button class="close-btn" onclick="hideChangelogModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Past changes panel -->
+  <div id="past-changes" class="past-changes" onclick="if(event.target===this)hidePastChanges()">
+    <div class="past-changes-content">
+      <h2>Version History</h2>
+      <div id="past-changes-list"></div>
+      <button class="close-btn" onclick="hidePastChanges()">Close</button>
+    </div>
+  </div>
+
+  <div class="header">
+    <select id="project-selector" class="project-dropdown">
+      <option value="">Loading...</option>
+    </select>
+    <img src="/assets/mindspace-logo-56.png" alt="Mindspace" class="mindspace-logo" style="height:28px;margin-left:12px;">
+    <span class="viz-version"></span>
+    <span class="header-subtitle" id="view-toggle" style="cursor:pointer;" onclick="toggleMissionView()">Kanban</span>
+    <div class="search-container">
+      <input type="text" id="node-search" class="search-input" placeholder="Search nodes...">
+      <span id="search-count" class="search-count"></span>
+    </div>
+    <div class="header-controls">
+      <span id="live-indicator" class="live-indicator">
+        <span id="live-dot" class="live-dot"></span>
+        <span>Live</span>
+      </span>
+      <select id="liaison-mode" title="LIAISON Approval Mode">
+        <option value="manual">Manual</option>
+        <option value="semi">Semi</option>
+        <option value="auto-approval">Auto-Approval</option>
+        <option value="auto">Auto</option>
+      </select>
+      <span class="stats-bar" id="stats">Loading...</span>
+      <button id="refresh-btn">Refresh</button>
+      <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">Light</button>
+      <button id="version-history-btn" onclick="showPastChanges()">Version History</button>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <div class="viz-container">
+      <div id="kanban-board" class="kanban-board">
+        <!-- Suspect Status Bar -->
+        <div id="suspect-status-bar" style="display:none; padding: 8px 16px; background: #1a1e2e; border-bottom: 1px solid #333; font-size: 12px;">
+          <span style="color: #ef4444;">&#9679; <span id="suspect-count">0</span> suspect</span>
+          <span style="color: #22c55e; margin-left: 12px;">&#9679; <span id="cleared-count">0</span> cleared</span>
+          <span style="color: #f59e0b; margin-left: 12px;">&#9679; <span id="risk-count">0</span> accepted risk</span>
+          <span style="margin-left: 16px;">
+            <span id="suspect-progress-bar" style="display:inline-block; width: 100px; height: 6px; background: #333; border-radius: 3px; vertical-align: middle;">
+              <span id="suspect-progress-fill" style="display:block; height:100%; background: #22c55e; border-radius: 3px; width: 0%;"></span>
+            </span>
+            <span id="suspect-progress-pct" style="color: #888; margin-left: 4px;">0%</span> cleared
+          </span>
+        </div>
+        <!-- Agent Status Bar -->
+        <div id="agent-status-bar" class="agent-status-bar"></div>
+        <!-- Kanban Columns -->
+        <div id="kanban-columns" class="kanban-columns"></div>
+        <!-- Blocked Bottom Bar -->
+        <div id="blocked-bottom-bar" class="blocked-bottom-bar" style="display:none;"></div>
+      </div>
+
+      <!-- Mission Dashboard -->
+      <div id="mission-dashboard" class="mission-dashboard" style="display:none;">
+        <h2 style="margin:16px 0 12px;color:#e94560;">Mission Overview</h2>
+        <div id="mission-caps" class="cap-grid"></div>
+        <svg id="dependency-arrows" class="dependency-svg"></svg>
+      </div>
+    </div>
+
+    <div class="detail-panel" id="detail-panel">
+      <button class="close-btn" id="close-detail">x</button>
+      <h2>Object Details</h2>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // Configuration
+    // ============================================================
+
+    // Status-to-column mapping: Kanban phase columns
+    // QUEUE groups: pending, ready, rework
+    // ACTIVE groups: active, testing
+    // REVIEW groups: review, approval
+    // APPROVED: approved
+    // COMPLETE: complete
+    const COLUMN_CONFIG = [
+      { id: 'queue',    label: 'QUEUE',    statuses: ['pending', 'ready', 'rework'] },
+      { id: 'active',   label: 'ACTIVE',   statuses: ['active', 'testing'] },
+      { id: 'review',   label: 'REVIEW',   statuses: ['review', 'approval'] },
+      { id: 'approved', label: 'APPROVED', statuses: ['approved'] },
+      { id: 'complete', label: 'COMPLETE', statuses: ['complete', 'completed', 'done'] }
+    ];
+
+    // Blocked/cancelled statuses rendered in separate bottom bar (not a column)
+    const BLOCKED_STATUSES = ['blocked', 'cancelled'];
+
+    // State
+    let nodes = [];
+    let stations = [];
+    let selectedNodeId = null;
+    let searchQuery = '';
+    let searchDebounceTimer = null;
+    let lastDataHash = null;
+    let lastEtag = null;
+    let pollInterval = null;
+    let idleTickCount = 0;
+    const POLL_INTERVAL_FAST = 5000;
+    const POLL_INTERVAL_SLOW = 30000;
+    const IDLE_THRESHOLD = 6; // After 6 unchanged polls (30s), switch to slow
+    let currentPollInterval = POLL_INTERVAL_FAST;
+    // Complete column time filter (days): 1, 7, 30, 0=all — default 7 days (1 week)
+    const COMPLETE_FILTER_OPTIONS = [
+      { label: '1d', days: 1 },
+      { label: '1w', days: 7 },
+      { label: '1m', days: 30 },
+      { label: 'All', days: 0 }
+    ];
+    let completeFilterDays = parseInt(localStorage.getItem('completeFilter') || '7');
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    let blockedFilter = 'all'; // all, blocked, cancelled
+    let blockedCollapsed = localStorage.getItem('blocked-collapsed') === 'true';
+    let queueFilter = localStorage.getItem('queueFilter') || 'all'; // all, ready, pending, rework
+
+    // DOM elements
+    const kanbanBoard = document.getElementById('kanban-board');
+    const agentStatusBar = document.getElementById('agent-status-bar');
+    const kanbanColumnsEl = document.getElementById('kanban-columns');
+    const blockedBottomBar = document.getElementById('blocked-bottom-bar');
+    const detailPanel = document.getElementById('detail-panel');
+    const detailContent = document.getElementById('detail-content');
+    const statsEl = document.getElementById('stats');
+    const projectSelector = document.getElementById('project-selector');
+    const searchInput = document.getElementById('node-search');
+    const searchCountEl = document.getElementById('search-count');
+    const liveDot = document.getElementById('live-dot');
+
+    let currentProject = null;
+    const liaisonModeSelect = document.getElementById('liaison-mode');
+
+    // Project color mapping for badges
+    const PROJECT_COLORS = {
+      'best-practices': '#3b82f6',
+      'xpollination-mcp-server': '#8b5cf6',
+      'HomePage': '#10b981'
+    };
+
+    // Role-specific colors per PDSA design: LIAISON=red, PDSA=green, DEV=blue, QA=amber
+    const ROLE_COLORS = {
+      liaison: '#ef4444',
+      pdsa: '#22c55e',
+      dev: '#3b82f6',
+      qa: '#f59e0b'
+    };
+
+    // Status colors for dots
+    const STATUS_COLORS = {
+      pending: '#6b7280',
+      ready: '#3b82f6',
+      active: '#22c55e',
+      testing: '#10b981',
+      review: '#f59e0b',
+      approval: '#f59e0b',
+      approved: '#8b5cf6',
+      complete: '#14b8a6',
+      completed: '#14b8a6',
+      done: '#14b8a6',
+      rework: '#ef4444',
+      blocked: '#dc2626',
+      cancelled: '#9ca3af'
+    };
+
+    // ============================================================
+    // LIAISON approval mode: load current setting and handle changes
+    // ============================================================
+    let suppressModeChange = false;
+    let serverMode = 'manual';
+    let modeChangeTimer = null;
+    let modeWriteInFlight = false;
+    async function loadLiaisonMode() {
+      try {
+        const res = await fetch('/api/settings/liaison-approval-mode');
+        if (res.ok) {
+          const data = await res.json();
+          suppressModeChange = true;
+          liaisonModeSelect.value = data.mode;
+          serverMode = data.mode;
+          liaisonModeSelect.dataset.serverMode = data.mode;
+          suppressModeChange = false;
+          // Re-render detail panel if mode changed
+          if (selectedNodeId) {
+            const selectedNode = nodes.find(n => n.id === selectedNodeId);
+            if (selectedNode) showDetail(selectedNode, false);
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+    liaisonModeSelect.addEventListener('change', () => {
+      if (suppressModeChange) return;
+      // Debounce: wait 300ms for rapid changes (keyboard/scrollwheel) to settle
+      clearTimeout(modeChangeTimer);
+      modeChangeTimer = setTimeout(async () => {
+        const newMode = liaisonModeSelect.value;
+        if (newMode === serverMode) return;
+        if (modeWriteInFlight) return;
+        modeWriteInFlight = true;
+        try {
+          await fetch('/api/settings/liaison-approval-mode', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: newMode })
+          });
+          serverMode = newMode;
+          // Re-render detail panel to update buttons for new mode
+          if (selectedNodeId) {
+            const selectedNode = nodes.find(n => n.id === selectedNodeId);
+            if (selectedNode) showDetail(selectedNode, false);
+          }
+        } catch (e) { /* ignore */ }
+        modeWriteInFlight = false;
+      }, 300);
+    });
+    loadLiaisonMode();
+
+    // ============================================================
+    // Data loading
+    // ============================================================
+
+    async function loadProjects() {
+      try {
+        const response = await fetch('/api/projects');
+        const data = await response.json();
+
+        projectSelector.innerHTML = '';
+
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = 'All Projects';
+        allOption.selected = true;
+        projectSelector.appendChild(allOption);
+        currentProject = 'all';
+
+        data.projects.forEach(project => {
+          const option = document.createElement('option');
+          option.value = project.name;
+          option.textContent = project.name;
+          projectSelector.appendChild(option);
+        });
+
+        await loadData();
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        projectSelector.innerHTML = '<option>Local</option>';
+        await loadDataStatic();
+      }
+    }
+
+    async function loadData() {
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const response = await fetch('/api/data' + projectParam);
+        const data = await response.json();
+        nodes = data.nodes || [];
+        stations = data.stations || [];
+        renderVisualization();
+        updateStats(data);
+      } catch (error) {
+        console.error('Failed to load data from API:', error);
+        await loadDataStatic();
+      }
+    }
+
+    async function loadDataStatic() {
+      try {
+        const response = await fetch('data.json?' + Date.now());
+        const data = await response.json();
+        nodes = data.nodes || [];
+        stations = data.stations || [];
+        renderVisualization();
+        updateStats(data);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        statsEl.textContent = 'Error loading data';
+      }
+    }
+
+    // ============================================================
+    // Auto-refresh polling
+    // ============================================================
+
+    function computeDataHash(data) {
+      return JSON.stringify(data).length + '-' + (data.node_count || 0) + '-' + (data.stations?.length || 0);
+    }
+
+    function findChangedNodeIds(oldNodes, newNodes) {
+      const changed = [];
+      for (const newNode of newNodes) {
+        const oldNode = oldNodes.find(o => o.id === newNode.id);
+        if (!oldNode || JSON.stringify(oldNode) !== JSON.stringify(newNode)) {
+          changed.push(newNode.id);
+        }
+      }
+      return changed;
+    }
+
+    function flashNodes(nodeIds) {
+      nodeIds.forEach(id => {
+        const el = document.querySelector(`.task-card[data-id="${id}"]`);
+        if (el) {
+          el.classList.add('updated');
+          setTimeout(() => el.classList.remove('updated'), 500);
+        }
+      });
+    }
+
+    async function pollData() {
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const headers = {};
+        if (lastEtag) {
+          headers['If-None-Match'] = lastEtag;
+        }
+        const response = await fetch('/api/data' + projectParam, { headers });
+
+        // 304 Not Modified — data unchanged, increase idle count
+        if (response.status === 304) {
+          idleTickCount++;
+          adaptPollingInterval();
+          liveDot.classList.remove('error');
+          checkForUpdate();
+          return;
+        }
+
+        const etag = response.headers.get('etag');
+        if (etag) lastEtag = etag;
+
+        const data = await response.json();
+
+        const newHash = computeDataHash(data);
+        if (newHash !== lastDataHash) {
+          idleTickCount = 0; // Reset idle on data change
+          adaptPollingInterval();
+
+          const oldNodes = [...nodes];
+          nodes = data.nodes || [];
+          stations = data.stations || [];
+
+          const changedIds = findChangedNodeIds(oldNodes, nodes);
+
+          renderVisualization();
+          updateStats(data);
+          loadSuspectStats();
+          lastDataHash = newHash;
+
+          // Auto-refresh detail panel for selected node (shows created_at, updated_at timestamps)
+          if (selectedNodeId) {
+            const selectedNode = nodes.find(n => n.id === selectedNodeId);
+            if (selectedNode) {
+              showDetail(selectedNode); // refreshes created_at, updated_at timestamps
+            } else {
+              selectedNodeId = null;
+              hideDetail();
+            }
+          }
+
+          liveDot.classList.add('flash');
+          setTimeout(() => liveDot.classList.remove('flash'), 300);
+          if (changedIds.length > 0) {
+            setTimeout(() => flashNodes(changedIds), 100);
+          }
+        } else {
+          idleTickCount++;
+          adaptPollingInterval();
+        }
+
+        liveDot.classList.remove('error');
+
+      // Check for version updates on every poll cycle
+      checkForUpdate();
+      } catch (error) {
+        console.error('Poll failed:', error);
+        liveDot.classList.add('error');
+      }
+    }
+
+    function adaptPollingInterval() {
+      const newInterval = idleTickCount >= IDLE_THRESHOLD ? POLL_INTERVAL_SLOW : POLL_INTERVAL_FAST;
+      if (newInterval !== currentPollInterval) {
+        currentPollInterval = newInterval;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = setInterval(pollData, currentPollInterval);
+        }
+      }
+    }
+
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      idleTickCount = 0;
+      currentPollInterval = POLL_INTERVAL_FAST;
+      pollInterval = setInterval(pollData, currentPollInterval);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        pollData();
+        loadLiaisonMode();
+        startPolling();
+      }
+    });
+
+    function updateStats(data) {
+      statsEl.textContent = `Q:${data.queue_count || 0} A:${data.active_count || 0} C:${data.completed_count || 0} | ${data.node_count} objects`;
+    }
+
+    // ============================================================
+    // Search functionality
+    // ============================================================
+
+    function matchesSearch(node, query) {
+      if (!query) return true;
+      const lowerQuery = query.toLowerCase();
+      if (node.slug.toLowerCase().includes(lowerQuery)) return true;
+      const dna = node.dna || {};
+      const searchableText = JSON.stringify(dna).toLowerCase();
+      return searchableText.includes(lowerQuery);
+    }
+
+    function getFilteredNodes() {
+      if (!searchQuery) return nodes;
+      return nodes.filter(n => matchesSearch(n, searchQuery));
+    }
+
+    function updateSearchCount() {
+      if (!searchQuery) {
+        searchCountEl.textContent = '';
+      } else {
+        const filtered = getFilteredNodes();
+        searchCountEl.textContent = `${filtered.length}/${nodes.length}`;
+      }
+    }
+
+    // ============================================================
+    // Kanban Board Rendering
+    // ============================================================
+
+    function renderVisualization() {
+      updateSearchCount();
+      renderKanbanBoard();
+    }
+
+    function renderKanbanBoard() {
+      renderAgentStatusBar();
+      renderKanbanColumns();
+      renderBlockedBar();
+    }
+
+    /**
+     * Render the agent status bar at the top of the Kanban board.
+     * Shows 4 agents with their current task from stations data.
+     * Filters out non-process stations (e.g. stations with no role or utility stations).
+     */
+    function renderAgentStatusBar() {
+      // Filter stations to only process agents (4 roles: liaison, pdsa, dev, qa)
+      const agentRoles = ['liaison', 'pdsa', 'dev', 'qa'];
+      const processStations = stations.filter(s => {
+        const role = (s.role || s.name || '').toLowerCase();
+        return agentRoles.some(r => role.includes(r));
+      });
+
+      let html = '';
+
+      agentRoles.forEach(role => {
+        const station = processStations.find(s => {
+          const sRole = (s.role || s.name || '').toLowerCase();
+          return sRole.includes(role);
+        });
+
+        const roleColor = ROLE_COLORS[role] || '#888';
+        const hasTask = station && station.current_object_id;
+        let taskName = 'idle';
+        let taskStatus = '';
+
+        if (hasTask) {
+          const currentNode = nodes.find(n => n.id === station.current_object_id);
+          if (currentNode) {
+            taskName = currentNode.dna?.title || currentNode.slug;
+            taskStatus = currentNode.status;
+          }
+        }
+
+        html += `
+          <div class="agent-status-box ${hasTask ? 'has-task' : ''}">
+            <span class="agent-role-label" style="color: ${roleColor};">${role.toUpperCase()}</span>
+            <span class="agent-task-name ${hasTask ? '' : 'idle'}" title="${escapeHtml(taskName)}">${escapeHtml(truncate(taskName, 24))}</span>
+            ${taskStatus ? `<span class="agent-status-label">${taskStatus}</span>` : ''}
+          </div>
+        `;
+      });
+
+      agentStatusBar.innerHTML = html;
+    }
+
+    /**
+     * Render the 5 Kanban phase columns with task cards.
+     */
+    function renderKanbanColumns() {
+      let html = '';
+
+      COLUMN_CONFIG.forEach(col => {
+        let columnNodes = getFilteredNodes().filter(n =>
+          col.statuses.includes(n.status) && !BLOCKED_STATUSES.includes(n.status)
+        );
+
+        // Complete column: sort by updated_at descending (newest first) and apply time filter
+        if (col.id === 'complete') {
+          columnNodes.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+          if (completeFilterDays > 0) {
+            const cutoff = Date.now() - completeFilterDays * 24 * 60 * 60 * 1000;
+            columnNodes = columnNodes.filter(n => new Date(n.updated_at || 0).getTime() >= cutoff);
+          }
+        }
+
+        const filterHtml = col.id === 'complete' ? `
+          <div class="complete-time-filter" style="display:flex;gap:4px;margin-top:4px;">
+            ${COMPLETE_FILTER_OPTIONS.map(o => `
+              <button class="complete-filter-btn${completeFilterDays === o.days ? ' selected-filter' : ''}" onclick="setCompleteFilter(${o.days})" style="padding:1px 6px;font-size:10px;border-radius:3px;border:1px solid #555;background:${completeFilterDays === o.days ? '#e94560' : 'transparent'};color:${completeFilterDays === o.days ? '#fff' : '#888'};cursor:pointer;">${o.label}</button>
+            `).join('')}
+          </div>
+        ` : col.id === 'queue' ? `
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <button class="queue-filter-btn${queueFilter === 'all' ? ' active-filter' : ''}" data-filter="all" onclick="setQueueFilter('all')">All</button>
+            <button class="queue-filter-btn${queueFilter === 'ready' ? ' active-filter' : ''}" data-filter="ready" onclick="setQueueFilter('ready')">Ready</button>
+            <button class="queue-filter-btn${queueFilter === 'pending' ? ' active-filter' : ''}" data-filter="pending" onclick="setQueueFilter('pending')">Pending</button>
+            <button class="queue-filter-btn${queueFilter === 'rework' ? ' active-filter' : ''}" data-filter="rework" onclick="setQueueFilter('rework')">Rework</button>
+          </div>
+        ` : '';
+
+        html += `
+          <div class="kanban-column" id="column-${col.id}">
+            <div class="column-phase-header">
+              <span>${col.label}</span>
+              <span class="column-count">${columnNodes.length}</span>
+              ${filterHtml}
+            </div>
+            <div class="column-cards">
+        `;
+
+        // Queue column: apply filter and group nodes by status with sub-headers
+        if (col.id === 'queue') {
+          if (queueFilter !== 'all') {
+            columnNodes = columnNodes.filter(n => n.status === queueFilter);
+          }
+          const queueGroupOrder = ['ready', 'rework', 'pending'];
+          queueGroupOrder.forEach(status => {
+            const groupNodes = columnNodes.filter(n => n.status === status);
+            if (groupNodes.length > 0) {
+              html += `<div class="queue-group-header">${status} (${groupNodes.length})</div>`;
+              html += renderColumn(groupNodes);
+            }
+          });
+        } else {
+          html += renderColumn(columnNodes);
+        }
+
+        html += `
+            </div>
+          </div>
+        `;
+      });
+
+      kanbanColumnsEl.innerHTML = html;
+
+      // Attach click handlers to task cards
+      kanbanColumnsEl.querySelectorAll('.task-card').forEach(card => {
+        card.onclick = () => {
+          const nodeId = card.dataset.id;
+          const node = nodes.find(n => n.id === nodeId);
+          if (node) showDetail(node);
+        };
+      });
+    }
+
+    /**
+     * Render task cards for a column, filtered by statuses.
+     */
+    function renderColumn(columnNodes) {
+      let html = '';
+
+      columnNodes.forEach(node => {
+        const dna = node.dna || {};
+        const role = dna.role || '';
+        const roleColor = ROLE_COLORS[role] || '#555';
+        const isSelected = node.id === selectedNodeId;
+        const needsManualAction = liaisonModeSelect.value === 'manual' &&
+          (node.status === 'approval' || (node.status === 'review' && dna.role === 'liaison'));
+
+        const classes = [
+          'task-card',
+          isSelected ? 'selected' : '',
+          needsManualAction ? 'manual-pulse' : ''
+        ].filter(Boolean).join(' ');
+
+        html += `
+          <div class="${classes}" data-id="${node.id}" style="border-left: 4px solid ${roleColor};">
+            <div class="task-card-header">
+              <span class="task-card-slug" title="${escapeHtml(node.slug)}">${escapeHtml(truncate(dna.title || node.slug, 28))}</span>
+              <div class="task-card-badges">
+                ${role ? `<span class="role-badge role-${role}">${role.toUpperCase()}</span>` : ''}
+              </div>
+            </div>
+            ${currentProject === 'all' && dna._project ? `
+              <span class="project-badge" style="color: ${PROJECT_COLORS[dna._project] || '#888'};">${escapeHtml(dna._project)}</span>
+            ` : ''}
+            <div class="task-card-slug-display" style="font-family:monospace;font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(node.slug)}</div>
+            <div class="task-card-status">
+              <span><span class="status-dot ${node.status}"></span>${node.status}</span>
+              <span class="task-type-label">${node.type}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      return html;
+    }
+
+    /**
+     * Render blocked and cancelled tasks in the bottom bar.
+     * Blocked/cancelled are separate from the 5 Kanban columns.
+     */
+    function renderBlockedBar() {
+      const allBlockedNodes = getFilteredNodes().filter(n =>
+        BLOCKED_STATUSES.includes(n.status)
+      );
+
+      if (allBlockedNodes.length === 0) {
+        blockedBottomBar.style.display = 'none';
+        return;
+      }
+
+      blockedBottomBar.style.display = 'block';
+      if (blockedCollapsed) {
+        blockedBottomBar.classList.add('collapsed');
+      } else {
+        blockedBottomBar.classList.remove('collapsed');
+      }
+
+      // Apply blocked filter
+      const filteredBlockedNodes = allBlockedNodes.filter(n => {
+        if (blockedFilter === 'blocked') return n.status === 'blocked';
+        if (blockedFilter === 'cancelled') return n.status === 'cancelled';
+        return true;
+      });
+
+      const blockedCount = allBlockedNodes.filter(n => n.status === 'blocked').length;
+      const cancelledCount = allBlockedNodes.filter(n => n.status === 'cancelled').length;
+
+      let html = `
+        <div class="bar-header">
+          <span>
+            <span class="collapse-toggle" onclick="toggleBlockedCollapsed()">${blockedCollapsed ? '>' : 'v'}</span>
+            Blocked / Cancelled
+            <span class="column-count">${allBlockedNodes.length}</span>
+            ${blockedCollapsed ? ` <span style="font-size:10px;color:#888;font-weight:400;">(${blockedCount} blocked, ${cancelledCount} cancelled)</span>` : ''}
+          </span>
+          <div class="blocked-filter-buttons">
+            <button class="blocked-filter-btn ${blockedFilter === 'all' ? 'selected-filter' : ''}" onclick="setBlockedFilter('all')">All</button>
+            <button class="blocked-filter-btn ${blockedFilter === 'blocked' ? 'selected-filter' : ''}" onclick="setBlockedFilter('blocked')">Blocked</button>
+            <button class="blocked-filter-btn ${blockedFilter === 'cancelled' ? 'selected-filter' : ''}" onclick="setBlockedFilter('cancelled')">Cancelled</button>
+          </div>
+        </div>
+        <div class="blocked-cards">
+      `;
+
+      filteredBlockedNodes.forEach(node => {
+        const dna = node.dna || {};
+        const role = dna.role || '';
+        const roleColor = ROLE_COLORS[role] || '#555';
+        const isSelected = node.id === selectedNodeId;
+
+        html += `
+          <div class="task-card ${isSelected ? 'selected' : ''}" data-id="${node.id}" style="border-left: 4px solid ${roleColor};">
+            <div class="task-card-header">
+              <span class="task-card-slug" title="${escapeHtml(node.slug)}">${escapeHtml(truncate(dna.title || node.slug, 20))}</span>
+              <div class="task-card-badges">
+                ${role ? `<span class="role-badge role-${role}">${role.toUpperCase()}</span>` : ''}
+              </div>
+            </div>
+            <div class="task-card-slug-display" style="font-family:monospace;font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(node.slug)}</div>
+            <div class="task-card-status">
+              <span><span class="status-dot ${node.status}"></span>${node.status}</span>
+              <span class="task-type-label">${node.type}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      blockedBottomBar.innerHTML = html;
+
+      // Attach click handlers to blocked cards
+      blockedBottomBar.querySelectorAll('.task-card').forEach(card => {
+        card.onclick = () => {
+          const nodeId = card.dataset.id;
+          const node = nodes.find(n => n.id === nodeId);
+          if (node) showDetail(node);
+        };
+      });
+    }
+
+    // ============================================================
+    // Detail Panel
+    // ============================================================
+
+    function showDetail(node, doScroll = false) {
+      selectNode(node.id);
+      detailPanel.classList.add('visible');
+
+      const parentNodes = (node.parent_ids || []).map(pid =>
+        nodes.find(n => n.id === pid || n.slug === pid)
+      ).filter(Boolean);
+
+      const childNodes = nodes.filter(n =>
+        n.parent_ids && (n.parent_ids.includes(node.id) || n.parent_ids.includes(node.slug))
+      );
+
+      const dna = node.dna || {};
+      const acceptanceCriteria = dna.acceptance_criteria || [];
+
+      detailContent.innerHTML = `
+        <div class="detail-field">
+          <label>Title</label>
+          <div class="value">${dna.title || node.slug}</div>
+        </div>
+        <div class="detail-field">
+          <label>Slug</label>
+          <div class="value" style="font-family: monospace; font-size: 12px; color: #888;">${node.slug}</div>
+        </div>
+        ${dna._project ? `
+        <div class="detail-field">
+          <label>Project</label>
+          <div class="value"><span style="color: ${PROJECT_COLORS[dna._project] || '#888'}; font-weight: 600;">${dna._project}</span></div>
+        </div>
+        ` : ''}
+        <div class="detail-field">
+          <label>Type</label>
+          <div class="value"><span class="badge type-${node.type}">${node.type}</span></div>
+        </div>
+        <div class="detail-field">
+          <label>Status</label>
+          <div class="value"><span class="badge status-${node.status}">${node.status}</span></div>
+        </div>
+        <div class="detail-field">
+          <label>Role</label>
+          <div class="value">${dna.role ? `<span class="badge role-badge" style="color: ${ROLE_COLORS[dna.role] || '#888'}; border-color: ${ROLE_COLORS[dna.role] || '#888'}; font-weight: 600;">${dna.role.toUpperCase()}</span>` : '-'}</div>
+        </div>
+        ${(() => {
+          const isApprovalLiaison = (node.status === 'approval' && dna.role === 'liaison');
+          const isReviewLiaison = (node.status === 'review' && dna.role === 'liaison');
+          const mode = serverMode || liaisonModeSelect.value;
+          const showComplete = (isApprovalLiaison || isReviewLiaison) && (mode === 'manual' || mode === 'auto-approval');
+          const showApproveRework = (isApprovalLiaison || isReviewLiaison) && mode === 'manual';
+          if (!showComplete && !showApproveRework) return '';
+          return `
+        <div class="detail-field detail-actions-divider">
+          <div style="display:flex;gap:8px;align-items:center;">
+            ${showComplete ? `<button id="complete-task-btn" style="background:#14b8a6;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Complete</button>` : ''}
+            ${showApproveRework ? `<button id="approve-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Approve</button>
+            <button id="rework-task-btn" style="background:#ef4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Rework</button>` : ''}
+          </div>
+          ${dna.human_confirmed ? '<span style="color:#22c55e;margin-top:4px;font-size:12px;">Confirmed (human_confirmed_via: ' + (dna.human_confirmed_via || 'unknown') + ')</span>' : ''}
+        </div>`;
+        })()}
+        ${dna.description ? `
+        <div class="detail-field">
+          <label>Description</label>
+          <div class="description">${dna.description}</div>
+        </div>
+        ` : ''}
+        ${acceptanceCriteria.length > 0 ? `
+        <div class="detail-field">
+          <label>Acceptance Criteria</label>
+          <ul class="criteria-list">
+            ${acceptanceCriteria.map(c => `<li>${c}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+        <div class="detail-field">
+          <label>Parents (${parentNodes.length})</label>
+          ${parentNodes.length > 0
+            ? `<ul class="node-links">${parentNodes.map(p =>
+                `<li class="parent clickable" data-id="${p.id}">${p.dna?.title || p.slug}</li>`
+              ).join('')}</ul>`
+            : '<div class="value" style="color: #666;">None (root)</div>'}
+        </div>
+        <div class="detail-field">
+          <label>Children (${childNodes.length})</label>
+          ${childNodes.length > 0
+            ? `<ul class="node-links">${childNodes.map(c =>
+                `<li class="child clickable" data-id="${c.id}">${c.dna?.title || c.slug}</li>`
+              ).join('')}</ul>`
+            : '<div class="value" style="color: #666;">None (leaf)</div>'}
+        </div>
+        ${dna.pdsa_ref ? `
+        <div class="detail-field">
+          <label>PDSA</label>
+          <div class="dual-links">
+            ${typeof dna.pdsa_ref === 'string' ? `
+              <!-- New string format: git-relative path or GitHub URL -->
+              <div class="dual-link pdsa-name" style="color: #22c55e; font-weight: 500; margin-bottom: 4px;">
+                ${dna.pdsa_ref.split('/').pop().replace('.pdsa.md', '') || 'Unknown'}
+              </div>
+              ${dna.pdsa_ref.startsWith('https://')
+                ? `<div><a href="${dna.pdsa_ref}" target="_blank" class="dual-link git-link">${dna.pdsa_ref}</a></div>`
+                : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.pdsa_ref}</div>`
+              }
+            ` : `
+              <!-- Legacy object format for backward compatibility -->
+              <div class="dual-link pdsa-name" style="color: #22c55e; font-weight: 500; margin-bottom: 4px;">
+                ${(dna.pdsa_ref.git || dna.pdsa_ref.workspace || '').split('/').pop().replace('.pdsa.md', '') || 'Unknown'}
+              </div>
+              ${dna.pdsa_ref.git ? `<div><a href="${dna.pdsa_ref.git}" target="_blank" class="dual-link git-link">Git: ${dna.pdsa_ref.git.split('/').pop()}</a></div>` : ''}
+              ${dna.pdsa_ref.workspace ? `<div class="dual-link workspace-link">WS: ${dna.pdsa_ref.workspace}</div>` : ''}
+            `}
+          </div>
+        </div>
+        ` : ''}
+        ${dna.abstract_ref ? `
+        <div class="detail-field">
+          <label>Abstract</label>
+          <div class="dual-links">
+            <div class="dual-link" style="color: #60a5fa; font-weight: 500; margin-bottom: 4px;">
+              ${dna.abstract_ref.split('/').pop().replace('.abstract.md', '') || 'Completion Abstract'}
+            </div>
+            ${dna.abstract_ref.startsWith('https://')
+              ? `<div><a href="${dna.abstract_ref}" target="_blank" class="dual-link git-link" style="color: #60a5fa;">${dna.abstract_ref}</a></div>`
+              : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.abstract_ref}</div>`
+            }
+          </div>
+        </div>
+        ` : ''}
+        ${(() => {
+          const dependsOn = Array.isArray(dna.depends_on) ? dna.depends_on : [];
+          if (dependsOn.length === 0) return '';
+          return `
+        <div class="detail-field">
+          <label>Dependencies (${dependsOn.length})</label>
+          <ul class="node-links">${dependsOn.map(slug => {
+            const depNode = nodes.find(n => n.slug === slug);
+            const depStatus = depNode ? depNode.status : 'unknown';
+            const depTitle = depNode ? (depNode.dna?.title || slug) : slug;
+            return depNode
+              ? `<li class="clickable" data-id="${depNode.id}" style="display:flex;align-items:center;gap:6px;">
+                  <span class="badge status-${depStatus}" style="font-size:10px;padding:1px 6px;">${depStatus}</span>
+                  <span>${depTitle}</span>
+                </li>`
+              : `<li style="display:flex;align-items:center;gap:6px;">
+                  <span class="badge" style="font-size:10px;padding:1px 6px;background:#555;color:#aaa;">unknown</span>
+                  <span style="color:#888;">${slug}</span>
+                </li>`;
+          }).join('')}</ul>
+        </div>`;
+        })()}
+        ${dna.changelog_ref ? `
+        <div class="detail-field">
+          <label>Changelog</label>
+          <div class="dual-links">
+            <div class="dual-link" style="color: #f59e0b; font-weight: 500; margin-bottom: 4px;">
+              ${dna.changelog_ref.split('/').pop() || 'changelog.md'}
+            </div>
+            ${dna.changelog_ref.startsWith('https://')
+              ? `<div><a href="${dna.changelog_ref}" target="_blank" class="dual-link git-link" style="color: #f59e0b;">${dna.changelog_ref}</a></div>`
+              : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.changelog_ref}</div>`
+            }
+          </div>
+        </div>
+        ` : ''}
+        <div class="detail-field">
+          <label>Created</label>
+          <div class="value" style="font-size: 11px; color: #888;">${node.created_at ? formatDate(node.created_at) : '—'}</div>
+        </div>
+        <div class="detail-field">
+          <label>Updated</label>
+          <div class="value" style="font-size: 11px; color: #888;">${node.updated_at ? formatDate(node.updated_at) : '—'}</div>
+        </div>
+        <div class="detail-field">
+          <label>ID</label>
+          <div class="value" style="font-family: monospace; font-size: 10px; color: #666;">${node.id}</div>
+        </div>
+      `;
+
+      detailContent.querySelectorAll('.clickable').forEach(el => {
+        el.onclick = () => {
+          const targetNode = nodes.find(n => n.id === el.dataset.id);
+          if (targetNode) showDetail(targetNode, false);
+        };
+      });
+
+      // Complete button handler (auto-approval + manual modes)
+      const completeBtn = document.getElementById('complete-task-btn');
+      if (completeBtn) {
+        completeBtn.onclick = async () => {
+          const slug = completeBtn.dataset.slug;
+          const project = completeBtn.dataset.project || undefined;
+          try {
+            const res = await fetch(`/api/node/${slug}/confirm`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project, human_confirmed_via: 'viz' })
+            });
+            if (res.ok) {
+              completeBtn.textContent = 'Confirmed';
+              completeBtn.disabled = true;
+              completeBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to confirm');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
+
+      // Approve button handler
+      const approveBtn = document.getElementById('approve-task-btn');
+      if (approveBtn) {
+        approveBtn.onclick = async () => {
+          const slug = approveBtn.dataset.slug;
+          const project = approveBtn.dataset.project || undefined;
+          try {
+            const res = await fetch(`/api/node/${slug}/confirm`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project, human_confirmed_via: 'viz' })
+            });
+            if (res.ok) {
+              approveBtn.textContent = 'Approved';
+              approveBtn.disabled = true;
+              approveBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to approve');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
+
+      // Rework button handler
+      const reworkBtn = document.getElementById('rework-task-btn');
+      if (reworkBtn) {
+        reworkBtn.onclick = async () => {
+          const slug = reworkBtn.dataset.slug;
+          const project = reworkBtn.dataset.project || undefined;
+          const reason = prompt('Rework reason:');
+          if (!reason) return;
+          try {
+            const res = await fetch(`/api/node/${slug}/rework`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project, rework_reason: reason })
+            });
+            if (res.ok) {
+              reworkBtn.textContent = 'Sent to rework';
+              reworkBtn.disabled = true;
+              reworkBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to rework');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
+    }
+
+    function hideDetail() {
+      detailPanel.classList.remove('visible');
+    }
+
+    function selectNode(nodeId) {
+      // Remove previous selection
+      document.querySelectorAll('.task-card.selected').forEach(el =>
+        el.classList.remove('selected')
+      );
+
+      selectedNodeId = nodeId;
+      const el = document.querySelector(`.task-card[data-id="${nodeId}"]`);
+      if (el) el.classList.add('selected');
+    }
+
+    // ============================================================
+    // Utility functions
+    // ============================================================
+
+    function truncate(str, len) {
+      return str.length > len ? str.substring(0, len - 1) + '..' : str;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ============================================================
+    // Event listeners
+    // ============================================================
+
+    document.getElementById('refresh-btn').onclick = loadData;
+    document.getElementById('close-detail').onclick = hideDetail;
+
+    // Search handler with debounce
+    searchInput.oninput = (e) => {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        searchQuery = e.target.value.trim();
+        renderVisualization();
+        updateSearchCount();
+      }, 150);
+    };
+
+    // Project change handler
+    projectSelector.onchange = async (e) => {
+      currentProject = e.target.value;
+      hideDetail();
+      selectedNodeId = null;
+      searchQuery = '';
+      searchInput.value = '';
+      await loadData();
+    };
+
+    // ============================================================
+    // Update notification and changelog
+    // ============================================================
+
+    const updateBanner = document.getElementById('update-banner');
+    const changelogModal = document.getElementById('changelog-modal');
+    const changelogVersion = document.getElementById('changelog-version');
+    const changelogList = document.getElementById('changelog-list');
+    const pastChangesPanel = document.getElementById('past-changes');
+    const pastChangesList = document.getElementById('past-changes-list');
+    let pendingVersion = null;
+
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        if (data.version) {
+          const el = document.querySelector('.viz-version');
+          if (el) el.textContent = data.version;
+        }
+      } catch (err) {
+        console.warn('Failed to load version:', err);
+      }
+    }
+
+    async function checkForUpdate() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        if (!data.version) return;
+        const acceptedVersion = localStorage.getItem('acceptedVersion');
+        if (acceptedVersion !== data.version) {
+          pendingVersion = data.version;
+          updateBanner.classList.add('show');
+          document.body.style.paddingTop = '40px';
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function acceptUpdate() {
+      if (pendingVersion) {
+        localStorage.setItem('acceptedVersion', pendingVersion);
+      }
+      updateBanner.classList.remove('show');
+      document.body.style.paddingTop = '0';
+      location.reload();
+    }
+    window.acceptUpdate = acceptUpdate;
+
+    async function showChangelogModal() {
+      const version = pendingVersion || localStorage.getItem('acceptedVersion') || 'v0.0.2';
+      try {
+        const res = await fetch(`/api/changelog/${version}`);
+        const data = await res.json();
+        changelogVersion.textContent = `${data.version || version} — ${data.title || ''} (${data.date || ''})`;
+        changelogList.innerHTML = (data.changes || []).map(c => `<li>${c}</li>`).join('');
+      } catch (e) {
+        changelogVersion.textContent = version;
+        changelogList.innerHTML = '<li>Could not load changelog</li>';
+      }
+      changelogModal.classList.add('show');
+    }
+    window.showChangelogModal = showChangelogModal;
+
+    function hideChangelogModal() {
+      changelogModal.classList.remove('show');
+    }
+    window.hideChangelogModal = hideChangelogModal;
+
+    async function showPastChanges() {
+      try {
+        const res = await fetch('/api/changelogs');
+        const data = await res.json();
+        pastChangesList.innerHTML = (data.changelogs || []).map(cl => `
+          <div class="version-entry">
+            <div class="version-title">${cl.version} — ${cl.title || ''}</div>
+            <div class="version-date">${cl.date || ''}</div>
+            <ul class="version-changes">
+              ${(cl.changes || []).map(c => `<li>${c}</li>`).join('')}
+            </ul>
+          </div>
+        `).join('');
+      } catch (e) {
+        pastChangesList.innerHTML = '<p>Could not load version history</p>';
+      }
+      pastChangesPanel.classList.add('show');
+    }
+    window.showPastChanges = showPastChanges;
+
+    function hidePastChanges() {
+      pastChangesPanel.classList.remove('show');
+    }
+    window.hidePastChanges = hidePastChanges;
+
+    function setQueueFilter(filter) {
+      queueFilter = filter;
+      localStorage.setItem('queueFilter', filter);
+      renderKanbanColumns();
+    }
+    window.setQueueFilter = setQueueFilter;
+
+    // ============================================================
+    // Light mode toggle
+    // ============================================================
+
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('light-mode');
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+      const themeToggle = document.getElementById('theme-toggle');
+      themeToggle.textContent = isLight ? 'Dark' : 'Light';
+    }
+    window.toggleTheme = toggleTheme;
+
+    // Restore theme from localStorage
+    if (localStorage.getItem('theme') === 'light') {
+      document.body.classList.add('light-mode');
+      document.getElementById('theme-toggle').textContent = 'Dark';
+    }
+
+    // ============================================================
+    // Blocked section collapse toggle
+    // ============================================================
+
+    function toggleBlockedCollapsed() {
+      blockedCollapsed = !blockedCollapsed;
+      localStorage.setItem('blocked-collapsed', blockedCollapsed);
+      renderBlockedBar();
+    }
+    window.toggleBlockedCollapsed = toggleBlockedCollapsed;
+
+    // ============================================================
+    // Blocked filter
+    // ============================================================
+
+    function setBlockedFilter(filter) {
+      blockedFilter = filter;
+      renderBlockedBar();
+    }
+    window.setBlockedFilter = setBlockedFilter;
+
+    function setCompleteFilter(days) {
+      completeFilterDays = days;
+      localStorage.setItem('completeFilter', String(days));
+      renderKanbanColumns();
+    }
+    window.setCompleteFilter = setCompleteFilter;
+
+    // Initial load and start polling
+    loadProjects().then(() => {
+      lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
+      startPolling();
+      loadSuspectStats();
+    });
+    checkForUpdate();
+    loadVersion();
+
+    // Mission dashboard toggle
+    let missionViewActive = false;
+    function toggleMissionView() {
+      missionViewActive = !missionViewActive;
+      const kanban = document.getElementById('kanban-board');
+      const mission = document.getElementById('mission-dashboard');
+      const toggle = document.getElementById('view-toggle');
+      if (missionViewActive) {
+        kanban.style.display = 'none';
+        mission.style.display = 'block';
+        toggle.textContent = 'Mission';
+        loadMissionDashboard();
+      } else {
+        kanban.style.display = 'flex';
+        mission.style.display = 'none';
+        toggle.textContent = 'Kanban';
+      }
+    }
+    window.toggleMissionView = toggleMissionView;
+
+    // ============================================================
+    // Suspect links status bar
+    // ============================================================
+
+    async function loadSuspectStats() {
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const res = await fetch('/api/suspect-links/stats' + projectParam);
+        const stats = await res.json();
+
+        if (stats.total === 0) {
+          document.getElementById('suspect-status-bar').style.display = 'none';
+          return;
+        }
+
+        document.getElementById('suspect-status-bar').style.display = '';
+        document.getElementById('suspect-count').textContent = stats.suspect || 0;
+        document.getElementById('cleared-count').textContent = stats.cleared || 0;
+        document.getElementById('risk-count').textContent = stats.accepted_risk || 0;
+
+        const resolvedPct = stats.total > 0
+          ? Math.round(((stats.cleared + stats.accepted_risk) / stats.total) * 100)
+          : 0;
+        document.getElementById('suspect-progress-fill').style.width = resolvedPct + '%';
+        document.getElementById('suspect-progress-pct').textContent = resolvedPct + '%';
+      } catch (e) {
+        document.getElementById('suspect-status-bar').style.display = 'none';
+      }
+    }
+
+    async function loadMissionDashboard() {
+      const capsContainer = document.getElementById('mission-caps');
+      if (!capsContainer) return;
+      try {
+        const projectParam = currentProject ? `?project=${currentProject}` : '';
+        const res = await fetch('/api/mission-overview' + projectParam);
+        const data = await res.json();
+
+        if (!data.capabilities || data.capabilities.length === 0) {
+          capsContainer.innerHTML = '<div style="color:#888;">No capabilities found</div>';
+          return;
+        }
+
+        capsContainer.innerHTML = data.capabilities.map(cap => `
+          <div class="cap-card" data-cap-id="${cap.id}" onclick="showCapabilityDetail('${cap.id}')" style="cursor:pointer;padding:12px;background:#1a1e2e;border:1px solid #333;border-radius:6px;margin-bottom:8px;">
+            <h3 style="margin:0 0 8px 0;font-size:14px;color:#eee;">${cap.title}</h3>
+            <div class="cap-progress" style="height:6px;background:#333;border-radius:3px;overflow:hidden;">
+              <div class="cap-progress-fill" style="height:100%;background:#22c55e;width:${cap.progress_percent}%;border-radius:3px;"></div>
+            </div>
+            <div class="cap-stats" style="margin-top:4px;font-size:11px;color:#888;">
+              ${cap.complete_count}/${cap.task_count} tasks complete (${cap.progress_percent}%)
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        capsContainer.innerHTML = '<div style="color:#ef4444;">Failed to load mission data</div>';
+      }
+    }
+
+    async function showCapabilityDetail(capId) {
+      const projectParam = currentProject ? `?project=${currentProject}` : '';
+      try {
+        const res = await fetch(`/api/capabilities/${capId}` + projectParam);
+        const cap = await res.json();
+        if (cap.error) return;
+
+        const detailPanel = document.getElementById('detail-panel');
+        if (!detailPanel) return;
+        detailPanel.innerHTML = `
+          <div class="detail-header" style="padding:12px;border-bottom:1px solid #333;">
+            <button onclick="hideDetail()" style="background:#333;color:#eee;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">Back</button>
+            <h3 style="display:inline;margin-left:8px;font-size:16px;">${cap.title}</h3>
+            <span class="badge status-${cap.status}" style="margin-left:8px;">${cap.status}</span>
+          </div>
+
+          <div class="detail-section" style="padding:12px;">
+            <h4 style="color:#8ab4f8;margin:0 0 8px 0;">Requirements (${(cap.requirements || []).length})</h4>
+            ${(cap.requirements || []).map(r => `
+              <div class="req-row" style="padding:6px 0;border-bottom:1px solid #333;">
+                <span class="badge" style="font-size:10px;background:#0f3460;color:#8ab4f8;">${r.req_id_human}</span>
+                <span style="margin-left:8px;color:#eee;">${r.title}</span>
+                <span class="badge status-${r.status}" style="float:right;">${r.status}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="detail-section" style="padding:12px;">
+            <h4 style="color:#8ab4f8;margin:0 0 8px 0;">Tasks (${cap.complete_count}/${cap.task_count})</h4>
+            ${(cap.tasks || []).map(t => `
+              <div class="task-row" style="padding:6px 0;border-bottom:1px solid #333;">
+                <span class="badge status-${t.status}" style="font-size:10px;">${t.status}</span>
+                <span style="margin-left:8px;color:#eee;">${t.title}</span>
+                ${t.role ? `<span class="badge role-badge" style="float:right;color:${ROLE_COLORS[t.role]||'#888'};border-color:${ROLE_COLORS[t.role]||'#888'};">${t.role.toUpperCase()}</span>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+        detailPanel.classList.add('open');
+      } catch (e) {
+        console.error('Failed to load capability detail:', e);
+      }
+    }
+    window.showCapabilityDetail = showCapabilityDetail;
+
+    // PWA install prompt
+    // NOTE: PWA install requires HTTPS. On HTTP (dev/VPN), beforeinstallprompt won't fire
+    // and serviceWorker.register will fail. This is expected — PWA activates on HTTPS deploy.
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      console.log('PWA install available');
+    });
+
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

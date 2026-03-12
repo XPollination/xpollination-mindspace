@@ -1,0 +1,15 @@
+{
+  "version": "v0.0.21",
+  "title": "Capability Drill-Down View",
+  "date": "2026-03-12",
+  "task": "h1-6-viz-capability-drilldown",
+  "changes": [
+    "Replace loadMissionDashboard() stub with real /api/mission-overview fetch",
+    "Render cap-cards with progress bars, task counts, click-to-drill-down",
+    "Add showCapabilityDetail() function fetching /api/capabilities/:capId",
+    "Drill-down shows requirements list (req_id_human, title, status)",
+    "Drill-down shows tasks with status badges and role colors",
+    "Back button navigation via hideDetail()",
+    "Server: /api/mission-overview and /api/capabilities/:capId already in server.js from v0.0.18"
+  ]
+}
