@@ -1,0 +1,10 @@
+{
+  "version": "v0.0.24",
+  "title": "Fix: Capability detail crash when requirements table missing",
+  "date": "2026-03-12",
+  "task": "viz-capability-detail-crash",
+  "changes": [
+    "Server: wrap requirements query in own try/catch — defaults to empty array when table missing",
+    "Server: capability detail endpoint no longer crashes on missing requirements table"
+  ]
+}
