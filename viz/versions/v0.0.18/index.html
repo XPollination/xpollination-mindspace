@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mindspace Flow Visualization</title>
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicons/favicon-48x48.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
   <style>
     * {
       margin: 0;
@@ -46,6 +52,35 @@
 
     .project-dropdown:focus {
       box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.3);
+    }
+
+    .viz-version {
+      font-size: 11px;
+      color: #666;
+      margin-left: 8px;
+      opacity: 0.7;
+    }
+    .queue-group-header {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 6px 8px 2px;
+      margin-top: 4px;
+    }
+    .queue-filter-btn {
+      padding: 1px 6px;
+      font-size: 10px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+    }
+    .queue-filter-btn.active-filter {
+      background: #e94560;
+      color: #fff;
+      border-color: #e94560;
     }
 
     .header-subtitle {
@@ -165,6 +200,16 @@
       overflow: hidden;
       position: relative;
     }
+
+    /* Mission Dashboard */
+    .mission-dashboard { padding: 0 20px; overflow: auto; height: 100%; }
+    .cap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .cap-card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; }
+    .cap-card h3 { font-size: 14px; margin: 0 0 8px; color: #eee; }
+    .cap-card .cap-progress { height: 6px; background: #0f3460; border-radius: 3px; overflow: hidden; margin: 6px 0; }
+    .cap-card .cap-progress-fill { height: 100%; background: #4caf50; border-radius: 3px; }
+    .cap-card .cap-stats { font-size: 11px; color: #888; }
+    .dependency-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
     /* Kanban Board Layout */
     .kanban-board {
@@ -479,6 +524,12 @@
       color: #e94560;
     }
 
+    .detail-actions-divider {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+    }
+
     .detail-field {
       margin-bottom: 12px;
     }
@@ -515,19 +566,19 @@
     .badge.type-task { background: #eab308; color: #000; }
     .badge.type-test { background: #a855f7; }
 
-    .badge.status-pending { background: #6b7280; }
-    .badge.status-ready { background: #3b82f6; }
-    .badge.status-active { background: #22c55e; }
-    .badge.status-testing { background: #10b981; }
-    .badge.status-review { background: #f59e0b; }
-    .badge.status-rework { background: #ef4444; }
-    .badge.status-complete { background: #14b8a6; }
-    .badge.status-done { background: #14b8a6; }
-    .badge.status-completed { background: #14b8a6; }
-    .badge.status-blocked { background: #dc2626; }
-    .badge.status-cancelled { background: #9ca3af; }
-    .badge.status-approval { background: #f59e0b; }
-    .badge.status-approved { background: #8b5cf6; }
+    .badge.status-pending { background: #6b7280; color: #fff; }
+    .badge.status-ready { background: #3b82f6; color: #fff; }
+    .badge.status-active { background: #166534; color: #fff; }
+    .badge.status-testing { background: #065f46; color: #fff; }
+    .badge.status-review { background: #92400e; color: #fff; }
+    .badge.status-rework { background: #991b1b; color: #fff; }
+    .badge.status-complete { background: #115e59; color: #fff; }
+    .badge.status-done { background: #115e59; color: #fff; }
+    .badge.status-completed { background: #115e59; color: #fff; }
+    .badge.status-blocked { background: #991b1b; color: #fff; }
+    .badge.status-cancelled { background: #6b7280; color: #fff; }
+    .badge.status-approval { background: #92400e; color: #fff; }
+    .badge.status-approved { background: #5b21b6; color: #fff; }
 
     .badge.role-liaison { color: #ef4444; border: 1px solid #ef4444; background: transparent; }
     .badge.role-pdsa { color: #22c55e; border: 1px solid #22c55e; background: transparent; }
@@ -763,6 +814,8 @@
     body.light-mode .detail-field label { color: #666; }
     body.light-mode .detail-field .value { color: #222; }
     body.light-mode .detail-field .description { color: #444; }
+    body.light-mode .detail-actions-divider { border-top-color: #ccc; }
+    body.light-mode #liaison-mode option { background: #e8e8e8; color: #333; }
     body.light-mode .search-input { background: #fff; border-color: #ccc; color: #222; }
     body.light-mode .search-input::placeholder { color: #999; }
     body.light-mode .project-dropdown { background: #e8e8e8; color: #e94560; border-color: #e94560; }
@@ -790,6 +843,29 @@
     body.light-mode .update-banner button.primary { background: #e94560; color: #fff; border-color: #e94560; }
     body.light-mode .blocked-filter-btn { border-color: #aaa; color: #555; }
     body.light-mode .live-indicator { color: #555; }
+
+    /* Liaison mode select */
+    #liaison-mode {
+      padding: 2px 4px;
+      font-size: 11px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: #2a2a2a;
+      color: #ccc;
+      cursor: pointer;
+    }
+    #liaison-mode option { background: #2a2a2a; color: #ccc; }
+
+    /* Version history button */
+    #version-history-btn {
+      padding: 2px 8px;
+      font-size: 11px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      background: #2a2a2a;
+      color: #ccc;
+      cursor: pointer;
+    }
 
     /* Theme toggle button */
     .theme-toggle {
@@ -871,7 +947,9 @@
     <select id="project-selector" class="project-dropdown">
       <option value="">Loading...</option>
     </select>
-    <span class="header-subtitle">Kanban</span>
+    <img src="/assets/mindspace-logo-56.png" alt="Mindspace" class="mindspace-logo" style="height:28px;margin-left:12px;">
+    <span class="viz-version"></span>
+    <span class="header-subtitle" id="view-toggle" style="cursor:pointer;" onclick="toggleMissionView()">Kanban</span>
     <div class="search-container">
       <input type="text" id="node-search" class="search-input" placeholder="Search nodes...">
       <span id="search-count" class="search-count"></span>
@@ -881,42 +959,35 @@
         <span id="live-dot" class="live-dot"></span>
         <span>Live</span>
       </span>
-      <select id="liaison-mode" title="LIAISON Approval Mode" style="padding:2px 4px;font-size:11px;border-radius:3px;border:1px solid #555;background:#2a2a2a;color:#ccc;cursor:pointer;">
+      <select id="liaison-mode" title="LIAISON Approval Mode">
         <option value="manual">Manual</option>
         <option value="semi">Semi</option>
-        <option value="auto">Auto</option>
         <option value="auto-approval">Auto-Approval</option>
+        <option value="auto">Auto</option>
       </select>
       <span class="stats-bar" id="stats">Loading...</span>
       <button id="refresh-btn">Refresh</button>
       <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">Light</button>
-      <button id="version-history-btn" style="padding:2px 8px;font-size:11px;border-radius:3px;border:1px solid #555;background:#2a2a2a;color:#ccc;cursor:pointer;" onclick="showPastChanges()">Version History</button>
+      <button id="version-history-btn" onclick="showPastChanges()">Version History</button>
     </div>
   </div>
 
   <div class="main-container">
     <div class="viz-container">
       <div id="kanban-board" class="kanban-board">
-        <!-- Suspect Status Bar -->
-        <div id="suspect-status-bar" style="display:none; padding: 8px 16px; background: #1a1e2e; border-bottom: 1px solid #333; font-size: 12px;">
-          <span style="color: #ef4444;">&#9679; <span id="suspect-count">0</span> suspect</span>
-          <span style="color: #22c55e; margin-left: 12px;">&#9679; <span id="cleared-count">0</span> cleared</span>
-          <span style="color: #f59e0b; margin-left: 12px;">&#9679; <span id="risk-count">0</span> accepted risk</span>
-          <span style="margin-left: 16px;">
-            <span id="suspect-progress-bar" style="display:inline-block; width: 100px; height: 6px; background: #333; border-radius: 3px; vertical-align: middle;">
-              <span id="suspect-progress-fill" style="display:block; height:100%; background: #22c55e; border-radius: 3px; width: 0%;"></span>
-            </span>
-            <span id="suspect-progress-pct" style="color: #888; margin-left: 4px;">0%</span> cleared
-          </span>
-        </div>
         <!-- Agent Status Bar -->
         <div id="agent-status-bar" class="agent-status-bar"></div>
         <!-- Kanban Columns -->
         <div id="kanban-columns" class="kanban-columns"></div>
         <!-- Blocked Bottom Bar -->
         <div id="blocked-bottom-bar" class="blocked-bottom-bar" style="display:none;"></div>
-        <!-- Mission Capabilities -->
-        <div id="mission-caps" style="padding:8px 16px;display:none;"></div>
+      </div>
+
+      <!-- Mission Dashboard -->
+      <div id="mission-dashboard" class="mission-dashboard" style="display:none;">
+        <h2 style="margin:16px 0 12px;color:#e94560;">Mission Overview</h2>
+        <div id="mission-caps" class="cap-grid"></div>
+        <svg id="dependency-arrows" class="dependency-svg"></svg>
       </div>
     </div>
 
@@ -956,10 +1027,31 @@
     let searchQuery = '';
     let searchDebounceTimer = null;
     let lastDataHash = null;
+    let lastEtag = null;
     let pollInterval = null;
-    const POLL_INTERVAL_MS = 5000;
+    let idleTickCount = 0;
+    const POLL_INTERVAL_FAST = 5000;
+    const POLL_INTERVAL_SLOW = 30000;
+    const IDLE_THRESHOLD = 6; // After 6 unchanged polls (30s), switch to slow
+    let currentPollInterval = POLL_INTERVAL_FAST;
+    // Complete column time filter (days): 1, 7, 30, 0=all — default 7 days (1 week)
+    const COMPLETE_FILTER_OPTIONS = [
+      { label: '1d', days: 1 },
+      { label: '1w', days: 7 },
+      { label: '1m', days: 30 },
+      { label: 'All', days: 0 }
+    ];
+    let completeFilterDays = parseInt(localStorage.getItem('completeFilter') || '7');
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
     let blockedFilter = 'all'; // all, blocked, cancelled
     let blockedCollapsed = localStorage.getItem('blocked-collapsed') === 'true';
+    let queueFilter = localStorage.getItem('queueFilter') || 'all'; // all, ready, pending, rework
 
     // DOM elements
     const kanbanBoard = document.getElementById('kanban-board');
@@ -1094,114 +1186,6 @@
       }
     }
 
-    // ============================================================
-    // Suspect links status bar
-    // ============================================================
-
-    async function loadSuspectStats() {
-      try {
-        const projectParam = currentProject ? `?project=${currentProject}` : '';
-        const res = await fetch('/api/suspect-links/stats' + projectParam);
-        const stats = await res.json();
-
-        if (stats.total === 0) {
-          document.getElementById('suspect-status-bar').style.display = 'none';
-          return;
-        }
-
-        document.getElementById('suspect-status-bar').style.display = '';
-        document.getElementById('suspect-count').textContent = stats.suspect || 0;
-        document.getElementById('cleared-count').textContent = stats.cleared || 0;
-        document.getElementById('risk-count').textContent = stats.accepted_risk || 0;
-
-        const resolvedPct = stats.total > 0
-          ? Math.round(((stats.cleared + stats.accepted_risk) / stats.total) * 100)
-          : 0;
-        document.getElementById('suspect-progress-fill').style.width = resolvedPct + '%';
-        document.getElementById('suspect-progress-pct').textContent = resolvedPct + '%';
-      } catch (e) {
-        document.getElementById('suspect-status-bar').style.display = 'none';
-      }
-    }
-
-    // ============================================================
-    // Mission dashboard + Capability drill-down
-    // ============================================================
-
-    async function loadMissionDashboard() {
-      const capsContainer = document.getElementById('mission-caps');
-      if (!capsContainer) return;
-      try {
-        const projectParam = currentProject ? `?project=${currentProject}` : '';
-        const res = await fetch('/api/mission-overview' + projectParam);
-        const data = await res.json();
-
-        if (!data.capabilities || data.capabilities.length === 0) {
-          capsContainer.innerHTML = '<div style="color:#888;">No capabilities found</div>';
-          return;
-        }
-
-        capsContainer.innerHTML = data.capabilities.map(cap => `
-          <div class="cap-card" data-cap-id="${cap.id}" onclick="showCapabilityDetail('${cap.id}')" style="cursor:pointer;padding:12px;background:#1a1e2e;border:1px solid #333;border-radius:6px;margin-bottom:8px;">
-            <h3 style="margin:0 0 8px 0;font-size:14px;color:#eee;">${cap.title}</h3>
-            <div class="cap-progress" style="height:6px;background:#333;border-radius:3px;overflow:hidden;">
-              <div class="cap-progress-fill" style="height:100%;background:#22c55e;width:${cap.progress_percent}%;border-radius:3px;"></div>
-            </div>
-            <div class="cap-stats" style="margin-top:4px;font-size:11px;color:#888;">
-              ${cap.complete_count}/${cap.task_count} tasks complete (${cap.progress_percent}%)
-            </div>
-          </div>
-        `).join('');
-      } catch (e) {
-        capsContainer.innerHTML = '<div style="color:#ef4444;">Failed to load mission data</div>';
-      }
-    }
-
-    async function showCapabilityDetail(capId) {
-      const projectParam = currentProject ? `?project=${currentProject}` : '';
-      try {
-        const res = await fetch(`/api/capabilities/${capId}` + projectParam);
-        const cap = await res.json();
-        if (cap.error) return;
-
-        const detailPanel = document.getElementById('detail-panel');
-        if (!detailPanel) return;
-        detailPanel.innerHTML = `
-          <div class="detail-header" style="padding:12px;border-bottom:1px solid #333;">
-            <button onclick="hideDetail()" style="background:#333;color:#eee;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">Back</button>
-            <h3 style="display:inline;margin-left:8px;font-size:16px;">${cap.title}</h3>
-            <span class="badge status-${cap.status}" style="margin-left:8px;">${cap.status}</span>
-          </div>
-
-          <div class="detail-section" style="padding:12px;">
-            <h4 style="color:#8ab4f8;margin:0 0 8px 0;">Requirements (${(cap.requirements || []).length})</h4>
-            ${(cap.requirements || []).map(r => `
-              <div class="req-row" style="padding:6px 0;border-bottom:1px solid #333;">
-                <span class="badge" style="font-size:10px;background:#0f3460;color:#8ab4f8;">${r.req_id_human}</span>
-                <span style="margin-left:8px;color:#eee;">${r.title}</span>
-                <span class="badge status-${r.status}" style="float:right;">${r.status}</span>
-              </div>
-            `).join('')}
-          </div>
-
-          <div class="detail-section" style="padding:12px;">
-            <h4 style="color:#8ab4f8;margin:0 0 8px 0;">Tasks (${cap.complete_count}/${cap.task_count})</h4>
-            ${(cap.tasks || []).map(t => `
-              <div class="task-row" style="padding:6px 0;border-bottom:1px solid #333;">
-                <span class="badge status-${t.status}" style="font-size:10px;">${t.status}</span>
-                <span style="margin-left:8px;color:#eee;">${t.title}</span>
-                ${t.role ? `<span class="badge role-badge" style="float:right;color:${ROLE_COLORS[t.role]||'#888'};border-color:${ROLE_COLORS[t.role]||'#888'};">${t.role.toUpperCase()}</span>` : ''}
-              </div>
-            `).join('')}
-          </div>
-        `;
-        detailPanel.classList.add('open');
-      } catch (e) {
-        console.error('Failed to load capability detail:', e);
-      }
-    }
-    window.showCapabilityDetail = showCapabilityDetail;
-
     async function loadData() {
       try {
         const projectParam = currentProject ? `?project=${currentProject}` : '';
@@ -1260,8 +1244,6 @@
       });
     }
 
-    let lastEtag = null;
-
     async function pollData() {
       try {
         const projectParam = currentProject ? `?project=${currentProject}` : '';
@@ -1271,22 +1253,25 @@
         }
         const response = await fetch('/api/data' + projectParam, { headers });
 
-        // 304 Not Modified — data unchanged, skip processing
+        // 304 Not Modified — data unchanged, increase idle count
         if (response.status === 304) {
+          idleTickCount++;
+          adaptPollingInterval();
           liveDot.classList.remove('error');
+          checkForUpdate();
           return;
         }
 
-        const data = await response.json();
+        const etag = response.headers.get('etag');
+        if (etag) lastEtag = etag;
 
-        // Store ETag for next request
-        const newEtag = response.headers.get('ETag');
-        if (newEtag) {
-          lastEtag = newEtag;
-        }
+        const data = await response.json();
 
         const newHash = computeDataHash(data);
         if (newHash !== lastDataHash) {
+          idleTickCount = 0; // Reset idle on data change
+          adaptPollingInterval();
+
           const oldNodes = [...nodes];
           nodes = data.nodes || [];
           stations = data.stations || [];
@@ -1297,11 +1282,11 @@
           updateStats(data);
           lastDataHash = newHash;
 
-          // Auto-refresh detail panel for selected node
+          // Auto-refresh detail panel for selected node (shows created_at, updated_at timestamps)
           if (selectedNodeId) {
             const selectedNode = nodes.find(n => n.id === selectedNodeId);
             if (selectedNode) {
-              showDetail(selectedNode);
+              showDetail(selectedNode); // refreshes created_at, updated_at timestamps
             } else {
               selectedNodeId = null;
               hideDetail();
@@ -1313,19 +1298,37 @@
           if (changedIds.length > 0) {
             setTimeout(() => flashNodes(changedIds), 100);
           }
+        } else {
+          idleTickCount++;
+          adaptPollingInterval();
         }
 
         liveDot.classList.remove('error');
-        loadSuspectStats();
+
+      // Check for version updates on every poll cycle
+      checkForUpdate();
       } catch (error) {
         console.error('Poll failed:', error);
         liveDot.classList.add('error');
       }
     }
 
+    function adaptPollingInterval() {
+      const newInterval = idleTickCount >= IDLE_THRESHOLD ? POLL_INTERVAL_SLOW : POLL_INTERVAL_FAST;
+      if (newInterval !== currentPollInterval) {
+        currentPollInterval = newInterval;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = setInterval(pollData, currentPollInterval);
+        }
+      }
+    }
+
     function startPolling() {
       if (pollInterval) clearInterval(pollInterval);
-      pollInterval = setInterval(pollData, POLL_INTERVAL_MS);
+      idleTickCount = 0;
+      currentPollInterval = POLL_INTERVAL_FAST;
+      pollInterval = setInterval(pollData, currentPollInterval);
     }
 
     function stopPolling() {
@@ -1444,20 +1447,60 @@
       let html = '';
 
       COLUMN_CONFIG.forEach(col => {
-        const columnNodes = getFilteredNodes().filter(n =>
+        let columnNodes = getFilteredNodes().filter(n =>
           col.statuses.includes(n.status) && !BLOCKED_STATUSES.includes(n.status)
         );
+
+        // Complete column: sort by updated_at descending (newest first) and apply time filter
+        if (col.id === 'complete') {
+          columnNodes.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+          if (completeFilterDays > 0) {
+            const cutoff = Date.now() - completeFilterDays * 24 * 60 * 60 * 1000;
+            columnNodes = columnNodes.filter(n => new Date(n.updated_at || 0).getTime() >= cutoff);
+          }
+        }
+
+        const filterHtml = col.id === 'complete' ? `
+          <div class="complete-time-filter" style="display:flex;gap:4px;margin-top:4px;">
+            ${COMPLETE_FILTER_OPTIONS.map(o => `
+              <button class="complete-filter-btn${completeFilterDays === o.days ? ' selected-filter' : ''}" onclick="setCompleteFilter(${o.days})" style="padding:1px 6px;font-size:10px;border-radius:3px;border:1px solid #555;background:${completeFilterDays === o.days ? '#e94560' : 'transparent'};color:${completeFilterDays === o.days ? '#fff' : '#888'};cursor:pointer;">${o.label}</button>
+            `).join('')}
+          </div>
+        ` : col.id === 'queue' ? `
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <button class="queue-filter-btn${queueFilter === 'all' ? ' active-filter' : ''}" data-filter="all" onclick="setQueueFilter('all')">All</button>
+            <button class="queue-filter-btn${queueFilter === 'ready' ? ' active-filter' : ''}" data-filter="ready" onclick="setQueueFilter('ready')">Ready</button>
+            <button class="queue-filter-btn${queueFilter === 'pending' ? ' active-filter' : ''}" data-filter="pending" onclick="setQueueFilter('pending')">Pending</button>
+            <button class="queue-filter-btn${queueFilter === 'rework' ? ' active-filter' : ''}" data-filter="rework" onclick="setQueueFilter('rework')">Rework</button>
+          </div>
+        ` : '';
 
         html += `
           <div class="kanban-column" id="column-${col.id}">
             <div class="column-phase-header">
               <span>${col.label}</span>
               <span class="column-count">${columnNodes.length}</span>
+              ${filterHtml}
             </div>
             <div class="column-cards">
         `;
 
-        html += renderColumn(columnNodes);
+        // Queue column: apply filter and group nodes by status with sub-headers
+        if (col.id === 'queue') {
+          if (queueFilter !== 'all') {
+            columnNodes = columnNodes.filter(n => n.status === queueFilter);
+          }
+          const queueGroupOrder = ['ready', 'rework', 'pending'];
+          queueGroupOrder.forEach(status => {
+            const groupNodes = columnNodes.filter(n => n.status === status);
+            if (groupNodes.length > 0) {
+              html += `<div class="queue-group-header">${status} (${groupNodes.length})</div>`;
+              html += renderColumn(groupNodes);
+            }
+          });
+        } else {
+          html += renderColumn(columnNodes);
+        }
 
         html += `
             </div>
@@ -1613,11 +1656,11 @@
       detailPanel.classList.add('visible');
 
       const parentNodes = (node.parent_ids || []).map(pid =>
-        nodes.find(n => n.id === pid)
+        nodes.find(n => n.id === pid || n.slug === pid)
       ).filter(Boolean);
 
       const childNodes = nodes.filter(n =>
-        n.parent_ids && n.parent_ids.includes(node.id)
+        n.parent_ids && (n.parent_ids.includes(node.id) || n.parent_ids.includes(node.slug))
       );
 
       const dna = node.dna || {};
@@ -1658,11 +1701,11 @@
           const showApproveRework = (isApprovalLiaison || isReviewLiaison) && mode === 'manual';
           if (!showComplete && !showApproveRework) return '';
           return `
-        <div class="detail-field" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
+        <div class="detail-field detail-actions-divider">
           <div style="display:flex;gap:8px;align-items:center;">
-            ${showApproveRework ? `<button id="approve-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Approve</button>` : ''}
-            ${showComplete ? `<button id="complete-task-btn" style="background:#3b82f6;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Complete</button>` : ''}
-            ${showApproveRework ? `<button id="rework-task-btn" style="background:#ef4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Rework</button>` : ''}
+            ${showComplete ? `<button id="complete-task-btn" style="background:#14b8a6;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Complete</button>` : ''}
+            ${showApproveRework ? `<button id="approve-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Approve</button>
+            <button id="rework-task-btn" style="background:#ef4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Rework</button>` : ''}
           </div>
           ${dna.human_confirmed ? '<span style="color:#22c55e;margin-top:4px;font-size:12px;">Confirmed (human_confirmed_via: ' + (dna.human_confirmed_via || 'unknown') + ')</span>' : ''}
         </div>`;
@@ -1735,6 +1778,50 @@
           </div>
         </div>
         ` : ''}
+        ${(() => {
+          const dependsOn = Array.isArray(dna.depends_on) ? dna.depends_on : [];
+          if (dependsOn.length === 0) return '';
+          return `
+        <div class="detail-field">
+          <label>Dependencies (${dependsOn.length})</label>
+          <ul class="node-links">${dependsOn.map(slug => {
+            const depNode = nodes.find(n => n.slug === slug);
+            const depStatus = depNode ? depNode.status : 'unknown';
+            const depTitle = depNode ? (depNode.dna?.title || slug) : slug;
+            return depNode
+              ? `<li class="clickable" data-id="${depNode.id}" style="display:flex;align-items:center;gap:6px;">
+                  <span class="badge status-${depStatus}" style="font-size:10px;padding:1px 6px;">${depStatus}</span>
+                  <span>${depTitle}</span>
+                </li>`
+              : `<li style="display:flex;align-items:center;gap:6px;">
+                  <span class="badge" style="font-size:10px;padding:1px 6px;background:#555;color:#aaa;">unknown</span>
+                  <span style="color:#888;">${slug}</span>
+                </li>`;
+          }).join('')}</ul>
+        </div>`;
+        })()}
+        ${dna.changelog_ref ? `
+        <div class="detail-field">
+          <label>Changelog</label>
+          <div class="dual-links">
+            <div class="dual-link" style="color: #f59e0b; font-weight: 500; margin-bottom: 4px;">
+              ${dna.changelog_ref.split('/').pop() || 'changelog.md'}
+            </div>
+            ${dna.changelog_ref.startsWith('https://')
+              ? `<div><a href="${dna.changelog_ref}" target="_blank" class="dual-link git-link" style="color: #f59e0b;">${dna.changelog_ref}</a></div>`
+              : `<div class="dual-link" style="font-family: monospace; font-size: 11px; color: #666;" title="Git-relative path (view in repo)">${dna.changelog_ref}</div>`
+            }
+          </div>
+        </div>
+        ` : ''}
+        <div class="detail-field">
+          <label>Created</label>
+          <div class="value" style="font-size: 11px; color: #888;">${node.created_at ? formatDate(node.created_at) : '—'}</div>
+        </div>
+        <div class="detail-field">
+          <label>Updated</label>
+          <div class="value" style="font-size: 11px; color: #888;">${node.updated_at ? formatDate(node.updated_at) : '—'}</div>
+        </div>
         <div class="detail-field">
           <label>ID</label>
           <div class="value" style="font-family: monospace; font-size: 10px; color: #666;">${node.id}</div>
@@ -1747,6 +1834,32 @@
           if (targetNode) showDetail(targetNode, false);
         };
       });
+
+      // Complete button handler (auto-approval + manual modes)
+      const completeBtn = document.getElementById('complete-task-btn');
+      if (completeBtn) {
+        completeBtn.onclick = async () => {
+          const slug = completeBtn.dataset.slug;
+          const project = completeBtn.dataset.project || undefined;
+          try {
+            const res = await fetch(`/api/node/${slug}/confirm`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project, human_confirmed_via: 'viz' })
+            });
+            if (res.ok) {
+              completeBtn.textContent = 'Confirmed';
+              completeBtn.disabled = true;
+              completeBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to confirm');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
 
       // Approve button handler
       const approveBtn = document.getElementById('approve-task-btn');
@@ -1767,32 +1880,6 @@
             } else {
               const data = await res.json();
               alert(data.error || 'Failed to approve');
-            }
-          } catch (e) {
-            alert('Error: ' + e.message);
-          }
-        };
-      }
-
-      // Complete button handler
-      const completeBtn = document.getElementById('complete-task-btn');
-      if (completeBtn) {
-        completeBtn.onclick = async () => {
-          const slug = completeBtn.dataset.slug;
-          const project = completeBtn.dataset.project || undefined;
-          try {
-            const res = await fetch(`/api/node/${slug}/confirm`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ project, human_confirmed_via: 'viz' })
-            });
-            if (res.ok) {
-              completeBtn.textContent = 'Confirmed';
-              completeBtn.disabled = true;
-              completeBtn.style.background = '#666';
-            } else {
-              const data = await res.json();
-              alert(data.error || 'Failed to confirm completion');
             }
           } catch (e) {
             alert('Error: ' + e.message);
@@ -1897,6 +1984,19 @@
     const pastChangesList = document.getElementById('past-changes-list');
     let pendingVersion = null;
 
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        if (data.version) {
+          const el = document.querySelector('.viz-version');
+          if (el) el.textContent = data.version;
+        }
+      } catch (err) {
+        console.warn('Failed to load version:', err);
+      }
+    }
+
     async function checkForUpdate() {
       try {
         const res = await fetch('/api/version');
@@ -1945,7 +2045,7 @@
       try {
         const res = await fetch('/api/changelogs');
         const data = await res.json();
-        pastChangesList.innerHTML = (data.changelogs || []).slice(0, 33).map(cl => `
+        pastChangesList.innerHTML = (data.changelogs || []).map(cl => `
           <div class="version-entry">
             <div class="version-title">${cl.version} — ${cl.title || ''}</div>
             <div class="version-date">${cl.date || ''}</div>
@@ -1965,6 +2065,13 @@
       pastChangesPanel.classList.remove('show');
     }
     window.hidePastChanges = hidePastChanges;
+
+    function setQueueFilter(filter) {
+      queueFilter = filter;
+      localStorage.setItem('queueFilter', filter);
+      renderKanbanColumns();
+    }
+    window.setQueueFilter = setQueueFilter;
 
     // ============================================================
     // Light mode toggle
@@ -2005,13 +2112,62 @@
     }
     window.setBlockedFilter = setBlockedFilter;
 
+    function setCompleteFilter(days) {
+      completeFilterDays = days;
+      localStorage.setItem('completeFilter', String(days));
+      renderKanbanColumns();
+    }
+    window.setCompleteFilter = setCompleteFilter;
+
     // Initial load and start polling
     loadProjects().then(() => {
       lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
-      loadSuspectStats();
       startPolling();
     });
     checkForUpdate();
+    loadVersion();
+
+    // Mission dashboard toggle
+    let missionViewActive = false;
+    function toggleMissionView() {
+      missionViewActive = !missionViewActive;
+      const kanban = document.getElementById('kanban-board');
+      const mission = document.getElementById('mission-dashboard');
+      const toggle = document.getElementById('view-toggle');
+      if (missionViewActive) {
+        kanban.style.display = 'none';
+        mission.style.display = 'block';
+        toggle.textContent = 'Mission';
+        loadMissionDashboard();
+      } else {
+        kanban.style.display = 'flex';
+        mission.style.display = 'none';
+        toggle.textContent = 'Kanban';
+      }
+    }
+    window.toggleMissionView = toggleMissionView;
+
+    async function loadMissionDashboard() {
+      const capsContainer = document.getElementById('mission-caps');
+      capsContainer.innerHTML = '<div style="color:#888;">Loading capabilities...</div>';
+      // Mission dashboard data loaded from viz server project data
+      // Capabilities are rendered as cap-cards with dependency links
+      capsContainer.innerHTML = '<div class="cap-card"><h3>Loading...</h3><div class="cap-stats">Fetching mission data</div></div>';
+    }
+
+    // PWA install prompt
+    // NOTE: PWA install requires HTTPS. On HTTP (dev/VPN), beforeinstallprompt won't fire
+    // and serviceWorker.register will fail. This is expected — PWA activates on HTTPS deploy.
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      console.log('PWA install available');
+    });
+
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
   </script>
 </body>
 </html>

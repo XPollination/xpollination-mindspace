@@ -1,0 +1,12 @@
+{
+  "version": "v0.0.18",
+  "title": "WORKFLOW v0.0.18 Approval Mode Enforcement",
+  "date": "2026-03-12",
+  "task": "wf-v18-approval-mode-enforcement",
+  "changes": [
+    "Add Complete button on review+liaison and approval+liaison cards in manual+auto-approval modes",
+    "Approve/Rework buttons shown only in manual mode",
+    "Re-render detail panel when liaison mode changes for button visibility",
+    "Server: auto-approval mode validation, suspect-links stats, mission-overview, capability detail endpoints"
+  ]
+}

@@ -35,7 +35,8 @@ import {
   getNewRoleForTransition,
   getClearsDnaForTransition,
   validateType,
-  validateDnaRequirements
+  validateDnaRequirements,
+  validateRoleConsistency
 } from './workflow-engine.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -210,7 +211,11 @@ function validateDnaFields(dna) {
 
 function getDb() {
   const dbPath = process.env.DATABASE_PATH || join(__dirname, '../../data/xpollination.db');
-  return new Database(dbPath);
+  const db = new Database(dbPath);
+  // Set busy_timeout = 5000ms to handle WAL contention gracefully
+  // Without this, concurrent writes fail immediately with SQLITE_BUSY
+  db.pragma('busy_timeout = 5000');
+  return db;
 }
 
 function output(data) {
@@ -410,7 +415,7 @@ async function microGarden(slug, project, dna, timeoutMs = 5000) {
   });
 }
 
-async function cmdTransition(id, newStatus, actor) {
+async function cmdTransition(id, newStatus, actor, extraArgs = []) {
   if (!VALID_STATUSES.includes(newStatus) && newStatus !== 'restore') {
     error(`Invalid status: ${newStatus}. Valid: ${VALID_STATUSES.join(', ')}, restore`);
   }
@@ -433,6 +438,15 @@ async function cmdTransition(id, newStatus, actor) {
   const nodeType = node.type;
   const dna = JSON.parse(node.dna_json || '{}');
   const currentRole = dna.role || null;
+
+  // Narrow immutability bypass: complete→rework needs rework_target_role in DNA
+  // Accept it as a transition parameter since update-dna blocks complete tasks
+  if (fromStatus === 'complete' && newStatus === 'rework') {
+    const reworkTargetArg = extraArgs.find(a => a.startsWith('--rework-target-role='));
+    if (reworkTargetArg) {
+      dna.rework_target_role = reworkTargetArg.split('=')[1];
+    }
+  }
 
   // Handle blocked→restore: read stored state from DNA and restore
   let effectiveNewStatus = newStatus;
@@ -631,40 +645,34 @@ async function cmdTransition(id, newStatus, actor) {
     const mode = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
     const modeValue = mode?.value || 'auto';
 
-    if (modeValue === 'manual') {
-      // Manual mode: require human_confirmed AND human_confirmed_via='viz' in DNA
+    // Determine if this is a completion transition (terminal — closes work)
+    const isCompletionTransition = (newStatus === 'complete');
+
+    // Matrix-based enforcement per WORKFLOW v0.0.18:
+    // manual: all requiresHumanConfirm transitions gated
+    // auto-approval: only completion transitions gated
+    // semi: no engine enforcement (protocol only)
+    // auto: no engine enforcement (free)
+    const requiresVizConfirm =
+      (modeValue === 'manual') ||
+      (modeValue === 'auto-approval' && isCompletionTransition);
+
+    if (requiresVizConfirm) {
       if (!dna.human_confirmed) {
         db.close();
-        error(`LIAISON manual mode active. Set dna.human_confirmed=true via mindspace viz before executing ${transitionKey}. Human must click Approve in viz UI.`);
+        error(`LIAISON ${modeValue} mode: ${transitionKey} requires human confirmation via mindspace viz. Click the button in viz UI.`);
       }
       if (dna.human_confirmed_via !== 'viz') {
         db.close();
-        error(`LIAISON manual mode requires human_confirmed_via='viz'. Current value: '${dna.human_confirmed_via || 'none'}'. Approval must come through the mindspace viz UI, not via CLI.`);
+        error(`LIAISON ${modeValue} mode: ${transitionKey} requires human_confirmed_via='viz'. Current: '${dna.human_confirmed_via || 'none'}'.`);
       }
-      // Clear human_confirmed after use (one-time confirmation)
+      // Clear after use (one-time confirmation)
       delete dna.human_confirmed;
       delete dna.human_confirmed_via;
-    } else if (modeValue === 'auto-approval') {
-      // Auto-approval mode:
-      //   approval→approved = AUTO (no gate)
-      //   review→complete = SEMI (protocol-based, no engine enforcement)
-      //   Other dangerous transitions (approval→rework) = require human_confirmed
-      const isApprovalGrant = (fromStatus === 'approval' && newStatus === 'approved');
-      const isCompletionReview = (fromStatus === 'review' && newStatus === 'complete');
-      if (!isApprovalGrant && !isCompletionReview) {
-        if (!dna.human_confirmed) {
-          db.close();
-          error(`LIAISON auto-approval mode: ${fromStatus}→${newStatus} requires human_confirmed. Only approval→approved (auto) and review→complete (semi/protocol) pass without viz click. Set dna.human_confirmed=true via mindspace viz.`);
-        }
-        // Clear human_confirmed after use (one-time confirmation)
-        delete dna.human_confirmed;
-        delete dna.human_confirmed_via;
-      }
-      // approval→approved and review→complete pass freely (protocol enforces human decision for completions)
-    } else if (modeValue === 'auto') {
-      // Full auto mode: no enforcement, liaison proceeds freely
     }
-    // Semi mode: no engine enforcement (agent protocol handles chat-based confirmation)
+    // auto mode: no enforcement (free)
+    // semi mode: no enforcement (protocol only)
+    // auto-approval non-completion: no enforcement (free)
   }
 
   // Clear DNA fields if transition requires it (e.g., rework clears memory fields)
@@ -701,25 +709,68 @@ async function cmdTransition(id, newStatus, actor) {
     newRole = dna.rework_target_role;
   }
 
+  // Role consistency enforcement: reject transitions that produce wrong role for fixed-role states
+  const effectiveRole = newRole || currentRole;
+  const consistencyError = validateRoleConsistency(newStatus, effectiveRole);
+  if (consistencyError) {
+    db.close();
+    error(consistencyError);
+  }
+
   let updatedDna = dna;
   if (newRole && newRole !== currentRole) {
     updatedDna = { ...dna, role: newRole };
   }
 
-  // Perform transition (write DNA if role changed or fields were cleared)
+  // Perform transition inside db.transaction() to prevent TOCTOU race conditions
+  // between the read (line ~410) and write — ensures atomic read-modify-write
   const dnaChanged = (newRole && newRole !== currentRole) || fieldsToClear.length > 0;
-  if (dnaChanged) {
-    db.prepare(`
-      UPDATE mindspace_nodes
-      SET status = ?, dna_json = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(newStatus, JSON.stringify(updatedDna), node.id);
-  } else {
-    db.prepare(`
-      UPDATE mindspace_nodes
-      SET status = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(newStatus, node.id);
+
+  const performTransition = db.transaction(() => {
+    let updateResult;
+    if (dnaChanged) {
+      updateResult = db.prepare(`
+        UPDATE mindspace_nodes
+        SET status = ?, dna_json = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(newStatus, JSON.stringify(updatedDna), node.id);
+    } else {
+      updateResult = db.prepare(`
+        UPDATE mindspace_nodes
+        SET status = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(newStatus, node.id);
+    }
+
+    // Check .changes — if 0 rows affected, the UPDATE silently failed
+    if (updateResult.changes === 0) {
+      throw new Error(`Transition UPDATE affected 0 rows for node ${node.id}. Possible SQLITE_BUSY lock contention or node was deleted.`);
+    }
+
+    // Verification read-back: confirm role persisted correctly after UPDATE
+    const verifyNode = db.prepare('SELECT status, dna_json FROM mindspace_nodes WHERE id = ?').get(node.id);
+    if (!verifyNode) {
+      throw new Error(`Verification read-back failed: node ${node.id} not found after UPDATE`);
+    }
+    if (verifyNode.status !== newStatus) {
+      throw new Error(`Verification read-back failed: expected status="${newStatus}" but got "${verifyNode.status}"`);
+    }
+    if (dnaChanged) {
+      const verifyDna = JSON.parse(verifyNode.dna_json);
+      const expectedRole = newRole || currentRole;
+      if (verifyDna.role !== expectedRole) {
+        throw new Error(`Verification read-back failed: expected role="${expectedRole}" but got "${verifyDna.role}". Role change did not persist.`);
+      }
+    }
+
+    return updateResult;
+  });
+
+  try {
+    performTransition();
+  } catch (err) {
+    db.close();
+    error(`Transition failed: ${err.message}`);
   }
 
   const result = {
@@ -998,7 +1049,7 @@ switch (command) {
     if (!args[1] || !args[2] || !args[3]) {
       error('Usage: transition <id|slug> <newStatus> <actor>');
     }
-    await cmdTransition(args[1], args[2], args[3]);
+    await cmdTransition(args[1], args[2], args[3], args.slice(4));
     break;
 
   case 'update-dna':

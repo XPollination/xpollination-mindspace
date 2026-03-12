@@ -7,17 +7,14 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
-import { fileURLToPath, pathToFileURL } from 'url';
-import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
-const { discoverProjects } = require('./discover-projects.cjs');
 
 const PORT = parseInt(process.argv[2]) || 3000;
+const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || '/home/developer/workspaces/github/PichlerThomas';
 
 // MIME types for static files
 const MIME_TYPES = {
@@ -26,11 +23,41 @@ const MIME_TYPES = {
   '.js': 'application/javascript',
   '.json': 'application/json',
   '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.webmanifest': 'application/manifest+json',
-  '.webp': 'image/webp'
+  '.svg': 'image/svg+xml'
 };
+
+/**
+ * Discover projects with xpollination.db in workspace
+ */
+function discoverProjects() {
+  const projects = [];
+
+  try {
+    const dirs = fs.readdirSync(WORKSPACE_PATH);
+
+    for (const dir of dirs) {
+      const projectPath = path.join(WORKSPACE_PATH, dir);
+      const dbPath = path.join(projectPath, 'data', 'xpollination.db');
+
+      // Skip if not a directory
+      const stat = fs.statSync(projectPath);
+      if (!stat.isDirectory()) continue;
+
+      // Check if db exists
+      if (fs.existsSync(dbPath)) {
+        projects.push({
+          name: dir,
+          path: projectPath,
+          dbPath: dbPath
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error discovering projects:', err.message);
+  }
+
+  return projects;
+}
 
 /**
  * Export data from a project's database
@@ -184,155 +211,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: Mission overview (capabilities with progress)
-  if (pathname === '/api/mission-overview') {
-    const projectName = url.searchParams.get('project');
-    const projects = discoverProjects();
-    const capabilities = [];
-
-    const targetProjects = projectName === 'all' ? projects :
-      projects.filter(p => p.name === projectName);
-
-    for (const proj of (targetProjects.length ? targetProjects : projects)) {
-      try {
-        const db = new Database(proj.dbPath, { readonly: true });
-        try {
-          const caps = db.prepare('SELECT * FROM capabilities').all();
-          for (const cap of caps) {
-            const taskRows = db.prepare(
-              `SELECT t.status FROM capability_tasks ct
-               LEFT JOIN mindspace_nodes t ON t.slug = ct.task_slug
-               WHERE ct.capability_id = ?`
-            ).all(cap.id);
-            const task_count = taskRows.length;
-            const complete_count = taskRows.filter(t => t.status === 'complete').length;
-            const progress_percent = task_count > 0 ? Math.round((complete_count / task_count) * 100) : 0;
-            capabilities.push({
-              id: cap.id,
-              title: cap.title,
-              description: cap.description,
-              status: cap.status,
-              mission_id: cap.mission_id,
-              task_count,
-              complete_count,
-              progress_percent,
-              _project: proj.name
-            });
-          }
-        } catch (err) { /* tables may not exist */ }
-        db.close();
-      } catch (err) { /* skip project */ }
-    }
-    sendJson(res, { capabilities });
-    return;
-  }
-
-  // API: Capability detail — GET /api/capabilities/:capId
-  if (pathname.match(/^\/api\/capabilities\/([^/]+)$/)) {
-    const capId = pathname.split('/')[3];
-    const projectName = url.searchParams.get('project');
-    const projects = discoverProjects();
-    const targetProjects = projectName ? projects.filter(p => p.name === projectName) : projects;
-
-    for (const proj of (targetProjects.length ? targetProjects : projects)) {
-      try {
-        const db = new Database(proj.dbPath, { readonly: true });
-        try {
-          const cap = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capId);
-          if (cap) {
-            const requirements = db.prepare(
-              `SELECT r.id, r.req_id_human, r.title, r.status, r.priority
-               FROM capability_requirements cr
-               JOIN requirements r ON r.id = cr.requirement_ref
-               WHERE cr.capability_id = ?
-               ORDER BY r.req_id_human ASC`
-            ).all(capId);
-
-            const tasks = db.prepare(
-              `SELECT ct.task_slug, t.id, t.status, t.dna_json
-               FROM capability_tasks ct
-               LEFT JOIN mindspace_nodes t ON t.slug = ct.task_slug
-               WHERE ct.capability_id = ?
-               ORDER BY t.status ASC`
-            ).all(capId);
-
-            const enrichedTasks = tasks.map(t => {
-              const dna = t.dna_json ? JSON.parse(t.dna_json) : {};
-              return {
-                slug: t.task_slug,
-                title: dna.title || t.task_slug,
-                status: t.status || 'unknown',
-                role: dna.role || null
-              };
-            });
-
-            db.close();
-            sendJson(res, {
-              id: cap.id,
-              title: cap.title,
-              description: cap.description,
-              status: cap.status,
-              requirements,
-              tasks: enrichedTasks,
-              task_count: enrichedTasks.length,
-              complete_count: enrichedTasks.filter(t => t.status === 'complete').length
-            });
-            return;
-          }
-        } catch (err) { /* tables may not exist */ }
-        db.close();
-      } catch (err) { /* skip project */ }
-    }
-    sendJson(res, { error: 'Capability not found' }, 404);
-    return;
-  }
-
-  // API: Suspect links stats
-  if (pathname === '/api/suspect-links/stats') {
-    const projectName = url.searchParams.get('project');
-    const projects = discoverProjects();
-
-    const merged = { suspect: 0, cleared: 0, accepted_risk: 0, total: 0, by_source_type: {} };
-
-    const targetProjects = projectName === 'all' ? projects :
-      projects.filter(p => p.name === projectName).slice(0, 1);
-
-    if (targetProjects.length === 0 && projectName !== 'all') {
-      // Default to current project
-      const currentName = path.basename(__dirname.replace('/viz', ''));
-      const current = projects.find(p => p.name === currentName);
-      if (current) targetProjects.push(current);
-    }
-
-    for (const proj of (targetProjects.length ? targetProjects : projects)) {
-      try {
-        const db = new Database(proj.dbPath, { readonly: true });
-        try {
-          const rows = db.prepare(
-            'SELECT status, source_type, COUNT(*) as count FROM suspect_links GROUP BY status, source_type'
-          ).all();
-          for (const row of rows) {
-            if (merged[row.status] !== undefined) merged[row.status] += row.count;
-            merged.total += row.count;
-            if (!merged.by_source_type[row.source_type]) {
-              merged.by_source_type[row.source_type] = { suspect: 0, cleared: 0, accepted_risk: 0 };
-            }
-            if (merged.by_source_type[row.source_type][row.status] !== undefined) {
-              merged.by_source_type[row.source_type][row.status] += row.count;
-            }
-          }
-        } catch (err) {
-          // Table doesn't exist in this project — skip
-        }
-        db.close();
-      } catch (err) {
-        // DB open error — skip project
-      }
-    }
-    sendJson(res, merged);
-    return;
-  }
-
   // API: Get project data
   if (pathname === '/api/data') {
     const projectName = url.searchParams.get('project');
@@ -368,7 +246,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        const responseData = {
+        sendJson(res, {
           exported_at: new Date().toISOString(),
           project: 'All Projects',
           node_count: mergedNodes.length,
@@ -377,22 +255,7 @@ const server = http.createServer(async (req, res) => {
           completed_count: totalCompleted,
           stations: mergedStations,
           nodes: mergedNodes
-        };
-        const responseBody = JSON.stringify(responseData, null, 2);
-        const etag = '"' + crypto.createHash('md5').update(responseBody).digest('hex') + '"';
-        const ifNoneMatch = req.headers['if-none-match'];
-        if (ifNoneMatch === etag) {
-          res.writeHead(304, { 'ETag': etag, 'Access-Control-Allow-Origin': '*' });
-          res.end();
-          return;
-        }
-        res.writeHead(200, {
-          'Content-Type': 'application/json',
-          'ETag': etag,
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-cache'
         });
-        res.end(responseBody);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -416,21 +279,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const data = exportProjectData(targetProject.dbPath);
       data.project = targetProject.name;
-      const responseBody = JSON.stringify(data, null, 2);
-      const etag = '"' + crypto.createHash('md5').update(responseBody).digest('hex') + '"';
-      const ifNoneMatch = req.headers['if-none-match'];
-      if (ifNoneMatch === etag) {
-        res.writeHead(304, { 'ETag': etag, 'Access-Control-Allow-Origin': '*' });
-        res.end();
-        return;
-      }
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'ETag': etag,
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-cache'
-      });
-      res.end(responseBody);
+      sendJson(res, data);
     } catch (err) {
       sendJson(res, { error: err.message }, 500);
     }
@@ -469,12 +318,7 @@ const server = http.createServer(async (req, res) => {
     const versionsDir = path.join(__dirname, 'versions');
     const changelogs = [];
     try {
-      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort((a, b) => {
-        const pa = a.replace('v', '').split('.').map(Number);
-        const pb = b.replace('v', '').split('.').map(Number);
-        for (let i = 0; i < 3; i++) { if ((pb[i] || 0) !== (pa[i] || 0)) return (pb[i] || 0) - (pa[i] || 0); }
-        return 0;
-      });
+      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort().reverse();
       for (const dir of dirs) {
         const changelogPath = path.join(versionsDir, dir, 'changelog.json');
         if (fs.existsSync(changelogPath)) {
@@ -482,7 +326,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
     } catch (e) { /* ignore */ }
-    sendJson(res, { changelogs: changelogs.slice(0, 33) });
+    sendJson(res, { changelogs });
     return;
   }
 
@@ -513,8 +357,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'PUT') {
     try {
       const body = await readBody(req);
-      if (!body.mode || !['manual', 'semi', 'auto-approval', 'auto'].includes(body.mode)) {
-        sendJson(res, { error: 'Invalid mode. Must be "manual", "semi", "auto-approval", or "auto".' }, 400);
+      if (!body.mode || !['manual', 'semi', 'auto'].includes(body.mode)) {
+        sendJson(res, { error: 'Invalid mode. Must be "manual", "semi", or "auto".' }, 400);
         return;
       }
       const projects = discoverProjects();
@@ -664,10 +508,9 @@ const server = http.createServer(async (req, res) => {
   serveStatic(res, filePath);
 });
 
-const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
-server.listen(PORT, BIND_HOST, () => {
-  console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
-  console.log(`Workspace: ${__dirname}`);
+server.listen(PORT, () => {
+  console.log(`Viz server running at http://localhost:${PORT}`);
+  console.log(`Workspace: ${WORKSPACE_PATH}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
 });

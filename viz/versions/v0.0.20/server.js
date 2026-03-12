@@ -8,16 +8,14 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { fileURLToPath, pathToFileURL } from 'url';
-import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
-const { discoverProjects } = require('./discover-projects.cjs');
 
 const PORT = parseInt(process.argv[2]) || 3000;
+const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || '/home/developer/workspaces/github/PichlerThomas';
 
 // MIME types for static files
 const MIME_TYPES = {
@@ -26,11 +24,41 @@ const MIME_TYPES = {
   '.js': 'application/javascript',
   '.json': 'application/json',
   '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.webmanifest': 'application/manifest+json',
-  '.webp': 'image/webp'
+  '.svg': 'image/svg+xml'
 };
+
+/**
+ * Discover projects with xpollination.db in workspace
+ */
+function discoverProjects() {
+  const projects = [];
+
+  try {
+    const dirs = fs.readdirSync(WORKSPACE_PATH);
+
+    for (const dir of dirs) {
+      const projectPath = path.join(WORKSPACE_PATH, dir);
+      const dbPath = path.join(projectPath, 'data', 'xpollination.db');
+
+      // Skip if not a directory
+      const stat = fs.statSync(projectPath);
+      if (!stat.isDirectory()) continue;
+
+      // Check if db exists
+      if (fs.existsSync(dbPath)) {
+        projects.push({
+          name: dir,
+          path: projectPath,
+          dbPath: dbPath
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error discovering projects:', err.message);
+  }
+
+  return projects;
+}
 
 /**
  * Export data from a project's database
@@ -298,7 +326,6 @@ const server = http.createServer(async (req, res) => {
       projects.filter(p => p.name === projectName).slice(0, 1);
 
     if (targetProjects.length === 0 && projectName !== 'all') {
-      // Default to current project
       const currentName = path.basename(__dirname.replace('/viz', ''));
       const current = projects.find(p => p.name === currentName);
       if (current) targetProjects.push(current);
@@ -440,7 +467,11 @@ const server = http.createServer(async (req, res) => {
   // API: Get current viz version from active symlink
   if (pathname === '/api/version' && req.method === 'GET') {
     try {
-      const activePath = path.join(__dirname, 'active');
+      // Try viz/active relative to cwd first (for systemd/symlink-based deployment),
+      // then fall back to __dirname/active (for direct execution from viz/)
+      const cwdActivePath = path.join(process.cwd(), 'viz', 'active');
+      const dirActivePath = path.join(__dirname, 'active');
+      const activePath = fs.existsSync(cwdActivePath) ? cwdActivePath : dirActivePath;
       const target = fs.readlinkSync(activePath);
       const versionMatch = target.match(/v(\d+\.\d+\.\d+)/);
       sendJson(res, { version: versionMatch ? `v${versionMatch[1]}` : target });
@@ -469,12 +500,7 @@ const server = http.createServer(async (req, res) => {
     const versionsDir = path.join(__dirname, 'versions');
     const changelogs = [];
     try {
-      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort((a, b) => {
-        const pa = a.replace('v', '').split('.').map(Number);
-        const pb = b.replace('v', '').split('.').map(Number);
-        for (let i = 0; i < 3; i++) { if ((pb[i] || 0) !== (pa[i] || 0)) return (pb[i] || 0) - (pa[i] || 0); }
-        return 0;
-      });
+      const dirs = fs.readdirSync(versionsDir).filter(d => d.startsWith('v')).sort().reverse();
       for (const dir of dirs) {
         const changelogPath = path.join(versionsDir, dir, 'changelog.json');
         if (fs.existsSync(changelogPath)) {
@@ -482,7 +508,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
     } catch (e) { /* ignore */ }
-    sendJson(res, { changelogs: changelogs.slice(0, 33) });
+    sendJson(res, { changelogs });
     return;
   }
 
@@ -664,10 +690,11 @@ const server = http.createServer(async (req, res) => {
   serveStatic(res, filePath);
 });
 
-const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
+const BIND_HOST = process.env.VIZ_BIND || undefined;
 server.listen(PORT, BIND_HOST, () => {
-  console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
-  console.log(`Workspace: ${__dirname}`);
+  const host = BIND_HOST || '0.0.0.0';
+  console.log(`Viz server running at http://${host}:${PORT}`);
+  console.log(`Workspace: ${WORKSPACE_PATH}`);
   const projects = discoverProjects();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
 });

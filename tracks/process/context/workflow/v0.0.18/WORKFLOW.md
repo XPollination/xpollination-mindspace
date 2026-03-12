@@ -1,7 +1,7 @@
 # Workflow Reference - Source of Truth
 
-**Last Updated:** 2026-03-10
-**Status:** DRAFT v17 - Role consistency enforcement
+**Last Updated:** 2026-03-12
+**Status:** DRAFT v18 - Liaison approval modes with hard engine gates
 
 ---
 
@@ -219,6 +219,64 @@ When a task reaches `complete` or `cancelled`, a completion abstract must exist 
 
 ---
 
+## Liaison Approval Modes (v18)
+
+Liaison executes human-decision transitions on behalf of Thomas. The **approval mode** controls which transitions require a hard engine gate (`human_confirmed` + `human_confirmed_via=viz`) vs which liaison can execute freely.
+
+The mode is stored in `system_settings` as `liaison_approval_mode`. Thomas changes it via the mindspace viz dropdown. The engine checks the mode on every human-decision transition.
+
+### Mode Definitions
+
+**Auto** — No engine enforcement. Liaison executes all human-decision transitions freely. Use only when Thomas is actively monitoring agent output in real-time.
+
+**Auto-Approval** — Approval transitions are free, completion transitions require viz confirmation. This is the standard operating mode: Thomas trusts the pipeline to move work forward but always signs off on final completion.
+
+**Semi** — No engine enforcement. Liaison must follow protocol: present task details and wait for Thomas to type his decision before executing. Enforcement is protocol-only (agent behavior, not engine gate). Use when Thomas wants to see every decision but doesn't want to click viz buttons.
+
+**Manual** — All human-decision transitions require `human_confirmed=true` with `human_confirmed_via=viz`. Thomas must click the corresponding button in mindspace viz for every transition. Maximum control.
+
+### Transition Enforcement Matrix
+
+This table is the **source of truth** for how the engine gates each human-decision transition per mode.
+
+| Transition | Auto | Auto-Approval | Semi | Manual |
+|------------|------|---------------|------|--------|
+| `approval → approved` | free | free | protocol only | `human_confirmed` + `via=viz` |
+| `approval → complete` | free | `human_confirmed` + `via=viz` | protocol only | `human_confirmed` + `via=viz` |
+| `approval → rework` | free | free | protocol only | `human_confirmed` + `via=viz` |
+| `review+liaison → complete` | free | `human_confirmed` + `via=viz` | protocol only | `human_confirmed` + `via=viz` |
+| `review+liaison → rework` | free | free | protocol only | `human_confirmed` + `via=viz` |
+| `complete → rework` | protocol only | protocol only | protocol only | protocol only |
+
+**Legend:**
+- **free** = engine allows the transition without any human confirmation gate
+- **`human_confirmed` + `via=viz`** = engine requires `dna.human_confirmed=true` AND `dna.human_confirmed_via=viz`. Only the mindspace viz UI can set these fields. Liaison agents cannot set `human_confirmed` via CLI (enforced by update-dna command)
+- **protocol only** = engine does not enforce a gate. Enforcement relies on agent protocol (liaison presents and waits for Thomas). No viz button exists for this transition
+
+### Design Principles
+
+1. **Completion is always gated in auto-approval.** Any transition to `complete` requires Thomas to click in viz. Completing a task is terminal — it closes the work item. Thomas must always sign off.
+
+2. **Approval-direction transitions are free in auto-approval.** Moving work forward (`approval → approved`) or backward (`approval → rework`, `review+liaison → rework`) through the pipeline is trusted. These redirect work, they don't close it.
+
+3. **Protocol-only is unreliable.** Semi mode and `complete → rework` rely on agent protocol — the agent must present and wait. This has failed repeatedly (2026-03-02 incident: 4 tasks auto-completed, 2026-03-12 incident: 4 more tasks auto-completed). Protocol-only gates should be replaced with engine gates when viz buttons become available.
+
+4. **`complete → rework` has no viz button.** Reopening completed tasks is rare and has no UI element. It remains protocol-only across all modes until a viz button is added.
+
+### Viz Button Requirements
+
+For hard gates to work, the mindspace viz must show action buttons on task cards:
+
+| Button | Shows on | Sets in DNA |
+|--------|----------|-------------|
+| **Approve** | `approval+liaison` cards | `human_confirmed=true`, `human_confirmed_via=viz` |
+| **Complete** | `approval+liaison` cards (research tasks), `review+liaison` cards | `human_confirmed=true`, `human_confirmed_via=viz` |
+| **Rework** | `approval+liaison` cards (manual mode only) | `human_confirmed=true`, `human_confirmed_via=viz` |
+
+The **Complete** button on `review+liaison` cards is the critical missing element. Without it, auto-approval mode cannot enforce the completion gate.
+
+---
+
 ## Key Rules
 
 1. **Actor** = who performs the transition
@@ -244,6 +302,8 @@ These transitions require human (Thomas) decision but are executed by liaison:
 
 **Security implication:** In the agent key system, these transitions are allowed for `actor=liaison`. There is no separate "human" key - liaison's key grants authority to execute human decisions.
 
+**Enforcement:** The level of engine enforcement per transition depends on the active approval mode. See [Liaison Approval Modes](#liaison-approval-modes-v18) for the enforcement matrix.
+
 ---
 
 ## Change Log
@@ -267,3 +327,4 @@ These transitions require human (Thomas) decision but are executed by liaison:
 | 2026-03-02 | v15 Added approval→complete transition for research tasks. LIAISON can complete directly from approval when task produced sub-tasks and has no code to test. Requires abstract_ref + human confirmation. Bug type excluded (no approval state in bug flow) | DEV |
 | 2026-03-06 | v16 Explicit rework target role routing: review+liaison→rework and complete→rework require dna.rework_target_role (dev/pdsa/qa/liaison). Engine must not guess — reject if missing. Fixes bug where binary pdsa_ref check routed to rework+liaison instead of rework+dev | Liaison |
 | 2026-03-10 | v17 Role consistency enforcement: engine REJECTS transitions producing wrong role for fixed-role states (complete→liaison, approval→liaison, approved→qa, testing→qa, cancelled→liaison). EXPECTED_ROLES_BY_STATE map + validateRoleConsistency() gate. One-time migration fixes 69 historical complete tasks. Tracks structure reconciled between main and develop | DEV |
+| 2026-03-12 | v18 Liaison approval modes: documented 4 modes (auto, auto-approval, semi, manual) with transition enforcement matrix. Key change: auto-approval gates completion transitions (`→ complete`) with `human_confirmed` + `via=viz`, keeps approval-direction transitions free. Protocol-only enforcement documented as unreliable (2 incidents). Viz button requirements specified. `complete → rework` remains protocol-only (no viz button) | Liaison |
