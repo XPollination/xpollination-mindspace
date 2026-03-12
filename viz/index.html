@@ -885,6 +885,7 @@
         <option value="manual">Manual</option>
         <option value="semi">Semi</option>
         <option value="auto">Auto</option>
+        <option value="auto-approval">Auto-Approval</option>
       </select>
       <span class="stats-bar" id="stats">Loading...</span>
       <button id="refresh-btn">Refresh</button>
@@ -1497,15 +1498,23 @@
           <label>Role</label>
           <div class="value">${dna.role ? `<span class="badge role-badge" style="color: ${ROLE_COLORS[dna.role] || '#888'}; border-color: ${ROLE_COLORS[dna.role] || '#888'}; font-weight: 600;">${dna.role.toUpperCase()}</span>` : '-'}</div>
         </div>
-        ${(node.status === 'approval' || (node.status === 'review' && dna.role === 'liaison')) && liaisonModeSelect.value === 'manual' ? `
+        ${(() => {
+          const isApprovalLiaison = (node.status === 'approval' && dna.role === 'liaison');
+          const isReviewLiaison = (node.status === 'review' && dna.role === 'liaison');
+          const mode = liaisonModeSelect.value;
+          const showComplete = (isApprovalLiaison || isReviewLiaison) && (mode === 'manual' || mode === 'auto-approval');
+          const showApproveRework = (isApprovalLiaison || isReviewLiaison) && mode === 'manual';
+          if (!showComplete && !showApproveRework) return '';
+          return `
         <div class="detail-field" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
           <div style="display:flex;gap:8px;align-items:center;">
-            <button id="approve-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Approve</button>
-            <button id="rework-task-btn" style="background:#ef4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Rework</button>
+            ${showApproveRework ? `<button id="approve-task-btn" style="background:#22c55e;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Approve</button>` : ''}
+            ${showComplete ? `<button id="complete-task-btn" style="background:#3b82f6;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Complete</button>` : ''}
+            ${showApproveRework ? `<button id="rework-task-btn" style="background:#ef4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;" data-slug="${node.slug}" data-project="${dna._project || ''}">Rework</button>` : ''}
           </div>
           ${dna.human_confirmed ? '<span style="color:#22c55e;margin-top:4px;font-size:12px;">Confirmed (human_confirmed_via: ' + (dna.human_confirmed_via || 'unknown') + ')</span>' : ''}
-        </div>
-        ` : ''}
+        </div>`;
+        })()}
         ${dna.description ? `
         <div class="detail-field">
           <label>Description</label>
@@ -1606,6 +1615,32 @@
             } else {
               const data = await res.json();
               alert(data.error || 'Failed to approve');
+            }
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+      }
+
+      // Complete button handler
+      const completeBtn = document.getElementById('complete-task-btn');
+      if (completeBtn) {
+        completeBtn.onclick = async () => {
+          const slug = completeBtn.dataset.slug;
+          const project = completeBtn.dataset.project || undefined;
+          try {
+            const res = await fetch(`/api/node/${slug}/confirm`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project, human_confirmed_via: 'viz' })
+            });
+            if (res.ok) {
+              completeBtn.textContent = 'Confirmed';
+              completeBtn.disabled = true;
+              completeBtn.style.background = '#666';
+            } else {
+              const data = await res.json();
+              alert(data.error || 'Failed to confirm completion');
             }
           } catch (e) {
             alert('Error: ' + e.message);

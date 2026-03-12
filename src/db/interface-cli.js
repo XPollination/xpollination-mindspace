@@ -415,7 +415,7 @@ async function microGarden(slug, project, dna, timeoutMs = 5000) {
   });
 }
 
-async function cmdTransition(id, newStatus, actor) {
+async function cmdTransition(id, newStatus, actor, extraArgs = []) {
   if (!VALID_STATUSES.includes(newStatus) && newStatus !== 'restore') {
     error(`Invalid status: ${newStatus}. Valid: ${VALID_STATUSES.join(', ')}, restore`);
   }
@@ -438,6 +438,15 @@ async function cmdTransition(id, newStatus, actor) {
   const nodeType = node.type;
   const dna = JSON.parse(node.dna_json || '{}');
   const currentRole = dna.role || null;
+
+  // Narrow immutability bypass: complete→rework needs rework_target_role in DNA
+  // Accept it as a transition parameter since update-dna blocks complete tasks
+  if (fromStatus === 'complete' && newStatus === 'rework') {
+    const reworkTargetArg = extraArgs.find(a => a.startsWith('--rework-target-role='));
+    if (reworkTargetArg) {
+      dna.rework_target_role = reworkTargetArg.split('=')[1];
+    }
+  }
 
   // Handle blocked→restore: read stored state from DNA and restore
   let effectiveNewStatus = newStatus;
@@ -636,22 +645,34 @@ async function cmdTransition(id, newStatus, actor) {
     const mode = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
     const modeValue = mode?.value || 'auto';
 
-    if (modeValue === 'manual') {
-      // Manual mode: require human_confirmed AND human_confirmed_via='viz' in DNA
+    // Determine if this is a completion transition (terminal — closes work)
+    const isCompletionTransition = (newStatus === 'complete');
+
+    // Matrix-based enforcement per WORKFLOW v0.0.18:
+    // manual: all requiresHumanConfirm transitions gated
+    // auto-approval: only completion transitions gated
+    // semi: no engine enforcement (protocol only)
+    // auto: no engine enforcement (free)
+    const requiresVizConfirm =
+      (modeValue === 'manual') ||
+      (modeValue === 'auto-approval' && isCompletionTransition);
+
+    if (requiresVizConfirm) {
       if (!dna.human_confirmed) {
         db.close();
-        error(`LIAISON manual mode active. Set dna.human_confirmed=true via mindspace viz before executing ${transitionKey}. Human must click Approve in viz UI.`);
+        error(`LIAISON ${modeValue} mode: ${transitionKey} requires human confirmation via mindspace viz. Click the button in viz UI.`);
       }
       if (dna.human_confirmed_via !== 'viz') {
         db.close();
-        error(`LIAISON manual mode requires human_confirmed_via='viz'. Current value: '${dna.human_confirmed_via || 'none'}'. Approval must come through the mindspace viz UI, not via CLI.`);
+        error(`LIAISON ${modeValue} mode: ${transitionKey} requires human_confirmed_via='viz'. Current: '${dna.human_confirmed_via || 'none'}'.`);
       }
-      // Clear human_confirmed after use (one-time confirmation)
+      // Clear after use (one-time confirmation)
       delete dna.human_confirmed;
       delete dna.human_confirmed_via;
     }
-    // Semi mode: no engine enforcement (agent protocol handles chat-based confirmation)
-    // Auto mode: no enforcement, liaison proceeds freely
+    // auto mode: no enforcement (free)
+    // semi mode: no enforcement (protocol only)
+    // auto-approval non-completion: no enforcement (free)
   }
 
   // Clear DNA fields if transition requires it (e.g., rework clears memory fields)
@@ -1028,7 +1049,7 @@ switch (command) {
     if (!args[1] || !args[2] || !args[3]) {
       error('Usage: transition <id|slug> <newStatus> <actor>');
     }
-    await cmdTransition(args[1], args[2], args[3]);
+    await cmdTransition(args[1], args[2], args[3], args.slice(4));
     break;
 
   case 'update-dna':
