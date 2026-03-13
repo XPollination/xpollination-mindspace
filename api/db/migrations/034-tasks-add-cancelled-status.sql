@@ -1,6 +1,9 @@
 -- Add 'cancelled' to tasks status CHECK constraint
 -- Required for workflow engine any->cancelled transitions (F1 fix)
 -- SQLite requires table recreation to alter CHECK constraints
+-- defer_foreign_keys defers FK checks until transaction commit (when tasks_new is already renamed)
+
+PRAGMA defer_foreign_keys = ON;
 
 CREATE TABLE tasks_new (
   id TEXT PRIMARY KEY,
