@@ -1,0 +1,38 @@
+# Mindspace Docker Compose — Production
+#
+# Runs the mindspace service on production ports.
+# Replaces systemd mindspace.service.
+# Brain (3200) and Qdrant (6333) are already running on the host.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up --build -d
+#
+# Ports:
+#   API:  3100 (production — first time online)
+#   Viz:  4100 (production — replaces systemd)
+
+services:
+  mindspace:
+    build: .
+    container_name: mindspace-prod
+    ports:
+      - "10.33.33.1:3100:3100"
+      - "10.33.33.1:4100:4100"
+    volumes:
+      - mindspace-prod-data:/app/data
+      - ./data/xpollination.db:/app/data/xpollination.db:ro
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/mindspace.db
+      - API_PORT=3100
+      - VIZ_PORT=4100
+      - BRAIN_API_URL=http://host.docker.internal:3200
+      - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
+      - JWT_SECRET=${JWT_SECRET:-xpo-prod-jwt-secret-2026}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  mindspace-prod-data:
+    driver: local
