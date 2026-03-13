@@ -48,7 +48,7 @@ echo "  Creating admin users, projects, and API keys."
 echo "  Agent API keys (pdsa, dev, qa, liaison) enable the 4-agent workflow."
 echo ""
 
-npx tsx -e "import { seed } from './api/db/seed.js'; seed();"
+npx tsx -e "import { seed } from './api/db/seed.ts'; seed();"
 
 echo ""
 echo "  ✓ Seed complete."
@@ -63,7 +63,7 @@ if [ -f "/app/data/xpollination.db" ]; then
   echo "  Groups (A0, VIZ, WF...) become capabilities under a default mission."
   echo ""
 
-  npx tsx -e "import { seedFromLegacy } from './api/db/seed-from-legacy.js'; seedFromLegacy('/app/data/xpollination.db');"
+  npx tsx -e "import { seedFromLegacy } from './api/db/seed-from-legacy.ts'; seedFromLegacy('/app/data/xpollination.db');"
 
   echo ""
   echo "  ✓ Legacy migration complete."
