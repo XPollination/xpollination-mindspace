@@ -1,0 +1,35 @@
+# Mindspace Docker Compose — Dev Standalone
+#
+# Runs only the mindspace service on dev ports.
+# Brain (3200) and Qdrant (6333) are already running on the host.
+#
+# Usage:
+#   docker compose -f docker-compose.dev-standalone.yml up --build
+#
+# Ports:
+#   API:  3101 (dev)
+#   Viz:  4201 (dev)
+
+services:
+  mindspace:
+    build: .
+    ports:
+      - "3101:3101"
+      - "4201:4201"
+    volumes:
+      - mindspace-dev-data:/app/data
+      - ./data/xpollination.db:/app/data/xpollination.db:ro
+    environment:
+      - NODE_ENV=development
+      - DATABASE_PATH=/app/data/mindspace.db
+      - API_PORT=3101
+      - VIZ_PORT=4201
+      - BRAIN_API_URL=http://host.docker.internal:3200
+      - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+
+volumes:
+  mindspace-dev-data:
+    driver: local

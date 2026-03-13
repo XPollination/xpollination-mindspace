@@ -87,7 +87,7 @@ echo "════════════════════════�
 echo ""
 
 # Start viz in background, API in foreground
-node viz/server.js &
+node viz/server.js ${VIZ_PORT:-4200} &
 VIZ_PID=$!
 
 # Start API server (foreground — container stays alive)
