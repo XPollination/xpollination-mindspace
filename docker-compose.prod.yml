@@ -9,7 +9,7 @@
 #
 # Ports:
 #   API:  3100 (production — first time online)
-#   Viz:  4100 (production — replaces systemd)
+#   Viz:  4200 (production)
 
 services:
   mindspace:
@@ -17,7 +17,7 @@ services:
     container_name: mindspace-prod
     ports:
       - "10.33.33.1:3100:3100"
-      - "10.33.33.1:4100:4100"
+      - "10.33.33.1:4200:4200"
     volumes:
       - mindspace-prod-data:/app/data
       - ./data/xpollination.db:/app/data/xpollination.db:ro
@@ -26,7 +26,7 @@ services:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/mindspace.db
       - API_PORT=3100
-      - VIZ_PORT=4100
+      - VIZ_PORT=4200
       - XPO_WORKSPACE_PATH=/workspace
       - BRAIN_API_URL=http://host.docker.internal:3200
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
