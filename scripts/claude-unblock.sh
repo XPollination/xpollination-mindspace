@@ -1,30 +1,28 @@
 #!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Thomas Pichler <herr.thomas.pichler@gmail.com>
 #===============================================================================
 # claude-unblock.sh — Auto-confirm permission prompts for Claude agents
 #
+# Auto-discovers ALL running Claude agents via tmux list-panes -a.
 # Runs inside its own tmux session so it persists across terminal disconnects.
-# Works like claude-session: creates tmux session if missing, attaches if exists.
 #
 # Usage:
-#   claude-unblock                          # Unblock QA, DEV, PDSA (panes 1-3)
-#   claude-unblock liaison                  # Unblock LIAISON only (pane 0)
-#   claude-unblock HomeAssistantDevOpsAgent # Unblock a named tmux session (pane 0)
+#   claude-unblock                          # Unblock ALL detected agents
+#   claude-unblock liaison                  # Filter to LIAISON only
+#   claude-unblock dev qa                   # Filter to DEV and QA
+#   claude-unblock agents                   # Backward compat: all non-liaison
+#   claude-unblock HomeAssistantDevOpsAgent # Filter to named session
 #
 # Behavior:
-#   - First run  → creates tmux session "claude-unblock-*", starts monitor
+#   - First run  → creates tmux session "claude-unblock", starts monitor
 #   - Next run   → attaches to existing session (monitor already running)
 #   - Detach     → Ctrl+B D (monitor keeps running in background)
-#   - Stop       → attach and Ctrl+C, or: tmux kill-session -t claude-unblock-*
-#
-# Built-in modes (claude-agents session):
-#   agents   → Panes 1-3: PDSA, DEV, QA
-#   liaison  → Pane 0: LIAISON
-#
-# Named session mode:
-#   Any other argument is treated as a tmux session name.
-#   Monitors pane 0 of that session.
+#   - Stop       → attach and Ctrl+C, or: tmux kill-session -t claude-unblock
 #
 # What it does:
+#   - Auto-discovers all Claude agent panes via tmux list-panes -a
+#   - Re-discovers agents every 60 seconds (adds new, removes dead)
 #   - Checks last 300 lines of each pane every 6 seconds
 #   - Detects "❯ N. Yes/Allow" permission prompts
 #   - Prefers "don't ask again" > "allow all" > "yes"
@@ -34,9 +32,10 @@
 # What it does NOT do:
 #   - Never sends Enter to "accept edits on" (mode indicator, not a prompt)
 #   - Never interferes with agent typing or active work
+#   - Never auto-confirms AskUserQuestion (bullet gate ● protection)
 #
 # Prerequisites:
-#   - Target tmux session must be running
+#   - At least one tmux session with Claude agents running
 #   - On Hetzner: works directly
 #   - Remote: SSHes to Hetzner via VPN (like claude-session)
 #===============================================================================
@@ -49,6 +48,7 @@ readonly HETZNER_USER="developer"
 readonly HETZNER_HOME="/home/${HETZNER_USER}"
 readonly SELF_PATH="$(realpath "$0")"
 readonly CLAUDE_BIN="${HETZNER_HOME}/.local/bin/claude"
+readonly REDISCOVER_INTERVAL=10  # re-discover every 10 cycles (~60s at 6s poll)
 
 # --- Functions ---
 
@@ -70,61 +70,116 @@ run_remote() {
         "$SELF_PATH" "$mode"
 }
 
+get_agent_name() {
+    local session="$1" pane_idx="$2"
+    if [[ "$session" == *"claude-agents"* ]]; then
+        case "$pane_idx" in
+            0) echo "LIAISON" ;;
+            1) echo "PDSA" ;;
+            2) echo "DEV" ;;
+            3) echo "QA" ;;
+            *) echo "${session}:${pane_idx}" ;;
+        esac
+    else
+        echo "$session"
+    fi
+}
+
+discover_agents() {
+    # Auto-detect all panes running claude across ALL tmux sessions.
+    # Returns lines of: TARGET AGENT_NAME
+    # Uses tmux list-panes -a to find every pane, then filters for claude processes.
+    local pane_list
+    pane_list=$(tmux list-panes -a -F '#{session_name} #{window_index} #{pane_index} #{pane_current_command}' 2>/dev/null) || return
+
+    while IFS=' ' read -r session win_idx pane_idx cmd; do
+        # Match panes running claude (the CLI binary)
+        if [[ "$cmd" == *"claude"* ]]; then
+            local target="${session}:${win_idx}.${pane_idx}"
+            local name
+            name=$(get_agent_name "$session" "$pane_idx")
+            echo "${target} ${name}"
+        fi
+    done <<< "$pane_list"
+}
+
 run_monitor() {
     # This function runs inside the tmux session — it IS the monitor loop.
-    local mode="$1"
+    local -a target_filters=("$@")
 
-    local agent_session
-    declare -A PANES
+    echo "=== claude-unblock: auto-discovery ==="
+    echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
 
-    if [[ "$mode" == "liaison" || "$mode" == "agents" ]]; then
-        # Built-in modes: find the claude-agents session
-        agent_session=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -m1 'claude-agents' || true)
-        if [[ -z "$agent_session" ]]; then
-            echo "ERROR: claude-agents tmux session not found"
-            echo "Start it first: claude-session claude-agents"
-            echo "Waiting for claude-agents session..."
-            while true; do
-                agent_session=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -m1 'claude-agents' || true)
-                if [[ -n "$agent_session" ]]; then
-                    echo "Found session: $agent_session"
-                    break
-                fi
-                sleep 10
-            done
+    # Wait until at least one agent is detected
+    local discovery_output=""
+    while true; do
+        discovery_output=$(discover_agents)
+        if [[ -n "$discovery_output" ]]; then
+            break
         fi
+        echo "No Claude agents detected. Waiting..."
+        sleep 10
+    done
 
-        if [[ "$mode" == "liaison" ]]; then
-            PANES=([0]="LIAISON")
-            echo "=== claude-unblock: LIAISON mode (pane 0 only) ==="
+    # Build agent list from discovery
+    declare -A AGENTS  # TARGET -> NAME
+    local total_found=0
+
+    while IFS=' ' read -r target name; do
+        AGENTS["$target"]="$name"
+        total_found=$((total_found + 1))
+    done <<< "$discovery_output"
+
+    echo "Detected ${total_found} Claude agents:"
+    for target in "${!AGENTS[@]}"; do
+        echo "  ${target}  ${AGENTS[$target]}"
+    done
+
+    # Apply target filter if specified
+    if [[ ${#target_filters[@]} -gt 0 && "${target_filters[0]}" != "all" ]]; then
+        declare -A FILTERED
+        local filter_matched=0
+
+        for target in "${!AGENTS[@]}"; do
+            local agent_name="${AGENTS[$target]}"
+            local agent_lower
+            agent_lower=$(echo "$agent_name" | tr 'A-Z' 'a-z')
+
+            for filter in "${target_filters[@]}"; do
+                local filter_lower
+                filter_lower=$(echo "$filter" | tr 'A-Z' 'a-z')
+
+                # Backward compat: "agents" matches PDSA/DEV/QA (not LIAISON)
+                if [[ "$filter_lower" == "agents" ]]; then
+                    if [[ "$agent_lower" == "pdsa" || "$agent_lower" == "dev" || "$agent_lower" == "qa" ]]; then
+                        FILTERED["$target"]="$agent_name"
+                        filter_matched=$((filter_matched + 1))
+                    fi
+                elif [[ "$agent_lower" == "$filter_lower" || "$agent_name" == *"$filter"* ]]; then
+                    FILTERED["$target"]="$agent_name"
+                    filter_matched=$((filter_matched + 1))
+                fi
+            done
+        done
+
+        if [[ $filter_matched -eq 0 ]]; then
+            echo "WARNING: No agents match filter: ${target_filters[*]}"
+            echo "Available: ${AGENTS[*]}"
+            echo "Falling back to ALL agents"
         else
-            PANES=([1]="PDSA" [2]="DEV" [3]="QA")
-            echo "=== claude-unblock: AGENTS mode (panes 1-3: PDSA, DEV, QA) ==="
+            # Replace AGENTS with filtered set
+            unset AGENTS
+            declare -A AGENTS
+            for target in "${!FILTERED[@]}"; do
+                AGENTS["$target"]="${FILTERED[$target]}"
+            done
+            echo "Monitoring: ${AGENTS[*]} (${filter_matched} of ${total_found} agents)"
         fi
     else
-        # Named session mode: monitor pane 0 of the given session
-        agent_session="$mode"
-
-        # Wait for the named session to exist
-        if ! tmux has-session -t "$agent_session" 2>/dev/null; then
-            echo "Waiting for tmux session '$agent_session'..."
-            while true; do
-                if tmux has-session -t "$agent_session" 2>/dev/null; then
-                    echo "Found session: $agent_session"
-                    break
-                fi
-                sleep 10
-            done
-        fi
-
-        PANES=([0]="$agent_session")
-        echo "=== claude-unblock: SESSION mode ($agent_session, pane 0) ==="
+        echo "Monitoring: ALL (${total_found} agents)"
     fi
 
-    echo "Agent session: $agent_session"
-    echo "Monitoring: ${PANES[*]}"
-    echo "Poll interval: 6s"
-    echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "Poll interval: 6s | Re-discovery: every 60s"
     echo "Detach: Ctrl+B D (monitor keeps running)"
     echo "Stop:   Ctrl+C"
     echo "---"
@@ -133,9 +188,52 @@ run_monitor() {
     local scan_count=0
 
     while true; do
-        for PANE_ID in "${!PANES[@]}"; do
-            local PANE_NAME="${PANES[$PANE_ID]}"
-            local TARGET="${agent_session}:0.${PANE_ID}"
+        # Re-discover agents periodically
+        if (( scan_count > 0 && scan_count % REDISCOVER_INTERVAL == 0 )); then
+            local new_discovery
+            new_discovery=$(discover_agents) || true
+
+            if [[ -n "$new_discovery" ]]; then
+                # Check for new agents
+                while IFS=' ' read -r target name; do
+                    if [[ -z "${AGENTS[$target]+x}" ]]; then
+                        # Apply filter if active
+                        local should_add=true
+                        if [[ ${#target_filters[@]} -gt 0 && "${target_filters[0]}" != "all" ]]; then
+                            should_add=false
+                            local name_lower
+                            name_lower=$(echo "$name" | tr 'A-Z' 'a-z')
+                            for filter in "${target_filters[@]}"; do
+                                local fl
+                                fl=$(echo "$filter" | tr 'A-Z' 'a-z')
+                                if [[ "$fl" == "agents" ]]; then
+                                    if [[ "$name_lower" == "pdsa" || "$name_lower" == "dev" || "$name_lower" == "qa" ]]; then
+                                        should_add=true
+                                    fi
+                                elif [[ "$name_lower" == "$fl" || "$name" == *"$filter"* ]]; then
+                                    should_add=true
+                                fi
+                            done
+                        fi
+                        if [[ "$should_add" == "true" ]]; then
+                            AGENTS["$target"]="$name"
+                            echo "[$(date '+%H:%M:%S')] + ${name} detected (${target})"
+                        fi
+                    fi
+                done <<< "$new_discovery"
+
+                # Check for removed agents
+                for target in "${!AGENTS[@]}"; do
+                    if ! echo "$new_discovery" | grep -q "^${target} "; then
+                        echo "[$(date '+%H:%M:%S')] - ${AGENTS[$target]} removed (pane gone)"
+                        unset "AGENTS[$target]"
+                    fi
+                done
+            fi
+        fi
+
+        for TARGET in "${!AGENTS[@]}"; do
+            local PANE_NAME="${AGENTS[$TARGET]}"
 
             # Capture pane with deep scrollback — narrow panes (8-15 chars) wrap a single
             # permission prompt across 100+ lines, pushing "❯ 1. Yes" far above visible area
@@ -239,7 +337,7 @@ run_monitor() {
         scan_count=$((scan_count + 1))
         # Periodic heartbeat every ~30 scans (~3 min)
         if (( scan_count % 30 == 0 )); then
-            echo "[$(date '+%H:%M:%S')] ... scanning (${confirm_count} confirmed so far)"
+            echo "[$(date '+%H:%M:%S')] ... scanning (${confirm_count} confirmed so far, ${#AGENTS[@]} agents)"
         fi
 
         sleep 6
@@ -248,28 +346,38 @@ run_monitor() {
 
 # --- Main ---
 
-MODE="${1:-agents}"
+MODE="${1:-all}"
+shift 2>/dev/null || true
+EXTRA_ARGS=("$@")
 
 # Handle --run flag (internal: called inside the tmux session)
 if [[ "$MODE" == "--run-"* ]]; then
     # Extract the actual mode from --run-<mode>
     run_mode="${MODE#--run-}"
-    run_monitor "$run_mode"
+    # Split remaining args — "agents" and "liaison" are backward compat filters
+    if [[ "$run_mode" == "all" ]]; then
+        run_monitor "all"
+    else
+        run_monitor "$run_mode" "${EXTRA_ARGS[@]}"
+    fi
     exit 0
 fi
 
 # Show help for -h/--help
 if [[ "$MODE" == "-h" || "$MODE" == "--help" ]]; then
     cat <<'EOF'
-Usage: claude-unblock [agents|liaison|<session-name>]
+Usage: claude-unblock [target...]
 
-  claude-unblock                          Unblock QA, DEV, PDSA (panes 1-3)
-  claude-unblock liaison                  Unblock LIAISON only (pane 0)
-  claude-unblock HomeAssistantDevOpsAgent Unblock a named tmux session (pane 0)
+  claude-unblock                          Unblock ALL detected Claude agents
+  claude-unblock liaison                  Filter to LIAISON agent only
+  claude-unblock dev qa                   Filter to DEV and QA agents
+  claude-unblock agents                   Backward compat: PDSA, DEV, QA
+  claude-unblock HomeAssistantDevOpsAgent Filter to named session agent
 
-The monitor runs in a tmux session that persists across disconnects.
-  Detach: Ctrl+B D    Reattach: claude-unblock [mode]
-  Stop:   Ctrl+C (inside session) or: tmux kill-session -t claude-unblock-*
+The monitor auto-discovers all Claude agents via tmux list-panes -a.
+Re-discovers every 60s. Runs in a tmux session that persists across disconnects.
+  Detach: Ctrl+B D    Reattach: claude-unblock
+  Stop:   Ctrl+C (inside session) or: tmux kill-session -t claude-unblock
 EOF
     exit 0
 fi
@@ -277,20 +385,14 @@ fi
 if is_on_hetzner; then
     # If running as thomas, re-exec as developer
     if [[ "$(whoami)" != "developer" ]]; then
-        exec sudo -i -u developer bash "$SELF_PATH" "$MODE"
+        exec sudo -i -u developer bash "$SELF_PATH" "$MODE" "${EXTRA_ARGS[@]}"
     fi
 
     # Unset TMUX to allow running from inside an existing tmux session
     unset TMUX
 
-    # Session name for the unblock monitor tmux session
-    if [[ "$MODE" == "agents" ]]; then
-        SESSION_NAME="claude-unblock"
-    else
-        # liaison → claude-unblock-liaison
-        # HomeAssistantDevOpsAgent → claude-unblock-HomeAssistantDevOpsAgent
-        SESSION_NAME="claude-unblock-${MODE}"
-    fi
+    # Unified session name — auto-discovery replaces per-mode sessions
+    SESSION_NAME="claude-unblock"
     RUN_FLAG="--run-${MODE}"
 
     # If session exists, just attach
@@ -301,7 +403,7 @@ if is_on_hetzner; then
 
     # Create new session running the monitor
     echo "Starting unblock monitor in tmux session '$SESSION_NAME'..."
-    tmux new-session -d -s "$SESSION_NAME" "bash $SELF_PATH $RUN_FLAG"
+    tmux new-session -d -s "$SESSION_NAME" "bash $SELF_PATH $RUN_FLAG ${EXTRA_ARGS[*]:-}"
 
     # Attach
     exec tmux attach -t "$SESSION_NAME"
