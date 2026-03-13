@@ -76,4 +76,9 @@ npm start
 
 ## License
 
-MIT
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
+### Commercial License
+
+For proprietary or commercial use without AGPL obligations, a commercial license is available.
+Contact: licensing@xpollination.earth

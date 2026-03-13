@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Thomas Pichler <herr.thomas.pichler@gmail.com>
 /**
  * XPollination MCP Server
  *
