@@ -1,28 +1,32 @@
 #!/bin/bash
 #===============================================================================
-# claude-unblock.sh — Auto-confirm permission prompts for Claude agents
+# claude-unblock.sh — Auto-confirm permission prompts for ALL Claude agents
 #
-# Runs inside its own tmux session so it persists across terminal disconnects.
-# Works like claude-session: creates tmux session if missing, attaches if exists.
+# Monitors any agent running in any tmux session on the system. Runs inside
+# its own persistent tmux session so it survives terminal disconnects.
+# One instance per target session — run multiple for full system coverage.
 #
 # Usage:
-#   claude-unblock                          # Unblock all panes (0-3: LIAISON, PDSA, DEV, QA)
-#   claude-unblock liaison                  # Unblock LIAISON only (pane 0)
-#   claude-unblock HomeAssistantDevOpsAgent # Unblock a named tmux session (pane 0)
+#   claude-unblock                          # claude-agents: all panes (0-3)
+#   claude-unblock liaison                  # claude-agents: pane 0 only
+#   claude-unblock HomeAssistantDevOpsAgent # HomeAssistantDevOpsAgent: pane 0
+#   claude-unblock <any-tmux-session>       # Any session: pane 0
+#
+# Full system coverage (all agents on this machine):
+#   claude-unblock                          # covers claude-agents (4 panes)
+#   claude-unblock HomeAssistantDevOpsAgent # covers HomeAssistant agent
+#   # ... one call per additional agent session
 #
 # Behavior:
-#   - First run  → creates tmux session "claude-unblock-*", starts monitor
+#   - First run  → creates tmux session "claude-unblock[-name]", starts monitor
 #   - Next run   → attaches to existing session (monitor already running)
 #   - Detach     → Ctrl+B D (monitor keeps running in background)
 #   - Stop       → attach and Ctrl+C, or: tmux kill-session -t claude-unblock-*
 #
-# Built-in modes (claude-agents session):
-#   agents   → All panes 0-3: LIAISON, PDSA, DEV, QA
-#   liaison  → Pane 0 only: LIAISON
-#
-# Named session mode:
-#   Any other argument is treated as a tmux session name.
-#   Monitors pane 0 of that session.
+# Modes:
+#   agents (default) → claude-agents session, panes 0-3 (LIAISON, PDSA, DEV, QA)
+#   liaison          → claude-agents session, pane 0 only (LIAISON)
+#   <session-name>   → any tmux session, pane 0
 #
 # What it does:
 #   - Checks last 300 lines of each pane every 6 seconds
@@ -30,13 +34,15 @@
 #   - Prefers "don't ask again" > "allow all" > "yes"
 #   - Detects "Do you want to proceed" prompts
 #   - Logs every action with timestamp and pane name
+#   - Handles narrow panes (15+ chars) where prompts wrap heavily
 #
 # What it does NOT do:
 #   - Never sends Enter to "accept edits on" (mode indicator, not a prompt)
+#   - Never auto-confirms AskUserQuestion (human decision prompts)
 #   - Never interferes with agent typing or active work
 #
 # Prerequisites:
-#   - Target tmux session must be running
+#   - Target tmux session must be running (script waits if not yet started)
 #   - On Hetzner: works directly
 #   - Remote: SSHes to Hetzner via VPN (like claude-session)
 #===============================================================================
@@ -265,11 +271,15 @@ if [[ "$MODE" == "-h" || "$MODE" == "--help" ]]; then
     cat <<'EOF'
 Usage: claude-unblock [agents|liaison|<session-name>]
 
-  claude-unblock                          Unblock all panes (0-3: LIAISON, PDSA, DEV, QA)
-  claude-unblock liaison                  Unblock LIAISON only (pane 0)
-  claude-unblock HomeAssistantDevOpsAgent Unblock a named tmux session (pane 0)
+Monitors any Claude agent tmux session and auto-confirms permission prompts.
+Run one instance per agent session for full system coverage.
 
-The monitor runs in a tmux session that persists across disconnects.
+  claude-unblock                          claude-agents: all panes (0-3)
+  claude-unblock liaison                  claude-agents: pane 0 only
+  claude-unblock HomeAssistantDevOpsAgent HomeAssistant agent session
+  claude-unblock <session-name>           Any tmux session (pane 0)
+
+The monitor runs in a persistent tmux session (survives disconnects).
   Detach: Ctrl+B D    Reattach: claude-unblock [mode]
   Stop:   Ctrl+C (inside session) or: tmux kill-session -t claude-unblock-*
 EOF
