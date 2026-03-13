@@ -27,6 +27,7 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.t
 const PUBLIC_PATHS = [
   '/login',
   '/register',
+  '/invite/',
   '/health',
   '/api/auth/',
   '/assets/',
@@ -325,6 +326,15 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'API server unreachable' }));
     }
+    return;
+  }
+
+  // ─── Invite landing: /invite/{code} → register page with code pre-filled ───
+  const inviteMatch = pathname.match(/^\/invite\/([^/]+)$/);
+  if (inviteMatch) {
+    const code = inviteMatch[1];
+    res.writeHead(302, { 'Location': `/register?code=${encodeURIComponent(code)}` });
+    res.end();
     return;
   }
 

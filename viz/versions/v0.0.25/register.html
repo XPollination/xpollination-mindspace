@@ -65,8 +65,20 @@
           errorEl.style.display = 'block';
           return;
         }
-        successEl.textContent = 'Account created! Redirecting to login...';
+        // Auto-login after successful registration
+        successEl.textContent = 'Account created! Logging in...';
         successEl.style.display = 'block';
+        try {
+          const loginRes = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          if (loginRes.ok) {
+            window.location.href = '/';
+            return;
+          }
+        } catch (e) { /* fall through to login page */ }
         setTimeout(() => { window.location.href = '/login'; }, 1500);
       } catch (err) {
         errorEl.textContent = 'Network error';
