@@ -5,8 +5,9 @@
   "type": "module",
   "main": "dist/src/index.js",
   "scripts": {
-    "build": "tsc && cp src/db/schema.sql dist/src/db/schema.sql",
-    "start": "node dist/src/index.js",
+    "build": "tsc && cp src/db/schema.sql dist/db/schema.sql",
+    "start": "docker compose up --build",
+    "start:native": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src/",
     "test": "vitest",
@@ -14,7 +15,8 @@
     "viz": "node viz/server.js",
     "api": "node dist/api/server.js",
     "api:dev": "tsx watch api/server.ts",
-    "api:migrate": "tsx api/db/migrate.ts"
+    "api:migrate": "tsx api/db/migrate.ts",
+    "start:api": "tsx api/db/migrate.ts && tsx api/server.ts"
   },
   "keywords": [
     "mcp",

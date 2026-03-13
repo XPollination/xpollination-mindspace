@@ -282,8 +282,8 @@ xpollination-mcp-server/
 
 ## GitHub Repository
 
-- **URL:** https://github.com/PichlerThomas/xpollination-mcp-server
-- **Visibility:** Private
+- **URL:** https://github.com/XPollination/xpollination-mindspace
+- **Visibility:** Public
 - **Auth:** PAT stored in HomeAssistant/systems/hetzner-cx22-ubuntu/credentials.md
 
 ## Current Implementation Status

@@ -48,7 +48,7 @@ export function seed(): void {
     }
   }
 
-  // --- API Keys ---
+  // --- API Keys (user keys) ---
   for (const user of seedUsers) {
     const rawKey = `xpo-${randomUUID()}`;
     const keyHash = createHash('sha256').update(rawKey).digest('hex');
@@ -58,6 +58,22 @@ export function seed(): void {
 
     if (result.changes > 0) {
       console.log(`API key for ${user.name}: ${rawKey}`);
+    }
+  }
+
+  // --- Agent API Keys (pdsa, dev, qa, liaison) ---
+  const agentRoles = ['pdsa', 'dev', 'qa', 'liaison'];
+  const thomas = seedUsers[0];
+  for (const role of agentRoles) {
+    const rawKey = `xpo-agent-${role}-${randomUUID()}`;
+    const keyHash = createHash('sha256').update(rawKey).digest('hex');
+    const keyName = `agent-${role}`;
+    const result = db.prepare(
+      'INSERT OR IGNORE INTO api_keys (id, user_id, key_hash, name) VALUES (?, ?, ?, ?)'
+    ).run(randomUUID(), thomas.id, keyHash, keyName);
+
+    if (result.changes > 0) {
+      console.log(`Agent API key for ${role}: ${rawKey}`);
     }
   }
 }

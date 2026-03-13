@@ -639,40 +639,44 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
   if (!transitionRule) transitionRule = typeTransitions[`any->${newStatus}`];
 
   if (transitionRule?.requiresHumanConfirm && actor === 'liaison') {
-    // Check global LIAISON approval mode
-    const ensureSettings = db.prepare("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-    ensureSettings.run();
+    // Human answer audit trail gate (v0.0.19) — applies in ALL modes
+    const validApprovalModes = ['auto', 'semi', 'auto-approval', 'manual'];
+    if (!dna.human_answer) {
+      db.close();
+      error(`Human answer audit gate: human_answer required in DNA for ${transitionKey} (liaison). Set dna.human_answer to the exact human decision text.`);
+    }
+    if (!dna.human_answer_at) {
+      db.close();
+      error(`Human answer audit gate: human_answer_at required in DNA for ${transitionKey} (liaison). Set dna.human_answer_at to ISO timestamp of when human answered.`);
+    }
+    if (!dna.approval_mode) {
+      db.close();
+      error(`Human answer audit gate: approval_mode required in DNA for ${transitionKey} (liaison). Set dna.approval_mode to one of: ${validApprovalModes.join(', ')}.`);
+    }
+    if (!validApprovalModes.includes(dna.approval_mode)) {
+      db.close();
+      error(`Human answer audit gate: invalid approval_mode '${dna.approval_mode}'. Must be one of: ${validApprovalModes.join(', ')}.`);
+    }
+
+    // Viz confirmation gate (v0.0.18) — mode-specific enforcement
+    db.prepare("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)").run();
     const mode = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
     const modeValue = mode?.value || 'auto';
-
-    // Determine if this is a completion transition (terminal — closes work)
     const isCompletionTransition = (newStatus === 'complete');
-
-    // Matrix-based enforcement per WORKFLOW v0.0.18:
-    // manual: all requiresHumanConfirm transitions gated
-    // auto-approval: only completion transitions gated
-    // semi: no engine enforcement (protocol only)
-    // auto: no engine enforcement (free)
-    const requiresVizConfirm =
-      (modeValue === 'manual') ||
-      (modeValue === 'auto-approval' && isCompletionTransition);
+    const requiresVizConfirm = (modeValue === 'manual') || (modeValue === 'auto-approval' && isCompletionTransition);
 
     if (requiresVizConfirm) {
       if (!dna.human_confirmed) {
         db.close();
-        error(`LIAISON ${modeValue} mode: ${transitionKey} requires human confirmation via mindspace viz. Click the button in viz UI.`);
+        error(`LIAISON ${modeValue} mode: ${transitionKey} requires human confirmation via mindspace viz.`);
       }
       if (dna.human_confirmed_via !== 'viz') {
         db.close();
         error(`LIAISON ${modeValue} mode: ${transitionKey} requires human_confirmed_via='viz'. Current: '${dna.human_confirmed_via || 'none'}'.`);
       }
-      // Clear after use (one-time confirmation)
       delete dna.human_confirmed;
       delete dna.human_confirmed_via;
     }
-    // auto mode: no enforcement (free)
-    // semi mode: no enforcement (protocol only)
-    // auto-approval non-completion: no enforcement (free)
   }
 
   // Clear DNA fields if transition requires it (e.g., rework clears memory fields)

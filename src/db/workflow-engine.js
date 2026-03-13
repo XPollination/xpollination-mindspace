@@ -98,7 +98,7 @@ export const ALLOWED_TRANSITIONS = {
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },
-    'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'] },
+    'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'], newRole: 'liaison' },
     'any->cancelled:system': { allowedActors: ['system'], newRole: 'liaison' }
   },
   // Bug flow (can bypass PDSA, simplified)
@@ -120,7 +120,7 @@ export const ALLOWED_TRANSITIONS = {
     // Special transitions
     'any->blocked': { allowedActors: ['liaison', 'system', 'pdsa', 'dev', 'qa'], requiresDna: ['blocked_reason'] },
     'blocked->restore': { allowedActors: ['liaison', 'system'], clearsDna: ['blocked_from_state', 'blocked_from_role', 'blocked_reason', 'blocked_at'] },
-    'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'] },
+    'any->cancelled': { allowedActors: ['liaison'], requiresDna: ['abstract_ref'], newRole: 'liaison' },
     'any->cancelled:system': { allowedActors: ['system'], newRole: 'liaison' }
   }
 };
