@@ -6,7 +6,7 @@
 # Works like claude-session: creates tmux session if missing, attaches if exists.
 #
 # Usage:
-#   claude-unblock                          # Unblock QA, DEV, PDSA (panes 1-3)
+#   claude-unblock                          # Unblock all panes (0-3: LIAISON, PDSA, DEV, QA)
 #   claude-unblock liaison                  # Unblock LIAISON only (pane 0)
 #   claude-unblock HomeAssistantDevOpsAgent # Unblock a named tmux session (pane 0)
 #
@@ -17,8 +17,8 @@
 #   - Stop       → attach and Ctrl+C, or: tmux kill-session -t claude-unblock-*
 #
 # Built-in modes (claude-agents session):
-#   agents   → Panes 1-3: PDSA, DEV, QA
-#   liaison  → Pane 0: LIAISON
+#   agents   → All panes 0-3: LIAISON, PDSA, DEV, QA
+#   liaison  → Pane 0 only: LIAISON
 #
 # Named session mode:
 #   Any other argument is treated as a tmux session name.
@@ -98,8 +98,8 @@ run_monitor() {
             PANES=([0]="LIAISON")
             echo "=== claude-unblock: LIAISON mode (pane 0 only) ==="
         else
-            PANES=([1]="PDSA" [2]="DEV" [3]="QA")
-            echo "=== claude-unblock: AGENTS mode (panes 1-3: PDSA, DEV, QA) ==="
+            PANES=([0]="LIAISON" [1]="PDSA" [2]="DEV" [3]="QA")
+            echo "=== claude-unblock: ALL PANES mode (panes 0-3: LIAISON, PDSA, DEV, QA) ==="
         fi
     else
         # Named session mode: monitor pane 0 of the given session
@@ -172,13 +172,13 @@ run_monitor() {
                 # 3. Safety warning: "Do you want to proceed?" — no ●, command safety check
                 # 4. AskUserQuestion: "? Approve to send?" — no ● AND no trust/safety language
                 #
-                # Strategy: check last 20 lines for ● OR known safe prompt language.
-                # If none found, skip (likely AskUserQuestion).
-                local prompt_header
-                prompt_header=$(echo "$output" | tail -20 | tr '\n' ' ' | tr -s ' ')
-                if ! echo "$prompt_header" | grep -qE '●'; then
+                # Strategy: check prompt_area (tail -40) for ● OR known safe prompt language.
+                # Narrow panes (15 chars) wrap options across 8+ empty lines, pushing the ●
+                # and "Do you want" text 30+ lines above the bottom. tail -20 misses them.
+                # prompt_area (tail -40) is already computed and large enough.
+                if ! echo "$prompt_area" | grep -qE '●'; then
                     # No ● bullet — check for trust/safety prompt language
-                    if ! echo "$prompt_header" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed'; then
+                    if ! echo "$prompt_area" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed|Run shell command'; then
                         continue
                     fi
                 fi
@@ -188,8 +188,10 @@ run_monitor() {
                     # Extract the option number for "don't ask again"
                     # Use single-digit [1-9] only — multi-digit numbers (183, etc.)
                     # are line numbers from Read tool output, not option numbers.
+                    # Narrow panes (15 chars) may render "2Yes" instead of "2. Yes"
+                    # because the period wraps to a different line.
                     local option
-                    option=$(echo "$prompt_area" | grep -oiE '[1-9]\.[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
+                    option=$(echo "$prompt_area" | grep -oiE '[1-9]\.?[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
                     if [[ -n "$option" ]]; then
                         tmux send-keys -t "$TARGET" "$option"
                         confirm_count=$((confirm_count + 1))
@@ -263,7 +265,7 @@ if [[ "$MODE" == "-h" || "$MODE" == "--help" ]]; then
     cat <<'EOF'
 Usage: claude-unblock [agents|liaison|<session-name>]
 
-  claude-unblock                          Unblock QA, DEV, PDSA (panes 1-3)
+  claude-unblock                          Unblock all panes (0-3: LIAISON, PDSA, DEV, QA)
   claude-unblock liaison                  Unblock LIAISON only (pane 0)
   claude-unblock HomeAssistantDevOpsAgent Unblock a named tmux session (pane 0)
 
