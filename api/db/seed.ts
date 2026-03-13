@@ -10,7 +10,7 @@ export function seed(): void {
 
   // --- Users (system admins) ---
   const users = [
-    { id: randomUUID(), name: 'Thomas Pichler', email: 'thomas@xpollination.dev' },
+    { id: randomUUID(), name: 'Thomas Pichler', email: 'thomas.pichler@xpollination.earth' },
     { id: randomUUID(), name: 'Robin Pichler', email: 'robin@xpollination.dev' },
     { id: randomUUID(), name: 'Maria Pichler', email: 'maria@xpollination.dev' },
   ];
