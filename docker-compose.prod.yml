@@ -21,11 +21,13 @@ services:
     volumes:
       - mindspace-prod-data:/app/data
       - ./data/xpollination.db:/app/data/xpollination.db:ro
+      - /home/developer/workspaces/github/PichlerThomas:/workspace
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/mindspace.db
       - API_PORT=3100
       - VIZ_PORT=4100
+      - XPO_WORKSPACE_PATH=/workspace
       - BRAIN_API_URL=http://host.docker.internal:3200
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
       - JWT_SECRET=${JWT_SECRET:-xpo-prod-jwt-secret-2026}

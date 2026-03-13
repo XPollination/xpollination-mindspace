@@ -19,11 +19,13 @@ services:
     volumes:
       - mindspace-dev-data:/app/data
       - ./data/xpollination.db:/app/data/xpollination.db:ro
+      - /home/developer/workspaces/github/PichlerThomas:/workspace
     environment:
       - NODE_ENV=development
       - DATABASE_PATH=/app/data/mindspace.db
       - API_PORT=3101
       - VIZ_PORT=4201
+      - XPO_WORKSPACE_PATH=/workspace
       - BRAIN_API_URL=http://host.docker.internal:3200
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
     extra_hosts:
