@@ -11,7 +11,12 @@ const BCRYPT_COST = 12;
 const MIN_PASSWORD_LENGTH = 8;
 
 authRouter.post('/register', async (req: Request, res: Response) => {
-  const { email, name, password } = req.body;
+  const { email, name, password, invite_code } = req.body;
+
+  if (!invite_code) {
+    res.status(400).json({ error: 'invite_code is required — registration is invite-only' });
+    return;
+  }
 
   if (!email || !name || !password) {
     res.status(400).json({ error: 'Missing required fields: email, name, password' });
@@ -29,6 +34,22 @@ authRouter.post('/register', async (req: Request, res: Response) => {
   }
 
   const db = getDb();
+
+  // Validate invite code
+  const invite = db.prepare('SELECT id, code, created_by, used_by, expires_at FROM invites WHERE code = ?').get(invite_code) as any;
+  if (!invite) {
+    res.status(400).json({ error: 'Invalid invite code' });
+    return;
+  }
+  if (invite.used_by) {
+    res.status(400).json({ error: 'Invite code already used' });
+    return;
+  }
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    res.status(400).json({ error: 'Invite code expired' });
+    return;
+  }
+
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) {
     res.status(409).json({ error: 'Email already registered' });
@@ -39,6 +60,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
   const password_hash = await bcrypt.hash(password, BCRYPT_COST);
 
   db.prepare('INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)').run(id, email, password_hash, name);
+  db.prepare('UPDATE invites SET used_by = ?, used_at = datetime(\'now\') WHERE id = ?').run(id, invite.id);
 
   res.status(201).json({ id, email, name });
 });
