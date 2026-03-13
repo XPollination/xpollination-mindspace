@@ -2,7 +2,7 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { embed, EMBEDDING_DIM } from "./embedding.js";
-import { insertQueryLog } from "./database.js";
+import { insertQueryLog, cleanupExpiredAgentState } from "./database.js";
 import { SCORING_CONFIG } from "../scoring-config.js";
 import { computeCID } from "./cid-service.js";
 
@@ -589,6 +589,10 @@ export function startPheromoneDecayJob(): void {
       if (count > 0) {
         console.log(`Pheromone decay: updated ${count} thoughts`);
       }
+      const expired = cleanupExpiredAgentState();
+      if (expired > 0) {
+        console.log(`TTL cleanup: deleted ${expired} expired agent_state rows`);
+      }
     } catch (err) {
       console.error("Pheromone decay job failed:", err);
     }
@@ -600,6 +604,39 @@ export function stopPheromoneDecayJob(): void {
   if (decayInterval) {
     clearInterval(decayInterval);
     decayInterval = null;
+  }
+}
+
+// --- Recent Thoughts by Contributor ---
+
+export async function getRecentByContributor(
+  contributorId: string,
+  limit: number = 5,
+  collection: string = "thought_space"
+): Promise<Array<{ id: string; content: string; category: string; topic: string | null; created_at: string }>> {
+  try {
+    const results = await client.scroll(collection, {
+      filter: {
+        must: [{ key: "contributor_id", match: { value: contributorId } }],
+      },
+      limit,
+      with_payload: true,
+      with_vector: false,
+      order_by: { key: "created_at", direction: "desc" },
+    });
+
+    return results.points.map((p) => {
+      const payload = p.payload as Record<string, unknown>;
+      return {
+        id: String(p.id),
+        content: (payload.content as string) || "",
+        category: (payload.thought_category as string) || "uncategorized",
+        topic: (payload.topic as string) || null,
+        created_at: (payload.created_at as string) || "",
+      };
+    });
+  } catch {
+    return [];
   }
 }
 

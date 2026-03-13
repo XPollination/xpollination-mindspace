@@ -18,13 +18,14 @@ set -uo pipefail
 
 ROLE="${AGENT_ROLE:-unknown}"
 BRAIN_API_KEY="${BRAIN_API_KEY:-$(cat "$HOME/.brain-api-key" 2>/dev/null || echo "")}"
+BRAIN_API_URL="${BRAIN_API_URL:-http://localhost:3200}"
 export BRAIN_API_KEY
 
 # --- 1. Read stdin ---
 INPUT=$(cat)
 
 # --- 2. Brain health check (fast fail, bash curl) ---
-HEALTH=$(curl -s --connect-timeout 2 --max-time 2 "http://localhost:3200/api/v1/health" 2>/dev/null || echo "")
+HEALTH=$(curl -s --connect-timeout 2 --max-time 2 "${BRAIN_API_URL}/api/v1/health" 2>/dev/null || echo "")
 
 if ! echo "$HEALTH" | grep -q '"ok"'; then
   echo "Brain API unavailable. Cannot proceed without brain-first knowledge check." >&2
@@ -56,7 +57,8 @@ const queryData = JSON.stringify({
 
 const authHeaders = { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(queryData) };
 if (process.env.BRAIN_API_KEY) authHeaders["Authorization"] = "Bearer " + process.env.BRAIN_API_KEY;
-const req = http.request("http://localhost:3200/api/v1/memory", {
+const brainUrl = process.env.BRAIN_API_URL || "http://localhost:3200";
+const req = http.request(brainUrl + "/api/v1/memory", {
   method: "POST",
   headers: authHeaders,
   timeout: 5000

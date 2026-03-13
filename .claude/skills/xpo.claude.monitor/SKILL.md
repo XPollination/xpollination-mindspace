@@ -44,7 +44,8 @@ The shared memory holds everything you need: your role definition, workflow know
 
 **Health check first:**
 ```bash
-curl -s http://localhost:3200/api/v1/health
+BRAIN_API_URL="${BRAIN_API_URL:-http://localhost:3200}"
+curl -s ${BRAIN_API_URL}/api/v1/health
 ```
 
 If healthy, generate a session ID and query:
@@ -54,17 +55,17 @@ SESSION_ID=$(cat /proc/sys/kernel/random/uuid)
 AUTH_HDR="Authorization: Bearer $BRAIN_API_KEY"
 
 # Query 1: Your role and recovery knowledge
-curl -s -X POST http://localhost:3200/api/v1/memory \
+curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "$AUTH_HDR" \
   -d "{\"prompt\": \"Recovery protocol and role definition for $ARGUMENTS agent. What are my responsibilities and what are the latest operational learnings?\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"read_only\": true}"
 
 # Query 2: Current task state and recent decisions
-curl -s -X POST http://localhost:3200/api/v1/memory \
+curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "$AUTH_HDR" \
   -d "{\"prompt\": \"Current task state, recent decisions, and in-flight work across all projects\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"read_only\": true}"
 
 # Query 3: In-flight task recovery (transition markers)
-curl -s -X POST http://localhost:3200/api/v1/memory \
+curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "$AUTH_HDR" \
   -d "{\"prompt\": \"TASK START or TASK BLOCKED markers for $(echo $ARGUMENTS | tr a-z A-Z) agent — any interrupted or in-progress tasks\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"read_only\": true}"
 ```
@@ -112,7 +113,7 @@ DATABASE_PATH=$DB node $CLI get <slug>
 DATABASE_PATH=$DB node $CLI transition <slug> active $ARGUMENTS
 
 # 4b. TASK START brain marker
-curl -s -X POST http://localhost:3200/api/v1/memory \
+curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "Authorization: Bearer $BRAIN_API_KEY" \
   -d "{\"prompt\": \"TASK START: $(echo $ARGUMENTS | tr a-z A-Z) claiming <slug> (<project>) — <DNA title>\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"context\": \"task: <slug>\", \"thought_category\": \"transition_marker\", \"topic\": \"<slug>\"}"
 
@@ -125,7 +126,7 @@ DATABASE_PATH=$DB node $CLI update-dna <slug> '{"findings":"..."}' $ARGUMENTS
 DATABASE_PATH=$DB node $CLI transition <slug> <next-state> $ARGUMENTS
 
 # 7b. TASK TRANSITION brain marker (auto-emitted by CLI brain gate, but contribute if manual)
-curl -s -X POST http://localhost:3200/api/v1/memory \
+curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "Authorization: Bearer $BRAIN_API_KEY" \
   -d "{\"prompt\": \"TASK active→<next-state>: $(echo $ARGUMENTS | tr a-z A-Z) <slug> (<project>) — <outcome, 1 sentence>\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"context\": \"task: <slug>\", \"thought_category\": \"transition_marker\", \"topic\": \"<slug>\"}"
 
@@ -157,7 +158,7 @@ curl -s -X POST http://localhost:3200/api/v1/memory \
 # The task is already complete — gardening is optional cleanup.
 
 # 8. Contribute key learnings to memory
-curl -s -X POST http://localhost:3200/api/v1/memory \
+curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "Authorization: Bearer $BRAIN_API_KEY" \
   -d "{\"prompt\": \"YOUR KEY LEARNING FROM THIS TASK\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"context\": \"task: <slug>\"}"
 ```

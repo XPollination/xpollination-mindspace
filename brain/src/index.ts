@@ -11,6 +11,9 @@ import { queryRoutes } from "./routes/query.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { healthRoutes } from "./routes/health.js";
 import { memoryRoutes } from "./routes/memory.js";
+import { recoveryRoutes } from "./routes/recovery.js";
+import { workingMemoryRoutes } from "./routes/working-memory.js";
+import { onboardingRoutes } from "./routes/onboarding.js";
 import { startMcpServer } from "./mcp/brain-mcp.js";
 import { authHook } from "./middleware/auth.js";
 
@@ -24,6 +27,9 @@ await app.register(queryRoutes);
 await app.register(ingestRoutes);
 await app.register(healthRoutes);
 await app.register(memoryRoutes);
+await app.register(recoveryRoutes);
+await app.register(workingMemoryRoutes);
+await app.register(onboardingRoutes);
 
 try {
   await ensureCollections();

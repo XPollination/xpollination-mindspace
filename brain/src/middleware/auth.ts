@@ -8,8 +8,8 @@ interface UserRow {
 }
 
 export async function authHook(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // Health endpoint is exempt from auth
-  if (request.url.startsWith("/api/v1/health") || request.url === "/health") {
+  // Health and onboarding endpoints are exempt from auth
+  if (request.url.startsWith("/api/v1/health") || request.url === "/health" || request.url === "/" || request.url.startsWith("/assets/")) {
     return;
   }
 

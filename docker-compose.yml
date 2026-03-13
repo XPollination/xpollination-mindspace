@@ -44,6 +44,7 @@ services:
       - NODE_ENV=production
       - QDRANT_URL=http://qdrant:6333
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
+      - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
     depends_on:
       - qdrant
     restart: unless-stopped

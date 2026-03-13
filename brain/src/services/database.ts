@@ -48,6 +48,100 @@ function initSchema(db: Database.Database): void {
 
     INSERT OR IGNORE INTO users (user_id, display_name, api_key, qdrant_collection)
     VALUES ('thomas', 'Thomas Pichler', 'MUST_SET_VIA_PROVISION', 'thought_space');
+
+    CREATE TABLE IF NOT EXISTS agent_state (
+      agent_id TEXT PRIMARY KEY,
+      state_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      session_id TEXT,
+      ttl_hours INTEGER DEFAULT 72
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_state_updated ON agent_state(updated_at);
+
+    CREATE TABLE IF NOT EXISTS agent_identity (
+      agent_id TEXT PRIMARY KEY,
+      role TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      responsibilities TEXT NOT NULL,
+      recovery_protocol TEXT NOT NULL,
+      platform_hints TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT OR IGNORE INTO agent_identity (agent_id, role, display_name, responsibilities, recovery_protocol)
+    VALUES
+      ('agent-liaison', 'liaison', 'LIAISON',
+       'Bridge between human and agents. Creates tasks with complete DNA. Executes human-decision transitions (approve, reject, reopen). Presents work for review. Never does agent work.',
+       '## Recovery Protocol for LIAISON
+
+Step 1: Call GET /api/v1/recovery/agent-liaison to receive identity and working state.
+Step 2: Read your working_state to understand current task, step, and human expectations.
+Step 3: Review key_context for recent transition markers and decisions.
+Step 4: Self-Test (MANDATORY) — Present to the human:
+"I recovered my context. Here is what I understand:
+- My role: LIAISON — bridge between human and agents
+- Current task: {working_state.task_slug}
+- Current step: {working_state.step}
+- You expect: {working_state.human_expectation}
+- Pending: {working_state.pending_items}
+Is this correct? Should I continue from here?"
+Wait for human confirmation before proceeding.
+If no working state exists, say: "I have no working state. What should I work on?"'),
+
+      ('agent-pdsa', 'pdsa', 'PDSA',
+       'Plans, researches, designs. Produces PDSA documents. Verifies dev implementation matches design. Never implements code.',
+       '## Recovery Protocol for PDSA
+
+Step 1: Call GET /api/v1/recovery/agent-pdsa to receive identity and working state.
+Step 2: Read your working_state to understand current task, step, and human expectations.
+Step 3: Review key_context for recent transition markers and decisions.
+Step 4: Self-Test (MANDATORY) — Present to the human:
+"I recovered my context. Here is what I understand:
+- My role: PDSA — plans, researches, designs
+- Current task: {working_state.task_slug}
+- Current step: {working_state.step}
+- You expect: {working_state.human_expectation}
+- Pending: {working_state.pending_items}
+Is this correct? Should I continue from here?"
+Wait for human confirmation before proceeding.
+If no working state exists, say: "I have no working state. What should I work on?"'),
+
+      ('agent-dev', 'dev', 'DEV',
+       'Implements what PDSA designed. Reads DNA, builds, submits for review. Never plans. Never changes tests. If tests fail, fix implementation or escalate via DNA.',
+       '## Recovery Protocol for DEV
+
+Step 1: Call GET /api/v1/recovery/agent-dev to receive identity and working state.
+Step 2: Read your working_state to understand current task, step, and human expectations.
+Step 3: Review key_context for recent transition markers and decisions.
+Step 4: Self-Test (MANDATORY) — Present to the human:
+"I recovered my context. Here is what I understand:
+- My role: DEV — implements what PDSA designed
+- Current task: {working_state.task_slug}
+- Current step: {working_state.step}
+- You expect: {working_state.human_expectation}
+- Pending: {working_state.pending_items}
+Is this correct? Should I continue from here?"
+Wait for human confirmation before proceeding.
+If no working state exists, say: "I have no working state. What should I work on?"'),
+
+      ('agent-qa', 'qa', 'QA',
+       'Writes tests from approved designs. Reviews dev implementations by running tests. Never fixes implementation code — write failing tests, let dev fix.',
+       '## Recovery Protocol for QA
+
+Step 1: Call GET /api/v1/recovery/agent-qa to receive identity and working state.
+Step 2: Read your working_state to understand current task, step, and human expectations.
+Step 3: Review key_context for recent transition markers and decisions.
+Step 4: Self-Test (MANDATORY) — Present to the human:
+"I recovered my context. Here is what I understand:
+- My role: QA — writes tests, reviews implementations
+- Current task: {working_state.task_slug}
+- Current step: {working_state.step}
+- You expect: {working_state.human_expectation}
+- Pending: {working_state.pending_items}
+Is this correct? Should I continue from here?"
+Wait for human confirmation before proceeding.
+If no working state exists, say: "I have no working state. What should I work on?"');
   `);
 }
 
@@ -109,4 +203,48 @@ export function getSessionReturnedIds(sessionId: string): string[] {
     } catch { /* skip malformed */ }
   }
   return [...new Set(allIds)];
+}
+
+export function getAgentIdentity(agentId: string): AgentIdentityRow | undefined {
+  const db = getDb();
+  return db.prepare("SELECT * FROM agent_identity WHERE agent_id = ?").get(agentId) as AgentIdentityRow | undefined;
+}
+
+export function getAgentState(agentId: string): AgentStateRow | undefined {
+  const db = getDb();
+  return db.prepare("SELECT * FROM agent_state WHERE agent_id = ?").get(agentId) as AgentStateRow | undefined;
+}
+
+export function upsertAgentState(agentId: string, stateJson: string, sessionId: string | null, ttlHours: number = 72): void {
+  const db = getDb();
+  db.prepare(
+    "INSERT OR REPLACE INTO agent_state (agent_id, state_json, updated_at, session_id, ttl_hours) VALUES (?, ?, datetime('now'), ?, ?)"
+  ).run(agentId, stateJson, sessionId, ttlHours);
+}
+
+export function cleanupExpiredAgentState(): number {
+  const db = getDb();
+  const result = db.prepare(
+    "DELETE FROM agent_state WHERE datetime(updated_at, '+' || ttl_hours || ' hours') < datetime('now')"
+  ).run();
+  return result.changes;
+}
+
+export interface AgentIdentityRow {
+  agent_id: string;
+  role: string;
+  display_name: string;
+  responsibilities: string;
+  recovery_protocol: string;
+  platform_hints: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentStateRow {
+  agent_id: string;
+  state_json: string;
+  updated_at: string;
+  session_id: string | null;
+  ttl_hours: number;
 }
