@@ -1,0 +1,34 @@
+# ============================================================================
+# Brain API — Knowledge service for Mindspace agents
+# ============================================================================
+# Fastify server + Qdrant vector search + SQLite query logging.
+# Agents query and contribute knowledge via POST /api/v1/memory.
+# ============================================================================
+
+FROM node:22-slim AS builder
+
+WORKDIR /app
+
+# Build tools for better-sqlite3 native compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY brain/package.json brain/package-lock.json* ./
+RUN npm ci
+
+COPY brain/ .
+RUN npm run build 2>/dev/null || true
+
+FROM node:22-slim AS runtime
+
+WORKDIR /app
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/ ./
+
+EXPOSE 3200
+
+CMD ["node", "--loader", "tsx/esm", "src/server.ts"]

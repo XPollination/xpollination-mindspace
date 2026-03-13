@@ -3,10 +3,12 @@
 # Start the full Mindspace system:
 #   docker compose up --build
 #
-# Services:
+# 3 services:
 #   mindspace — API (3100) + viz (4200) + SQLite
+#   qdrant    — Vector database for brain knowledge storage
+#   brain     — Knowledge API (3200) for agent shared memory
 #
-# Data persists via named volume (survives container restarts).
+# Data persists via named volumes (survives container restarts).
 
 services:
   mindspace:
@@ -19,8 +21,35 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/mindspace.db
+      - BRAIN_API_URL=http://brain:3200
+    depends_on:
+      - brain
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+
+  brain:
+    build:
+      context: .
+      dockerfile: Dockerfile.brain
+    ports:
+      - "3200:3200"
+    environment:
+      - NODE_ENV=production
+      - QDRANT_URL=http://qdrant:6333
+      - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
+    depends_on:
+      - qdrant
     restart: unless-stopped
 
 volumes:
   mindspace-data:
+    driver: local
+  qdrant-data:
     driver: local
