@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Thomas Pichler <herr.thomas.pichler@gmail.com>
+
 /**
  * Workflow Engine Module
  *
@@ -215,7 +218,11 @@ export function getNewRoleForTransition(nodeType, fromStatus, toStatus, currentR
 
   // Fall back to generic transition
   const rule = typeTransitions[transitionKey];
-  return rule?.newRole || null;
+  if (rule?.newRole) return rule.newRole;
+
+  // Check 'any' transitions (e.g., any->cancelled, any->blocked)
+  const anyRule = typeTransitions[`any->${toStatus}`];
+  return anyRule?.newRole || null;
 }
 
 /**
