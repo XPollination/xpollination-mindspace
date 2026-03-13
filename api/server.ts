@@ -43,8 +43,8 @@ app.use('/api/projects', requireApiKeyOrJwt, projectsRouter);
 app.use('/api/agents', requireApiKeyOrJwt, agentsRouter);
 app.use('/api/invites', requireApiKeyOrJwt, invitesRouter);
 app.use('/a2a/message', a2aMessageRouter);
-app.use('/api/marketplace/announcements', marketplaceAnnouncementsRouter);
-app.use('/api/marketplace/requests', marketplaceRequestsRouter);
+app.use('/api/marketplace/announcements', requireApiKeyOrJwt, marketplaceAnnouncementsRouter);
+app.use('/api/marketplace/requests', requireApiKeyOrJwt, marketplaceRequestsRouter);
 
 // Error handling (after routes)
 app.use(notFoundHandler);
