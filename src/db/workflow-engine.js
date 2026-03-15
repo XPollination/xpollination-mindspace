@@ -31,10 +31,8 @@ export const ALLOWED_TRANSITIONS = {
   // Task flow - role-aware transitions
   // Key principle: Role assigned at creation should be preserved unless explicitly transitioned
   'task': {
-    // AC1: pending->ready preserves original role (no automatic override)
-    'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'] },
-    // Design gate: dev tasks require PDSA design before becoming ready
-    'pending->ready:dev': { allowedActors: ['liaison', 'system', 'pdsa'], requireRole: 'dev', requiresDna: ['pdsa_ref'] },
+    // AC1: pending->ready forces PDSA start — all tasks must go through PDSA planning first
+    'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'], newRole: 'pdsa' },
 
     // AC2: ready->active allows role-matched claiming
     'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'], requiresDna: ['memory_query_session'] },
