@@ -7,15 +7,14 @@
 # One instance per target session — run multiple for full system coverage.
 #
 # Usage:
-#   claude-unblock                          # claude-agents: all panes (0-3)
+#   claude-unblock                          # ALL sessions, all panes (auto-discover)
+#   claude-unblock agents                   # claude-agents: agent panes 1-3 (PDSA, DEV, QA)
 #   claude-unblock liaison                  # claude-agents: pane 0 only
 #   claude-unblock HomeAssistantDevOpsAgent # HomeAssistantDevOpsAgent: pane 0
 #   claude-unblock <any-tmux-session>       # Any session: pane 0
 #
-# Full system coverage (all agents on this machine):
-#   claude-unblock                          # covers claude-agents (4 panes)
-#   claude-unblock HomeAssistantDevOpsAgent # covers HomeAssistant agent
-#   # ... one call per additional agent session
+# Full system coverage:
+#   claude-unblock                          # single instance covers everything
 #
 # Behavior:
 #   - First run  → creates tmux session "claude-unblock[-name]", starts monitor
@@ -24,7 +23,8 @@
 #   - Stop       → attach and Ctrl+C, or: tmux kill-session -t claude-unblock-*
 #
 # Modes:
-#   agents (default) → claude-agents session, panes 0-3 (LIAISON, PDSA, DEV, QA)
+#   all (default)    → auto-discover ALL tmux sessions (except claude-unblock*), all panes
+#   agents           → claude-agents session, agent panes 1-3 (PDSA, DEV, QA) — excludes human pane
 #   liaison          → claude-agents session, pane 0 only (LIAISON)
 #   <session-name>   → any tmux session, pane 0
 #
@@ -76,10 +76,169 @@ run_remote() {
         "$SELF_PATH" "$mode"
 }
 
+# Global confirm counter file for cross-subshell tracking
+CONFIRM_FILE="/tmp/claude-unblock-confirms"
+echo 0 > "$CONFIRM_FILE" 2>/dev/null || true
+
+increment_confirms() {
+    local count
+    count=$(cat "$CONFIRM_FILE" 2>/dev/null || echo 0)
+    echo $((count + 1)) > "$CONFIRM_FILE"
+    echo $((count + 1))
+}
+
+process_pane() {
+    # Process a single pane: detect and auto-confirm permission prompts.
+    # Args: $1 = TARGET (e.g. "session:0.1"), $2 = PANE_NAME (label for logging)
+    local TARGET="$1"
+    local PANE_NAME="$2"
+
+    # Capture pane with deep scrollback — narrow panes (8-15 chars) wrap a single
+    # permission prompt across 100+ lines, pushing "❯ 1. Yes" far above visible area
+    local output
+    output=$(tmux capture-pane -t "$TARGET" -p -S -300 2>/dev/null) || return 1
+
+    # Only process if there's an active prompt (bottom of pane has prompt indicator)
+    local bottom
+    bottom=$(echo "$output" | tail -12)
+
+    local bottom_collapsed
+    bottom_collapsed=$(echo "$bottom" | tr '\n' ' ' | tr -s ' ')
+    if ! echo "$bottom_collapsed" | grep -qE 'Esc to cancel|Do you want to allow'; then
+        return 0
+    fi
+
+    # Use ONLY the prompt area for option matching (last 40 lines).
+    local prompt_area
+    prompt_area=$(echo "$output" | tail -40 | tr '\n' ' ' | tr -s ' ')
+
+    # SAFETY: Only auto-confirm tool PERMISSION, TRUST, and SAFETY prompts.
+    # Never auto-confirm AskUserQuestion (human decision prompts).
+    if ! echo "$prompt_area" | grep -qE '●'; then
+        if ! echo "$prompt_area" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed|Run shell command'; then
+            return 0
+        fi
+    fi
+
+    local confirm_count
+
+    # Find the best option: prefer "don't ask again" > numbered Yes > Enter
+    if echo "$prompt_area" | grep -qiE "don.t ask again"; then
+        local option
+        option=$(echo "$prompt_area" | grep -oiE '[1-9]\.?[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
+        if [[ -n "$option" ]]; then
+            tmux send-keys -t "$TARGET" "$option"
+            confirm_count=$(increment_confirms)
+            echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option $option (don't ask again) [#$confirm_count]"
+            sleep 3
+            return 0
+        fi
+    fi
+
+    if echo "$prompt_area" | grep -qE '❯.*[0-9]+\. Yes'; then
+        if echo "$prompt_area" | grep -qE '3\.[^0-9]*Yes'; then
+            tmux send-keys -t "$TARGET" 3
+            confirm_count=$(increment_confirms)
+            echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 3 (yes/allow all) [#$confirm_count]"
+        elif echo "$prompt_area" | grep -qE '2\.[^0-9]*Yes'; then
+            tmux send-keys -t "$TARGET" 2
+            confirm_count=$(increment_confirms)
+            echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 2 (yes/allow all) [#$confirm_count]"
+        else
+            tmux send-keys -t "$TARGET" 1
+            confirm_count=$(increment_confirms)
+            echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 1 (yes) [#$confirm_count]"
+        fi
+        sleep 3
+        return 0
+    fi
+
+    # Fallback: "Do you want to proceed" with numbered options
+    if echo "$prompt_area" | grep -qE 'Do you want'; then
+        if echo "$prompt_area" | grep -qE '[0-9]+\. Yes'; then
+            tmux send-keys -t "$TARGET" 1
+            confirm_count=$(increment_confirms)
+            echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed prompt (option 1) [#$confirm_count]"
+        else
+            tmux send-keys -t "$TARGET" Enter
+            confirm_count=$(increment_confirms)
+            echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed 'Do you want' (Enter) [#$confirm_count]"
+        fi
+        sleep 3
+        return 0
+    fi
+
+    return 0
+}
+
+discover_targets() {
+    # Build a list of "session:0.pane_id label" targets from all non-unblock tmux sessions.
+    # Output: one line per target: "session:0.pane_id|LABEL"
+    local sessions
+    sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -v '^claude-unblock' || true)
+    for sess in $sessions; do
+        local panes
+        panes=$(tmux list-panes -t "$sess" -F '#{pane_index}' 2>/dev/null || true)
+        for pane_id in $panes; do
+            echo "${sess}:0.${pane_id}|${sess}/p${pane_id}"
+        done
+    done
+}
+
 run_monitor() {
     # This function runs inside the tmux session — it IS the monitor loop.
     local mode="$1"
 
+    # --- "all" mode: auto-discover ALL sessions and panes ---
+    if [[ "$mode" == "all" ]]; then
+        echo "=== claude-unblock: AUTO-DISCOVER mode (all sessions, all panes) ==="
+        echo "Poll interval: 6s | Re-discover sessions every ~60s"
+        echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "Detach: Ctrl+B D (monitor keeps running)"
+        echo "Stop:   Ctrl+C"
+        echo "---"
+
+        local confirm_count=0
+        local scan_count=0
+        local targets=""
+
+        while true; do
+            # Re-discover targets every ~10 scans (~60s)
+            if (( scan_count % 10 == 0 )); then
+                local new_targets
+                new_targets=$(discover_targets)
+                if [[ "$new_targets" != "$targets" ]]; then
+                    targets="$new_targets"
+                    local count
+                    count=$(echo "$targets" | grep -c '.' || true)
+                    echo "[$(date '+%H:%M:%S')] Discovered $count panes across sessions"
+                    echo "$targets" | while IFS='|' read -r tgt label; do
+                        echo "  → $label ($tgt)"
+                    done
+                fi
+            fi
+
+            echo "$targets" | while IFS='|' read -r TARGET PANE_NAME; do
+                [[ -z "$TARGET" ]] && continue
+                process_pane "$TARGET" "$PANE_NAME" || true
+            done
+
+            # Read confirm_count from temp file (subshell workaround)
+            if [[ -f /tmp/claude-unblock-confirms ]]; then
+                confirm_count=$(cat /tmp/claude-unblock-confirms)
+            fi
+
+            scan_count=$((scan_count + 1))
+            if (( scan_count % 30 == 0 )); then
+                echo "[$(date '+%H:%M:%S')] ... scanning (${confirm_count} confirmed so far)"
+            fi
+
+            sleep 6
+        done
+        return
+    fi
+
+    # --- Legacy modes: agents, liaison, <session-name> ---
     local agent_session
     declare -A PANES
 
@@ -104,8 +263,8 @@ run_monitor() {
             PANES=([0]="LIAISON")
             echo "=== claude-unblock: LIAISON mode (pane 0 only) ==="
         else
-            PANES=([0]="LIAISON" [1]="PDSA" [2]="DEV" [3]="QA")
-            echo "=== claude-unblock: ALL PANES mode (panes 0-3: LIAISON, PDSA, DEV, QA) ==="
+            PANES=([1]="PDSA" [2]="DEV" [3]="QA")
+            echo "=== claude-unblock: AGENT PANES mode (panes 1-3: PDSA, DEV, QA) ==="
         fi
     else
         # Named session mode: monitor pane 0 of the given session
@@ -142,110 +301,11 @@ run_monitor() {
         for PANE_ID in "${!PANES[@]}"; do
             local PANE_NAME="${PANES[$PANE_ID]}"
             local TARGET="${agent_session}:0.${PANE_ID}"
-
-            # Capture pane with deep scrollback — narrow panes (8-15 chars) wrap a single
-            # permission prompt across 100+ lines, pushing "❯ 1. Yes" far above visible area
-            local output
-            output=$(tmux capture-pane -t "$TARGET" -p -S -300 2>/dev/null) || continue
-
-            # Only process if there's an active prompt (bottom of pane has prompt indicator)
-            # Use tail -12 because narrow panes wrap the footer across many lines:
-            # "Esc to cancel · Tab to amend · ctrl+e to explain" can span 8+ lines
-            local bottom
-            bottom=$(echo "$output" | tail -12)
-
-            # Active prompt detection: two prompt formats exist:
-            # 1. Tool execution prompts: show "Esc to cancel" footer
-            # 2. Trust/domain prompts: show "Do you want to allow Claude to..."
-            # NEVER use generic patterns like "❯ [0-9]+" — they match displayed
-            # tool output (line numbers, numbered lists) and cause false positives.
-            local bottom_collapsed
-            bottom_collapsed=$(echo "$bottom" | tr '\n' ' ' | tr -s ' ')
-            if echo "$bottom_collapsed" | grep -qE 'Esc to cancel|Do you want to allow'; then
-
-                # Use ONLY the prompt area for option matching (last 40 lines).
-                # The full 300-line scrollback contains prior agent output that
-                # causes false matches — e.g. "2." in output + "Yes" elsewhere
-                # would match "2\..*Yes" and pick option 2 (No) instead of 1 (Yes).
-                local prompt_area
-                prompt_area=$(echo "$output" | tail -40 | tr '\n' ' ' | tr -s ' ')
-
-                # SAFETY: Only auto-confirm tool PERMISSION, TRUST, and SAFETY prompts.
-                # Never auto-confirm AskUserQuestion (human decision prompts).
-                # Four prompt types exist:
-                # 1. Tool execution: "● Bash(...)" — have ● bullet near options
-                # 2. Trust/domain:   "Do you want to allow Claude to fetch..." — no ●
-                # 3. Safety warning: "Do you want to proceed?" — no ●, command safety check
-                # 4. AskUserQuestion: "? Approve to send?" — no ● AND no trust/safety language
-                #
-                # Strategy: check prompt_area (tail -40) for ● OR known safe prompt language.
-                # Narrow panes (15 chars) wrap options across 8+ empty lines, pushing the ●
-                # and "Do you want" text 30+ lines above the bottom. tail -20 misses them.
-                # prompt_area (tail -40) is already computed and large enough.
-                if ! echo "$prompt_area" | grep -qE '●'; then
-                    # No ● bullet — check for trust/safety prompt language
-                    if ! echo "$prompt_area" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed|Run shell command'; then
-                        continue
-                    fi
-                fi
-
-                # Find the best option: prefer "don't ask again" > numbered Yes > Enter
-                if echo "$prompt_area" | grep -qiE "don.t ask again"; then
-                    # Extract the option number for "don't ask again"
-                    # Use single-digit [1-9] only — multi-digit numbers (183, etc.)
-                    # are line numbers from Read tool output, not option numbers.
-                    # Narrow panes (15 chars) may render "2Yes" instead of "2. Yes"
-                    # because the period wraps to a different line.
-                    local option
-                    option=$(echo "$prompt_area" | grep -oiE '[1-9]\.?[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
-                    if [[ -n "$option" ]]; then
-                        tmux send-keys -t "$TARGET" "$option"
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option $option (don't ask again) [#$confirm_count]"
-                        sleep 3
-                        continue
-                    fi
-                fi
-
-                if echo "$prompt_area" | grep -qE '❯.*[0-9]+\. Yes'; then
-                    # Pick the highest-numbered "Yes" option (allow all > allow once)
-                    # but NEVER pick an option that doesn't contain "Yes"
-                    if echo "$prompt_area" | grep -qE '3\.[^0-9]*Yes'; then
-                        tmux send-keys -t "$TARGET" 3
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 3 (yes/allow all) [#$confirm_count]"
-                    elif echo "$prompt_area" | grep -qE '2\.[^0-9]*Yes'; then
-                        tmux send-keys -t "$TARGET" 2
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 2 (yes/allow all) [#$confirm_count]"
-                    else
-                        tmux send-keys -t "$TARGET" 1
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 1 (yes) [#$confirm_count]"
-                    fi
-                    sleep 3
-                    continue
-                fi
-
-                # Fallback: "Do you want to proceed" with numbered options
-                if echo "$prompt_area" | grep -qE 'Do you want'; then
-                    if echo "$prompt_area" | grep -qE '[0-9]+\. Yes'; then
-                        tmux send-keys -t "$TARGET" 1
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed prompt (option 1) [#$confirm_count]"
-                    else
-                        tmux send-keys -t "$TARGET" Enter
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed 'Do you want' (Enter) [#$confirm_count]"
-                    fi
-                    sleep 3
-                    continue
-                fi
-            fi
+            process_pane "$TARGET" "$PANE_NAME" || true
         done
 
+        confirm_count=$(cat "$CONFIRM_FILE" 2>/dev/null || echo 0)
         scan_count=$((scan_count + 1))
-        # Periodic heartbeat every ~30 scans (~3 min)
         if (( scan_count % 30 == 0 )); then
             echo "[$(date '+%H:%M:%S')] ... scanning (${confirm_count} confirmed so far)"
         fi
@@ -256,7 +316,7 @@ run_monitor() {
 
 # --- Main ---
 
-MODE="${1:-agents}"
+MODE="${1:-all}"
 
 # Handle --run flag (internal: called inside the tmux session)
 if [[ "$MODE" == "--run-"* ]]; then
@@ -269,15 +329,18 @@ fi
 # Show help for -h/--help
 if [[ "$MODE" == "-h" || "$MODE" == "--help" ]]; then
     cat <<'EOF'
-Usage: claude-unblock [agents|liaison|<session-name>]
+Usage: claude-unblock [all|agents|liaison|<session-name>]
 
-Monitors any Claude agent tmux session and auto-confirms permission prompts.
-Run one instance per agent session for full system coverage.
+Monitors Claude agent tmux sessions and auto-confirms permission prompts.
 
-  claude-unblock                          claude-agents: all panes (0-3)
+  claude-unblock                          ALL sessions, all panes (auto-discover)
+  claude-unblock agents                   claude-agents: all panes (0-3)
   claude-unblock liaison                  claude-agents: pane 0 only
   claude-unblock HomeAssistantDevOpsAgent HomeAssistant agent session
   claude-unblock <session-name>           Any tmux session (pane 0)
+
+Default mode (no args) auto-discovers all tmux sessions and monitors all panes.
+Sessions are re-discovered every ~60s, so new sessions are picked up automatically.
 
 The monitor runs in a persistent tmux session (survives disconnects).
   Detach: Ctrl+B D    Reattach: claude-unblock [mode]
@@ -296,8 +359,10 @@ if is_on_hetzner; then
     unset TMUX
 
     # Session name for the unblock monitor tmux session
-    if [[ "$MODE" == "agents" ]]; then
+    if [[ "$MODE" == "all" ]]; then
         SESSION_NAME="claude-unblock"
+    elif [[ "$MODE" == "agents" ]]; then
+        SESSION_NAME="claude-unblock-agents"
     else
         # liaison → claude-unblock-liaison
         # HomeAssistantDevOpsAgent → claude-unblock-HomeAssistantDevOpsAgent
