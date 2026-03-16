@@ -33,6 +33,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_CALLBACK_URL=https://mindspace.xpollination.earth/api/auth/oauth/google/callback
+      - FRONTEND_URL=https://mindspace.xpollination.earth
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

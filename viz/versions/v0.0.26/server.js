@@ -73,7 +73,7 @@ const MIME_TYPES = {
 /**
  * DNA-lite: strip heavy fields, keep essentials for Kanban view
  */
-const LITE_FIELDS = ['title', 'role', 'description', 'depends_on', 'group', 'environment', 'priority', '_project', 'pdsa_ref', 'abstract_ref', 'changelog_ref'];
+const LITE_FIELDS = ['title', 'role', 'description', 'depends_on', 'group', 'environment', 'priority', '_project', 'pdsa_ref', 'abstract_ref', 'changelog_ref', 'liaison_review', 'liaison_q1_approval', 'liaison_q2_approval', 'liaison_q3_approval', 'liaison_q1_complete', 'liaison_q2_complete', 'liaison_q3_complete'];
 function toLiteDna(dnaJson) {
   const dna = typeof dnaJson === 'string' ? JSON.parse(dnaJson) : dnaJson;
   if (!dna) return {};
