@@ -339,6 +339,25 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
     if (!dna || !dna.liaison_review) {
       return `Transition ${transitionKey} by liaison requires dna.liaison_review. Document your reasoning: What did you check? What did you challenge? What is your recommendation and why?`;
     }
+
+    // Liaison challenge questions — mandatory per transition type
+    const MIN_ANSWER_LENGTH = 20;
+    if (transitionKey === 'approval->approved') {
+      const approvalQuestions = ['liaison_q1_approval', 'liaison_q2_approval', 'liaison_q3_approval'];
+      for (const q of approvalQuestions) {
+        if (!dna[q] || typeof dna[q] !== 'string' || dna[q].length < MIN_ANSWER_LENGTH) {
+          return `Transition ${transitionKey} requires dna.${q} (min ${MIN_ANSWER_LENGTH} chars). Answer must be task-specific, not a template.`;
+        }
+      }
+    }
+    if (transitionKey === 'review->complete') {
+      const completeQuestions = ['liaison_q1_complete', 'liaison_q2_complete', 'liaison_q3_complete'];
+      for (const q of completeQuestions) {
+        if (!dna[q] || typeof dna[q] !== 'string' || dna[q].length < MIN_ANSWER_LENGTH) {
+          return `Transition ${transitionKey} requires dna.${q} (min ${MIN_ANSWER_LENGTH} chars). Answer must be task-specific, not a template.`;
+        }
+      }
+    }
   }
 
   return null;
