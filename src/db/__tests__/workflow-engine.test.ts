@@ -116,9 +116,9 @@ describe('PDSA Design Path (WORKFLOW.md v12 lines 8-24)', () => {
       expectRejected('task', 'pending', 'ready', 'qa', null);
     });
 
-    it('preserves original role (no automatic override)', () => {
+    it('forces PDSA start (newRole=pdsa on develop)', () => {
       const newRole = getNewRoleForTransition('task', 'pending', 'ready');
-      expect(newRole).toBeNull();
+      expect(newRole).toBe('pdsa');
     });
   });
 
@@ -385,9 +385,9 @@ describe('Liaison Content Path (WORKFLOW.md v12 lines 80-90)', () => {
       expectAllowed('task', 'pending', 'ready', 'liaison', 'liaison');
     });
 
-    it('preserves liaison role', () => {
+    it('forces PDSA start (all pending->ready routes to pdsa on develop)', () => {
       const newRole = getNewRoleForTransition('task', 'pending', 'ready');
-      expect(newRole).toBeNull(); // Role preserved
+      expect(newRole).toBe('pdsa'); // PDSA start enforced
     });
   });
 
@@ -985,8 +985,8 @@ describe('Memory enforcement — requiresDna gates', () => {
     expect(result).toContain('memory_query_session');
   });
 
-  it('task ready→active passes with memory_query_session', () => {
-    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123' }, 'dev');
+  it('task ready→active passes with memory_query_session and pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123', pdsa_ref: 'https://github.com/test/repo' }, 'dev');
     expect(result).toBeNull();
   });
 
@@ -1107,8 +1107,8 @@ describe('Bug fix: approved->active for QA', () => {
     expect(result).toContain('memory_query_session');
   });
 
-  it('approved->active passes with memory_query_session', () => {
-    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'test' }, 'qa');
+  it('approved->active passes with memory_query_session and pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'test', pdsa_ref: 'https://github.com/test/repo' }, 'qa');
     expect(result).toBeNull();
   });
 
