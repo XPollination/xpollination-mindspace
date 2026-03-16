@@ -72,7 +72,14 @@ oauthRouter.get('/google/callback',
       { expiresIn: process.env.JWT_EXPIRY || '24h' }
     );
 
-    res.redirect(`${FRONTEND_URL}/?token=${token}`);
+    // Set JWT as httpOnly cookie (same pattern as viz login proxy)
+    res.cookie('ms_session', token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000, // 24h
+    });
+    res.redirect(FRONTEND_URL || '/');
   }
 );
 
