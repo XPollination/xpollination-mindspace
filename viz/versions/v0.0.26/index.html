@@ -1499,16 +1499,26 @@
 
     /**
      * Render the agent status bar at the top of the Kanban board.
-     * Shows 4 agents with their current task from stations data.
-     * Filters out non-process stations (e.g. stations with no role or utility stations).
+     * Fetches from /api/agents (A2A agents table) instead of stations.
+     * Falls back to stations data if agents API is empty.
      */
-    function renderAgentStatusBar() {
-      // Filter stations to only process agents (4 roles: liaison, pdsa, dev, qa)
+    async function renderAgentStatusBar() {
+      // Fetch agents from A2A agents API
+      let agentPool = [];
+      try {
+        const agentRes = await fetch('/api/agents/pool');
+        if (agentRes.ok) agentPool = await agentRes.json();
+      } catch { /* API unavailable — fall back to stations */ }
+
       const agentRoles = ['liaison', 'pdsa', 'dev', 'qa'];
-      const processStations = stations.filter(s => {
-        const role = (s.role || s.name || '').toLowerCase();
-        return agentRoles.some(r => role.includes(r));
-      });
+
+      // Use A2A agents if available, fall back to stations
+      const processStations = agentPool.length > 0
+        ? agentPool.filter(a => agentRoles.some(r => (a.current_role || a.name || '').toLowerCase().includes(r)))
+        : stations.filter(s => {
+            const role = (s.role || s.name || '').toLowerCase();
+            return agentRoles.some(r => role.includes(r));
+          });
 
       let html = '';
 
