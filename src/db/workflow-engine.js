@@ -31,16 +31,14 @@ export const ALLOWED_TRANSITIONS = {
   // Task flow - role-aware transitions
   // Key principle: Role assigned at creation should be preserved unless explicitly transitioned
   'task': {
-    // AC1: pending->ready preserves original role (no automatic override)
-    'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'] },
-    // Design gate: dev tasks require PDSA design before becoming ready
-    'pending->ready:dev': { allowedActors: ['liaison', 'system', 'pdsa'], requireRole: 'dev', requiresDna: ['pdsa_ref'] },
+    // AC1: pending->ready forces PDSA start — all tasks must go through PDSA planning first
+    'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'], newRole: 'pdsa' },
 
     // AC2: ready->active allows role-matched claiming
     'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'], requiresDna: ['memory_query_session'] },
     'ready->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['memory_query_session'] },
-    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session'] },
-    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session'] },
+    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session', 'pdsa_ref'] },
+    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session', 'pdsa_ref'] },
     'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', requiresDna: ['memory_query_session'] },
 
     // Per WORKFLOW.md v12 line 21: dev sends to review, Monitor=qa (QA reviews dev work)
@@ -60,7 +58,7 @@ export const ALLOWED_TRANSITIONS = {
     'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'], requiresHumanConfirm: true },
 
     // QA claims approved task into active (WORKFLOW.md: approved monitor=qa)
-    'approved->active': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'qa', requiresDna: ['memory_query_session'] },
+    'approved->active': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'qa', requiresDna: ['memory_query_session', 'pdsa_ref'] },
 
     // AC6 & AC7: QA testing phase
     'approved->testing': { allowedActors: ['liaison', 'system'], newRole: 'qa' },
@@ -327,6 +325,19 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
       if (test_pass_count !== test_total_count) {
         return `Test gate blocked: 100% test pass required. test_pass_count=${test_pass_count} but test_total_count=${test_total_count}. All tests must pass before completion.`;
       }
+    }
+  }
+
+  // Version bump gate: if task modifies a versioned component, require version_bump_ref
+  if (dna && dna.versioned_component && !dna.version_bump_ref) {
+    return `Task modifies versioned component "${dna.versioned_component}" but no version_bump_ref in DNA. Run scripts/version-bump.sh ${dna.versioned_component} first.`;
+  }
+
+  // Liaison review gate: liaison must document reasoning for approval/completion/rework decisions
+  const liaisonGatedTransitions = ['approval->approved', 'review->complete', 'review->rework'];
+  if (actor === 'liaison' && liaisonGatedTransitions.includes(transitionKey)) {
+    if (!dna || !dna.liaison_review) {
+      return `Transition ${transitionKey} by liaison requires dna.liaison_review. Document your reasoning: What did you check? What did you challenge? What is your recommendation and why?`;
     }
   }
 

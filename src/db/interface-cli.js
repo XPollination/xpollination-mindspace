@@ -544,6 +544,16 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
   }
 
   // Standard transition flow
+  // Detect role-specific fallback to generic transition and warn
+  if (currentRole) {
+    const roleSpecificKey = `${fromStatus}->${newStatus}:${currentRole}`;
+    const genericKey = `${fromStatus}->${newStatus}`;
+    const typeRules = ALLOWED_TRANSITIONS[nodeType] || {};
+    if (!typeRules[roleSpecificKey] && typeRules[genericKey]) {
+      console.warn(`[workflow] No role-specific transition ${roleSpecificKey} — fallback to generic ${genericKey}`);
+    }
+  }
+
   // Validate transition against whitelist
   const validationError = validateTransition(nodeType, fromStatus, newStatus, actor, currentRole);
   if (validationError) {

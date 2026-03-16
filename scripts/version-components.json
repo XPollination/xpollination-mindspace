@@ -1,0 +1,22 @@
+{
+  "viz": {
+    "versions": "viz/versions/",
+    "active": "viz/active",
+    "description": "Visualization server and UI"
+  },
+  "workflow": {
+    "versions": "tracks/process/context/workflow/",
+    "active": null,
+    "description": "Workflow engine rules (uses WORKFLOW.md, not symlink)"
+  },
+  "api": {
+    "versions": "api/versions/",
+    "active": null,
+    "description": "Express API server"
+  },
+  "brain": {
+    "versions": "brain/versions/",
+    "active": null,
+    "description": "Brain/memory API server"
+  }
+}

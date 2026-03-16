@@ -18,7 +18,6 @@ services:
       - "4201:4201"
     volumes:
       - mindspace-dev-data:/app/data
-      - ./data/xpollination.db:/app/data/xpollination.db:ro
       - /home/developer/workspaces/github/PichlerThomas:/workspace
     environment:
       - NODE_ENV=development

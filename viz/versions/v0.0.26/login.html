@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — XPollination Mindspace</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #fafafa; color: #222222; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+    .login-box { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .logo { text-align: center; margin-bottom: 1rem; }
+    .logo img { width: 120px; height: 120px; }
+    .tagline { text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 1.5rem; }
+    h1 { text-align: center; font-size: 1.4rem; margin-bottom: 0.5rem; color: #222222; }
+    label { display: block; margin-bottom: 0.3rem; font-size: 0.9rem; color: #333; }
+    input { width: 100%; padding: 0.6rem; margin-bottom: 1rem; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; color: #222222; box-sizing: border-box; transition: border-color 0.2s; }
+    input:focus { border-color: #e07020; outline: none; box-shadow: 0 0 0 2px rgba(224,112,32,0.15); }
+    button { width: 100%; padding: 0.7rem; background: linear-gradient(135deg, #e07020, #3070c0); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; transition: opacity 0.2s; }
+    button:hover { opacity: 0.9; }
+    .error { color: #d32f2f; font-size: 0.85rem; display: none; margin-bottom: 0.5rem; }
+    .register-link { text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: #666; }
+    .register-link a { color: #3070c0; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="logo">
+      <picture>
+        <source srcset="/assets/mindspace-logo-120.webp" type="image/webp">
+        <img src="/assets/mindspace-logo-120.png" alt="XPollination Mindspace" width="120" height="120">
+      </picture>
+    </div>
+    <h1>Mindspace</h1>
+    <p class="tagline">Collective intelligence — where humans and agents build knowledge together</p>
+    <div class="error" id="error"></div>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autocomplete="email">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password">
+      <button type="submit">Sign In</button>
+    </form>
+    <div class="register-link">Have an invite? <a href="/register">Register</a></div>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('error');
+      errorEl.style.display = 'none';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Login failed';
+          errorEl.style.display = 'block';
+          return;
+        }
+        window.location.href = '/';
+      } catch (err) {
+        errorEl.textContent = 'Network error';
+        errorEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

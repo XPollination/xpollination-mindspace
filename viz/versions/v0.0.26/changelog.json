@@ -1,0 +1,15 @@
+{
+  "version": "v0.0.26",
+  "title": "Branch consolidation — auth gate, login/register pages, extensionless routes",
+  "date": "2026-03-16",
+  "task": "ms-branch-consolidation",
+  "changes": [
+    "Auth gate: JWT cookie check on all non-public paths",
+    "Login page: /login serves login.html",
+    "Register page: /register serves register.html",
+    "Invite flow: /invite/{code} redirects to /register?code={code}",
+    "Extensionless route fix: /login and /register resolve to .html files",
+    "CORS: origin-based instead of wildcard",
+    "Logout: /logout clears ms_session cookie"
+  ]
+}

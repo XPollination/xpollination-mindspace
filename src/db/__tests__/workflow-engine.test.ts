@@ -116,9 +116,9 @@ describe('PDSA Design Path (WORKFLOW.md v12 lines 8-24)', () => {
       expectRejected('task', 'pending', 'ready', 'qa', null);
     });
 
-    it('preserves original role (no automatic override)', () => {
+    it('forces PDSA start (newRole=pdsa on develop)', () => {
       const newRole = getNewRoleForTransition('task', 'pending', 'ready');
-      expect(newRole).toBeNull();
+      expect(newRole).toBe('pdsa');
     });
   });
 
@@ -385,9 +385,9 @@ describe('Liaison Content Path (WORKFLOW.md v12 lines 80-90)', () => {
       expectAllowed('task', 'pending', 'ready', 'liaison', 'liaison');
     });
 
-    it('preserves liaison role', () => {
+    it('forces PDSA start (all pending->ready routes to pdsa on develop)', () => {
       const newRole = getNewRoleForTransition('task', 'pending', 'ready');
-      expect(newRole).toBeNull(); // Role preserved
+      expect(newRole).toBe('pdsa'); // PDSA start enforced
     });
   });
 
@@ -921,7 +921,7 @@ describe('Critical forbidden transitions (spec enforcement)', () => {
 // 13. DNA REQUIREMENTS (non-approval transitions don't need pdsa_ref)
 // ==========================================================================
 
-describe('DNA Requirements — only active→approval requires pdsa_ref', () => {
+describe('DNA Requirements — pdsa_ref not needed for pdsa/liaison claiming or non-approval paths', () => {
 
   it('pending→ready does NOT require pdsa_ref', () => {
     const result = validateDnaRequirements('task', 'pending', 'ready', { role: 'pdsa' }, null);
@@ -985,8 +985,8 @@ describe('Memory enforcement — requiresDna gates', () => {
     expect(result).toContain('memory_query_session');
   });
 
-  it('task ready→active passes with memory_query_session', () => {
-    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123' }, 'dev');
+  it('task ready→active passes with memory_query_session and pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123', pdsa_ref: 'https://github.com/test/repo' }, 'dev');
     expect(result).toBeNull();
   });
 
@@ -1107,8 +1107,8 @@ describe('Bug fix: approved->active for QA', () => {
     expect(result).toContain('memory_query_session');
   });
 
-  it('approved->active passes with memory_query_session', () => {
-    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'test' }, 'qa');
+  it('approved->active passes with memory_query_session and pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'test', pdsa_ref: 'https://github.com/test/repo' }, 'qa');
     expect(result).toBeNull();
   });
 
@@ -1120,5 +1120,134 @@ describe('Bug fix: approved->active for QA', () => {
   it('approved->active preserves qa role', () => {
     const newRole = getNewRoleForTransition('task', 'approved', 'active', 'qa');
     expect(newRole).toBe('qa');
+  });
+});
+
+// ==========================================================================
+// 18. PDSA HARD GATE — all tasks must have pdsa_ref before dev/qa can claim
+// ==========================================================================
+
+describe('PDSA hard gate — pdsa_ref required for dev and QA claiming', () => {
+
+  // --- ready->active:dev requires pdsa_ref ---
+
+  it('task ready->active:dev BLOCKED without pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123' }, 'dev');
+    expect(result).toContain('pdsa_ref');
+  });
+
+  it('task ready->active:dev passes with pdsa_ref (GitHub link)', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', {
+      role: 'dev',
+      memory_query_session: 'session-123',
+      pdsa_ref: 'https://github.com/XPollination/xpollination-mindspace/blob/main/tracks/test/PDSA.md'
+    }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  it('task ready->active:dev rejects non-GitHub pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', {
+      role: 'dev',
+      memory_query_session: 'session-123',
+      pdsa_ref: '/tmp/local-pdsa.md'
+    }, 'dev');
+    expect(result).not.toBeNull();
+  });
+
+  // --- approved->active (QA claiming) requires pdsa_ref ---
+
+  it('task approved->active BLOCKED without pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'session-456' }, 'qa');
+    expect(result).toContain('pdsa_ref');
+  });
+
+  it('task approved->active passes with pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', {
+      role: 'qa',
+      memory_query_session: 'session-456',
+      pdsa_ref: 'https://github.com/XPollination/xpollination-mindspace/blob/main/tracks/test/PDSA.md'
+    }, 'qa');
+    expect(result).toBeNull();
+  });
+
+  // --- Bug type is EXEMPT from pdsa_ref requirement ---
+
+  it('bug ready->active does NOT require pdsa_ref', () => {
+    const result = validateDnaRequirements('bug', 'ready', 'active', { role: 'dev', memory_query_session: 'session-789' }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  // --- PDSA claiming does NOT require pdsa_ref (PDSA creates it) ---
+
+  it('task ready->active:pdsa does NOT require pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'pdsa', memory_query_session: 'session-abc' }, 'pdsa');
+    expect(result).toBeNull();
+  });
+
+  // --- Generic ready->active still works for pdsa/liaison (they create pdsa_ref) ---
+
+  it('task ready->active generic with pdsa role does NOT require pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'pdsa', memory_query_session: 'session-def' }, null);
+    expect(result).toBeNull();
+  });
+});
+
+// ==========================================================================
+// 19. VERSION BUMP GATE — version_bump_ref required for versioned components
+// ==========================================================================
+
+describe('Version bump gate — version_bump_ref for versioned component tasks', () => {
+
+  // Tasks that modify versioned components must have version_bump_ref before review->complete
+  it('task review->complete BLOCKED without version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'review', 'complete', {
+      role: 'liaison',
+      abstract_ref: 'https://github.com/test/repo',
+      test_pass_count: 5,
+      test_total_count: 5,
+      versioned_component: 'viz'
+    }, 'liaison');
+    expect(result).toContain('version_bump_ref');
+  });
+
+  it('task review->complete passes with version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'review', 'complete', {
+      role: 'liaison',
+      abstract_ref: 'https://github.com/test/repo',
+      test_pass_count: 5,
+      test_total_count: 5,
+      versioned_component: 'viz',
+      version_bump_ref: 'abc123'
+    }, 'liaison');
+    expect(result).toBeNull();
+  });
+
+  it('task review->complete passes WITHOUT version_bump_ref when no versioned_component', () => {
+    const result = validateDnaRequirements('task', 'review', 'complete', {
+      role: 'liaison',
+      abstract_ref: 'https://github.com/test/repo',
+      test_pass_count: 5,
+      test_total_count: 5
+    }, 'liaison');
+    expect(result).toBeNull();
+  });
+
+  it('task active->review BLOCKED without version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', {
+      role: 'dev',
+      memory_contribution_id: 'thought-123',
+      versioned_component: 'workflow'
+    }, 'dev');
+    expect(result).toContain('version_bump_ref');
+  });
+
+  it('task active->review passes with version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', {
+      role: 'dev',
+      memory_contribution_id: 'thought-123',
+      versioned_component: 'workflow',
+      version_bump_ref: 'def456'
+    }, 'dev');
+    expect(result).toBeNull();
   });
 });

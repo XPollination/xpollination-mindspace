@@ -1,25 +1,37 @@
 import { randomUUID, createHash } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { getDb } from './connection.js';
 
 /**
- * Seed initial data: admin users, projects, project access, API keys.
+ * Seed initial data: admin user (Thomas), projects, project access, API keys.
  * Idempotent via INSERT OR IGNORE — safe to run multiple times.
  */
 export function seed(): void {
   const db = getDb();
 
-  // --- Users (system admins) ---
+  // --- Admin user (Thomas only — test users removed) ---
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
+  const password_hash = bcrypt.hashSync(ADMIN_PASSWORD, 12);
+
   const users = [
-    { id: randomUUID(), name: 'Thomas Pichler', email: 'thomas@xpollination.dev' },
-    { id: randomUUID(), name: 'Robin Pichler', email: 'robin@xpollination.dev' },
-    { id: randomUUID(), name: 'Maria Pichler', email: 'maria@xpollination.dev' },
+    { id: randomUUID(), name: 'Thomas Pichler', email: 'thomas.pichler@xpollination.earth' },
   ];
 
   for (const user of users) {
     db.prepare(
-      'INSERT OR IGNORE INTO users (id, email, name, is_system_admin) VALUES (?, ?, ?, 1)'
-    ).run(user.id, user.email, user.name);
+      'INSERT OR IGNORE INTO users (id, email, name, is_system_admin, password_hash, invite_quota) VALUES (?, ?, ?, 1, ?, 999)'
+    ).run(user.id, user.email, user.name, password_hash);
   }
+
+  // Update existing Thomas user if password_hash or invite_quota is missing
+  db.prepare(
+    'UPDATE users SET password_hash = COALESCE(NULLIF(password_hash, \'\'), ?), invite_quota = 999, is_system_admin = 1 WHERE email = ?'
+  ).run(password_hash, 'thomas.pichler@xpollination.earth');
+
+  // Remove test users (cleanup from previous seeds)
+  db.prepare('DELETE FROM users WHERE email IN (?, ?, ?)').run(
+    'robin@xpollination.dev', 'maria@xpollination.dev', 'test@xpollination.dev'
+  );
 
   // Fetch actual user IDs (may already exist)
   const seedUsers = users.map(u => {

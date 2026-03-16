@@ -4,6 +4,13 @@ import { requireProjectAccess } from '../middleware/require-project-access.js';
 
 export const missionsRouter = Router({ mergeParams: true });
 
+// GET / — list all missions
+missionsRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const db = getDb();
+  const missions = db.prepare('SELECT * FROM missions ORDER BY created_at DESC').all();
+  res.status(200).json(missions);
+});
+
 // GET /:missionId/overview — batched mission overview with all capabilities + progress
 missionsRouter.get('/:missionId/overview', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { slug, missionId } = req.params;

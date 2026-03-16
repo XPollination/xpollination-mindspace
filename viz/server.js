@@ -16,8 +16,69 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const { discoverProjects } = require('./discover-projects.cjs');
+const jwt = require('jsonwebtoken');
 
 const PORT = parseInt(process.argv[2]) || 3000;
+const JWT_SECRET = process.env.JWT_SECRET;
+const API_PORT = parseInt(process.env.API_PORT || '3100', 10);
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+// Paths that bypass auth — login page, registration, static assets, health, auth API
+const PUBLIC_PATHS = [
+  '/login',
+  '/register',
+  '/invite/',
+  '/health',
+  '/api/auth/',
+  '/assets/',
+  '/favicon.ico',
+];
+
+/**
+ * Parse cookies from request header
+ */
+function parseCookies(req) {
+  const cookieHeader = req.headers.cookie || '';
+  const cookies = {};
+  cookieHeader.split(';').forEach(pair => {
+    const [key, ...rest] = pair.trim().split('=');
+    if (key) cookies[key] = rest.join('=');
+  });
+  return cookies;
+}
+
+/**
+ * Check if a path is public (no auth required)
+ */
+function isPublicPath(pathname) {
+  return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p));
+}
+
+/**
+ * Verify JWT from ms_session cookie. Returns decoded payload or null.
+ */
+function verifySession(req) {
+  if (!JWT_SECRET) return null;
+  const cookies = parseCookies(req);
+  const token = cookies.ms_session;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get CORS origin header value — returns the request origin if allowed, or empty
+ */
+function getCorsOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return '';
+  if (ALLOWED_ORIGINS.length === 0) return origin; // No config = allow same-origin only (no header)
+  if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  return '';
+}
 
 // MIME types for static files
 const MIME_TYPES = {
@@ -152,11 +213,13 @@ function serveStatic(res, filePath) {
 /**
  * Send JSON response
  */
-function sendJson(res, data, status = 200) {
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*'
-  });
+function sendJson(res, data, status = 200, req = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (req) {
+    const corsOrigin = getCorsOrigin(req);
+    if (corsOrigin) headers['Access-Control-Allow-Origin'] = corsOrigin;
+  }
+  res.writeHead(status, headers);
   res.end(JSON.stringify(data, null, 2));
 }
 
@@ -209,6 +272,88 @@ function getSettingsDb(dbPath) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
+
+  // ─── D6: Logout — clear ms_session cookie ───
+  if (pathname === '/logout' || pathname === '/api/auth/logout') {
+    res.writeHead(302, {
+      'Set-Cookie': 'ms_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0',
+      'Location': '/login'
+    });
+    res.end();
+    return;
+  }
+
+  // ─── D7: Proxy auth requests to API server ───
+  if (pathname === '/api/auth/login' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const apiRes = await fetch(`http://localhost:${API_PORT}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await apiRes.json();
+      if (apiRes.ok && data.token) {
+        // D2: Set JWT as httpOnly cookie with SameSite=Strict
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `ms_session=${data.token}; HttpOnly; SameSite=Strict; Path=/`
+        });
+        res.end(JSON.stringify(data));
+      } else {
+        res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      }
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API server unreachable' }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/auth/register' && req.method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const apiRes = await fetch(`http://localhost:${API_PORT}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await apiRes.json();
+      res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API server unreachable' }));
+    }
+    return;
+  }
+
+  // ─── Invite landing: /invite/{code} → register page with code pre-filled ───
+  const inviteMatch = pathname.match(/^\/invite\/([^/]+)$/);
+  if (inviteMatch) {
+    const code = inviteMatch[1];
+    res.writeHead(302, { 'Location': `/register?code=${encodeURIComponent(code)}` });
+    res.end();
+    return;
+  }
+
+  // ─── D1/D3: Auth gate — check ms_session cookie ───
+  if (!isPublicPath(pathname)) {
+    const session = verifySession(req);
+    if (!session) {
+      // D3: Return 401 for API requests
+      if (pathname.startsWith('/api/')) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+      }
+      // D1: Redirect browser requests to /login
+      res.writeHead(302, { 'Location': '/login' });
+      res.end();
+      return;
+    }
+  }
 
   // API: List projects
   if (pathname === '/api/projects') {
@@ -505,15 +650,17 @@ const server = http.createServer(async (req, res) => {
         const responseBody = JSON.stringify(responseData);
         const etag = '"' + crypto.createHash('md5').update(responseBody).digest('hex') + '"';
         const ifNoneMatch = req.headers['if-none-match'];
+        const corsOrigin = getCorsOrigin(req);
+        const corsHeaders = corsOrigin ? { 'Access-Control-Allow-Origin': corsOrigin } : {};
         if (ifNoneMatch === etag) {
-          res.writeHead(304, { 'ETag': etag, 'Access-Control-Allow-Origin': '*' });
+          res.writeHead(304, { 'ETag': etag, ...corsHeaders });
           res.end();
           return;
         }
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'ETag': etag,
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
           'Cache-Control': 'no-cache'
         });
         res.end(responseBody);
@@ -543,15 +690,17 @@ const server = http.createServer(async (req, res) => {
       const responseBody = JSON.stringify(data);
       const etag = '"' + crypto.createHash('md5').update(responseBody).digest('hex') + '"';
       const ifNoneMatch = req.headers['if-none-match'];
+      const corsOrigin2 = getCorsOrigin(req);
+      const corsHeaders2 = corsOrigin2 ? { 'Access-Control-Allow-Origin': corsOrigin2 } : {};
       if (ifNoneMatch === etag) {
-        res.writeHead(304, { 'ETag': etag, 'Access-Control-Allow-Origin': '*' });
+        res.writeHead(304, { 'ETag': etag, ...corsHeaders2 });
         res.end();
         return;
       }
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'ETag': etag,
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders2,
         'Cache-Control': 'no-cache'
       });
       res.end(responseBody);
@@ -780,6 +929,14 @@ const server = http.createServer(async (req, res) => {
     : __dirname;
   let filePath = pathname === '/' ? '/index.html' : pathname;
   let resolvedPath = path.join(staticRoot, filePath);
+
+  // Try .html extension for extensionless paths (e.g., /login → login.html)
+  if (!fs.existsSync(resolvedPath) && !path.extname(filePath)) {
+    const htmlPath = path.join(staticRoot, filePath + '.html');
+    if (fs.existsSync(htmlPath)) {
+      resolvedPath = htmlPath;
+    }
+  }
 
   // Fallback to root dir for shared assets (e.g., /assets/favicons/)
   if (!fs.existsSync(resolvedPath) && staticRoot !== __dirname) {
