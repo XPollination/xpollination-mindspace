@@ -930,6 +930,14 @@ const server = http.createServer(async (req, res) => {
   let filePath = pathname === '/' ? '/index.html' : pathname;
   let resolvedPath = path.join(staticRoot, filePath);
 
+  // Try .html extension for extensionless paths (e.g., /login → login.html)
+  if (!fs.existsSync(resolvedPath) && !path.extname(filePath)) {
+    const htmlPath = path.join(staticRoot, filePath + '.html');
+    if (fs.existsSync(htmlPath)) {
+      resolvedPath = htmlPath;
+    }
+  }
+
   // Fallback to root dir for shared assets (e.g., /assets/favicons/)
   if (!fs.existsSync(resolvedPath) && staticRoot !== __dirname) {
     resolvedPath = path.join(__dirname, filePath);
