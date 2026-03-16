@@ -333,6 +333,14 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
     return `Task modifies versioned component "${dna.versioned_component}" but no version_bump_ref in DNA. Run scripts/version-bump.sh ${dna.versioned_component} first.`;
   }
 
+  // Liaison review gate: liaison must document reasoning for approval/completion/rework decisions
+  const liaisonGatedTransitions = ['approval->approved', 'review->complete', 'review->rework'];
+  if (actor === 'liaison' && liaisonGatedTransitions.includes(transitionKey)) {
+    if (!dna || !dna.liaison_review) {
+      return `Transition ${transitionKey} by liaison requires dna.liaison_review. Document your reasoning: What did you check? What did you challenge? What is your recommendation and why?`;
+    }
+  }
+
   return null;
 }
 
