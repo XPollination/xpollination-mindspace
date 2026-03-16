@@ -1,10 +1,15 @@
 {
-  "version": "v0.0.25",
-  "title": "Fix: Detail panel invisible after drill-down — CSS class mismatch",
-  "date": "2026-03-12",
-  "task": "viz-detail-panel-visibility",
+  "version": "v0.0.26",
+  "title": "Branch consolidation — auth gate, login/register pages, extensionless routes",
+  "date": "2026-03-16",
+  "task": "ms-branch-consolidation",
   "changes": [
-    "Client: fix classList.add('open') to classList.add('visible') in showCapabilityDetail()",
-    "Client: fix classList.add('open') to classList.add('visible') in showTaskDetail()"
+    "Auth gate: JWT cookie check on all non-public paths",
+    "Login page: /login serves login.html",
+    "Register page: /register serves register.html",
+    "Invite flow: /invite/{code} redirects to /register?code={code}",
+    "Extensionless route fix: /login and /register resolve to .html files",
+    "CORS: origin-based instead of wildcard",
+    "Logout: /logout clears ms_session cookie"
   ]
 }
