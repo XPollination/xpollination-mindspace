@@ -921,7 +921,7 @@ describe('Critical forbidden transitions (spec enforcement)', () => {
 // 13. DNA REQUIREMENTS (non-approval transitions don't need pdsa_ref)
 // ==========================================================================
 
-describe('DNA Requirements — only active→approval requires pdsa_ref', () => {
+describe('DNA Requirements — pdsa_ref not needed for pdsa/liaison claiming or non-approval paths', () => {
 
   it('pending→ready does NOT require pdsa_ref', () => {
     const result = validateDnaRequirements('task', 'pending', 'ready', { role: 'pdsa' }, null);
@@ -1120,5 +1120,74 @@ describe('Bug fix: approved->active for QA', () => {
   it('approved->active preserves qa role', () => {
     const newRole = getNewRoleForTransition('task', 'approved', 'active', 'qa');
     expect(newRole).toBe('qa');
+  });
+});
+
+// ==========================================================================
+// 18. PDSA HARD GATE — all tasks must have pdsa_ref before dev/qa can claim
+// ==========================================================================
+
+describe('PDSA hard gate — pdsa_ref required for dev and QA claiming', () => {
+
+  // --- ready->active:dev requires pdsa_ref ---
+
+  it('task ready->active:dev BLOCKED without pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'dev', memory_query_session: 'session-123' }, 'dev');
+    expect(result).toContain('pdsa_ref');
+  });
+
+  it('task ready->active:dev passes with pdsa_ref (GitHub link)', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', {
+      role: 'dev',
+      memory_query_session: 'session-123',
+      pdsa_ref: 'https://github.com/XPollination/xpollination-mindspace/blob/main/tracks/test/PDSA.md'
+    }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  it('task ready->active:dev rejects non-GitHub pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', {
+      role: 'dev',
+      memory_query_session: 'session-123',
+      pdsa_ref: '/tmp/local-pdsa.md'
+    }, 'dev');
+    expect(result).not.toBeNull();
+  });
+
+  // --- approved->active (QA claiming) requires pdsa_ref ---
+
+  it('task approved->active BLOCKED without pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', { role: 'qa', memory_query_session: 'session-456' }, 'qa');
+    expect(result).toContain('pdsa_ref');
+  });
+
+  it('task approved->active passes with pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'approved', 'active', {
+      role: 'qa',
+      memory_query_session: 'session-456',
+      pdsa_ref: 'https://github.com/XPollination/xpollination-mindspace/blob/main/tracks/test/PDSA.md'
+    }, 'qa');
+    expect(result).toBeNull();
+  });
+
+  // --- Bug type is EXEMPT from pdsa_ref requirement ---
+
+  it('bug ready->active does NOT require pdsa_ref', () => {
+    const result = validateDnaRequirements('bug', 'ready', 'active', { role: 'dev', memory_query_session: 'session-789' }, 'dev');
+    expect(result).toBeNull();
+  });
+
+  // --- PDSA claiming does NOT require pdsa_ref (PDSA creates it) ---
+
+  it('task ready->active:pdsa does NOT require pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'pdsa', memory_query_session: 'session-abc' }, 'pdsa');
+    expect(result).toBeNull();
+  });
+
+  // --- Generic ready->active still works for pdsa/liaison (they create pdsa_ref) ---
+
+  it('task ready->active generic with pdsa role does NOT require pdsa_ref', () => {
+    const result = validateDnaRequirements('task', 'ready', 'active', { role: 'pdsa', memory_query_session: 'session-def' }, null);
+    expect(result).toBeNull();
   });
 });
