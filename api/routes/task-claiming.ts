@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db/connection.js';
 import { requireProjectAccess } from '../middleware/require-project-access.js';
-import { createLease } from '../services/lease-service.js';
+import { createLease, renewLease } from '../services/lease-service.js';
 import { broadcastTaskAvailable } from '../services/task-broadcast.js';
 
 export const taskClaimingRouter = Router({ mergeParams: true });
@@ -49,7 +49,35 @@ taskClaimingRouter.post('/:taskId/claim', requireProjectAccess('contributor'), (
   const lease = createLease(db, taskId, user.id, task.current_role || 'dev');
 
   const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
-  res.status(200).json({ ...updated as any, lease, ...(branch_warning ? { branch_warning } : {}) });
+  res.status(200).json({
+    ...updated as any,
+    lease,
+    lease_token: lease?.id || null,
+    expires_at: lease?.expires_at || null,
+    ...(branch_warning ? { branch_warning } : {})
+  });
+});
+
+// POST /:taskId/heartbeat — renew lease
+taskClaimingRouter.post('/:taskId/heartbeat', requireProjectAccess('contributor'), (req: Request, res: Response) => {
+  const { slug, taskId } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug) as any;
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  const lease = db.prepare('SELECT * FROM leases WHERE task_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1').get(taskId, user.id) as any;
+  if (!lease) {
+    res.status(404).json({ error: 'No active lease found' });
+    return;
+  }
+
+  const renewed = renewLease(db, lease.id);
+  res.status(200).json({ lease: renewed, lease_token: renewed?.id, expires_at: renewed?.expires_at });
 });
 
 // DELETE /:taskId/claim — unclaim a task
