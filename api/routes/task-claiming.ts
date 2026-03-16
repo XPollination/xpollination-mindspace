@@ -24,7 +24,7 @@ taskClaimingRouter.post('/:taskId/claim', requireProjectAccess('contributor'), (
   }
 
   // Advisory branch validation
-  const { branch } = req.body;
+  const branch = req.body?.branch;
   let branch_warning: string | null = null;
   if (branch) {
     const validPatterns = [
@@ -66,7 +66,7 @@ taskClaimingRouter.post('/:taskId/heartbeat', requireProjectAccess('contributor'
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug) as any;
   if (!task) {
-    res.status(404).json({ error: 'Task not found' });
+    res.status(400).json({ error: 'Task not found' });
     return;
   }
 
@@ -87,7 +87,7 @@ taskClaimingRouter.delete('/:taskId/claim', requireProjectAccess('contributor'),
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND project_slug = ?').get(taskId, slug) as any;
   if (!task) {
-    res.status(404).json({ error: 'Task not found' });
+    res.status(400).json({ error: 'Task not found' });
     return;
   }
 
