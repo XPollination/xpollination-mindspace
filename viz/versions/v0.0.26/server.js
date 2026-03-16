@@ -35,7 +35,7 @@ const MIME_TYPES = {
 /**
  * DNA-lite: strip heavy fields, keep essentials for Kanban view
  */
-const LITE_FIELDS = ['title', 'role', 'description', 'depends_on', 'group', 'environment', 'priority', '_project'];
+const LITE_FIELDS = ['title', 'role', 'description', 'depends_on', 'group', 'environment', 'priority', '_project', 'pdsa_ref', 'abstract_ref', 'changelog_ref'];
 function toLiteDna(dnaJson) {
   const dna = typeof dnaJson === 'string' ? JSON.parse(dnaJson) : dnaJson;
   if (!dna) return {};
@@ -375,6 +375,8 @@ const server = http.createServer(async (req, res) => {
               description: dna.description || null,
               depends_on: dna.depends_on || [],
               pdsa_ref: dna.pdsa_ref || null,
+              abstract_ref: dna.abstract_ref || null,
+              changelog_ref: dna.changelog_ref || null,
               requirement_refs: dna.requirement_refs || [],
               group: dna.group || null,
               breadcrumb: [
