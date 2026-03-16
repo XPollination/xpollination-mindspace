@@ -45,6 +45,10 @@ async function apiFetchWithBody(path, method, body) {
   return res.json();
 }
 
+// Default status filter: exclude blocked and cancelled from default view
+// Client-side filtering in index.html uses these as the initial active pipeline
+const DEFAULT_VISIBLE_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 'testing', 'review', 'rework'];
+
 // MIME types for static files
 const MIME_TYPES = {
   '.html': 'text/html',
