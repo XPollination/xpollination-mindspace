@@ -37,8 +37,8 @@ export const ALLOWED_TRANSITIONS = {
     // AC2: ready->active allows role-matched claiming
     'ready->active': { allowedActors: ['pdsa', 'dev', 'qa', 'liaison'], requiresDna: ['memory_query_session'] },
     'ready->active:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', requiresDna: ['memory_query_session'] },
-    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session'] },
-    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session'] },
+    'ready->active:dev': { allowedActors: ['dev'], requireRole: 'dev', requiresDna: ['memory_query_session', 'pdsa_ref'] },
+    'ready->active:qa': { allowedActors: ['qa'], requireRole: 'qa', requiresDna: ['memory_query_session', 'pdsa_ref'] },
     'ready->active:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', requiresDna: ['memory_query_session'] },
 
     // Per WORKFLOW.md v12 line 21: dev sends to review, Monitor=qa (QA reviews dev work)
@@ -58,7 +58,7 @@ export const ALLOWED_TRANSITIONS = {
     'approval->rework': { allowedActors: ['liaison', 'thomas'], newRole: 'pdsa', clearsDna: ['memory_query_session', 'memory_contribution_id'], requiresHumanConfirm: true },
 
     // QA claims approved task into active (WORKFLOW.md: approved monitor=qa)
-    'approved->active': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'qa', requiresDna: ['memory_query_session'] },
+    'approved->active': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'qa', requiresDna: ['memory_query_session', 'pdsa_ref'] },
 
     // AC6 & AC7: QA testing phase
     'approved->testing': { allowedActors: ['liaison', 'system'], newRole: 'qa' },
