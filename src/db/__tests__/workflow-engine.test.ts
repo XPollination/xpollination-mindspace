@@ -1191,3 +1191,63 @@ describe('PDSA hard gate — pdsa_ref required for dev and QA claiming', () => {
     expect(result).toBeNull();
   });
 });
+
+// ==========================================================================
+// 19. VERSION BUMP GATE — version_bump_ref required for versioned components
+// ==========================================================================
+
+describe('Version bump gate — version_bump_ref for versioned component tasks', () => {
+
+  // Tasks that modify versioned components must have version_bump_ref before review->complete
+  it('task review->complete BLOCKED without version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'review', 'complete', {
+      role: 'liaison',
+      abstract_ref: 'https://github.com/test/repo',
+      test_pass_count: 5,
+      test_total_count: 5,
+      versioned_component: 'viz'
+    }, 'liaison');
+    expect(result).toContain('version_bump_ref');
+  });
+
+  it('task review->complete passes with version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'review', 'complete', {
+      role: 'liaison',
+      abstract_ref: 'https://github.com/test/repo',
+      test_pass_count: 5,
+      test_total_count: 5,
+      versioned_component: 'viz',
+      version_bump_ref: 'abc123'
+    }, 'liaison');
+    expect(result).toBeNull();
+  });
+
+  it('task review->complete passes WITHOUT version_bump_ref when no versioned_component', () => {
+    const result = validateDnaRequirements('task', 'review', 'complete', {
+      role: 'liaison',
+      abstract_ref: 'https://github.com/test/repo',
+      test_pass_count: 5,
+      test_total_count: 5
+    }, 'liaison');
+    expect(result).toBeNull();
+  });
+
+  it('task active->review BLOCKED without version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', {
+      role: 'dev',
+      memory_contribution_id: 'thought-123',
+      versioned_component: 'workflow'
+    }, 'dev');
+    expect(result).toContain('version_bump_ref');
+  });
+
+  it('task active->review passes with version_bump_ref when versioned_component is set', () => {
+    const result = validateDnaRequirements('task', 'active', 'review', {
+      role: 'dev',
+      memory_contribution_id: 'thought-123',
+      versioned_component: 'workflow',
+      version_bump_ref: 'def456'
+    }, 'dev');
+    expect(result).toBeNull();
+  });
+});
