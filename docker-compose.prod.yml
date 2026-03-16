@@ -30,6 +30,7 @@ services:
       - BRAIN_API_URL=http://host.docker.internal:3200
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
       - JWT_SECRET=${JWT_SECRET:-xpo-prod-jwt-secret-2026}
+      - FRONTEND_URL=https://mindspace.xpollination.earth
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

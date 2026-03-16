@@ -37,14 +37,12 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
       if (user) {
         // Link google_id if not already set
         db.prepare('UPDATE users SET google_id = ? WHERE id = ? AND google_id IS NULL').run(googleId, user.id);
+        done(null, user);
       } else {
-        // Create new user (no password_hash for OAuth users)
-        const id = randomUUID();
-        db.prepare('INSERT INTO users (id, email, name, google_id) VALUES (?, ?, ?, ?)').run(id, email, name, googleId);
-        user = { id, email, name };
+        // Account not found — invite-only enforcement: do NOT auto-create users
+        // User must register with an invite code first, then link Google account
+        done(null, false, { message: 'Account not found. Register with an invite code first.' });
       }
-
-      done(null, user);
     }
   ));
 }
@@ -56,7 +54,7 @@ oauthRouter.get('/google', passport.authenticate('google', { scope: ['profile', 
 
 // GET /google/callback — handle OAuth callback
 oauthRouter.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/google/failure' }),
+  passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL || ''}/login?error=Account+not+found.+Register+with+an+invite+code+first.` }),
   (req: Request, res: Response) => {
     const user = req.user as any;
     const secret = process.env.JWT_SECRET;
@@ -71,6 +69,14 @@ oauthRouter.get('/google/callback',
       secret,
       { expiresIn: process.env.JWT_EXPIRY || '24h' }
     );
+
+    // Set session cookie with SameSite=lax (allows OAuth redirect cookies)
+    res.cookie('ms_session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     res.redirect(`${FRONTEND_URL}/?token=${token}`);
   }
