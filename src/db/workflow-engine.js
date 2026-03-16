@@ -328,6 +328,11 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
     }
   }
 
+  // Version bump gate: if task modifies a versioned component, require version_bump_ref
+  if (dna && dna.versioned_component && !dna.version_bump_ref) {
+    return `Task modifies versioned component "${dna.versioned_component}" but no version_bump_ref in DNA. Run scripts/version-bump.sh ${dna.versioned_component} first.`;
+  }
+
   return null;
 }
 
