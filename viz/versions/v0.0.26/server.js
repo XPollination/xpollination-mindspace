@@ -16,7 +16,15 @@ import { createRequire } from 'module';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
-const { discoverProjects } = require('./discover-projects.cjs');
+
+// Projects discovered via API instead of filesystem scanner
+async function discoverProjectsViaApi() {
+  try {
+    const res = await fetch(`${API_BASE}/api/projects`);
+    if (res.ok) return await res.json();
+  } catch { /* API not available */ }
+  return [];
+}
 
 const PORT = parseInt(process.argv[2]) || 3000;
 const API_PORT = process.env.API_PORT || '3100';
@@ -146,7 +154,7 @@ const server = http.createServer(async (req, res) => {
 
   // API: List projects
   if (pathname === '/api/projects') {
-    const projects = discoverProjects();
+    const projects = await discoverProjectsViaApi();
     const currentProject = path.basename(__dirname.replace('/viz', ''));
     sendJson(res, {
       current: currentProject,
@@ -215,7 +223,7 @@ const server = http.createServer(async (req, res) => {
     const since = url.searchParams.get('since');
     const dnaMode = url.searchParams.get('dna');
     const dnaFull = dnaMode === 'full';
-    const projects = discoverProjects();
+    const projects = await discoverProjectsViaApi();
 
     // All Projects: merge data from all discovered project APIs
     if (projectName === 'all') {
@@ -454,6 +462,6 @@ const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Viz server running at http://${BIND_HOST}:${PORT}`);
   console.log(`API backend: ${API_BASE}`);
-  const projects = discoverProjects();
+  const projects = await discoverProjectsViaApi();
   console.log(`Found ${projects.length} projects: ${projects.map(p => p.name).join(', ')}`);
 });
