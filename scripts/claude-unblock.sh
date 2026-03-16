@@ -108,14 +108,20 @@ process_pane() {
         return 0
     fi
 
-    # Use ONLY the prompt area for option matching (last 40 lines).
-    local prompt_area
-    prompt_area=$(echo "$output" | tail -40 | tr '\n' ' ' | tr -s ' ')
+    # "Esc to cancel" confirmed in bottom — this IS a prompt. Now search the FULL
+    # captured output for keywords and options. Narrow panes (60 chars) with long
+    # command previews push "Do you want to proceed" 45+ lines above the bottom,
+    # far beyond a tail-40 window. Using full 300-line capture ensures we find it.
+    #
+    # Bug fixed 2026-03-16: tail-40 missed prompts in narrow panes where command
+    # text between options 2 and 3 was 40+ lines. PDSA hung for hours.
+    local full_collapsed
+    full_collapsed=$(echo "$output" | tr '\n' ' ' | tr -s ' ')
 
     # SAFETY: Only auto-confirm tool PERMISSION, TRUST, and SAFETY prompts.
     # Never auto-confirm AskUserQuestion (human decision prompts).
-    if ! echo "$prompt_area" | grep -qE '●'; then
-        if ! echo "$prompt_area" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed|Run shell command'; then
+    if ! echo "$full_collapsed" | grep -qE '●'; then
+        if ! echo "$full_collapsed" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed|Run shell command'; then
             return 0
         fi
     fi
@@ -123,9 +129,9 @@ process_pane() {
     local confirm_count
 
     # Find the best option: prefer "don't ask again" > numbered Yes > Enter
-    if echo "$prompt_area" | grep -qiE "don.t ask again"; then
+    if echo "$full_collapsed" | grep -qiE "don.t ask again"; then
         local option
-        option=$(echo "$prompt_area" | grep -oiE '[1-9]\.?[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
+        option=$(echo "$full_collapsed" | grep -oiE '[1-9]\.?[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
         if [[ -n "$option" ]]; then
             tmux send-keys -t "$TARGET" "$option"
             confirm_count=$(increment_confirms)
@@ -135,12 +141,12 @@ process_pane() {
         fi
     fi
 
-    if echo "$prompt_area" | grep -qE '❯.*[0-9]+\. Yes'; then
-        if echo "$prompt_area" | grep -qE '3\.[^0-9]*Yes'; then
+    if echo "$full_collapsed" | grep -qE '❯.*[0-9]+\. Yes'; then
+        if echo "$full_collapsed" | grep -qE '3\.[^0-9]*Yes'; then
             tmux send-keys -t "$TARGET" 3
             confirm_count=$(increment_confirms)
             echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 3 (yes/allow all) [#$confirm_count]"
-        elif echo "$prompt_area" | grep -qE '2\.[^0-9]*Yes'; then
+        elif echo "$full_collapsed" | grep -qE '2\.[^0-9]*Yes'; then
             tmux send-keys -t "$TARGET" 2
             confirm_count=$(increment_confirms)
             echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 2 (yes/allow all) [#$confirm_count]"
@@ -154,8 +160,8 @@ process_pane() {
     fi
 
     # Fallback: "Do you want to proceed" with numbered options
-    if echo "$prompt_area" | grep -qE 'Do you want'; then
-        if echo "$prompt_area" | grep -qE '[0-9]+\. Yes'; then
+    if echo "$full_collapsed" | grep -qE 'Do you want'; then
+        if echo "$full_collapsed" | grep -qE '[0-9]+\. Yes'; then
             tmux send-keys -t "$TARGET" 1
             confirm_count=$(increment_confirms)
             echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed prompt (option 1) [#$confirm_count]"
