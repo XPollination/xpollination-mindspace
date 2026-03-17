@@ -1,29 +1,13 @@
 {
-  "version": "v0.0.27",
-  "title": "Settings page, project selector, detail panel fix, catch-all API proxy",
+  "version": "v0.0.29",
+  "title": "Settings: sessions + account info fix",
   "date": "2026-03-17",
   "tasks": [
-    "ms-viz-user-controls",
-    "ms-viz-project-selector",
-    "ms-viz-detail-panel-close-bug",
-    "ms-viz-project-filter-bug",
-    "ms-settings-page-bugs",
-    "ms-login-page-redesign",
-    "ms-viz-recover-lost-features",
-    "ms-viz-default-filter",
-    "ms-viz-agent-bar-api"
+    "ms-settings-sessions-loading",
+    "ms-settings-account-info"
   ],
   "changes": [
-    "Settings page: /settings with change password, API key display, sessions, account info",
-    "Project selector: API-based project list replaces filesystem discovery",
-    "Detail panel close: panelClosed flag prevents reopen on poll refresh",
-    "Catch-all API proxy: all /api/* and /a2a/* forwarded to API with auth",
-    "Login redesign: light theme, XPollination branding, responsive images",
-    "LITE_FIELDS: pdsa_ref, changelog_ref, abstract_ref, liaison Q&A fields",
-    "Default filter: active pipeline only, excludes complete/cancelled/blocked",
-    "Agent bar: reads from A2A agents API with stations fallback",
-    "Google OAuth: Sign in with Google button, SameSite=lax cookie fix",
-    "Logout button + Settings link in header",
-    "Apple touch icon + manifest on login/register pages"
+    "Sessions endpoint returns data",
+    "Account info shows name+email via GET /api/auth/me"
   ]
 }
