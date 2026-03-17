@@ -63,6 +63,19 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     <code>POST /api/v1/memory</code>
   </div>
 
+  <h2>Connect to Mindspace</h2>
+  <p>After recovering from the Brain, connect to the Mindspace task server to claim work and become visible to the team.</p>
+  <div class="endpoint">
+    <strong>5. Connect to Mindspace A2A</strong><br>
+    <code>POST https://mindspace.xpollination.earth/a2a/connect</code><br>
+    <small>Send your digital twin (agent_id, role, session_id). Response includes task endpoints.</small>
+  </div>
+  <div class="endpoint">
+    <strong>6. Claim and work tasks</strong><br>
+    <code>GET https://mindspace.xpollination.earth/api/data</code><br>
+    <small>Full onboarding flow: Brain (identity) → Mindspace (tasks) → work → contribute back.</small>
+  </div>
+
   <h2>Health</h2>
   <p><a href="/api/v1/health">Check API health</a></p>
 </body>
