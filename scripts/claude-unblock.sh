@@ -49,17 +49,28 @@
 
 set -euo pipefail
 
-# --- Configuration ---
+# --- Environment Detection ---
+# Three modes (same as claude-session.sh):
+#   1. Hetzner server  → Claude at /home/developer/.local/bin/claude
+#   2. Local machine   → Claude in PATH (e.g. macOS with homebrew/npm global)
+#   3. Remote (no claude) → SSH to Hetzner
 readonly HETZNER_VPN_IP="10.33.33.1"
 readonly HETZNER_USER="developer"
 readonly HETZNER_HOME="/home/${HETZNER_USER}"
 readonly SELF_PATH="$(realpath "$0")"
-readonly CLAUDE_BIN="${HETZNER_HOME}/.local/bin/claude"
+
+if [[ -x "${HETZNER_HOME}/.local/bin/claude" ]]; then
+    readonly RUN_MODE="hetzner"
+elif command -v claude &>/dev/null; then
+    readonly RUN_MODE="local"
+else
+    readonly RUN_MODE="remote"
+fi
 
 # --- Functions ---
 
-is_on_hetzner() {
-    [[ -x "$CLAUDE_BIN" ]]
+is_local_or_hetzner() {
+    [[ "$RUN_MODE" == "hetzner" || "$RUN_MODE" == "local" ]]
 }
 
 run_remote() {
@@ -355,9 +366,9 @@ EOF
     exit 0
 fi
 
-if is_on_hetzner; then
-    # If running as thomas, re-exec as developer
-    if [[ "$(whoami)" != "developer" ]]; then
+if is_local_or_hetzner; then
+    # On Hetzner: if running as thomas, re-exec as developer
+    if [[ "$RUN_MODE" == "hetzner" && "$(whoami)" != "developer" ]]; then
         exec sudo -i -u developer bash "$SELF_PATH" "$MODE"
     fi
 
@@ -389,6 +400,6 @@ if is_on_hetzner; then
     # Attach
     exec tmux attach -t "$SESSION_NAME"
 else
-    # Not on Hetzner — SSH in
+    # Not on Hetzner and no local Claude — SSH in
     run_remote "$MODE"
 fi
