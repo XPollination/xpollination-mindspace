@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { QdrantClient } from "@qdrant/js-client-rest";
 
 const COLLECTION = "thought_space";
-const client = new QdrantClient({ url: "http://localhost:6333" });
+const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
 
 export async function thoughtsRoutes(app: FastifyInstance) {
   // GET /api/v1/thoughts/by-cid/:cid — lookup thought by content-addressable ID

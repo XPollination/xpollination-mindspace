@@ -29,6 +29,8 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/ ./
 
+RUN mkdir -p /app/data
+
 EXPOSE 3200
 
-CMD ["node", "--import", "tsx", "src/server.ts"]
+CMD ["node", "--import", "tsx", "src/index.ts"]
