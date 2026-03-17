@@ -1,6 +1,6 @@
 {
   "version": "v0.0.33",
-  "title": "Fix: Show API Key explains key is not retrievable, only regeneratable",
+  "title": "ROAD-002: hierarchy drill-down verification",
   "date": "2026-03-17",
   "tasks": [
     "ms-viz-data-proxy-conflict",
@@ -8,8 +8,6 @@
     "ms-settings-page-bugs"
   ],
   "changes": [
-    "Show button explains key shown once at creation only",
-    "Last generated key cached in session for reveal",
-    "Clear messaging: regenerate to get a new visible key"
+    "Pre-allocated for hierarchy drill-down verification"
   ]
 }
