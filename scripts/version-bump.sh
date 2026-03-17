@@ -63,6 +63,18 @@ echo "Bumping $component: $CURRENT_VERSION -> $NEW_VERSION"
 # Create new version directory (copy from current)
 cp -r "$VERSIONS_PATH/$CURRENT_VERSION" "$NEW_VERSION_PATH"
 
+# Update changelog.json in the new version directory with correct version number
+CHANGELOG_PATH="$NEW_VERSION_PATH/changelog.json"
+if [ -f "$CHANGELOG_PATH" ]; then
+  # Update version field in changelog to match new version
+  node -e "const f='$CHANGELOG_PATH';const d=JSON.parse(require('fs').readFileSync(f,'utf-8'));d.version='$NEW_VERSION';d.date=new Date().toISOString().split('T')[0];require('fs').writeFileSync(f,JSON.stringify(d,null,2)+'\n')"
+  echo "Updated changelog.json version to $NEW_VERSION"
+else
+  # Create a new changelog.json with the version number
+  echo "{\"version\":\"$NEW_VERSION\",\"date\":\"$(date -I)\",\"changes\":[]}" > "$CHANGELOG_PATH"
+  echo "Created changelog.json for $NEW_VERSION"
+fi
+
 # Update active symlink if configured
 if [ -n "$ACTIVE_SYMLINK" ]; then
   SYMLINK_PATH="$REPO_ROOT/$ACTIVE_SYMLINK"
