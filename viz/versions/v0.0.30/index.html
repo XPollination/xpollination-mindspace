@@ -1461,13 +1461,14 @@
       return searchableText.includes(lowerQuery);
     }
 
-    // Default filter: show active pipeline, exclude blocked/cancelled/complete
-    const defaultFilter = ['pending', 'ready', 'active', 'approval', 'approved', 'testing', 'review', 'rework'];
-    let activeFilter = defaultFilter; // User can switch to 'all' to see everything
+    // Default filter: show ALL statuses — blocked column visible for stuck-task awareness
+    // Thomas's intent: "Blocked as default filter" = SEE blocked tasks, not HIDE them
+    const defaultFilter = null; // null = no filter = show everything
+    let activeFilter = defaultFilter;
 
     function getFilteredNodes() {
       let filtered = nodes;
-      // Apply status filter (default excludes blocked/cancelled/complete)
+      // Apply status filter (null = show all)
       if (activeFilter && activeFilter.length > 0) {
         filtered = filtered.filter(n => activeFilter.includes(n.status));
       }
