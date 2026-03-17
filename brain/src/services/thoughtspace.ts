@@ -7,7 +7,7 @@ import { SCORING_CONFIG } from "../scoring-config.js";
 import { computeCID } from "./cid-service.js";
 
 const COLLECTION = "thought_space";
-const client = new QdrantClient({ url: "http://localhost:6333" });
+const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
 
 // --- Collection Setup ---
 
