@@ -1342,7 +1342,8 @@
             loadSuspectStats();
             lastDataHash = computeDataHash({ nodes, stations, node_count: nodes.length });
 
-            if (selectedNodeId) {
+            // On refresh: preserve panel closed state — don't reopen if user dismissed
+            if (selectedNodeId && !panelClosed) {
               const selectedNode = nodes.find(n => n.id === selectedNodeId);
               if (selectedNode) {
                 showDetail(selectedNode);
@@ -1374,7 +1375,8 @@
             loadSuspectStats();
             lastDataHash = newHash;
 
-            if (selectedNodeId) {
+            // On refresh: preserve panel closed state — don't reopen if user dismissed
+            if (selectedNodeId && !panelClosed) {
               const selectedNode = nodes.find(n => n.id === selectedNodeId);
               if (selectedNode) {
                 showDetail(selectedNode);
@@ -1767,6 +1769,7 @@
     // ============================================================
 
     function showDetail(node, doScroll = false) {
+      panelClosed = false; // User explicitly opened panel
       selectNode(node.id);
       detailPanel.classList.add('visible');
 
@@ -2031,10 +2034,16 @@
       }
     }
 
+    // Track if user manually closed the panel — refresh should preserveClose state
+    let panelClosed = false;
+
     function hideDetail() {
       navStack = [];
       detailPanel.classList.remove('visible');
+      panelClosed = true; // User closed panel — don't reopen on refresh
     }
+
+    function closeDetail() { hideDetail(); }
 
     function selectNode(nodeId) {
       // Remove previous selection

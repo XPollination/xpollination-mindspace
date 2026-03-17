@@ -28,17 +28,18 @@ keysRouter.post('/', (req: Request, res: Response) => {
   res.status(201).json({ id, key: rawKey, name: name || null });
 });
 
-// GET / - List user's API keys
+// GET / - List user's API keys (from JWT user or query param)
 keysRouter.get('/', (req: Request, res: Response) => {
-  const { user_id } = req.query;
+  const user = (req as any).user;
+  const userId = (req.query.user_id as string) || user?.id;
 
-  if (!user_id) {
-    res.status(400).json({ error: 'Missing required query param: user_id' });
+  if (!userId) {
+    res.status(400).json({ error: 'Missing user_id (provide via query param or authenticate)' });
     return;
   }
 
   const db = getDb();
-  const keys = db.prepare('SELECT id, user_id, name, created_at, revoked_at FROM api_keys WHERE user_id = ?').all(user_id);
+  const keys = db.prepare('SELECT id, user_id, name, created_at, revoked_at FROM api_keys WHERE user_id = ?').all(userId);
 
   res.status(200).json(keys);
 });
