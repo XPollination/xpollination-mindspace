@@ -84,8 +84,67 @@
         msg.style.display = 'block';
       } catch { msg.textContent = 'Network error'; msg.className = 'message error'; msg.style.display = 'block'; }
     });
-    async function revealApiKey() { document.getElementById('api-key-value').textContent = 'Loading...'; }
-    async function regenerateApiKey() { if (confirm('Regenerate API key? Old key will stop working.')) { document.getElementById('api-key-value').textContent = 'New key generated'; } }
+    // Load API keys
+    async function revealApiKey() {
+      const el = document.getElementById('api-key-value');
+      el.textContent = 'Loading...';
+      try {
+        const res = await fetch('/api/keys');
+        if (res.ok) {
+          const keys = await res.json();
+          if (Array.isArray(keys) && keys.length > 0) {
+            el.textContent = keys.map(k => k.name || k.id).join(', ') + ' (key hidden — regenerate for new key)';
+          } else {
+            el.textContent = 'No API keys. Click Regenerate to create one.';
+          }
+        } else { el.textContent = 'Could not load API keys'; }
+      } catch { el.textContent = 'API keys not available'; }
+    }
+
+    async function regenerateApiKey() {
+      if (!confirm('Regenerate API key? Old key will stop working.')) return;
+      try {
+        const res = await fetch('/api/keys', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:'settings-generated'}) });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('api-key-value').textContent = data.key || 'Key generated';
+        }
+      } catch { document.getElementById('api-key-value').textContent = 'Failed to regenerate'; }
+    }
+
+    // Load active sessions
+    async function loadSessions() {
+      const el = document.getElementById('sessions-list');
+      try {
+        const res = await fetch('/api/auth/sessions');
+        if (res.ok) {
+          const data = await res.json();
+          const sessions = data.sessions || data;
+          if (Array.isArray(sessions) && sessions.length > 0) {
+            el.innerHTML = sessions.map(s => '<div>' + (s.ip_address || 'unknown') + ' — ' + (s.created_at || '') + '</div>').join('');
+          } else { el.textContent = 'No active sessions'; }
+        } else { el.textContent = 'Could not load sessions'; }
+      } catch { el.textContent = 'Sessions not available'; }
+    }
+
+    // Load user info
+    async function loadUserInfo() {
+      const el = document.getElementById('user-email');
+      try {
+        // Parse JWT from cookie to get user info
+        const cookies = document.cookie.split(';').map(c => c.trim());
+        const session = cookies.find(c => c.startsWith('ms_session='));
+        if (session) {
+          const token = session.split('=')[1];
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          el.textContent = payload.email || payload.name || 'Unknown';
+        } else { el.textContent = 'Not signed in'; }
+      } catch { el.textContent = 'Unknown user'; }
+    }
+
+    // Initialize
+    loadSessions();
+    loadUserInfo();
   </script>
 </body>
 </html>
