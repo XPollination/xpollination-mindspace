@@ -84,8 +84,68 @@
         msg.style.display = 'block';
       } catch { msg.textContent = 'Network error'; msg.className = 'message error'; msg.style.display = 'block'; }
     });
-    async function revealApiKey() { document.getElementById('api-key-value').textContent = 'Loading...'; }
-    async function regenerateApiKey() { if (confirm('Regenerate API key? Old key will stop working.')) { document.getElementById('api-key-value').textContent = 'New key generated'; } }
+    async function revealApiKey() {
+      const el = document.getElementById('api-key-value');
+      el.textContent = 'Loading...';
+      try {
+        const res = await fetch('/api/keys');
+        const keys = await res.json();
+        if (Array.isArray(keys) && keys.length > 0) {
+          el.textContent = keys[0].name + ' (ID: ' + keys[0].id.substring(0, 8) + '...)';
+        } else {
+          el.textContent = 'No API key found. Generate one below.';
+        }
+      } catch { el.textContent = 'Failed to load API key'; }
+    }
+
+    async function regenerateApiKey() {
+      if (!confirm('Regenerate API key? Old key will stop working.')) return;
+      try {
+        const res = await fetch('/api/keys', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: 'Agent Key'}) });
+        const data = await res.json();
+        if (data.key) {
+          document.getElementById('api-key-value').textContent = data.key;
+          alert('New key generated. Copy it now — it will not be shown again.');
+        } else {
+          document.getElementById('api-key-value').textContent = data.error || 'Failed';
+        }
+      } catch { document.getElementById('api-key-value').textContent = 'Network error'; }
+    }
+
+    // Load sessions on page load
+    async function loadSessions() {
+      try {
+        const res = await fetch('/api/auth/sessions');
+        const data = await res.json();
+        const el = document.getElementById('sessions-list');
+        if (data.sessions && data.sessions.length > 0) {
+          el.innerHTML = data.sessions.map(s =>
+            '<div style="padding:0.3rem 0;border-bottom:1px solid #eee;font-size:0.85rem;">' +
+            '<strong>' + (s.user_agent || 'unknown') + '</strong> — ' +
+            s.ip_address + ' — ' +
+            new Date(s.created_at).toLocaleDateString() +
+            '</div>'
+          ).join('');
+        } else {
+          el.textContent = 'No active sessions';
+        }
+      } catch { document.getElementById('sessions-list').textContent = 'Failed to load sessions'; }
+    }
+
+    // Load account info on page load
+    async function loadAccount() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.email) {
+          document.getElementById('user-email').textContent = data.name + ' (' + data.email + ')';
+        }
+      } catch { /* silent — shows default "..." */ }
+    }
+
+    // Init
+    loadSessions();
+    loadAccount();
   </script>
 </body>
 </html>
