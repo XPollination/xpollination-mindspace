@@ -445,7 +445,10 @@ const server = http.createServer(async (req, res) => {
   const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
     ? path.resolve(path.join(__dirname, 'active'))
     : __dirname;
-  let filePath = pathname === '/' ? '/index.html' : pathname;
+  // Route HTML pages to their files
+  let filePath = pathname === '/' ? '/index.html'
+    : pathname === '/settings' ? '/settings.html'
+    : pathname;
   filePath = path.join(staticRoot, filePath);
 
   // Security: prevent directory traversal
