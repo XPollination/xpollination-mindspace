@@ -322,6 +322,19 @@ authRouter.delete('/sessions/:sessionId', requireAuth, (req: Request, res: Respo
   res.status(200).json({ message: 'Session revoked' });
 });
 
+// --- GET /me — authenticated user info ---
+
+authRouter.get('/me', requireAuth, (req: Request, res: Response) => {
+  const user = req.user as any;
+  const db = getDb();
+  const dbUser = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(user.id) as any;
+  if (!dbUser) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  res.status(200).json({ id: dbUser.id, email: dbUser.email, name: dbUser.name });
+});
+
 // --- D5: Account deletion (GDPR) ---
 
 authRouter.delete('/account', requireAuth, async (req: Request, res: Response) => {

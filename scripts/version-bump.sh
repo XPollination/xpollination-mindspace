@@ -5,7 +5,7 @@
 #
 # Reads the current version for a component from version-components.json,
 # creates a new version directory (copy from current), updates symlink,
-# and commits the change.
+# and commits the change. No external dependencies — uses node for JSON parsing.
 
 set -euo pipefail
 
@@ -15,23 +15,28 @@ REGISTRY="$SCRIPT_DIR/version-components.json"
 
 component="${1:-}"
 
+# Helper: read JSON field using node
+json_keys() { node -e "console.log(Object.keys(JSON.parse(require('fs').readFileSync('$REGISTRY','utf-8'))).join('\n'))"; }
+json_field() { node -e "const r=JSON.parse(require('fs').readFileSync('$REGISTRY','utf-8'));const v=r['$1']?.['$2'];console.log(v===null||v===undefined?'':v)"; }
+json_has() { node -e "const r=JSON.parse(require('fs').readFileSync('$REGISTRY','utf-8'));process.exit(r['$1']?0:1)"; }
+
 if [ -z "$component" ]; then
   echo "Usage: scripts/version-bump.sh <component>"
   echo "Available components:"
-  jq -r 'keys[]' "$REGISTRY"
+  json_keys
   exit 1
 fi
 
 # Read component config from registry
-if ! jq -e ".[\"$component\"]" "$REGISTRY" > /dev/null 2>&1; then
+if ! json_has "$component"; then
   echo "Error: Unknown component '$component'"
   echo "Available components:"
-  jq -r 'keys[]' "$REGISTRY"
+  json_keys
   exit 1
 fi
 
-VERSIONS_DIR=$(jq -r ".[\"$component\"].versions" "$REGISTRY")
-ACTIVE_SYMLINK=$(jq -r ".[\"$component\"].active // empty" "$REGISTRY")
+VERSIONS_DIR=$(json_field "$component" "versions")
+ACTIVE_SYMLINK=$(json_field "$component" "active")
 
 VERSIONS_PATH="$REPO_ROOT/$VERSIONS_DIR"
 
@@ -43,7 +48,7 @@ if [ -z "$CURRENT_VERSION" ]; then
   exit 1
 fi
 
-# Parse version number and bump minor
+# Parse version number and bump patch
 MAJOR=$(echo "$CURRENT_VERSION" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
 MINOR=$(echo "$CURRENT_VERSION" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
 PATCH=$(echo "$CURRENT_VERSION" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')

@@ -932,6 +932,14 @@ function cmdCreate(type, slug, dnaJson, actor) {
 
   const id = randomUUID();
 
+  // Auto-detect versioned_component from group field
+  // VIZ group → versioned_component=viz, WORKFLOW → workflow, etc.
+  const GROUP_TO_VERSIONED_COMPONENT = { VIZ: 'viz', WORKFLOW: 'workflow', API: 'api', BRAIN: 'brain' };
+  if (!dna.versioned_component && dna.group) {
+    const mapped = GROUP_TO_VERSIONED_COMPONENT[dna.group.toUpperCase()];
+    if (mapped) dna.versioned_component = mapped;
+  }
+
   // Extract parent_ids from DNA into its own column (avoid duplication)
   const parentIds = dna.parent_ids ? JSON.stringify(dna.parent_ids) : null;
   if (dna.parent_ids) delete dna.parent_ids;
