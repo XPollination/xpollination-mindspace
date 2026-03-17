@@ -18,7 +18,7 @@ services:
       - "4201:4201"
     volumes:
       - mindspace-dev-data:/app/data
-      - /home/developer/workspaces/github/PichlerThomas:/workspace
+      - ${XPO_WORKSPACE_PATH:-.}:/workspace
     environment:
       - NODE_ENV=development
       - DATABASE_PATH=/app/data/mindspace.db
