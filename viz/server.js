@@ -357,6 +357,19 @@ const server = http.createServer(async (req, res) => {
 
   // API: List projects
   if (pathname === '/api/projects') {
+    // Proxy to Mindspace API for authenticated project list
+    try {
+      const cookies = parseCookies(req);
+      const apiRes = await fetch(`http://localhost:${API_PORT}/api/projects`, {
+        headers: cookies.ms_session ? { 'Authorization': `Bearer ${cookies.ms_session}` } : {}
+      });
+      if (apiRes.ok) {
+        const apiProjects = await apiRes.json();
+        sendJson(res, { current: null, projects: apiProjects.map(p => ({ name: p.name, slug: p.slug, path: p.slug })) }, 200, req);
+        return;
+      }
+    } catch (e) { /* API unavailable, fall through to filesystem */ }
+    // Fallback to filesystem discovery (unauthenticated or API down)
     const projects = discoverProjects();
     const currentProject = path.basename(__dirname.replace('/viz', ''));
     sendJson(res, {
