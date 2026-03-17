@@ -1216,7 +1216,7 @@
 
         data.projects.forEach(project => {
           const option = document.createElement('option');
-          option.value = project.name;
+          option.value = project.path || project.slug || project.name;
           option.textContent = project.name;
           projectSelector.appendChild(option);
         });
