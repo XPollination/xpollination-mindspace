@@ -309,7 +309,8 @@ wait_for_claude() {
     while [ $waited -lt $max_wait ]; do
         local cmd
         cmd=$(tmux display-message -t "$pane" -p '#{pane_current_command}' 2>/dev/null)
-        if [ "$cmd" = "claude" ]; then
+        # Match "claude" (direct) or "bash" (via launch script wrapper)
+        if [ "$cmd" = "claude" ] || [ "$cmd" = "bash" ]; then
             return 0
         fi
         sleep 1
@@ -400,6 +401,9 @@ ROLE
 
     tmux rename-window -t "${session}:0" 'LIAISON | PDSA | DEV | QA'
 
+    # Enable mouse support (click to switch panes, scroll, resize)
+    tmux set-option -t "$session" mouse on
+
     # Pane border labels — persistent role names (Claude overrides pane_title with its spinner)
     tmux set-option -t "$session" pane-border-status top
     tmux set-option -t "$session" pane-border-format \
@@ -408,19 +412,23 @@ ROLE
     # Start Claude in each pane with role via --append-system-prompt
     echo "Starting Claude in 4 panes (this takes ~30s per pane)..."
 
-    # Build --allowedTools string with each tool individually single-quoted
-    # to prevent bash in the pane from interpreting parentheses in Bash(node:*) etc.
-    local tools_arg=""
-    for tool in "${ALLOWED_TOOLS[@]}"; do
-        tools_arg+="'${tool}' "
-    done
-
+    # Write each agent's launch command to a temp script to avoid tmux send-keys
+    # length limits (the --allowedTools list is too long for send-keys)
     local roles=("liaison" "pdsa" "dev" "qa")
     for i in 0 1 2 3; do
         local role="${roles[$i]}"
-        # AGENT_ROLE env var enables hook-based recovery after auto-compact
-        tmux send-keys -t "${session}:0.${i}" \
-            "AGENT_ROLE=${role} ${CLAUDE_BIN} --allowedTools ${tools_arg} --append-system-prompt \"\$(cat /tmp/claude-role-${role}.txt)\"" Enter
+        local launch_script="/tmp/claude-launch-${role}.sh"
+        {
+            echo "#!/bin/bash"
+            echo "export AGENT_ROLE=${role}"
+            printf '%s --allowedTools' "${CLAUDE_BIN}"
+            for tool in "${ALLOWED_TOOLS[@]}"; do
+                printf ' %q' "$tool"
+            done
+            printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$role"
+        } > "$launch_script"
+        chmod +x "$launch_script"
+        tmux send-keys -t "${session}:0.${i}" "bash ${launch_script}" Enter
     done
 
     # Wait for Claude to be ready in each pane, handle trust prompts
