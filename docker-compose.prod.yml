@@ -20,7 +20,7 @@ services:
       - "10.33.33.1:4200:4200"
     volumes:
       - mindspace-prod-data:/app/data
-      - /home/developer/workspaces/github/PichlerThomas:/workspace
+      - ${XPO_WORKSPACE_PATH:-.}:/workspace
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/mindspace.db

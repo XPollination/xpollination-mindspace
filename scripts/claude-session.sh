@@ -58,13 +58,37 @@
 
 set -euo pipefail
 
-# --- Configuration (all paths absolute — no pwd dependency) ---
+# --- Environment Detection ---
+# Three modes:
+#   1. Hetzner server  → Claude at /home/developer/.local/bin/claude
+#   2. Local machine   → Claude in PATH (e.g. macOS with homebrew/npm global)
+#   3. Remote (no claude) → SSH to Hetzner
 readonly HETZNER_VPN_IP="10.33.33.1"
 readonly HETZNER_USER="developer"
 readonly HETZNER_HOME="/home/${HETZNER_USER}"
-readonly CLAUDE_BIN="${HETZNER_HOME}/.local/bin/claude"
-readonly WORKING_DIR="${XPO_WORKSPACE_PATH:-${HETZNER_HOME}/workspaces/github/PichlerThomas}"
 readonly SELF_PATH="$(realpath "$0")"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [[ -x "${HETZNER_HOME}/.local/bin/claude" ]]; then
+    # On Hetzner
+    readonly RUN_MODE="hetzner"
+    readonly CLAUDE_BIN="${HETZNER_HOME}/.local/bin/claude"
+    readonly WORKING_DIR="${XPO_WORKSPACE_PATH:-${HETZNER_HOME}/workspaces/github/PichlerThomas}"
+    readonly NVM_NODE="${HETZNER_HOME}/.nvm/versions/node/v22.22.0/bin"
+elif command -v claude &>/dev/null; then
+    # Local machine with Claude installed
+    readonly RUN_MODE="local"
+    readonly CLAUDE_BIN="$(command -v claude)"
+    readonly WORKING_DIR="${XPO_WORKSPACE_PATH:-${PROJECT_ROOT}}"
+    readonly NVM_NODE=""
+else
+    # Remote — will SSH to Hetzner
+    readonly RUN_MODE="remote"
+    readonly CLAUDE_BIN=""
+    readonly WORKING_DIR=""
+    readonly NVM_NODE=""
+fi
 
 # Pre-approved tool patterns for agents — eliminates most permission prompts.
 # Agents still can't do destructive ops (rm -rf, git reset --hard) without confirmation.
@@ -192,13 +216,24 @@ readonly ALLOWED_TOOLS=(
 
 # --- Skill & Hook Auto-Deploy ---
 
-readonly SKILLS_SRC="$WORKING_DIR/xpollination-mcp-server/.claude/skills"
-readonly SKILLS_DST="${HETZNER_HOME}/.claude/skills"
-readonly SETTINGS_TEMPLATE="$WORKING_DIR/xpollination-mcp-server/scripts/xpo.claude.settings.json"
-readonly SYNC_SETTINGS_SCRIPT="$WORKING_DIR/xpollination-mcp-server/scripts/xpo.claude.sync-settings.js"
-readonly NVM_NODE="${HETZNER_HOME}/.nvm/versions/node/v22.22.0/bin"
+# Skills can live in the project itself or in a sibling xpollination-mcp-server repo
+if [[ -d "${PROJECT_ROOT}/.claude/skills" ]]; then
+    readonly SKILLS_SRC="${PROJECT_ROOT}/.claude/skills"
+elif [[ -d "$WORKING_DIR/xpollination-mcp-server/.claude/skills" ]]; then
+    readonly SKILLS_SRC="$WORKING_DIR/xpollination-mcp-server/.claude/skills"
+else
+    readonly SKILLS_SRC=""
+fi
+readonly SKILLS_DST="${HOME}/.claude/skills"
+readonly SETTINGS_TEMPLATE="${WORKING_DIR:+${WORKING_DIR}/xpollination-mcp-server/scripts/xpo.claude.settings.json}"
+readonly SYNC_SETTINGS_SCRIPT="${WORKING_DIR:+${WORKING_DIR}/xpollination-mcp-server/scripts/xpo.claude.sync-settings.js}"
 
 sync_skills() {
+    if [[ -z "$SKILLS_SRC" || ! -d "$SKILLS_SRC" ]]; then
+        echo "  Skills source not found — skipping skill sync"
+        return
+    fi
+
     mkdir -p "$SKILLS_DST"
 
     for skill_dir in "$SKILLS_SRC"/*/; do
@@ -227,9 +262,9 @@ sync_skills() {
 }
 
 sync_settings() {
-    if [ ! -f "$SETTINGS_TEMPLATE" ]; then return; fi
+    if [[ -z "$SETTINGS_TEMPLATE" || ! -f "$SETTINGS_TEMPLATE" ]]; then return; fi
 
-    local local_settings="${HETZNER_HOME}/.claude/settings.json"
+    local local_settings="${HOME}/.claude/settings.json"
 
     # If no local settings, copy template
     if [ ! -f "$local_settings" ]; then
@@ -260,7 +295,11 @@ EOF
 }
 
 is_on_hetzner() {
-    [[ -x "$CLAUDE_BIN" ]]
+    [[ "$RUN_MODE" == "hetzner" ]]
+}
+
+has_local_claude() {
+    [[ "$RUN_MODE" == "local" ]]
 }
 
 wait_for_claude() {
@@ -270,7 +309,8 @@ wait_for_claude() {
     while [ $waited -lt $max_wait ]; do
         local cmd
         cmd=$(tmux display-message -t "$pane" -p '#{pane_current_command}' 2>/dev/null)
-        if [ "$cmd" = "claude" ]; then
+        # Match "claude" (direct) or "bash" (via launch script wrapper)
+        if [ "$cmd" = "claude" ] || [ "$cmd" = "bash" ]; then
             return 0
         fi
         sleep 1
@@ -331,14 +371,20 @@ ROLE
     # Create session with explicit size (pane 0: LIAISON)
     tmux new-session -d -s "$session" -x "$cols" -y "$rows" -c "$WORKING_DIR"
 
-    # Pre-configure PATH with nvm node so agents never need "source ~/.nvm/nvm.sh &&"
-    # This eliminates compound commands that bypass --allowedTools prefix matching
-    # NVM_NODE is already declared readonly at the top of the script
-    tmux set-environment -t "$session" PATH "${NVM_NODE}:${WORKING_DIR}/xpollination-mcp-server/scripts:/usr/local/bin:/usr/bin:/bin"
+    # Pre-configure PATH — on Hetzner use nvm node, locally use existing PATH
+    if [[ -n "$NVM_NODE" ]]; then
+        tmux set-environment -t "$session" PATH "${NVM_NODE}:${WORKING_DIR}/xpollination-mcp-server/scripts:/usr/local/bin:/usr/bin:/bin"
+    fi
 
     # Export BRAIN_API_KEY so hooks can authenticate with brain API
-    local brain_key
-    brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
+    # Check: env var > Hetzner key file > project .env file
+    local brain_key="${BRAIN_API_KEY:-}"
+    if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
+        brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
+    fi
+    if [[ -z "$brain_key" && -f "${PROJECT_ROOT}/.env" ]]; then
+        brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
+    fi
     if [ -n "$brain_key" ]; then
         tmux set-environment -t "$session" BRAIN_API_KEY "$brain_key"
     fi
@@ -355,6 +401,9 @@ ROLE
 
     tmux rename-window -t "${session}:0" 'LIAISON | PDSA | DEV | QA'
 
+    # Enable mouse support (click to switch panes, scroll, resize)
+    tmux set-option -t "$session" mouse on
+
     # Pane border labels — persistent role names (Claude overrides pane_title with its spinner)
     tmux set-option -t "$session" pane-border-status top
     tmux set-option -t "$session" pane-border-format \
@@ -363,19 +412,23 @@ ROLE
     # Start Claude in each pane with role via --append-system-prompt
     echo "Starting Claude in 4 panes (this takes ~30s per pane)..."
 
-    # Build --allowedTools string with each tool individually single-quoted
-    # to prevent bash in the pane from interpreting parentheses in Bash(node:*) etc.
-    local tools_arg=""
-    for tool in "${ALLOWED_TOOLS[@]}"; do
-        tools_arg+="'${tool}' "
-    done
-
+    # Write each agent's launch command to a temp script to avoid tmux send-keys
+    # length limits (the --allowedTools list is too long for send-keys)
     local roles=("liaison" "pdsa" "dev" "qa")
     for i in 0 1 2 3; do
         local role="${roles[$i]}"
-        # AGENT_ROLE env var enables hook-based recovery after auto-compact
-        tmux send-keys -t "${session}:0.${i}" \
-            "AGENT_ROLE=${role} ${CLAUDE_BIN} --allowedTools ${tools_arg} --append-system-prompt \"\$(cat /tmp/claude-role-${role}.txt)\"" Enter
+        local launch_script="/tmp/claude-launch-${role}.sh"
+        {
+            echo "#!/bin/bash"
+            echo "export AGENT_ROLE=${role}"
+            printf '%s --allowedTools' "${CLAUDE_BIN}"
+            for tool in "${ALLOWED_TOOLS[@]}"; do
+                printf ' %q' "$tool"
+            done
+            printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$role"
+        } > "$launch_script"
+        chmod +x "$launch_script"
+        tmux send-keys -t "${session}:0.${i}" "bash ${launch_script}" Enter
     done
 
     # Wait for Claude to be ready in each pane, handle trust prompts
@@ -479,10 +532,9 @@ if [[ ! "$session" =~ ^[a-zA-Z0-9._-]+$ ]]; then
     exit 1
 fi
 
-if is_on_hetzner; then
-    # If running as thomas (or any non-developer), re-exec as developer via sudo
-    # Pass terminal dimensions through — sudo -i loses TTY size, causing tmux "size missing"
-    if [[ "$(whoami)" != "developer" ]]; then
+run_local_or_hetzner() {
+    # On Hetzner: auto-switch to developer user if needed
+    if is_on_hetzner && [[ "$(whoami)" != "developer" ]]; then
         COLS=$(tput cols 2>/dev/null || echo 200)
         ROWS=$(tput lines 2>/dev/null || echo 50)
         echo "Switching to developer user (${COLS}x${ROWS})..."
@@ -490,7 +542,6 @@ if is_on_hetzner; then
     fi
 
     # Unset TMUX to allow running from inside an existing tmux session
-    # This prevents "sessions should be nested with care, unset $TMUX to force"
     unset TMUX
 
     if tmux has-session -t "$session" 2>/dev/null; then
@@ -504,7 +555,13 @@ if is_on_hetzner; then
     esac
 
     exec tmux attach -t "$session"
-else
-    # Not on Hetzner — SSH in and run this script there
-    run_remote "$session"
-fi
+}
+
+case "$RUN_MODE" in
+    hetzner|local)
+        run_local_or_hetzner
+        ;;
+    remote)
+        run_remote "$session"
+        ;;
+esac

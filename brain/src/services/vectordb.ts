@@ -1,7 +1,7 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { EMBEDDING_DIM } from "./embedding.js";
 
-const client = new QdrantClient({ url: "http://localhost:6333" });
+const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
 
 export async function ensureCollections(): Promise<void> {
   const collections = await client.getCollections();
