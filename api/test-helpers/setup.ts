@@ -51,7 +51,7 @@ export async function createTestApp() {
 
   // Mount auth routes
   app.use('/api/auth', authRouter);
-  app.use('/api/keys', keysRouter);
+  app.use('/api/keys', requireApiKeyOrJwt, keysRouter);
 
   // Mount project routes (includes capabilities, missions, etc.)
   app.use('/api/v1/projects', projectsRouter);
