@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
-const DEFAULT_WORKSPACE = '/home/developer/workspaces/github/PichlerThomas';
+const DEFAULT_WORKSPACE = process.env.XPO_WORKSPACE_PATH || '/workspace';
 
 /**
  * Discover all projects with data/xpollination.db in the workspace.
