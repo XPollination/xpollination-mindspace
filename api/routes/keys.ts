@@ -9,12 +9,14 @@ function hashKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
 }
 
-// POST / - Generate a new API key
+// POST / - Generate a new API key (user_id from JWT or body)
 keysRouter.post('/', (req: Request, res: Response) => {
-  const { user_id, name } = req.body;
+  const user = (req as any).user;
+  const user_id = req.body?.user_id || user?.id;
+  const name = req.body?.name;
 
   if (!user_id) {
-    res.status(400).json({ error: 'Missing required field: user_id' });
+    res.status(400).json({ error: 'Missing user_id (authenticate or provide in body)' });
     return;
   }
 
