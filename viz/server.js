@@ -948,6 +948,7 @@ const server = http.createServer(async (req, res) => {
         method: req.method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
+        redirect: 'manual',
       });
 
       // Forward all response headers (including Set-Cookie for OAuth)
