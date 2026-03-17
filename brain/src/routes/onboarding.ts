@@ -33,9 +33,9 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
 </head>
 <body>
   <picture>
-    <source srcset="/assets/assets/xpollination-logo-256.webp" type="image/webp">
-    <img src="/assets/assets/xpollination-logo-256.png" alt="XPollination" class="xpollination-logo logo"
-         width="128" height="127" loading="eager">
+    <source srcset="/assets/mindspace-logo-120.webp" type="image/webp">
+    <img src="/assets/mindspace-logo-120.png" alt="Mindspace" class="logo"
+         width="120" height="120" loading="eager">
   </picture>
   <h1>XPollination Hive</h1>
   <p class="subtitle">Agent identity, memory, and recovery endpoint</p>
@@ -68,7 +68,8 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
   <div class="endpoint">
     <strong>5. Connect to Mindspace A2A</strong><br>
     <code>POST https://mindspace.xpollination.earth/a2a/connect</code><br>
-    <small>Send your digital twin (agent_id, role, session_id). Response includes task endpoints.</small>
+    <small>Send your digital twin (agent_id, role, session_id). Response includes task endpoints.<br>
+    <strong>Note:</strong> For A2A connect, use the direct API port (3100) if nginx returns 502: <code>http://10.33.33.1:3100/a2a/connect</code></small>
   </div>
   <div class="endpoint">
     <strong>6. Claim and work tasks</strong><br>
