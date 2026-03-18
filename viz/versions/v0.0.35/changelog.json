@@ -1,0 +1,17 @@
+{
+  "version": "v0.0.35",
+  "title": "Progressive hierarchy drilldown",
+  "date": "2026-03-18",
+  "tasks": [
+    "viz-v0035-hierarchy-drilldown",
+    "viz-hierarchy-data-layer",
+    "viz-hierarchy-progressive-drilldown"
+  ],
+  "changes": [
+    "Mission-grouped overview: mission cards with WHY descriptions and aggregate progress",
+    "Progressive drill-down: click mission to see capabilities, click capability for detail",
+    "Breadcrumb navigation at every level with clickable back links",
+    "Health colors: green (>80%), yellow (>50%), red (<50%) at mission and capability level",
+    "Task counting via requirement_refs in DNA (replaces flat capability_tasks lookup)"
+  ]
+}
