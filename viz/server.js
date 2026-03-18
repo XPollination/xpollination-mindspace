@@ -284,6 +284,32 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ─── D7: Proxy auth requests to API server ───
+
+  // OAuth: proxy /api/auth/oauth/* to API (handles redirects)
+  if (pathname.startsWith('/api/auth/oauth/')) {
+    try {
+      const apiUrl = `http://localhost:${API_PORT}${pathname}${url.search || ''}`;
+      const apiRes = await fetch(apiUrl, { redirect: 'manual' });
+      // Forward redirect (302 to Google, or callback redirect with cookie)
+      if (apiRes.status >= 300 && apiRes.status < 400) {
+        const headers = { 'Location': apiRes.headers.get('location') };
+        // Forward set-cookie from callback (contains ms_session JWT)
+        const setCookie = apiRes.headers.get('set-cookie');
+        if (setCookie) headers['Set-Cookie'] = setCookie;
+        res.writeHead(apiRes.status, headers);
+        res.end();
+      } else {
+        const data = await apiRes.text();
+        res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
+        res.end(data);
+      }
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API server unreachable' }));
+    }
+    return;
+  }
+
   if (pathname === '/api/auth/login' && req.method === 'POST') {
     try {
       const body = await readBody(req);

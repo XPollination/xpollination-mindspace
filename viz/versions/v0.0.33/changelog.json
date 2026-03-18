@@ -1,13 +1,12 @@
 {
   "version": "v0.0.33",
-  "title": "ROAD-002: hierarchy drill-down verification",
+  "title": "Show API Key explains not retrievable, Regenerate shows key once",
   "date": "2026-03-17",
   "tasks": [
-    "ms-viz-data-proxy-conflict",
-    "ms-version-bump-enforcement",
-    "ms-settings-page-bugs"
+    "ms-settings-api-key-show"
   ],
   "changes": [
-    "Pre-allocated for hierarchy drill-down verification"
+    "API key display explains value is not retrievable after creation",
+    "Regenerate shows the new key once before hiding"
   ]
 }

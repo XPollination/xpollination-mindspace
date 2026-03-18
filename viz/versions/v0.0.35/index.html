@@ -2437,7 +2437,8 @@
     }
     window.showCapabilityDetail = showCapabilityDetail;
 
-    // v0.0.35: Progressive hierarchy drilldown — knowledge space
+    // v0.0.35: Progressive hierarchy drilldown
+    // Mission drilldown reuses navStack (declared above)
     const missionNavStack = [{ level: 'overview', label: 'Missions' }];
     let missionOverviewData = null;
 
@@ -2447,25 +2448,24 @@
       return '#ef4444';
     }
 
-    function renderMissionBreadcrumb(container) {
-      const bc = container.querySelector('.mission-breadcrumb') || document.createElement('div');
-      bc.className = 'mission-breadcrumb breadcrumb';
+    function renderBreadcrumb(container) {
+      const bc = container.querySelector('.breadcrumb') || document.createElement('div');
+      bc.className = 'breadcrumb';
       bc.style.cssText = 'padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #333;margin-bottom:8px;';
       bc.innerHTML = missionNavStack.map((item, i) => {
         if (i === missionNavStack.length - 1) return `<span style="color:#8ab4f8;">${item.label}</span>`;
-        return `<a href="#" onclick="missionNavigateTo(${i});return false;" style="color:#888;text-decoration:none;">${item.label}</a>`;
+        return `<a href="#" onclick="navigateTo(${i});return false;" style="color:#888;text-decoration:none;">${item.label}</a>`;
       }).join(' <span style="color:#555;">›</span> ');
-      if (!container.querySelector('.mission-breadcrumb')) container.prepend(bc);
+      if (!container.querySelector('.breadcrumb')) container.prepend(bc);
     }
 
-    function missionNavigateTo(stackIndex) {
+    function navigateTo(stackIndex) {
       missionNavStack.length = stackIndex + 1;
       const target = missionNavStack[stackIndex];
       if (target.level === 'overview') loadMissionDashboard();
       else if (target.level === 'mission') showMissionDetail(target.missionId);
     }
-    window.missionNavigateTo = missionNavigateTo;
-    window.navigateTo = missionNavigateTo;
+    window.navigateTo = navigateTo;
 
     function showMissionDetail(missionId) {
       if (!missionOverviewData) return;
@@ -2478,33 +2478,20 @@
       const capsContainer = document.getElementById('mission-caps');
       if (!capsContainer) return;
       capsContainer.innerHTML = '';
-      renderMissionBreadcrumb(capsContainer);
-
-      // Mission header with WHY statement
-      capsContainer.innerHTML += `
-        <div style="padding:12px 12px 16px;border-bottom:1px solid #333;margin-bottom:12px;">
-          <h3 style="margin:0 0 8px 0;font-size:17px;color:#eee;">${mission.title}</h3>
-          <p style="margin:0 0 10px 0;font-size:13px;color:#bbb;line-height:1.5;">${mission.description || ''}</p>
-          <div style="font-size:11px;color:#888;">${mission.capabilities.length} capabilities compose this mission</div>
-        </div>`;
+      renderBreadcrumb(capsContainer);
 
       capsContainer.innerHTML += mission.capabilities.map(cap => {
         const progress = cap.task_count > 0 ? Math.round((cap.complete_count / cap.task_count) * 100) : 0;
         const color = getHealthColor(progress);
-        const reqList = (cap.requirements || []).map(r => r.req_id_human).join(', ');
         return `
-        <div class="capability-card" onclick="showCapabilityDetail('${cap.id}')" style="cursor:pointer;padding:14px;background:#1a1e2e;border:1px solid #333;border-left:3px solid ${color};border-radius:6px;margin-bottom:10px;">
-          <div style="display:flex;justify-content:space-between;align-items:start;">
-            <h4 style="margin:0 0 6px 0;font-size:14px;color:#eee;">${cap.title}</h4>
-            <span style="font-size:10px;color:#666;white-space:nowrap;">service</span>
-          </div>
-          <p style="margin:0 0 8px 0;font-size:12px;color:#aaa;line-height:1.4;">${cap.description || ''}</p>
-          ${reqList ? `<div style="font-size:10px;color:#666;margin-bottom:6px;">Requirements: ${reqList}</div>` : ''}
+        <div class="capability-card" onclick="showCapabilityDetail('${cap.id}')" style="cursor:pointer;padding:12px;background:#1a1e2e;border:1px solid #333;border-left:3px solid ${color};border-radius:6px;margin-bottom:8px;">
+          <h4 style="margin:0 0 4px 0;font-size:14px;color:#eee;">${cap.title}</h4>
+          <p style="margin:0 0 6px 0;font-size:11px;color:#999;">${cap.description || ''}</p>
           <div style="display:flex;justify-content:space-between;font-size:11px;color:#888;">
             <span>${(cap.requirements || []).length} requirements</span>
             <span style="color:${color};">${cap.complete_count}/${cap.task_count} tasks (${progress}%)</span>
           </div>
-          <div style="height:4px;background:#333;border-radius:2px;margin-top:6px;overflow:hidden;">
+          <div style="height:4px;background:#333;border-radius:2px;margin-top:4px;overflow:hidden;">
             <div style="height:100%;background:${color};width:${progress}%;border-radius:2px;"></div>
           </div>
         </div>`;
@@ -2530,24 +2517,22 @@
         }
 
         capsContainer.innerHTML = '';
-        renderMissionBreadcrumb(capsContainer);
+        renderBreadcrumb(capsContainer);
         capsContainer.innerHTML += missions.map(m => {
           const totalTasks = m.capabilities.reduce((s, c) => s + c.task_count, 0);
           const completeTasks = m.capabilities.reduce((s, c) => s + c.complete_count, 0);
           const progress = totalTasks > 0 ? Math.round((completeTasks / totalTasks) * 100) : 0;
           const color = getHealthColor(progress);
-          const capNames = m.capabilities.map(c => c.title).join(', ');
           return `
-          <div class="mission-card" onclick="showMissionDetail('${m.id}')" style="cursor:pointer;padding:16px;background:#1a1e2e;border:1px solid #333;border-left:4px solid ${color};border-radius:6px;margin-bottom:12px;">
-            <h3 style="margin:0 0 8px 0;font-size:16px;color:#eee;">${m.title}</h3>
-            <p style="margin:0 0 10px 0;font-size:12px;color:#aaa;line-height:1.4;">${m.description || ''}</p>
-            <div style="font-size:10px;color:#666;margin-bottom:8px;">Capabilities: ${capNames}</div>
+          <div class="mission-card" onclick="showMissionDetail('${m.id}')" style="cursor:pointer;padding:16px;background:#1a1e2e;border:1px solid #333;border-left:4px solid ${color};border-radius:6px;margin-bottom:10px;">
+            <h3 style="margin:0 0 6px 0;font-size:15px;color:#eee;">${m.title}</h3>
+            <p style="margin:0 0 8px 0;font-size:12px;color:#999;">${m.description || ''}</p>
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:11px;color:#888;">${m.capabilities.length} capabilities</span>
               <span style="font-size:11px;color:${color};">${completeTasks}/${totalTasks} tasks (${progress}%)</span>
             </div>
-            <div style="height:5px;background:#333;border-radius:3px;margin-top:6px;overflow:hidden;">
-              <div style="height:100%;background:${color};width:${progress}%;border-radius:3px;transition:width 0.3s;"></div>
+            <div style="height:4px;background:#333;border-radius:2px;margin-top:6px;overflow:hidden;">
+              <div style="height:100%;background:${color};width:${progress}%;border-radius:2px;"></div>
             </div>
           </div>`;
         }).join('');
