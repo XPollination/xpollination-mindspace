@@ -1,0 +1,15 @@
+{
+  "version": "v0.0.31",
+  "title": "Fix: default filter shows all statuses (blocked+complete visible)",
+  "date": "2026-03-17",
+  "tasks": [
+    "ms-viz-data-proxy-conflict",
+    "ms-version-bump-enforcement",
+    "ms-settings-page-bugs"
+  ],
+  "changes": [
+    "Default filter = null = show all statuses",
+    "Blocked and Complete columns visible on load",
+    "Project selector uses path/slug not display name"
+  ]
+}

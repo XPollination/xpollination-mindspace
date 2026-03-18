@@ -4,10 +4,16 @@ import { requireProjectAccess } from '../middleware/require-project-access.js';
 
 export const missionsRouter = Router({ mergeParams: true });
 
-// GET / — list all missions
+// GET / — list all missions with capability counts
 missionsRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const db = getDb();
-  const missions = db.prepare('SELECT * FROM missions ORDER BY created_at DESC').all();
+  const missions = db.prepare(`
+    SELECT m.*, COUNT(c.id) as capability_count
+    FROM missions m
+    LEFT JOIN capabilities c ON c.mission_id = m.id
+    GROUP BY m.id
+    ORDER BY m.created_at DESC
+  `).all();
   res.status(200).json(missions);
 });
 

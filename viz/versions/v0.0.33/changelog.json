@@ -1,0 +1,13 @@
+{
+  "version": "v0.0.33",
+  "title": "ROAD-002: hierarchy drill-down verification",
+  "date": "2026-03-17",
+  "tasks": [
+    "ms-viz-data-proxy-conflict",
+    "ms-version-bump-enforcement",
+    "ms-settings-page-bugs"
+  ],
+  "changes": [
+    "Pre-allocated for hierarchy drill-down verification"
+  ]
+}

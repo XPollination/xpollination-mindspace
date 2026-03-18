@@ -1,0 +1,15 @@
+{
+  "version": "v0.0.30",
+  "title": "Proxy fix + version-bump enforcement + settings batch",
+  "date": "2026-03-17",
+  "tasks": [
+    "ms-viz-data-proxy-conflict",
+    "ms-version-bump-enforcement",
+    "ms-settings-page-bugs"
+  ],
+  "changes": [
+    "Catch-all proxy excludes Viz-owned routes",
+    "Version bump auto-detect from group field",
+    "Settings page all endpoints working"
+  ]
+}

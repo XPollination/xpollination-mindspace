@@ -1,0 +1,12 @@
+{
+  "version": "v0.0.28",
+  "title": "Settings: API key show fix",
+  "date": "2026-03-17",
+  "tasks": [
+    "ms-settings-api-key-show"
+  ],
+  "changes": [
+    "API keys endpoint reads user_id from JWT",
+    "Show/reveal/regenerate buttons work"
+  ]
+}

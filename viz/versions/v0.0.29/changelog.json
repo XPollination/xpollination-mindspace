@@ -1,0 +1,13 @@
+{
+  "version": "v0.0.29",
+  "title": "Settings: sessions + account info fix",
+  "date": "2026-03-17",
+  "tasks": [
+    "ms-settings-sessions-loading",
+    "ms-settings-account-info"
+  ],
+  "changes": [
+    "Sessions endpoint returns data",
+    "Account info shows name+email via GET /api/auth/me"
+  ]
+}

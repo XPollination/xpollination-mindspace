@@ -357,6 +357,19 @@ const server = http.createServer(async (req, res) => {
 
   // API: List projects
   if (pathname === '/api/projects') {
+    // Proxy to Mindspace API for authenticated project list
+    try {
+      const cookies = parseCookies(req);
+      const apiRes = await fetch(`http://localhost:${API_PORT}/api/projects`, {
+        headers: cookies.ms_session ? { 'Authorization': `Bearer ${cookies.ms_session}` } : {}
+      });
+      if (apiRes.ok) {
+        const apiProjects = await apiRes.json();
+        sendJson(res, { current: null, projects: apiProjects.map(p => ({ name: p.name, slug: p.slug, path: p.slug })) }, 200, req);
+        return;
+      }
+    } catch (e) { /* API unavailable, fall through to filesystem */ }
+    // Fallback to filesystem discovery (unauthenticated or API down)
     const projects = discoverProjects();
     const currentProject = path.basename(__dirname.replace('/viz', ''));
     sendJson(res, {
@@ -919,6 +932,42 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (e) {
       sendJson(res, { error: e.message }, 400);
+    }
+    return;
+  }
+
+  // Catch-all API proxy: any /api/* or /a2a/* not handled above → forward to API server
+  if (pathname.startsWith('/api/') || pathname.startsWith('/a2a/') || pathname === '/.well-known/agent.json') {
+    try {
+      const cookies = parseCookies(req);
+      const headers = { 'Content-Type': req.headers['content-type'] || 'application/json' };
+      if (cookies.ms_session) headers['Authorization'] = `Bearer ${cookies.ms_session}`;
+
+      const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req) : undefined;
+      const apiRes = await fetch(`http://localhost:${API_PORT}${pathname}${url.search}`, {
+        method: req.method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        redirect: 'manual',
+      });
+
+      // Forward all response headers (including Set-Cookie for OAuth)
+      const resHeaders = {};
+      apiRes.headers.forEach((value, key) => { resHeaders[key] = value; });
+
+      // For redirects (OAuth flow), forward the redirect
+      if (apiRes.status >= 300 && apiRes.status < 400) {
+        res.writeHead(apiRes.status, { 'Location': apiRes.headers.get('location'), ...resHeaders });
+        res.end();
+        return;
+      }
+
+      const data = await apiRes.text();
+      res.writeHead(apiRes.status, resHeaders);
+      res.end(data);
+    } catch (e) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API server unreachable' }));
     }
     return;
   }

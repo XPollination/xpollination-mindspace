@@ -32,7 +32,7 @@ const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || "/home/developer/worksp
 const CLI_PATH = process.env.XPO_CLI_PATH || `${WORKSPACE_PATH}/xpollination-mcp-server/src/db/interface-cli.js`;
 
 // Add cliPath to each discovered project for backward compat
-const projects = _discoverProjects().map(p => ({ ...p, cliPath: CLI_PATH }));
+const projects = _discoverProjects(WORKSPACE_PATH).map(p => ({ ...p, cliPath: CLI_PATH }));
 
 /**
  * Simple monitoring: find tasks assigned to your role.
