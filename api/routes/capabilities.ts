@@ -67,18 +67,23 @@ capabilitiesRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: 
   res.status(200).json(capabilities);
 });
 
-// GET /:capId — get single capability
+// GET /:capId — get single capability with requirements
 capabilitiesRouter.get('/:capId', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { capId } = req.params;
   const db = getDb();
 
-  const capability = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capId);
+  const capability = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capId) as any;
   if (!capability) {
     res.status(404).json({ error: 'Capability not found' });
     return;
   }
 
-  res.status(200).json(capability);
+  // Include requirements linked via capability_id column
+  const requirements = db.prepare(
+    'SELECT id, req_id_human, title, description, status, priority FROM requirements WHERE capability_id = ? ORDER BY req_id_human'
+  ).all(capId);
+
+  res.status(200).json({ ...capability, requirements });
 });
 
 // PUT /:capId — update capability (contributor required). No DELETE — use cancelled status
