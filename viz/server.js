@@ -379,46 +379,49 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: Mission overview (capabilities with progress)
+  // API: Mission overview (missions with nested capabilities, requirement-based task counting)
   if (pathname === '/api/mission-overview') {
     const projectName = url.searchParams.get('project');
     const projects = discoverProjects();
-    const capabilities = [];
-
+    // Project deduplication: prefer project matching viz working directory
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
     const targetProjects = projectName === 'all' ? projects :
-      projects.filter(p => p.name === projectName);
+      projectName ? projects.filter(p => p.name === projectName) :
+      projects.filter(p => p.name === currentProject);
 
-    for (const proj of (targetProjects.length ? targetProjects : projects)) {
+    const missions = [];
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
       try {
         const db = new Database(proj.dbPath, { readonly: true });
         try {
-          const caps = db.prepare('SELECT * FROM capabilities').all();
-          for (const cap of caps) {
-            const taskRows = db.prepare(
-              `SELECT t.status FROM capability_tasks ct
-               LEFT JOIN mindspace_nodes t ON t.slug = ct.task_slug
-               WHERE ct.capability_id = ?`
-            ).all(cap.id);
-            const task_count = taskRows.length;
-            const complete_count = taskRows.filter(t => t.status === 'complete').length;
-            const progress_percent = task_count > 0 ? Math.round((complete_count / task_count) * 100) : 0;
-            capabilities.push({
-              id: cap.id,
-              title: cap.title,
-              description: cap.description,
-              status: cap.status,
-              mission_id: cap.mission_id,
-              task_count,
-              complete_count,
-              progress_percent,
-              _project: proj.name
+          const missionRows = db.prepare("SELECT id, slug, title, description, status FROM missions WHERE status = 'active' ORDER BY created_at ASC").all();
+          for (const m of missionRows) {
+            const caps = db.prepare("SELECT id, title, description, status, sort_order FROM capabilities WHERE mission_id = ? ORDER BY sort_order ASC").all(m.id);
+            const enrichedCaps = caps.map(cap => {
+              // Get requirements for this capability
+              let reqs = [];
+              try {
+                reqs = db.prepare("SELECT req_id_human, title FROM requirements WHERE capability_id = ?").all(cap.id);
+              } catch (e) { /* requirements table may not exist */ }
+              // Count tasks via requirement_refs LIKE matching in dna_json
+              let task_count = 0;
+              let complete_count = 0;
+              for (const r of reqs) {
+                try {
+                  task_count += db.prepare("SELECT COUNT(*) as c FROM mindspace_nodes WHERE type='task' AND dna_json LIKE '%' || ? || '%'").get(r.req_id_human).c;
+                  complete_count += db.prepare("SELECT COUNT(*) as c FROM mindspace_nodes WHERE type='task' AND status='complete' AND dna_json LIKE '%' || ? || '%'").get(r.req_id_human).c;
+                } catch (e) { /* mindspace_nodes may not exist */ }
+              }
+              const progress_percent = task_count > 0 ? Math.round((complete_count / task_count) * 100) : 0;
+              return { id: cap.id, title: cap.title, description: cap.description, status: cap.status, task_count, complete_count, progress_percent, requirements: reqs };
             });
+            missions.push({ id: m.id, slug: m.slug, title: m.title, description: m.description, status: m.status, capabilities: enrichedCaps });
           }
         } catch (err) { /* tables may not exist */ }
         db.close();
       } catch (err) { /* skip project */ }
     }
-    sendJson(res, { capabilities });
+    sendJson(res, { missions });
     return;
   }
 
@@ -435,15 +438,13 @@ const server = http.createServer(async (req, res) => {
         try {
           const cap = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capId);
           if (cap) {
-            // Requirements query in own try/catch — table may not exist
+            // Requirements linked via capability_id column
             let requirements = [];
             try {
               requirements = db.prepare(
-                `SELECT r.id, r.req_id_human, r.title, r.status, r.priority
-                 FROM capability_requirements cr
-                 JOIN requirements r ON r.id = cr.requirement_ref
-                 WHERE cr.capability_id = ?
-                 ORDER BY r.req_id_human ASC`
+                `SELECT id, req_id_human, title, status, priority, description
+                 FROM requirements WHERE capability_id = ?
+                 ORDER BY req_id_human ASC`
               ).all(capId);
             } catch (reqErr) { requirements = []; }
 
@@ -484,6 +485,42 @@ const server = http.createServer(async (req, res) => {
             });
             return;
           }
+        } catch (err) { /* tables may not exist */ }
+        db.close();
+      } catch (err) { /* skip project */ }
+    }
+    sendJson(res, { error: 'Capability not found' }, 404);
+    return;
+  }
+
+  // API: Capability requirements with implementing tasks — GET /api/capabilities/:capId/requirements
+  if (pathname.match(/^\/api\/capabilities\/([^/]+)\/requirements$/)) {
+    const capId = pathname.split('/')[3];
+    const projectName = url.searchParams.get('project');
+    const projects = discoverProjects();
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
+    const targetProjects = projectName ? projects.filter(p => p.name === projectName) :
+      projects.filter(p => p.name === currentProject);
+
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try {
+          const reqs = db.prepare("SELECT id, req_id_human, title, description, status, priority FROM requirements WHERE capability_id = ? ORDER BY req_id_human").all(capId);
+          const enrichedReqs = reqs.map(r => {
+            let tasks = [];
+            try {
+              const taskRows = db.prepare("SELECT slug, dna_json, status FROM mindspace_nodes WHERE type='task' AND dna_json LIKE '%' || ? || '%'").all(r.req_id_human);
+              tasks = taskRows.map(t => {
+                const dna = t.dna_json ? JSON.parse(t.dna_json) : {};
+                return { slug: t.slug, title: dna.title || t.slug, status: t.status };
+              });
+            } catch (e) { /* mindscape_nodes may not exist */ }
+            return { ...r, tasks, task_count: tasks.length, complete_count: tasks.filter(t => t.status === 'complete').length };
+          });
+          db.close();
+          sendJson(res, { capability_id: capId, requirements: enrichedReqs });
+          return;
         } catch (err) { /* tables may not exist */ }
         db.close();
       } catch (err) { /* skip project */ }
