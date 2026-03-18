@@ -1128,34 +1128,108 @@
     // Mission dashboard + Capability drill-down
     // ============================================================
 
+    // Navigation stack for breadcrumb
+    const navStack = [{ level: 'overview', label: 'Missions' }];
+    let missionOverviewData = null;
+
+    function getHealthColor(percent) {
+      if (percent >= 80) return '#22c55e';
+      if (percent >= 50) return '#eab308';
+      return '#ef4444';
+    }
+
+    function renderBreadcrumb(container) {
+      const bc = container.querySelector('.breadcrumb') || document.createElement('div');
+      bc.className = 'breadcrumb';
+      bc.style.cssText = 'padding:8px 12px;font-size:12px;color:#888;border-bottom:1px solid #333;';
+      bc.innerHTML = navStack.map((item, i) => {
+        if (i === navStack.length - 1) return `<span style="color:#8ab4f8;">${item.label}</span>`;
+        return `<a href="#" onclick="navigateTo(${i});return false;" style="color:#888;text-decoration:none;">${item.label}</a>`;
+      }).join(' <span style="color:#555;">›</span> ');
+      if (!container.querySelector('.breadcrumb')) container.prepend(bc);
+    }
+
+    function navigateTo(stackIndex) {
+      navStack.length = stackIndex + 1;
+      const target = navStack[stackIndex];
+      if (target.level === 'overview') loadMissionDashboard();
+      else if (target.level === 'mission') showMissionDetail(target.missionId);
+    }
+    window.navigateTo = navigateTo;
+
     async function loadMissionDashboard() {
       const capsContainer = document.getElementById('mission-caps');
       if (!capsContainer) return;
+      navStack.length = 1;
+      navStack[0] = { level: 'overview', label: 'Missions' };
       try {
         const projectParam = currentProject ? `?project=${currentProject}` : '';
         const res = await fetch('/api/mission-overview' + projectParam);
         const data = await res.json();
+        missionOverviewData = data;
 
-        if (!data.capabilities || data.capabilities.length === 0) {
-          capsContainer.innerHTML = '<div style="color:#888;">No capabilities found</div>';
+        const missions = data.missions || [];
+        if (missions.length === 0) {
+          capsContainer.innerHTML = '<div style="color:#888;">No missions found</div>';
           return;
         }
 
-        capsContainer.innerHTML = data.capabilities.map(cap => `
-          <div class="cap-card" data-cap-id="${cap.id}" onclick="showCapabilityDetail('${cap.id}')" style="cursor:pointer;padding:12px;background:#1a1e2e;border:1px solid #333;border-radius:6px;margin-bottom:8px;">
-            <h3 style="margin:0 0 8px 0;font-size:14px;color:#eee;">${cap.title}</h3>
-            <div class="cap-progress" style="height:6px;background:#333;border-radius:3px;overflow:hidden;">
-              <div class="cap-progress-fill" style="height:100%;background:#22c55e;width:${cap.progress_percent}%;border-radius:3px;"></div>
+        capsContainer.innerHTML = '';
+        renderBreadcrumb(capsContainer);
+        capsContainer.innerHTML += missions.map(m => {
+          const totalTasks = m.capabilities.reduce((s, c) => s + c.task_count, 0);
+          const completeTasks = m.capabilities.reduce((s, c) => s + c.complete_count, 0);
+          const progress = totalTasks > 0 ? Math.round((completeTasks / totalTasks) * 100) : 0;
+          const color = getHealthColor(progress);
+          return `
+          <div class="mission-card" onclick="showMissionDetail('${m.id}')" style="cursor:pointer;padding:16px;background:#1a1e2e;border:1px solid #333;border-left:4px solid ${color};border-radius:6px;margin-bottom:10px;">
+            <h3 style="margin:0 0 6px 0;font-size:15px;color:#eee;">${m.title}</h3>
+            <p style="margin:0 0 8px 0;font-size:12px;color:#999;">${m.description || ''}</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:#888;">${m.capabilities.length} capabilities</span>
+              <span style="font-size:11px;color:${color};">${completeTasks}/${totalTasks} tasks (${progress}%)</span>
             </div>
-            <div class="cap-stats" style="margin-top:4px;font-size:11px;color:#888;">
-              ${cap.complete_count}/${cap.task_count} tasks complete (${cap.progress_percent}%)
+            <div style="height:4px;background:#333;border-radius:2px;margin-top:6px;overflow:hidden;">
+              <div style="height:100%;background:${color};width:${progress}%;border-radius:2px;"></div>
             </div>
-          </div>
-        `).join('');
+          </div>`;
+        }).join('');
       } catch (e) {
         capsContainer.innerHTML = '<div style="color:#ef4444;">Failed to load mission data</div>';
       }
     }
+
+    function showMissionDetail(missionId) {
+      if (!missionOverviewData) return;
+      const mission = (missionOverviewData.missions || []).find(m => m.id === missionId);
+      if (!mission) return;
+
+      navStack.length = 1;
+      navStack.push({ level: 'mission', label: mission.title, missionId });
+
+      const capsContainer = document.getElementById('mission-caps');
+      if (!capsContainer) return;
+      capsContainer.innerHTML = '';
+      renderBreadcrumb(capsContainer);
+
+      capsContainer.innerHTML += mission.capabilities.map(cap => {
+        const progress = cap.task_count > 0 ? Math.round((cap.complete_count / cap.task_count) * 100) : 0;
+        const color = getHealthColor(progress);
+        return `
+        <div class="capability-card" onclick="showCapabilityDetail('${cap.id}')" style="cursor:pointer;padding:12px;background:#1a1e2e;border:1px solid #333;border-left:3px solid ${color};border-radius:6px;margin-bottom:8px;">
+          <h4 style="margin:0 0 4px 0;font-size:14px;color:#eee;">${cap.title}</h4>
+          <p style="margin:0 0 6px 0;font-size:11px;color:#999;">${cap.description || ''}</p>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#888;">
+            <span>${(cap.requirements || []).length} requirements</span>
+            <span style="color:${color};">${cap.complete_count}/${cap.task_count} tasks (${progress}%)</span>
+          </div>
+          <div style="height:4px;background:#333;border-radius:2px;margin-top:4px;overflow:hidden;">
+            <div style="height:100%;background:${color};width:${progress}%;border-radius:2px;"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    window.showMissionDetail = showMissionDetail;
 
     async function showCapabilityDetail(capId) {
       const projectParam = currentProject ? `?project=${currentProject}` : '';
