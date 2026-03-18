@@ -49,12 +49,24 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
 
 oauthRouter.use(passport.initialize());
 
-// GET /google — initiate OAuth flow
-oauthRouter.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+// GET /google — initiate OAuth flow (guarded: returns 503 if strategy not registered)
+oauthRouter.get('/google', (req: Request, res: Response, next) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    res.status(503).json({ error: 'Google OAuth not configured' });
+    return;
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+});
 
-// GET /google/callback — handle OAuth callback
+// GET /google/callback — handle OAuth callback (guarded)
 oauthRouter.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL || ''}/login?error=Account+not+found.+Register+with+an+invite+code+first.` }),
+  (req: Request, res: Response, next) => {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      res.status(503).json({ error: 'Google OAuth not configured' });
+      return;
+    }
+    passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL || ''}/login?error=Account+not+found.+Register+with+an+invite+code+first.` })(req, res, next);
+  },
   (req: Request, res: Response) => {
     const user = req.user as any;
     const secret = process.env.JWT_SECRET;
