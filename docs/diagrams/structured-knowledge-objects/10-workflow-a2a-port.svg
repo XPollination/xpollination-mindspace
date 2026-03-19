@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" font-family="system-ui, -apple-system, sans-serif">
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Workflow Port: CLI → A2A + SpiceDB + Digital Twin</text>
+
+  <!-- Current flow (left) -->
+  <rect x="20" y="55" width="280" height="560" rx="8" fill="#fff5f5" stroke="#fc8181" stroke-width="1.5"/>
+  <text x="160" y="78" text-anchor="middle" font-size="12" font-weight="bold" fill="#c53030">Current: CLI + SQLite</text>
+
+  <rect x="35" y="90" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="112" text-anchor="middle" font-size="9" fill="#4a5568">1. Agent polls: agent-monitor.cjs --wait</text>
+
+  <rect x="35" y="135" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="157" text-anchor="middle" font-size="9" fill="#4a5568">2. Claim: CLI transition slug active role</text>
+
+  <rect x="35" y="180" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="202" text-anchor="middle" font-size="9" fill="#4a5568">3. Branch: git checkout -b feature/slug</text>
+
+  <rect x="35" y="225" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="247" text-anchor="middle" font-size="9" fill="#4a5568">4. Work: code, commit, push to branch</text>
+
+  <rect x="35" y="270" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="292" text-anchor="middle" font-size="9" fill="#4a5568">5. DNA: CLI update-dna slug findings</text>
+
+  <rect x="35" y="315" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="337" text-anchor="middle" font-size="9" fill="#4a5568">6. Submit: CLI transition slug review role</text>
+
+  <rect x="35" y="360" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="382" text-anchor="middle" font-size="9" fill="#4a5568">7. PR: gh pr create (agent runs)</text>
+
+  <rect x="35" y="405" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="427" text-anchor="middle" font-size="9" fill="#4a5568">8. Review: QA→PDSA→LIAISON via CLI</text>
+
+  <rect x="35" y="450" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="472" text-anchor="middle" font-size="9" fill="#4a5568">9. Gate: CLI checks DNA fields inline</text>
+
+  <rect x="35" y="495" width="250" height="35" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="160" y="517" text-anchor="middle" font-size="9" fill="#4a5568">10. Complete: CLI transition + merge</text>
+
+  <text x="160" y="555" text-anchor="middle" font-size="9" fill="#c53030">Problems:</text>
+  <text x="40" y="570" font-size="8" fill="#e53e3e">&#x2022; 30s polling delay</text>
+  <text x="40" y="582" font-size="8" fill="#e53e3e">&#x2022; Agent has full git access</text>
+  <text x="40" y="594" font-size="8" fill="#e53e3e">&#x2022; Gates in code, not data</text>
+
+  <!-- Arrow -->
+  <text x="330" y="320" font-size="28" fill="#4a5568">&#x2192;</text>
+
+  <!-- Target flow (right) -->
+  <rect x="360" y="55" width="520" height="560" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="620" y="78" text-anchor="middle" font-size="12" font-weight="bold" fill="#276749">Target: A2A + SpiceDB + Digital Twin</text>
+
+  <!-- Step 1 -->
+  <rect x="375" y="90" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="107" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">1. SSE push: TASK_AVAILABLE</text>
+  <text x="495" y="118" text-anchor="middle" font-size="7" fill="#48bb78">A2A sends event — no polling</text>
+  <rect x="625" y="90" width="120" height="35" rx="4" fill="#e9d8fd" stroke="#9f7aea"/>
+  <text x="685" y="112" text-anchor="middle" font-size="8" fill="#553c9a">SpiceDB: assigned_to</text>
+
+  <!-- Step 2 -->
+  <rect x="375" y="135" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="152" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">2. CLAIM via A2A API</text>
+  <text x="495" y="163" text-anchor="middle" font-size="7" fill="#48bb78">POST /a2a/claim {task, agent}</text>
+  <rect x="625" y="135" width="120" height="35" rx="4" fill="#e9d8fd" stroke="#9f7aea"/>
+  <text x="685" y="152" text-anchor="middle" font-size="8" fill="#553c9a">CHECK can_claim</text>
+  <text x="685" y="163" text-anchor="middle" font-size="7" fill="#9f7aea">+ create ASSIGNED_TO</text>
+
+  <!-- Step 3 -->
+  <rect x="375" y="180" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="197" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">3. A2A creates branch</text>
+  <text x="495" y="208" text-anchor="middle" font-size="7" fill="#48bb78">A2A has GitHub PAT — agent does not</text>
+  <rect x="625" y="180" width="120" height="35" rx="4" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="685" y="202" text-anchor="middle" font-size="8" fill="#2b6cb0">GitHub API</text>
+
+  <!-- Step 4 -->
+  <rect x="375" y="225" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="242" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">4. Agent works: code + push</text>
+  <text x="495" y="253" text-anchor="middle" font-size="7" fill="#48bb78">Only free git op: push to assigned branch</text>
+  <rect x="625" y="225" width="120" height="35" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="685" y="247" text-anchor="middle" font-size="8" fill="#718096">Agent workspace</text>
+
+  <!-- Step 5 -->
+  <rect x="375" y="270" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="287" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">5. Submit twin via A2A</text>
+  <text x="495" y="298" text-anchor="middle" font-size="7" fill="#48bb78">POST /a2a/submit {twin with findings}</text>
+  <rect x="625" y="270" width="120" height="35" rx="4" fill="#c6f6d5" stroke="#48bb78"/>
+  <text x="685" y="287" text-anchor="middle" font-size="8" fill="#276749">Twin validates</text>
+  <text x="685" y="298" text-anchor="middle" font-size="7" fill="#48bb78">interface check</text>
+
+  <!-- Step 6 -->
+  <rect x="375" y="315" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="332" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">6. A2A creates PR</text>
+  <text x="495" y="343" text-anchor="middle" font-size="7" fill="#48bb78">GitHub API — agent never creates PRs</text>
+  <rect x="625" y="315" width="120" height="35" rx="4" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="685" y="332" text-anchor="middle" font-size="8" fill="#2b6cb0">GitHub API</text>
+  <text x="685" y="343" text-anchor="middle" font-size="7" fill="#4299e1">+ status check</text>
+
+  <!-- Step 7 -->
+  <rect x="375" y="360" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="377" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">7. Review: SSE notifications</text>
+  <text x="495" y="388" text-anchor="middle" font-size="7" fill="#48bb78">QA→PDSA→LIAISON via A2A events</text>
+  <rect x="625" y="360" width="120" height="35" rx="4" fill="#e9d8fd" stroke="#9f7aea"/>
+  <text x="685" y="377" text-anchor="middle" font-size="8" fill="#553c9a">SpiceDB: attestation</text>
+  <text x="685" y="388" text-anchor="middle" font-size="7" fill="#9f7aea">tuples per reviewer</text>
+
+  <!-- Step 8 -->
+  <rect x="375" y="405" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="422" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">8. Gates: SpiceDB CHECK</text>
+  <text x="495" y="433" text-anchor="middle" font-size="7" fill="#48bb78">has_attestation: qa + pdsa + human</text>
+  <rect x="625" y="405" width="120" height="35" rx="4" fill="#e9d8fd" stroke="#9f7aea"/>
+  <text x="685" y="422" text-anchor="middle" font-size="8" fill="#553c9a">CHECK is_complete</text>
+  <text x="685" y="433" text-anchor="middle" font-size="7" fill="#9f7aea">transitive closure</text>
+
+  <!-- Step 9 -->
+  <rect x="375" y="450" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="467" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">9. A2A merges PR</text>
+  <text x="495" y="478" text-anchor="middle" font-size="7" fill="#48bb78">After all gates pass — automatic</text>
+  <rect x="625" y="450" width="120" height="35" rx="4" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="685" y="472" text-anchor="middle" font-size="8" fill="#2b6cb0">GitHub API merge</text>
+
+  <!-- Step 10 -->
+  <rect x="375" y="495" width="240" height="35" rx="4" fill="white" stroke="#48bb78"/>
+  <text x="495" y="512" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">10. EVOLVE: service self-updates</text>
+  <text x="495" y="523" text-anchor="middle" font-size="7" fill="#48bb78">Twin validates → graceful handoff</text>
+  <rect x="625" y="495" width="120" height="35" rx="4" fill="#c6f6d5" stroke="#276749"/>
+  <text x="685" y="512" text-anchor="middle" font-size="8" fill="#276749">Service twin</text>
+  <text x="685" y="523" text-anchor="middle" font-size="7" fill="#276749">self-restart</text>
+
+  <text x="620" y="555" text-anchor="middle" font-size="9" fill="#276749">Improvements:</text>
+  <text x="380" y="570" font-size="8" fill="#48bb78">&#x2022; Instant notification (SSE, no polling)</text>
+  <text x="380" y="582" font-size="8" fill="#48bb78">&#x2022; Agent has push-only git access</text>
+  <text x="380" y="594" font-size="8" fill="#48bb78">&#x2022; Gates in SpiceDB (data, not code)</text>
+  <text x="620" y="570" font-size="8" fill="#48bb78">&#x2022; PRs created by A2A (not agent)</text>
+  <text x="620" y="582" font-size="8" fill="#48bb78">&#x2022; Attestations as relationships</text>
+  <text x="620" y="594" font-size="8" fill="#48bb78">&#x2022; Automatic merge + deploy</text>
+</svg>
