@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e53e3e"/>
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Mission Lifecycle State Machine</text>
+
+  <!-- Draft -->
+  <rect x="40" y="80" width="130" height="60" rx="8" fill="#edf2f7" stroke="#a0aec0" stroke-width="2"/>
+  <text x="105" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="#2d3748">DRAFT</text>
+  <text x="105" y="125" text-anchor="middle" font-size="10" fill="#718096">Planning scope</text>
+
+  <!-- Ready -->
+  <rect x="230" y="80" width="130" height="60" rx="8" fill="#ebf8ff" stroke="#4299e1" stroke-width="2"/>
+  <text x="295" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="#2b6cb0">READY</text>
+  <text x="295" y="125" text-anchor="middle" font-size="10" fill="#4a7fb5">Scope approved</text>
+
+  <!-- Active -->
+  <rect x="420" y="80" width="130" height="60" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="2"/>
+  <text x="485" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="#276749">ACTIVE</text>
+  <text x="485" y="125" text-anchor="middle" font-size="10" fill="#48bb78">Implementing</text>
+
+  <!-- Complete -->
+  <rect x="610" y="80" width="130" height="60" rx="8" fill="#f0fff4" stroke="#276749" stroke-width="2"/>
+  <text x="675" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="#276749">COMPLETE</text>
+  <text x="675" y="125" text-anchor="middle" font-size="10" fill="#48bb78">Shipped</text>
+
+  <!-- Deprecated -->
+  <rect x="320" y="240" width="160" height="60" rx="8" fill="#fff5f5" stroke="#e53e3e" stroke-width="2" stroke-dasharray="6,3"/>
+  <text x="400" y="265" text-anchor="middle" font-size="14" font-weight="bold" fill="#c53030">DEPRECATED</text>
+  <text x="400" y="285" text-anchor="middle" font-size="10" fill="#e53e3e">Superseded, read-only</text>
+
+  <!-- Arrows: main flow -->
+  <line x1="170" y1="110" x2="225" y2="110" stroke="#4a5568" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="360" y1="110" x2="415" y2="110" stroke="#4a5568" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="550" y1="110" x2="605" y2="110" stroke="#4a5568" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Arrow labels -->
+  <text x="197" y="100" text-anchor="middle" font-size="9" fill="#718096">human</text>
+  <text x="197" y="130" text-anchor="middle" font-size="9" fill="#718096">approves</text>
+  <text x="387" y="100" text-anchor="middle" font-size="9" fill="#718096">backlog</text>
+  <text x="387" y="130" text-anchor="middle" font-size="9" fill="#718096">releases</text>
+  <text x="577" y="100" text-anchor="middle" font-size="9" fill="#718096">all tasks</text>
+  <text x="577" y="130" text-anchor="middle" font-size="9" fill="#718096">done</text>
+
+  <!-- Deprecated arrows -->
+  <line x1="295" y1="140" x2="370" y2="235" stroke="#e53e3e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-red)"/>
+  <line x1="485" y1="140" x2="430" y2="235" stroke="#e53e3e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-red)"/>
+
+  <text x="310" y="195" font-size="9" fill="#c53030">superseded</text>
+  <text x="445" y="195" font-size="9" fill="#c53030">superseded</text>
+
+  <!-- Backlog annotation -->
+  <rect x="40" y="180" width="200" height="80" rx="6" fill="#fffbeb" stroke="#d69e2e" stroke-width="1"/>
+  <text x="140" y="200" text-anchor="middle" font-size="11" font-weight="bold" fill="#744210">BACKLOG</text>
+  <text x="140" y="218" text-anchor="middle" font-size="9" fill="#975a16">Tasks defined but NOT in pipeline</text>
+  <text x="140" y="233" text-anchor="middle" font-size="9" fill="#975a16">Visible in mission, hidden in kanban</text>
+  <text x="140" y="248" text-anchor="middle" font-size="9" fill="#975a16">Releases when mission → ready</text>
+
+  <line x1="105" y1="140" x2="105" y2="175" stroke="#d69e2e" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Legend -->
+  <rect x="560" y="200" width="200" height="100" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="660" y="220" text-anchor="middle" font-size="10" font-weight="bold" fill="#4a5568">Gate Conditions</text>
+  <text x="570" y="240" font-size="9" fill="#718096">draft→ready: human scope approval</text>
+  <text x="570" y="256" font-size="9" fill="#718096">ready→active: backlog releases</text>
+  <text x="570" y="272" font-size="9" fill="#718096">active→complete: all tasks done</text>
+  <text x="570" y="288" font-size="9" fill="#718096">any→deprecated: new mission exists</text>
+</svg>

@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="system-ui, -apple-system, sans-serif">
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Object Interface Hierarchy</text>
+  <text x="450" y="50" text-anchor="middle" font-size="11" fill="#718096">Every object type implements a versioned interface with mandatory sections</text>
+
+  <!-- MissionInterface -->
+  <rect x="20" y="75" width="200" height="200" rx="8" fill="#ebf8ff" stroke="#4299e1" stroke-width="2"/>
+  <rect x="20" y="75" width="200" height="30" rx="8" fill="#4299e1"/>
+  <text x="120" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="white">MissionInterface v1.0</text>
+  <text x="120" y="112" text-anchor="middle" font-size="10" fill="#4299e1">WHY — Purpose</text>
+
+  <text x="35" y="135" font-size="9" fill="#2d3748">1. Vision</text>
+  <text x="35" y="150" font-size="9" fill="#2d3748">2. Rationale</text>
+  <text x="35" y="165" font-size="9" fill="#2d3748">3. Capabilities Composed</text>
+  <text x="35" y="180" font-size="9" fill="#2d3748">4. Current State</text>
+  <text x="35" y="195" font-size="9" fill="#2d3748">5. Evidence</text>
+  <text x="35" y="210" font-size="9" fill="#2d3748">6. Implementation Sequence</text>
+  <text x="35" y="230" font-size="9" fill="#2d3748">7. Gaps Identified</text>
+  <text x="35" y="245" font-size="9" fill="#2d3748">8. Decision Trail</text>
+  <text x="35" y="260" font-size="9" fill="#2d3748">9. Changelog</text>
+
+  <!-- CapabilityInterface -->
+  <rect x="240" y="75" width="200" height="200" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="2"/>
+  <rect x="240" y="75" width="200" height="30" rx="8" fill="#48bb78"/>
+  <text x="340" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="white">CapabilityInterface v1.0</text>
+  <text x="340" y="112" text-anchor="middle" font-size="10" fill="#48bb78">WHAT — Service</text>
+
+  <text x="255" y="135" font-size="9" fill="#2d3748">1. What It Does</text>
+  <text x="255" y="150" font-size="9" fill="#2d3748">2. Why It Matters</text>
+  <text x="255" y="165" font-size="9" fill="#2d3748">3. Architecture</text>
+  <text x="255" y="180" font-size="9" fill="#2d3748">4. Reusability</text>
+  <text x="255" y="195" font-size="9" fill="#2d3748">5. Design Decisions</text>
+  <text x="255" y="210" font-size="9" fill="#2d3748">6. Current State</text>
+
+  <!-- RequirementInterface -->
+  <rect x="460" y="75" width="200" height="200" rx="8" fill="#fffbeb" stroke="#d69e2e" stroke-width="2"/>
+  <rect x="460" y="75" width="200" height="30" rx="8" fill="#d69e2e"/>
+  <text x="560" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="white">RequirementInterface v1.0</text>
+  <text x="560" y="112" text-anchor="middle" font-size="10" fill="#d69e2e">HOW — Specification</text>
+
+  <text x="475" y="135" font-size="9" fill="#2d3748">1. Statement (EARS)</text>
+  <text x="475" y="150" font-size="9" fill="#2d3748">2. Rationale</text>
+  <text x="475" y="165" font-size="9" fill="#2d3748">3. Scope (In + Out)</text>
+  <text x="475" y="180" font-size="9" fill="#2d3748">4. Acceptance Criteria</text>
+  <text x="475" y="195" font-size="9" fill="#2d3748">5. Behavior Spec (GWT x2)</text>
+  <text x="475" y="210" font-size="9" fill="#2d3748">6. Constraints (SHALL)</text>
+  <text x="475" y="225" font-size="9" fill="#2d3748">7. Dependencies</text>
+  <text x="475" y="240" font-size="9" fill="#2d3748">8. Verification Method</text>
+  <text x="475" y="255" font-size="9" fill="#2d3748">9. Change Impact</text>
+
+  <!-- TaskInterface -->
+  <rect x="680" y="75" width="200" height="200" rx="8" fill="#faf5ff" stroke="#9f7aea" stroke-width="2"/>
+  <rect x="680" y="75" width="200" height="30" rx="8" fill="#9f7aea"/>
+  <text x="780" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="white">TaskInterface v1.0</text>
+  <text x="780" y="112" text-anchor="middle" font-size="10" fill="#9f7aea">WORK — Implementation</text>
+
+  <text x="695" y="135" font-size="9" font-weight="bold" fill="#553c9a">Shared Base:</text>
+  <text x="695" y="150" font-size="9" fill="#2d3748">title, description, role</text>
+  <text x="695" y="165" font-size="9" fill="#2d3748">acceptance_criteria (GWT)</text>
+  <text x="695" y="180" font-size="9" fill="#2d3748">scope_boundary (in/out)</text>
+  <text x="695" y="200" font-size="9" font-weight="bold" fill="#553c9a">Type Extensions:</text>
+  <text x="695" y="215" font-size="9" fill="#6b46c1">Design: decision_points</text>
+  <text x="695" y="230" font-size="9" fill="#6b46c1">Impl: do_not_change</text>
+  <text x="695" y="245" font-size="9" fill="#6b46c1">Test: test_spec</text>
+
+  <!-- Validation flow -->
+  <rect x="100" y="320" width="700" height="80" rx="8" fill="#f7fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="450" y="345" text-anchor="middle" font-size="13" font-weight="bold" fill="#2d3748">Validation Chain</text>
+
+  <rect x="130" y="360" width="120" height="28" rx="4" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="190" y="378" text-anchor="middle" font-size="9" fill="#2b6cb0">Mission valid?</text>
+
+  <text x="265" y="378" font-size="14" fill="#4a5568">&#x2192;</text>
+
+  <rect x="280" y="360" width="120" height="28" rx="4" fill="#f0fff4" stroke="#48bb78"/>
+  <text x="340" y="378" text-anchor="middle" font-size="9" fill="#276749">Capability valid?</text>
+
+  <text x="415" y="378" font-size="14" fill="#4a5568">&#x2192;</text>
+
+  <rect x="430" y="360" width="120" height="28" rx="4" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="490" y="378" text-anchor="middle" font-size="9" fill="#744210">Requirement valid?</text>
+
+  <text x="565" y="378" font-size="14" fill="#4a5568">&#x2192;</text>
+
+  <rect x="580" y="360" width="120" height="28" rx="4" fill="#faf5ff" stroke="#9f7aea"/>
+  <text x="640" y="378" text-anchor="middle" font-size="9" fill="#553c9a">Task can start</text>
+
+  <!-- Arrows down -->
+  <line x1="120" y1="275" x2="120" y2="320" stroke="#4299e1" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="340" y1="275" x2="340" y2="320" stroke="#48bb78" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="560" y1="275" x2="560" y2="320" stroke="#d69e2e" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="780" y1="275" x2="780" y2="320" stroke="#9f7aea" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Version note -->
+  <text x="450" y="440" text-anchor="middle" font-size="10" fill="#718096">Each interface versions independently. Old objects valid under their version. New objects use current version.</text>
+  <text x="450" y="458" text-anchor="middle" font-size="10" fill="#718096">Upgrade path: scan old version objects → flag gaps → create remediation tasks → documented PDSA.</text>
+
+  <!-- Counts -->
+  <text x="120" y="490" text-anchor="middle" font-size="10" font-weight="bold" fill="#4299e1">9 sections</text>
+  <text x="340" y="490" text-anchor="middle" font-size="10" font-weight="bold" fill="#48bb78">6 sections</text>
+  <text x="560" y="490" text-anchor="middle" font-size="10" font-weight="bold" fill="#d69e2e">9 sections</text>
+  <text x="780" y="490" text-anchor="middle" font-size="10" font-weight="bold" fill="#9f7aea">base + 3 types</text>
+</svg>
