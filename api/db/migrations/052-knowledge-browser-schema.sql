@@ -35,3 +35,9 @@ CREATE TABLE IF NOT EXISTS node_content_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_history_node ON node_content_history(node_id, node_type);
+
+-- Generate short_ids for existing nodes using hex(randomblob(4)) = 8 hex chars
+-- Idempotent: only sets WHERE short_id IS NULL
+UPDATE missions SET short_id = lower(hex(randomblob(4))) WHERE short_id IS NULL;
+UPDATE capabilities SET short_id = lower(hex(randomblob(4))) WHERE short_id IS NULL;
+UPDATE requirements SET short_id = lower(hex(randomblob(4))) WHERE short_id IS NULL;
