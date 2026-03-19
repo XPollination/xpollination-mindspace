@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="a9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="a9g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#48bb78"/>
+    </marker>
+  </defs>
+
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Service as Digital Twin: Self-Aware, Self-Healing, Self-Evolving</text>
+
+  <!-- Before: External restart -->
+  <rect x="30" y="55" width="400" height="195" rx="8" fill="#fff5f5" stroke="#fc8181" stroke-width="1.5"/>
+  <text x="230" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#c53030">External Lifecycle (current)</text>
+
+  <rect x="50" y="95" width="100" height="50" rx="5" fill="white" stroke="#e2e8f0"/>
+  <text x="100" y="118" text-anchor="middle" font-size="9" fill="#4a5568">Agent/Human</text>
+  <text x="100" y="131" text-anchor="middle" font-size="8" fill="#718096">runs kill + start</text>
+
+  <line x1="150" y1="120" x2="195" y2="120" stroke="#4a5568" stroke-width="1.5" marker-end="url(#a9)"/>
+
+  <rect x="200" y="95" width="100" height="50" rx="5" fill="#fed7d7" stroke="#fc8181"/>
+  <text x="250" y="118" text-anchor="middle" font-size="9" fill="#c53030">Viz Process</text>
+  <text x="250" y="131" text-anchor="middle" font-size="8" fill="#e53e3e">dumb server</text>
+
+  <text x="320" y="118" font-size="14" fill="#c53030">&#x2717;</text>
+  <text x="340" y="118" font-size="8" fill="#c53030">doesn't know its version</text>
+  <text x="340" y="131" font-size="8" fill="#c53030">doesn't know its env vars</text>
+  <text x="340" y="144" font-size="8" fill="#c53030">doesn't know how to restart</text>
+
+  <text x="50" y="170" font-size="9" fill="#c53030">Failure modes:</text>
+  <text x="50" y="185" font-size="8" fill="#e53e3e">&#x2022; Agent kills process, restarts without env vars → login loop</text>
+  <text x="50" y="198" font-size="8" fill="#e53e3e">&#x2022; New version deployed, old process still running → stale</text>
+  <text x="50" y="211" font-size="8" fill="#e53e3e">&#x2022; Health fails but nobody notices → broken for hours</text>
+  <text x="50" y="224" font-size="8" fill="#e53e3e">&#x2022; Rollback = human must remember previous version</text>
+
+  <!-- After: Self-aware service -->
+  <rect x="460" y="55" width="420" height="195" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="670" y="78" text-anchor="middle" font-size="13" font-weight="bold" fill="#276749">Service as Digital Twin (target)</text>
+
+  <rect x="490" y="95" width="160" height="130" rx="6" fill="white" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="570" y="115" text-anchor="middle" font-size="10" font-weight="bold" fill="#276749">Viz Service Twin</text>
+  <text x="500" y="133" font-size="8" fill="#48bb78">&#x2713; I am v0.0.37</text>
+  <text x="500" y="146" font-size="8" fill="#48bb78">&#x2713; I need JWT_SECRET</text>
+  <text x="500" y="159" font-size="8" fill="#48bb78">&#x2713; I serve 3 missions</text>
+  <text x="500" y="172" font-size="8" fill="#48bb78">&#x2713; My health: ok</text>
+  <text x="500" y="185" font-size="8" fill="#48bb78">&#x2713; v0.0.38 available</text>
+  <text x="500" y="198" font-size="8" fill="#48bb78">&#x2713; I know how to restart</text>
+  <text x="500" y="211" font-size="8" fill="#48bb78">&#x2713; I know how to rollback</text>
+
+  <!-- Self-update flow -->
+  <rect x="680" y="95" width="180" height="130" rx="6" fill="white" stroke="#276749"/>
+  <text x="770" y="115" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">Self-Evolution Flow</text>
+  <text x="690" y="133" font-size="8" fill="#4a5568">1. Receive EVOLVE event</text>
+  <text x="690" y="148" font-size="8" fill="#4a5568">2. Load v0.0.38 as twin</text>
+  <text x="690" y="163" font-size="8" fill="#4a5568">3. twin.validate()</text>
+  <text x="690" y="178" font-size="8" fill="#48bb78">4. Graceful handoff</text>
+  <text x="690" y="193" font-size="8" fill="#48bb78">5. Health check passes</text>
+  <text x="690" y="208" font-size="8" fill="#48bb78">6. Old process exits</text>
+
+  <!-- Three-layer defense -->
+  <text x="450" y="280" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">Three-Layer Lifecycle Defense</text>
+
+  <!-- Layer 1: Service self-heals -->
+  <rect x="50" y="300" width="250" height="110" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="2"/>
+  <text x="175" y="325" text-anchor="middle" font-size="12" font-weight="bold" fill="#276749">Layer 1: Self-Healing</text>
+  <text x="175" y="342" text-anchor="middle" font-size="9" fill="#48bb78">Service handles its own lifecycle</text>
+  <text x="65" y="362" font-size="8" fill="#4a5568">EVOLVE event → validate → restart</text>
+  <text x="65" y="377" font-size="8" fill="#4a5568">Health degrades → self-diagnose</text>
+  <text x="65" y="392" font-size="8" fill="#4a5568">Rollback on failed health check</text>
+
+  <!-- Layer 2: A2A coordinates -->
+  <rect x="325" y="300" width="250" height="110" rx="8" fill="#faf5ff" stroke="#9f7aea" stroke-width="2"/>
+  <text x="450" y="325" text-anchor="middle" font-size="12" font-weight="bold" fill="#553c9a">Layer 2: A2A Orchestrator</text>
+  <text x="450" y="342" text-anchor="middle" font-size="9" fill="#9f7aea">Coordinates multi-service upgrades</text>
+  <text x="340" y="362" font-size="8" fill="#4a5568">Sequence: API first, then viz</text>
+  <text x="340" y="377" font-size="8" fill="#4a5568">SpiceDB permission checks</text>
+  <text x="340" y="392" font-size="8" fill="#4a5568">Cross-instance federation sync</text>
+
+  <!-- Layer 3: Watchdog fallback -->
+  <rect x="600" y="300" width="250" height="110" rx="8" fill="#fffbeb" stroke="#d69e2e" stroke-width="2"/>
+  <text x="725" y="325" text-anchor="middle" font-size="12" font-weight="bold" fill="#744210">Layer 3: Watchdog</text>
+  <text x="725" y="342" text-anchor="middle" font-size="9" fill="#d69e2e">External safety net</text>
+  <text x="615" y="362" font-size="8" fill="#4a5568">Catches self-healing failures</text>
+  <text x="615" y="377" font-size="8" fill="#4a5568">systemctl restart as last resort</text>
+  <text x="615" y="392" font-size="8" fill="#4a5568">Alerts human after 3 failures</text>
+
+  <text x="175" y="400" text-anchor="middle" font-size="8" fill="#276749">fast, self-aware</text>
+  <text x="450" y="400" text-anchor="middle" font-size="8" fill="#553c9a">authoritative, coordinated</text>
+  <text x="725" y="400" text-anchor="middle" font-size="8" fill="#744210">last defense, external</text>
+
+  <!-- Applies to all services -->
+  <rect x="50" y="430" width="800" height="150" rx="8" fill="#f7fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="450" y="455" text-anchor="middle" font-size="13" font-weight="bold" fill="#1a202c">Every Service is a Digital Twin</text>
+
+  <rect x="80" y="470" width="160" height="50" rx="5" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="160" y="492" text-anchor="middle" font-size="10" font-weight="bold" fill="#2b6cb0">Viz Twin</text>
+  <text x="160" y="507" text-anchor="middle" font-size="8" fill="#4a7fb5">port 4200 | HTML/JS</text>
+
+  <rect x="260" y="470" width="160" height="50" rx="5" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="340" y="492" text-anchor="middle" font-size="10" font-weight="bold" fill="#2b6cb0">API Twin</text>
+  <text x="340" y="507" text-anchor="middle" font-size="8" fill="#4a7fb5">port 3100 | Express</text>
+
+  <rect x="440" y="470" width="160" height="50" rx="5" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="520" y="492" text-anchor="middle" font-size="10" font-weight="bold" fill="#2b6cb0">Brain Twin</text>
+  <text x="520" y="507" text-anchor="middle" font-size="8" fill="#4a7fb5">port 3200 | Fastify</text>
+
+  <rect x="620" y="470" width="160" height="50" rx="5" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="700" y="492" text-anchor="middle" font-size="10" font-weight="bold" fill="#2b6cb0">SpiceDB Twin</text>
+  <text x="700" y="507" text-anchor="middle" font-size="8" fill="#4a7fb5">port 50051 | gRPC</text>
+
+  <text x="450" y="550" text-anchor="middle" font-size="9" fill="#718096">Each service: knows version, validates environment, handles EVOLVE events,</text>
+  <text x="450" y="565" text-anchor="middle" font-size="9" fill="#718096">checks own health, orchestrates own restart, rolls back on failure.</text>
+  <text x="450" y="580" text-anchor="middle" font-size="9" fill="#718096">External scripts (npm run restart) become bootstrap/fallback, not primary mechanism.</text>
+</svg>
