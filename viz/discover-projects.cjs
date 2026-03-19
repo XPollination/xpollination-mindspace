@@ -12,7 +12,7 @@ const DEFAULT_WORKSPACE = process.env.XPO_WORKSPACE_PATH || '/workspace';
 /**
  * Discover all projects with data/xpollination.db in the workspace.
  * Uses XPO_WORKSPACE_PATH env var, falls back to default.
- * Filters out zero-byte ghost databases.
+ * Filters out zero-byte ghost databases and symlink duplicates.
  *
  * @param {string} [workspacePath] - Override workspace path (defaults to env/default)
  * @returns {Array<{name: string, path: string, dbPath: string}>}
@@ -20,6 +20,7 @@ const DEFAULT_WORKSPACE = process.env.XPO_WORKSPACE_PATH || '/workspace';
 function discoverProjects(workspacePath) {
   const workspace = workspacePath || process.env.XPO_WORKSPACE_PATH || DEFAULT_WORKSPACE;
   const projects = [];
+  const seenRealPaths = new Set(); // Deduplicate symlinked DBs
 
   try {
     const dirs = fs.readdirSync(workspace);
@@ -39,6 +40,13 @@ function discoverProjects(workspacePath) {
           const dbStat = fs.statSync(dbPath);
           if (dbStat.size === 0) continue;
         } catch { continue; }
+
+        // Deduplicate: skip if another project already points to the same real DB file
+        try {
+          const realPath = fs.realpathSync(dbPath);
+          if (seenRealPaths.has(realPath)) continue;
+          seenRealPaths.add(realPath);
+        } catch { /* realpathSync failed — keep the project */ }
 
         // Validate DB has mindspace_nodes table
         try {
