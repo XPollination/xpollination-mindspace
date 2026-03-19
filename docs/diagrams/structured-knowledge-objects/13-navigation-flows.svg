@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550" font-family="system-ui, -apple-system, sans-serif">
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Navigation Flows: Every Path Through the Knowledge Space</text>
+
+  <!-- Flow 1: Hierarchical drill-down -->
+  <rect x="30" y="55" width="840" height="75" rx="6" fill="#f0fff4" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="50" y="78" font-size="11" font-weight="bold" fill="#276749">Flow 1: Hierarchical Drill-Down (the map)</text>
+  <text x="50" y="95" font-size="9" fill="#4a5568">Mission Map → click "Self-Healing" → Mission Document → click "CAP-HEALTH-ENDPOINT" → Capability Document</text>
+  <text x="50" y="110" font-size="9" fill="#4a5568">→ click "REQ-HEALTH-001" → Requirement Document (EARS + GWT) → click "implement-health-endpoint" → Task Detail (DNA)</text>
+  <text x="700" y="95" font-size="9" font-weight="bold" fill="#276749">4 clicks: mission to task</text>
+
+  <!-- Flow 2: Breadcrumb up -->
+  <rect x="30" y="140" width="840" height="55" rx="6" fill="#ebf8ff" stroke="#4299e1" stroke-width="1.5"/>
+  <text x="50" y="163" font-size="11" font-weight="bold" fill="#2b6cb0">Flow 2: Breadcrumb Up (back to context)</text>
+  <text x="50" y="180" font-size="9" fill="#4a5568">On Task Detail page → breadcrumb: Self-Healing > CAP-HEALTH-ENDPOINT > REQ-HEALTH-001 > [this task]</text>
+  <text x="50" y="193" font-size="9" fill="#4a5568">Click "Self-Healing" → jump directly to mission. Click "CAP-HEALTH-ENDPOINT" → jump to capability. Any level, one click.</text>
+
+  <!-- Flow 3: Cross-reference jump -->
+  <rect x="30" y="205" width="840" height="65" rx="6" fill="#fed7e2" stroke="#ed64a6" stroke-width="1.5"/>
+  <text x="50" y="228" font-size="11" font-weight="bold" fill="#97266d">Flow 3: Cross-Reference Jump (sideways)</text>
+  <text x="50" y="245" font-size="9" fill="#4a5568">On CAP-AUTH page → cross-refs bar: "Also composed by: Fair Attribution | Structured Knowledge Objects"</text>
+  <text x="50" y="258" font-size="9" fill="#4a5568">Click "Structured Knowledge Objects" → jump to that mission → see how AUTH is used in a different context.</text>
+  <text x="700" y="245" font-size="9" font-weight="bold" fill="#97266d">Graph traversal, not tree</text>
+
+  <!-- Flow 4: Search warp -->
+  <rect x="30" y="280" width="840" height="65" rx="6" fill="#faf5ff" stroke="#9f7aea" stroke-width="1.5"/>
+  <text x="50" y="303" font-size="11" font-weight="bold" fill="#553c9a">Flow 4: Search Warp Drive (jump anywhere)</text>
+  <text x="50" y="320" font-size="9" fill="#4a5568">On ANY page → type in search bar: "how do agents handle JWT" → Results:</text>
+  <text x="50" y="333" font-size="9" fill="#4a5568">[REQ] REQ-AUTH-001 (0.91) | [CAP] CAP-AUTH (0.87) | [TASK] brain-identity-auth (0.84) | [THOUGHT] JWT session design (0.78)</text>
+  <text x="700" y="320" font-size="9" font-weight="bold" fill="#553c9a">Any level, any language</text>
+
+  <!-- Flow 5: Task→Requirement→Capability (agent recovery) -->
+  <rect x="30" y="355" width="840" height="65" rx="6" fill="#fffbeb" stroke="#d69e2e" stroke-width="1.5"/>
+  <text x="50" y="378" font-size="11" font-weight="bold" fill="#744210">Flow 5: Agent Context Recovery (bottom-up)</text>
+  <text x="50" y="395" font-size="9" fill="#4a5568">Agent claims task "implement-health-endpoint" → reads DNA → needs more context → follows requirement_ref to REQ-HEALTH-001</text>
+  <text x="50" y="408" font-size="9" fill="#4a5568">→ reads EARS spec + GWT examples → follows capability_id to CAP-HEALTH-ENDPOINT → reads architecture → understands WHY</text>
+  <text x="700" y="395" font-size="9" font-weight="bold" fill="#744210">Context recovery WITHOUT brain</text>
+
+  <!-- Flow 6: Release management -->
+  <rect x="30" y="430" width="840" height="55" rx="6" fill="#e9d8fd" stroke="#9f7aea" stroke-width="1.5"/>
+  <text x="50" y="453" font-size="11" font-weight="bold" fill="#553c9a">Flow 6: Release Management (human approval)</text>
+  <text x="50" y="470" font-size="9" fill="#4a5568">Mission Document → Releases tab → Phase 1 backlog (6 tasks listed) → human reviews scope → clicks "Release Phase 1"</text>
+  <text x="50" y="483" font-size="9" fill="#4a5568">→ 6 backlog tasks move to pending → pipeline starts → agents pick up work via A2A SSE</text>
+
+  <!-- Flow 7: Version history exploration -->
+  <rect x="30" y="495" width="840" height="45" rx="6" fill="#c6f6d5" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="50" y="518" font-size="11" font-weight="bold" fill="#276749">Flow 7: Version History (time travel)</text>
+  <text x="50" y="533" font-size="9" fill="#4a5568">Capability page → Version History section → click v0.0.1 → see what CAP-AUTH looked like before brain identity was added</text>
+</svg>
