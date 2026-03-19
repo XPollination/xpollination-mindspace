@@ -211,67 +211,93 @@ function serveStatic(res, filePath) {
 }
 
 /**
- * Knowledge Browser: resolve hierarchy nodes by short_id
+ * Knowledge Browser: render hierarchy nodes as styled pages
  * Routes: /m/:id (mission), /c/:id (capability), /r/:id (requirement), /t/:id (task)
  */
+let marked;
+try { marked = require('marked'); } catch { marked = null; }
+
 const KB_TYPE_MAP = {
-  m: { table: 'missions', label: 'Mission',
+  m: { table: 'missions', label: 'Mission', color: '#22c55e',
     query: "SELECT m.*, m.short_id FROM missions m WHERE m.short_id = ?" },
-  c: { table: 'capabilities', label: 'Capability',
+  c: { table: 'capabilities', label: 'Capability', color: '#8ab4f8',
     query: "SELECT c.*, c.short_id, m.title as mission_title, m.short_id as mission_short_id FROM capabilities c JOIN missions m ON c.mission_id = m.id WHERE c.short_id = ?" },
-  r: { table: 'requirements', label: 'Requirement',
+  r: { table: 'requirements', label: 'Requirement', color: '#eab308',
     query: "SELECT r.*, r.short_id, c.title as capability_title, c.short_id as capability_short_id, m.title as mission_title, m.short_id as mission_short_id FROM requirements r JOIN capabilities c ON r.capability_id = c.id JOIN missions m ON c.mission_id = m.id WHERE r.short_id = ?" },
-  t: { table: 'mindscape_nodes', label: 'Task', query: null },
+  t: { table: 'mindspace_nodes', label: 'Task', color: '#ef4444', query: null },
 };
 
-function handleKbRoute(res, typePrefix, shortId, suffix) {
+const KB_ROUTE = /^\/(m|c|r|t)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/;
+
+function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   const typeInfo = KB_TYPE_MAP[typePrefix];
   if (!typeInfo || !typeInfo.query) {
     send404(res, shortId, typePrefix);
     return;
   }
 
-  const projects = discoverProjects();
-  const currentProject = path.basename(__dirname.replace('/viz', ''));
-  const targetProjects = projects.filter(p => p.name === currentProject);
-
-  for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
-    try {
-      const db = new Database(proj.dbPath, { readonly: true });
-      try {
-        const node = db.prepare(typeInfo.query).get(shortId);
-        if (node) {
-          db.close();
-          if (suffix === '.md') {
-            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-            res.end(node.content_md || node.description || '');
-            return;
-          }
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(renderNodePage(node, typePrefix, typeInfo));
-          return;
-        }
-      } catch (err) { /* table may not exist */ }
-      db.close();
-    } catch (err) { /* skip project */ }
-  }
+  try {
+    const node = db.prepare(typeInfo.query).get(shortId);
+    if (node) {
+      if (suffix === '.md') {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(node.content_md || node.description || '');
+        return;
+      }
+      // Fetch children for drill-down
+      let children = [];
+      if (typePrefix === 'm') {
+        children = db.prepare("SELECT id, title, description, short_id, status FROM capabilities WHERE mission_id = ? ORDER BY sort_order ASC").all(node.id);
+      } else if (typePrefix === 'c') {
+        children = db.prepare("SELECT id, req_id_human, title, description, short_id, status FROM requirements WHERE capability_id = ? ORDER BY req_id_human ASC").all(node.id);
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderNodePage(node, typePrefix, typeInfo, children));
+      return;
+    }
+  } catch (err) { /* table may not exist */ }
   send404(res, shortId, typePrefix);
 }
 
-function renderNodePage(node, typePrefix, typeInfo) {
+function renderNodePage(node, typePrefix, typeInfo, children) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
+  const content = node.content_md || description;
+
+  // Render markdown with marked.parse if available, fallback to pre-formatted
+  let renderedContent;
+  if (marked && marked.parse) {
+    renderedContent = marked.parse(content);
+  } else {
+    renderedContent = '<div style="white-space:pre-wrap;">' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+  }
+
+  // Build breadcrumb with short_id links
   const breadcrumb = [];
-  breadcrumb.push('<a href="/" style="color:#8ab4f8;text-decoration:none;">Mindspace</a>');
+  breadcrumb.push('<a href="/">Mindspace</a>');
   if (node.mission_title && node.mission_short_id) {
-    breadcrumb.push(`<a href="/m/${node.mission_short_id}" style="color:#8ab4f8;text-decoration:none;">${node.mission_title}</a>`);
+    breadcrumb.push(`<a href="/m/${node.mission_short_id}">${node.mission_title}</a>`);
   }
   if (node.capability_title && node.capability_short_id) {
-    breadcrumb.push(`<a href="/c/${node.capability_short_id}" style="color:#8ab4f8;text-decoration:none;">${node.capability_title}</a>`);
+    breadcrumb.push(`<a href="/c/${node.capability_short_id}">${node.capability_title}</a>`);
   }
-  breadcrumb.push(`<span style="color:#eee;">${title}</span>`);
+  breadcrumb.push(`<span class="current">${title}</span>`);
 
-  const content = node.content_md || description;
+  // Children cards
+  const childPrefix = typePrefix === 'm' ? 'c' : typePrefix === 'c' ? 'r' : 't';
+  const childLabel = typePrefix === 'm' ? 'Capabilities' : typePrefix === 'c' ? 'Requirements' : 'Tasks';
+  const childrenHtml = children.length > 0 ? `
+    <section class="children">
+      <h2>${childLabel}</h2>
+      <div class="child-grid">
+        ${children.map(c => `
+          <a href="/${childPrefix}/${c.short_id || c.id}" class="child-card">
+            <h3>${c.title || c.req_id_human || c.id}</h3>
+            <p>${(c.description || '').slice(0, 100)}${(c.description || '').length > 100 ? '...' : ''}</p>
+          </a>
+        `).join('')}
+      </div>
+    </section>` : '';
 
   return `<!DOCTYPE html>
 <html lang="en"><head>
@@ -280,32 +306,55 @@ function renderNodePage(node, typePrefix, typeInfo) {
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${description.slice(0, 200)}">
 <meta property="og:type" content="article">
-<style>body{margin:0;padding:0;background:#0f1117;color:#eee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
-.container{max-width:720px;margin:0 auto;padding:24px 16px;}
-.breadcrumb{font-size:13px;color:#888;margin-bottom:16px;}
-.breadcrumb a:hover{text-decoration:underline;}
-.breadcrumb span:not(:last-child)::after{content:" › ";color:#555;}
-h1{font-size:24px;margin:0 0 8px;color:#eee;}
-.type-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;}
-.content{line-height:1.6;color:#ccc;margin-top:16px;white-space:pre-wrap;}</style>
+<style>
+:root{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
+.container{max-width:760px;margin:0 auto;padding:24px 16px;}
+.breadcrumb{font-size:13px;color:var(--muted);margin-bottom:20px;}
+.breadcrumb a{color:var(--muted);text-decoration:none;}
+.breadcrumb a:hover{text-decoration:underline;color:var(--link);}
+.breadcrumb .current{color:var(--link);}
+.breadcrumb span:not(:last-child)::after,.breadcrumb a::after{content:" › ";color:#555;}
+.badge{display:inline-block;padding:2px 10px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#fff;background:${typeInfo.color};margin-bottom:8px;}
+h1{font-size:26px;margin:0 0 16px;color:var(--text);}
+.content{line-height:1.7;color:#ccc;}
+.content h2{color:var(--text);margin:24px 0 12px;font-size:20px;border-bottom:1px solid var(--border);padding-bottom:4px;}
+.content h3{color:var(--text);margin:16px 0 8px;font-size:16px;}
+.content p{margin:8px 0;}
+.content code{background:var(--surface);padding:2px 6px;border-radius:3px;font-size:13px;}
+.content pre{background:var(--surface);padding:12px;border-radius:6px;overflow-x:auto;margin:12px 0;}
+.content pre code{background:none;padding:0;}
+.content table{width:100%;border-collapse:collapse;margin:12px 0;}
+.content th,.content td{border:1px solid var(--border);padding:8px;text-align:left;}
+.content th{background:var(--surface);}
+.children{margin-top:32px;}
+.children h2{color:var(--text);font-size:18px;margin-bottom:12px;}
+.child-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.child-card{display:block;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text);transition:border-color 0.2s;}
+.child-card:hover{border-color:var(--link);}
+.child-card h3{font-size:14px;margin-bottom:4px;color:var(--link);}
+.child-card p{font-size:12px;color:var(--muted);margin:0;}
+.metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
+@media(max-width:600px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;}}
+</style>
 </head><body>
 <div class="container">
-<div class="breadcrumb">${breadcrumb.join('')}</div>
-<div class="type-label">${typeInfo.label}</div>
+<nav class="breadcrumb">${breadcrumb.join('')}</nav>
+<div class="badge">${typeInfo.label}</div>
 <h1>${title}</h1>
-<div class="content">${content}</div>
+<div class="content">${renderedContent}</div>
+${childrenHtml}
+<div class="metadata">Version ${node.content_version || 0}</div>
 </div></body></html>`;
 }
 
 function send404(res, shortId, typePrefix) {
   res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`<!DOCTYPE html><html><head><title>Not Found — Mindspace</title>
-<style>body{margin:0;padding:40px;background:#0f1117;color:#eee;font-family:sans-serif;text-align:center;}
-a{color:#8ab4f8;}</style></head><body>
-<h1>404 — Not Found</h1>
-<p>No ${typePrefix === 'm' ? 'mission' : typePrefix === 'c' ? 'capability' : typePrefix === 'r' ? 'requirement' : 'node'} found with ID <code>${shortId}</code></p>
-<p><a href="/">Back to Mindspace</a></p>
-</body></html>`);
+<style>body{margin:0;padding:40px;background:#0f1117;color:#eee;font-family:sans-serif;text-align:center;}a{color:#8ab4f8;}</style></head><body>
+<h1>404 — Not Found</h1><p>No ${typePrefix === 'm' ? 'mission' : typePrefix === 'c' ? 'capability' : typePrefix === 'r' ? 'requirement' : 'node'} found with ID <code>${shortId}</code></p>
+<p><a href="/">Back to Mindspace</a></p></body></html>`);
 }
 
 /**
@@ -382,32 +431,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ─── D7: Proxy auth requests to API server ───
-
-  // OAuth: proxy /api/auth/oauth/* to API (handles redirects)
-  if (pathname.startsWith('/api/auth/oauth/')) {
-    try {
-      const apiUrl = `http://localhost:${API_PORT}${pathname}${url.search || ''}`;
-      const apiRes = await fetch(apiUrl, { redirect: 'manual' });
-      // Forward redirect (302 to Google, or callback redirect with cookie)
-      if (apiRes.status >= 300 && apiRes.status < 400) {
-        const headers = { 'Location': apiRes.headers.get('location') };
-        // Forward set-cookie from callback (contains ms_session JWT)
-        const setCookie = apiRes.headers.get('set-cookie');
-        if (setCookie) headers['Set-Cookie'] = setCookie;
-        res.writeHead(apiRes.status, headers);
-        res.end();
-      } else {
-        const data = await apiRes.text();
-        res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
-        res.end(data);
-      }
-    } catch (err) {
-      res.writeHead(502, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'API server unreachable' }));
-    }
-    return;
-  }
-
   if (pathname === '/api/auth/login' && req.method === 'POST') {
     try {
       const body = await readBody(req);
@@ -1134,10 +1157,20 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Knowledge Browser routes: /m/:id/:slug?, /c/:id/:slug?, /r/:id/:slug?, /t/:id/:slug?
-  const KB_ROUTE = /^\/(m|c|r|t)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/;
   const kbMatch = pathname.match(KB_ROUTE);
   if (kbMatch) {
-    handleKbRoute(res, kbMatch[1], kbMatch[2], kbMatch[4]);
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
+    const projects = discoverProjects();
+    const targetProjects = projects.filter(p => p.name === currentProject);
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        handleKbRoute(res, kbMatch[1], kbMatch[2], kbMatch[4], db);
+        db.close();
+        return;
+      } catch (err) { /* skip */ }
+    }
+    send404(res, kbMatch[2], kbMatch[1]);
     return;
   }
 
