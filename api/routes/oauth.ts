@@ -55,7 +55,12 @@ oauthRouter.get('/google', (req: Request, res: Response, next) => {
     res.status(503).json({ error: 'Google OAuth not configured' });
     return;
   }
-  passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+  try {
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+  } catch (error) {
+    console.error('Google OAuth initiation error:', error);
+    res.status(503).json({ error: 'Google OAuth unavailable', details: String(error) });
+  }
 });
 
 // GET /google/callback — handle OAuth callback (guarded)
@@ -65,7 +70,12 @@ oauthRouter.get('/google/callback',
       res.status(503).json({ error: 'Google OAuth not configured' });
       return;
     }
-    passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL || ''}/login?error=Account+not+found.+Register+with+an+invite+code+first.` })(req, res, next);
+    try {
+      passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL || ''}/login?error=Account+not+found.+Register+with+an+invite+code+first.` })(req, res, next);
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      res.redirect(`${FRONTEND_URL || ''}/login?error=OAuth+error`);
+    }
   },
   (req: Request, res: Response) => {
     const user = req.user as any;
