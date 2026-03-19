@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 750" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+  </defs>
+
+  <text x="550" y="25" text-anchor="middle" font-size="16" font-weight="bold" fill="#1a202c">Dependency Map: 24 Requirements, 5 Phases</text>
+
+  <!-- DONE -->
+  <rect x="20" y="40" width="200" height="90" rx="6" fill="#f0fff4" stroke="#48bb78" stroke-width="2"/>
+  <text x="120" y="58" text-anchor="middle" font-size="10" font-weight="bold" fill="#276749">DONE (3)</text>
+  <text x="30" y="75" font-size="8" fill="#48bb78">✅ REQ-AUTH-003 Brain Identity</text>
+  <text x="30" y="88" font-size="8" fill="#48bb78">✅ REQ-WF-003 Autonomy Modes</text>
+  <text x="30" y="101" font-size="8" fill="#48bb78">✅ REQ-DEPLOY-001 Lifecycle Scripts</text>
+
+  <!-- PHASE 1: Template Gates -->
+  <rect x="20" y="145" width="300" height="160" rx="6" fill="#ebf8ff" stroke="#4299e1" stroke-width="2"/>
+  <text x="170" y="165" text-anchor="middle" font-size="11" font-weight="bold" fill="#2b6cb0">PHASE 1: Template Gates + State Machine</text>
+  <text x="170" y="178" text-anchor="middle" font-size="8" fill="#4299e1">No A2A needed — implementable now</text>
+
+  <rect x="35" y="190" width="130" height="28" rx="3" fill="white" stroke="#4299e1"/>
+  <text x="100" y="208" text-anchor="middle" font-size="7" font-weight="bold" fill="#2b6cb0">REQ-OI-001</text>
+  <text x="100" y="215" text-anchor="middle" font-size="6" fill="#718096">Template Gate</text>
+
+  <rect x="175" y="190" width="130" height="28" rx="3" fill="white" stroke="#4299e1"/>
+  <text x="240" y="208" text-anchor="middle" font-size="7" font-weight="bold" fill="#2b6cb0">REQ-OI-002</text>
+  <text x="240" y="215" text-anchor="middle" font-size="6" fill="#718096">Task Type</text>
+
+  <rect x="35" y="228" width="130" height="28" rx="3" fill="white" stroke="#4299e1"/>
+  <text x="100" y="246" text-anchor="middle" font-size="7" font-weight="bold" fill="#2b6cb0">REQ-WF-004</text>
+  <text x="100" y="253" text-anchor="middle" font-size="6" fill="#718096">Mission States</text>
+
+  <rect x="175" y="228" width="130" height="28" rx="3" fill="white" stroke="#4299e1"/>
+  <text x="240" y="246" text-anchor="middle" font-size="7" font-weight="bold" fill="#2b6cb0">REQ-WF-005</text>
+  <text x="240" y="253" text-anchor="middle" font-size="6" fill="#718096">Backlog Status</text>
+
+  <rect x="35" y="266" width="130" height="28" rx="3" fill="white" stroke="#4299e1"/>
+  <text x="100" y="284" text-anchor="middle" font-size="7" font-weight="bold" fill="#2b6cb0">REQ-AUTH-004</text>
+  <text x="100" y="291" text-anchor="middle" font-size="6" fill="#718096">Brain Auth Enforce</text>
+
+  <rect x="175" y="266" width="130" height="28" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="240" y="284" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-OI-003</text>
+  <text x="240" y="291" text-anchor="middle" font-size="6" fill="#718096">Content Enrichment</text>
+
+  <!-- Dependency: OI-003 depends on OI-001 (gate must exist before enriching) -->
+  <line x1="165" y1="204" x2="175" y2="280" stroke="#4a5568" stroke-width="1" marker-end="url(#ad)"/>
+
+  <!-- PHASE 2: Provenance -->
+  <rect x="350" y="145" width="230" height="110" rx="6" fill="#f0fff4" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="465" y="165" text-anchor="middle" font-size="11" font-weight="bold" fill="#276749">PHASE 2: Provenance</text>
+
+  <rect x="365" y="180" width="200" height="28" rx="3" fill="white" stroke="#48bb78"/>
+  <text x="465" y="198" text-anchor="middle" font-size="7" font-weight="bold" fill="#276749">REQ-CP-001 Version History Table</text>
+
+  <rect x="365" y="218" width="200" height="28" rx="3" fill="white" stroke="#48bb78"/>
+  <text x="465" y="236" text-anchor="middle" font-size="7" font-weight="bold" fill="#276749">REQ-CP-002 Version Timeline Browser</text>
+
+  <!-- Dep: CP-002 depends on CP-001 -->
+  <line x1="465" y1="208" x2="465" y2="215" stroke="#4a5568" stroke-width="1" marker-end="url(#ad)"/>
+
+  <!-- Dep: Phase 2 depends on Phase 1 (OI-001 for interface validation) -->
+  <line x1="320" y1="200" x2="360" y2="194" stroke="#4a5568" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+
+  <!-- PHASE 3: Object Graph -->
+  <rect x="610" y="145" width="230" height="110" rx="6" fill="#faf5ff" stroke="#9f7aea" stroke-width="1.5"/>
+  <text x="725" y="165" text-anchor="middle" font-size="11" font-weight="bold" fill="#553c9a">PHASE 3: Object Graph</text>
+
+  <rect x="625" y="180" width="200" height="28" rx="3" fill="white" stroke="#9f7aea"/>
+  <text x="725" y="198" text-anchor="middle" font-size="7" font-weight="bold" fill="#553c9a">REQ-OG-001 Relationship Table</text>
+
+  <rect x="625" y="218" width="200" height="28" rx="3" fill="white" stroke="#9f7aea"/>
+  <text x="725" y="236" text-anchor="middle" font-size="7" font-weight="bold" fill="#553c9a">REQ-OG-002 Multi-Mission Composition</text>
+
+  <!-- Dep: OG-002 depends on OG-001 -->
+  <line x1="725" y1="208" x2="725" y2="215" stroke="#4a5568" stroke-width="1" marker-end="url(#ad)"/>
+
+  <!-- Dep: Phase 3 depends on Phase 2 (provenance needs relationships) -->
+  <line x1="580" y1="200" x2="620" y2="194" stroke="#4a5568" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+
+  <!-- PHASE 4: A2A + Digital Twin -->
+  <rect x="250" y="320" width="600" height="160" rx="6" fill="#fffbeb" stroke="#d69e2e" stroke-width="1.5"/>
+  <text x="550" y="340" text-anchor="middle" font-size="11" font-weight="bold" fill="#744210">PHASE 4: A2A + Digital Twin + Brain</text>
+  <text x="550" y="353" text-anchor="middle" font-size="8" fill="#d69e2e">Depends on: Phase 1 (interfaces) + Phase 3 (SpiceDB relationships)</text>
+
+  <rect x="270" y="365" width="130" height="35" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="335" y="380" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-A2A-003</text>
+  <text x="335" y="392" text-anchor="middle" font-size="6" fill="#718096">Digital Twin Protocol</text>
+
+  <rect x="410" y="365" width="130" height="35" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="475" y="380" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-A2A-004</text>
+  <text x="475" y="392" text-anchor="middle" font-size="6" fill="#718096">MCP Tools</text>
+
+  <rect x="550" y="365" width="130" height="35" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="615" y="380" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-DEPLOY-002</text>
+  <text x="615" y="392" text-anchor="middle" font-size="6" fill="#718096">Service as Twin</text>
+
+  <rect x="270" y="415" width="130" height="35" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="335" y="430" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-PK-001</text>
+  <text x="335" y="442" text-anchor="middle" font-size="6" fill="#718096">Proactive Push</text>
+
+  <rect x="410" y="415" width="130" height="35" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="475" y="430" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-ML-001</text>
+  <text x="475" y="442" text-anchor="middle" font-size="6" fill="#718096">Multilingual Brain</text>
+
+  <rect x="550" y="415" width="130" height="35" rx="3" fill="white" stroke="#d69e2e"/>
+  <text x="615" y="430" text-anchor="middle" font-size="7" font-weight="bold" fill="#744210">REQ-CD-001</text>
+  <text x="615" y="442" text-anchor="middle" font-size="6" fill="#718096">Cap Discovery</text>
+
+  <!-- Internal deps Phase 4 -->
+  <line x1="335" y1="400" x2="475" y2="365" stroke="#4a5568" stroke-width="1" marker-end="url(#ad)"/>
+  <text x="405" y="375" font-size="6" fill="#718096">MCP uses twins</text>
+  <line x1="475" y1="450" x2="335" y2="450" stroke="#4a5568" stroke-width="1" marker-end="url(#ad)"/>
+  <text x="405" y="458" font-size="6" fill="#718096">push needs multilingual</text>
+  <line x1="475" y1="450" x2="615" y2="450" stroke="#4a5568" stroke-width="1" marker-end="url(#ad)"/>
+  <text x="545" y="458" font-size="6" fill="#718096">discovery needs multilingual</text>
+
+  <!-- Phase deps: Phase 4 depends on Phase 1 + Phase 3 -->
+  <line x1="170" y1="305" x2="400" y2="320" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+  <line x1="725" y1="255" x2="600" y2="320" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+
+  <!-- PHASE 5: Knowledge-First Viz -->
+  <rect x="150" y="510" width="700" height="120" rx="6" fill="#fed7e2" stroke="#ed64a6" stroke-width="1.5"/>
+  <text x="500" y="530" text-anchor="middle" font-size="11" font-weight="bold" fill="#97266d">PHASE 5: Knowledge-First Viz</text>
+  <text x="500" y="543" text-anchor="middle" font-size="8" fill="#ed64a6">Depends on: Phase 2 (version history) + Phase 3 (cross-refs) + Phase 4 (search, MCP)</text>
+
+  <rect x="170" y="555" width="120" height="28" rx="3" fill="white" stroke="#ed64a6"/>
+  <text x="230" y="573" text-anchor="middle" font-size="7" font-weight="bold" fill="#97266d">REQ-VKF-001</text>
+  <text x="230" y="580" text-anchor="middle" font-size="6" fill="#718096">Mission Map</text>
+
+  <rect x="300" y="555" width="120" height="28" rx="3" fill="white" stroke="#ed64a6"/>
+  <text x="360" y="573" text-anchor="middle" font-size="7" font-weight="bold" fill="#97266d">REQ-VKF-002</text>
+  <text x="360" y="580" text-anchor="middle" font-size="6" fill="#718096">Knowledge/Tasks</text>
+
+  <rect x="430" y="555" width="120" height="28" rx="3" fill="white" stroke="#ed64a6"/>
+  <text x="490" y="573" text-anchor="middle" font-size="7" font-weight="bold" fill="#97266d">REQ-VKF-003</text>
+  <text x="490" y="580" text-anchor="middle" font-size="6" fill="#718096">Mission State Viz</text>
+
+  <rect x="560" y="555" width="120" height="28" rx="3" fill="white" stroke="#ed64a6"/>
+  <text x="620" y="573" text-anchor="middle" font-size="7" font-weight="bold" fill="#97266d">REQ-KB-006</text>
+  <text x="620" y="580" text-anchor="middle" font-size="6" fill="#718096">PLATFORM-001 Style</text>
+
+  <rect x="300" y="593" width="120" height="28" rx="3" fill="white" stroke="#ed64a6"/>
+  <text x="360" y="611" text-anchor="middle" font-size="7" font-weight="bold" fill="#97266d">REQ-VS-001</text>
+  <text x="360" y="618" text-anchor="middle" font-size="6" fill="#718096">Search Bar</text>
+
+  <!-- Phase 5 depends on Phase 2+3+4 -->
+  <line x1="465" y1="255" x2="350" y2="510" stroke="#4a5568" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+  <line x1="550" y1="480" x2="500" y2="510" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+
+  <!-- Legend -->
+  <rect x="870" y="145" width="210" height="120" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="975" y="168" text-anchor="middle" font-size="10" font-weight="bold" fill="#4a5568">Legend</text>
+  <line x1="885" y1="180" x2="920" y2="180" stroke="#4a5568" stroke-width="1.5" marker-end="url(#ad)"/>
+  <text x="930" y="184" font-size="8" fill="#4a5568">depends on</text>
+  <line x1="885" y1="200" x2="920" y2="200" stroke="#4a5568" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ad)"/>
+  <text x="930" y="204" font-size="8" fill="#4a5568">phase depends on</text>
+  <rect x="885" y="212" width="12" height="12" rx="2" fill="#f0fff4" stroke="#48bb78"/>
+  <text x="905" y="222" font-size="8" fill="#4a5568">done</text>
+  <rect x="885" y="230" width="12" height="12" rx="2" fill="white" stroke="#4299e1"/>
+  <text x="905" y="240" font-size="8" fill="#4a5568">requirement</text>
+  <text x="975" y="258" text-anchor="middle" font-size="8" fill="#718096">24 total | 3 done | 21 to implement</text>
+
+  <!-- Summary -->
+  <rect x="20" y="660" width="1060" height="70" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="550" y="682" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a202c">Implementation Order</text>
+  <text x="550" y="700" text-anchor="middle" font-size="9" fill="#4a5568">Phase 1 (6 reqs, no deps) → Phase 2 (2 reqs, needs P1) → Phase 3 (2 reqs, needs P2) → Phase 4 (6 reqs, needs P1+P3) → Phase 5 (5 reqs, needs P2+P3+P4)</text>
+  <text x="550" y="716" text-anchor="middle" font-size="9" fill="#718096">Within each phase: requirements can be parallelized EXCEPT where internal deps exist (marked with solid arrows)</text>
+</svg>
