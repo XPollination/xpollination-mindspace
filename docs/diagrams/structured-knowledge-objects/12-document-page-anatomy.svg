@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 750" font-family="system-ui, -apple-system, sans-serif">
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Document Page Anatomy: Every Element</text>
+
+  <!-- Browser frame -->
+  <rect x="50" y="50" width="800" height="680" rx="8" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- Title bar -->
+  <rect x="50" y="50" width="800" height="25" rx="8" fill="#f7fafc"/>
+  <circle cx="68" cy="62" r="4" fill="#fc8181"/>
+  <circle cx="82" cy="62" r="4" fill="#fbd38d"/>
+  <circle cx="96" cy="62" r="4" fill="#9ae6b4"/>
+  <text x="450" y="66" text-anchor="middle" font-size="8" fill="#a0aec0">mindspace.xpollination.earth/c/RCYFibnw/authentication</text>
+
+  <!-- Header -->
+  <rect x="50" y="75" width="800" height="40" fill="#1a202c"/>
+  <text x="80" y="100" font-size="13" font-weight="bold" fill="white">Mindspace</text>
+  <rect x="220" y="87" width="250" height="22" rx="11" fill="#2d3748"/>
+  <text x="240" y="101" font-size="8" fill="#a0aec0">&#x1F50D; Search...</text>
+  <rect x="520" y="87" width="70" height="22" rx="4" fill="#4299e1"/>
+  <text x="555" y="101" text-anchor="middle" font-size="8" font-weight="bold" fill="white">Knowledge</text>
+  <rect x="598" y="87" width="50" height="22" rx="4" fill="#2d3748"/>
+  <text x="623" y="101" text-anchor="middle" font-size="8" fill="#a0aec0">Tasks</text>
+  <rect x="656" y="87" width="58" height="22" rx="4" fill="#2d3748"/>
+  <text x="685" y="101" text-anchor="middle" font-size="8" fill="#a0aec0">Releases</text>
+
+  <!-- Breadcrumb -->
+  <text x="80" y="135" font-size="10" fill="#a0aec0">
+    <tspan fill="#4299e1" text-decoration="underline">Agent-Human Collaboration</tspan>
+    <tspan fill="#718096"> › </tspan>
+    <tspan font-weight="bold" fill="#1a202c">CAP-AUTH</tspan>
+  </text>
+
+  <!-- Annotation: breadcrumb -->
+  <rect x="680" y="123" width="150" height="22" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="138" text-anchor="middle" font-size="7" fill="#744210">A: Breadcrumb — click to go UP</text>
+
+  <!-- Type badge + title -->
+  <rect x="80" y="148" width="80" height="20" rx="3" fill="#48bb78"/>
+  <text x="120" y="162" text-anchor="middle" font-size="9" font-weight="bold" fill="white">CAPABILITY</text>
+  <text x="80" y="190" font-size="22" font-weight="bold" fill="#1a202c">CAP-AUTH</text>
+
+  <!-- Version + status -->
+  <rect x="270" y="173" width="50" height="20" rx="3" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="295" y="187" text-anchor="middle" font-size="8" fill="#2b6cb0">v0.0.2</text>
+  <rect x="330" y="173" width="45" height="20" rx="3" fill="#c6f6d5" stroke="#48bb78"/>
+  <text x="352" y="187" text-anchor="middle" font-size="8" fill="#276749">active</text>
+
+  <!-- Annotation: version -->
+  <rect x="680" y="173" width="150" height="22" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="188" text-anchor="middle" font-size="7" fill="#744210">B: Version badge — click for history</text>
+
+  <!-- Cross-references -->
+  <rect x="80" y="205" width="560" height="25" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="90" y="221" font-size="8" fill="#718096">Also composed by: </text>
+  <text x="187" y="221" font-size="8" fill="#4299e1" text-decoration="underline">Fair Attribution</text>
+  <text x="270" y="221" font-size="8" fill="#718096"> | </text>
+  <text x="282" y="221" font-size="8" fill="#4299e1" text-decoration="underline">Structured Knowledge Objects</text>
+
+  <!-- Annotation: cross-ref -->
+  <rect x="680" y="205" width="150" height="22" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="220" text-anchor="middle" font-size="7" fill="#744210">C: Cross-refs — jump SIDEWAYS</text>
+
+  <!-- Content area -->
+  <rect x="80" y="240" width="560" height="180" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="90" y="260" font-size="13" font-weight="bold" fill="#1a202c">What It Does</text>
+  <line x1="90" y1="266" x2="620" y2="266" stroke="#e2e8f0"/>
+  <text x="90" y="283" font-size="9" fill="#4a5568">Authentication and authorization service. Handles user</text>
+  <text x="90" y="296" font-size="9" fill="#4a5568">login via email/password and Google OAuth, registration</text>
+  <text x="90" y="309" font-size="9" fill="#4a5568">with invite codes, JWT session management...</text>
+
+  <text x="90" y="335" font-size="13" font-weight="bold" fill="#1a202c">Architecture</text>
+  <line x1="90" y1="341" x2="620" y2="341" stroke="#e2e8f0"/>
+  <!-- Inline diagram placeholder -->
+  <rect x="90" y="350" width="530" height="60" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="355" y="383" text-anchor="middle" font-size="10" fill="#718096">[SVG diagram: JWT flow + API key flow + OAuth flow]</text>
+
+  <!-- Annotation: content -->
+  <rect x="680" y="290" width="150" height="35" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="305" text-anchor="middle" font-size="7" fill="#744210">D: Rendered markdown content</text>
+  <text x="755" y="317" text-anchor="middle" font-size="7" fill="#744210">with inline SVG diagrams</text>
+
+  <!-- Requirements section -->
+  <rect x="80" y="430" width="560" height="100" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="90" y="450" font-size="12" font-weight="bold" fill="#1a202c">Requirements</text>
+
+  <rect x="90" y="460" width="260" height="55" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <rect x="90" y="460" width="260" height="4" rx="4" fill="#d69e2e"/>
+  <text x="100" y="480" font-size="9" font-weight="bold" fill="#1a202c">REQ-AUTH-001: User Login</text>
+  <text x="100" y="493" font-size="8" fill="#718096">When a user submits credentials, the</text>
+  <text x="100" y="504" font-size="8" fill="#718096">system SHALL authenticate and issue JWT</text>
+
+  <rect x="365" y="460" width="260" height="55" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <rect x="365" y="460" width="260" height="4" rx="4" fill="#d69e2e"/>
+  <text x="375" y="480" font-size="9" font-weight="bold" fill="#1a202c">REQ-AUTH-003: Brain Identity</text>
+  <text x="375" y="493" font-size="8" fill="#718096">When an agent contributes to the brain,</text>
+  <text x="375" y="504" font-size="8" fill="#718096">the system SHALL authenticate via API key</text>
+
+  <!-- Annotation: requirements -->
+  <rect x="680" y="460" width="150" height="35" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="475" text-anchor="middle" font-size="7" fill="#744210">E: Requirements — click to</text>
+  <text x="755" y="487" text-anchor="middle" font-size="7" fill="#744210">drill DOWN into EARS spec</text>
+
+  <!-- Version history section -->
+  <rect x="80" y="540" width="560" height="80" rx="4" fill="white" stroke="#e2e8f0"/>
+  <text x="90" y="560" font-size="12" font-weight="bold" fill="#1a202c">Version History</text>
+
+  <rect x="90" y="570" width="530" height="18" rx="3" fill="#c6f6d5" stroke="#48bb78"/>
+  <text x="100" y="583" font-size="8" font-weight="bold" fill="#276749">v0.0.2 (2026-03-19)</text>
+  <text x="260" y="583" font-size="8" fill="#48bb78">auth-session-and-oauth-fix, brain-identity-auth | +5 tests</text>
+
+  <rect x="90" y="592" width="530" height="18" rx="3" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="100" y="605" font-size="8" fill="#718096">v0.0.1 (2026-03-01)</text>
+  <text x="260" y="605" font-size="8" fill="#718096">ms-auth-e2e, ms-auth-user-journey | 12 tests</text>
+
+  <!-- Annotation: version history -->
+  <rect x="680" y="570" width="150" height="35" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="585" text-anchor="middle" font-size="7" fill="#744210">F: Version timeline — tasks,</text>
+  <text x="755" y="597" text-anchor="middle" font-size="7" fill="#744210">requirements, commits per version</text>
+
+  <!-- Sidebar: tasks + metadata -->
+  <rect x="80" y="630" width="560" height="50" rx="4" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="90" y="648" font-size="9" fill="#718096">Implementing tasks: 80 total | 77 complete | 3 active</text>
+  <text x="90" y="663" font-size="9" fill="#718096">Driven by: Agent-Human Collaboration (original), Structured Knowledge Objects (extensions)</text>
+
+  <!-- Annotation: metadata -->
+  <rect x="680" y="630" width="150" height="35" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="645" text-anchor="middle" font-size="7" fill="#744210">G: Metadata — task counts,</text>
+  <text x="755" y="657" text-anchor="middle" font-size="7" fill="#744210">driving missions, agent access</text>
+
+  <!-- Agent readable note -->
+  <rect x="80" y="690" width="560" height="25" rx="4" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="360" y="707" text-anchor="middle" font-size="8" fill="#2b6cb0">&#x1F916; Append .md to URL → plain text with diagram descriptions for agent consumption</text>
+
+  <!-- Annotation: agent -->
+  <rect x="680" y="690" width="150" height="22" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="755" y="705" text-anchor="middle" font-size="7" fill="#744210">H: Agent-readable variant</text>
+</svg>
