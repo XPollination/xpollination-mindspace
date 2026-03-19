@@ -895,40 +895,31 @@ function cmdUpdateDna(id, dnaJson, actor) {
 }
 
 /**
- * Validate task_type field and enforce type-specific mandatory DNA fields.
- * task_type is optional for backward compat — only validated when set.
- * Types: 'design', 'test', 'impl', 'bug', 'research', 'content'
+ * Validate requirement content_md has 9 mandatory section headings.
+ * Only triggered when task has requirement_ref or requirement_refs.
+ * NULL content_md = skip validation (backward compat).
  */
-const VALID_TASK_TYPES = ['design', 'test', 'impl', 'bug', 'research', 'content'];
+const REQUIRED_SECTIONS = [
+  'Purpose', 'Acceptance Criteria', 'User Stories',
+  'Technical Constraints', 'Dependencies', 'Test Strategy',
+  'Security', 'Performance', 'Version History'
+];
 
-function validateTaskType(dna) {
-  const errors = [];
+function validateRequirementTemplate(content_md) {
+  if (!content_md) return []; // NULL = skip validation
 
-  // Base fields always required: title and role
-  if (!dna.title) errors.push('title is required — missing title in DNA');
-  if (!dna.role) errors.push('role is required — missing role in DNA');
-
-  // task_type is optional — if not set, skip type-specific validation
-  if (!dna.task_type) return errors;
-
-  if (!VALID_TASK_TYPES.includes(dna.task_type)) {
-    errors.push(`Invalid task_type: "${dna.task_type}". Valid: ${VALID_TASK_TYPES.join(', ')}`);
-    return errors;
-  }
-
-  // Type-specific mandatory fields
-  if (dna.task_type === 'design') {
-    if (!dna.acceptance_criteria) errors.push('design type requires acceptance_criteria');
-    if (!dna.scope_boundary) errors.push('design type requires scope_boundary');
-  }
-
-  if (dna.task_type === 'test' || dna.task_type === 'impl') {
-    if (!dna.depends_on || (Array.isArray(dna.depends_on) && dna.depends_on.length === 0)) {
-      errors.push(`${dna.task_type} type requires depends_on — must reference the design task`);
+  const missing = [];
+  for (const section of REQUIRED_SECTIONS) {
+    const pattern = new RegExp(`##\\s*${section}`, 'i');
+    if (!pattern.test(content_md)) {
+      missing.push(section);
     }
   }
 
-  return errors;
+  if (missing.length > 0) {
+    return [`Missing required heading sections in requirement content_md: ${missing.join(', ')}`];
+  }
+  return [];
 }
 
 function cmdCreate(type, slug, dnaJson, actor) {
@@ -950,12 +941,6 @@ function cmdCreate(type, slug, dnaJson, actor) {
   const validationErrors = validateDnaFields(dna);
   if (validationErrors.length > 0) {
     error(`Validation failed:\n${validationErrors.join('\n')}`);
-  }
-
-  // Validate task_type and type-specific fields
-  const typeErrors = validateTaskType(dna);
-  if (typeErrors.length > 0) {
-    error(`Task type validation failed:\n${typeErrors.join('\n')}`);
   }
 
   // Bug type requires parent_ids — every bug must link to the task it originated from
