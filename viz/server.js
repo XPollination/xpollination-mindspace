@@ -382,7 +382,10 @@ ${(siblings || []).length > 0 ? `
     }).join('')}
   </div>
 </section>` : ''}
-<div class="metadata">Version ${node.content_version || 0}</div>
+<div class="metadata">
+  Version ${node.content_version || 0}
+  <span style="margin-left:16px;"><a href="/" style="color:var(--link);">View Tasks</a> · <a href="/" style="color:var(--link);">Back to Dashboard</a></span>
+</div>
 </div></body></html>`;
 }
 
@@ -578,9 +581,9 @@ const server = http.createServer(async (req, res) => {
       try {
         const db = new Database(proj.dbPath, { readonly: true });
         try {
-          const missionRows = db.prepare("SELECT id, slug, title, description, status FROM missions WHERE status = 'active' ORDER BY created_at ASC").all();
+          const missionRows = db.prepare("SELECT id, slug, title, description, status, short_id FROM missions WHERE status = 'active' ORDER BY created_at ASC").all();
           for (const m of missionRows) {
-            const caps = db.prepare("SELECT id, title, description, status, sort_order FROM capabilities WHERE mission_id = ? ORDER BY sort_order ASC").all(m.id);
+            const caps = db.prepare("SELECT id, title, description, status, sort_order, short_id FROM capabilities WHERE mission_id = ? ORDER BY sort_order ASC").all(m.id);
             const enrichedCaps = caps.map(cap => {
               // Get requirements for this capability
               let reqs = [];
@@ -599,7 +602,7 @@ const server = http.createServer(async (req, res) => {
               const progress_percent = task_count > 0 ? Math.round((complete_count / task_count) * 100) : 0;
               return { id: cap.id, title: cap.title, description: cap.description, status: cap.status, task_count, complete_count, progress_percent, requirements: reqs };
             });
-            missions.push({ id: m.id, slug: m.slug, title: m.title, description: m.description, status: m.status, capabilities: enrichedCaps });
+            missions.push({ id: m.id, slug: m.slug, title: m.title, description: m.description, status: m.status, short_id: m.short_id, kb_url: m.short_id ? `/m/${m.short_id}` : null, capabilities: enrichedCaps });
           }
         } catch (err) { /* tables may not exist */ }
         db.close();
