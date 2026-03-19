@@ -286,15 +286,22 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
         children = db.prepare("SELECT id, req_id_human, title, description, short_id, status FROM requirements WHERE capability_id = ? ORDER BY req_id_human ASC").all(node.id);
       }
       const siblings = getSiblings(db, node, typePrefix);
+      // Version timeline for capabilities
+      let versionHistory = [];
+      if (typePrefix === 'c') {
+        try {
+          versionHistory = db.prepare("SELECT * FROM capability_version_history WHERE capability_id = ? ORDER BY version DESC").all(node.id);
+        } catch (e) { /* table may not exist */ }
+      }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(renderNodePage(node, typePrefix, typeInfo, children, siblings));
+      res.end(renderNodePage(node, typePrefix, typeInfo, children, siblings, versionHistory));
       return;
     }
   } catch (err) { /* table may not exist */ }
   send404(res, shortId, typePrefix);
 }
 
-function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
+function renderNodePage(node, typePrefix, typeInfo, children, siblings, versionHistory) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
   const content = node.content_md || description;
@@ -410,6 +417,26 @@ ${(siblings || []).length > 0 ? `
       return `<a href="/${prefix}/${s.short_id || s.id}/${slugify(sTitle)}" style="padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--link);text-decoration:none;">${sTitle}</a>`;
     }).join('')}
   </div>
+</section>` : ''}
+${(versionHistory || []).length > 0 ? `
+<section class="version-timeline" style="margin-top:24px;">
+  <h2 style="font-size:16px;color:var(--text);margin-bottom:12px;">Version History</h2>
+  ${versionHistory.slice(0, 3).map((v, i) => `
+    <div style="padding:8px 12px;border-left:3px solid ${i === 0 ? '#22c55e' : '#444'};margin-bottom:8px;background:var(--surface);border-radius:0 4px 4px 0;">
+      <strong style="color:var(--text);">v${v.version}</strong> <span style="color:var(--muted);font-size:11px;">${v.changed_at || ''} by ${v.changed_by}</span>
+      ${v.changelog ? `<p style="margin:4px 0 0;font-size:12px;color:var(--muted);">${v.changelog}</p>` : ''}
+    </div>
+  `).join('')}
+  ${versionHistory.length > 3 ? `
+    <details style="margin-top:4px;">
+      <summary style="cursor:pointer;color:var(--link);font-size:12px;">Show ${versionHistory.length - 3} more versions</summary>
+      ${versionHistory.slice(3).map(v => `
+        <div style="padding:6px 12px;border-left:3px solid #333;margin-top:4px;font-size:12px;color:var(--muted);">
+          <strong>v${v.version}</strong> — ${v.changelog || 'No changelog'}
+        </div>
+      `).join('')}
+    </details>
+  ` : ''}
 </section>` : ''}
 <div class="metadata">
   Version ${node.content_version || 0}
