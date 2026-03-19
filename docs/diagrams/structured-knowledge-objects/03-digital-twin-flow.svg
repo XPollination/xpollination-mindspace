@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+  </defs>
+
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Digital Twin: From Conversation to Database</text>
+
+  <!-- Phase 1: Conversation -->
+  <rect x="30" y="70" width="160" height="120" rx="10" fill="#ebf8ff" stroke="#4299e1" stroke-width="2"/>
+  <text x="110" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#2b6cb0">Conversation</text>
+  <circle cx="70" cy="130" r="18" fill="#bee3f8" stroke="#4299e1"/>
+  <text x="70" y="134" text-anchor="middle" font-size="10" fill="#2b6cb0">Human</text>
+  <circle cx="150" cy="130" r="18" fill="#bee3f8" stroke="#4299e1"/>
+  <text x="150" y="134" text-anchor="middle" font-size="8" fill="#2b6cb0">LIAISON</text>
+  <text x="110" y="170" text-anchor="middle" font-size="9" fill="#4a5568">"Create a mission</text>
+  <text x="110" y="182" text-anchor="middle" font-size="9" fill="#4a5568">about self-healing"</text>
+
+  <!-- Phase 2: Twin Creation -->
+  <rect x="220" y="70" width="160" height="120" rx="10" fill="#f0fff4" stroke="#48bb78" stroke-width="2"/>
+  <text x="300" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#276749">Twin Created</text>
+  <rect x="245" y="110" width="110" height="65" rx="4" fill="white" stroke="#48bb78" stroke-width="1"/>
+  <text x="300" y="128" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">MissionTwin</text>
+  <text x="300" y="142" text-anchor="middle" font-size="8" fill="#48bb78">interface: v1.0</text>
+  <text x="300" y="155" text-anchor="middle" font-size="8" fill="#48bb78">sections: 0/9</text>
+  <text x="300" y="168" text-anchor="middle" font-size="8" fill="#e53e3e">valid: false</text>
+
+  <!-- Phase 3: Filling -->
+  <rect x="410" y="70" width="160" height="120" rx="10" fill="#fffbeb" stroke="#d69e2e" stroke-width="2"/>
+  <text x="490" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#744210">Filling Twin</text>
+  <rect x="435" y="110" width="110" height="65" rx="4" fill="white" stroke="#d69e2e" stroke-width="1"/>
+  <text x="490" y="128" text-anchor="middle" font-size="9" font-weight="bold" fill="#744210">MissionTwin</text>
+  <text x="490" y="142" text-anchor="middle" font-size="8" fill="#d69e2e">Vision &#x2713;</text>
+  <text x="490" y="155" text-anchor="middle" font-size="8" fill="#d69e2e">Rationale &#x2713;</text>
+  <text x="490" y="168" text-anchor="middle" font-size="8" fill="#e53e3e">Scope &#x2717; ...</text>
+
+  <!-- Phase 4: Valid -->
+  <rect x="600" y="70" width="130" height="120" rx="10" fill="#f0fff4" stroke="#276749" stroke-width="2"/>
+  <text x="665" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#276749">Valid!</text>
+  <rect x="620" y="110" width="90" height="65" rx="4" fill="white" stroke="#276749" stroke-width="1"/>
+  <text x="665" y="128" text-anchor="middle" font-size="9" font-weight="bold" fill="#276749">MissionTwin</text>
+  <text x="665" y="142" text-anchor="middle" font-size="8" fill="#276749">sections: 9/9</text>
+  <text x="665" y="158" text-anchor="middle" font-size="11" fill="#276749">&#x2713; valid</text>
+
+  <!-- Phase 5: A2A -->
+  <rect x="760" y="70" width="120" height="120" rx="10" fill="#faf5ff" stroke="#9f7aea" stroke-width="2"/>
+  <text x="820" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#553c9a">A2A Server</text>
+  <text x="820" y="120" text-anchor="middle" font-size="9" fill="#6b46c1">Validates again</text>
+  <text x="820" y="135" text-anchor="middle" font-size="9" fill="#6b46c1">Checks perms</text>
+  <text x="820" y="150" text-anchor="middle" font-size="9" fill="#6b46c1">Creates in DB</text>
+  <text x="820" y="170" text-anchor="middle" font-size="9" fill="#276749">→ v0.0.1</text>
+
+  <!-- Arrows -->
+  <line x1="190" y1="130" x2="215" y2="130" stroke="#4a5568" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="380" y1="130" x2="405" y2="130" stroke="#4a5568" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="570" y1="130" x2="595" y2="130" stroke="#4a5568" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="730" y1="130" x2="755" y2="130" stroke="#4a5568" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Evolution flow below -->
+  <text x="450" y="230" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a202c">Twin Evolution (Version Bump)</text>
+
+  <rect x="50" y="260" width="150" height="80" rx="8" fill="#f7fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="125" y="285" text-anchor="middle" font-size="11" font-weight="bold" fill="#4a5568">Load Current</text>
+  <text x="125" y="302" text-anchor="middle" font-size="9" fill="#718096">CAP-AUTH v0.0.1</text>
+  <text x="125" y="317" text-anchor="middle" font-size="9" fill="#718096">→ CapabilityTwin</text>
+
+  <rect x="240" y="260" width="150" height="80" rx="8" fill="#fffbeb" stroke="#d69e2e" stroke-width="1.5"/>
+  <text x="315" y="285" text-anchor="middle" font-size="11" font-weight="bold" fill="#744210">Modify</text>
+  <text x="315" y="302" text-anchor="middle" font-size="9" fill="#975a16">Add brain identity</text>
+  <text x="315" y="317" text-anchor="middle" font-size="9" fill="#975a16">section (+800 chars)</text>
+
+  <rect x="430" y="260" width="150" height="80" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="505" y="285" text-anchor="middle" font-size="11" font-weight="bold" fill="#276749">Validate + Diff</text>
+  <text x="505" y="302" text-anchor="middle" font-size="9" fill="#48bb78">twin.validate() &#x2713;</text>
+  <text x="505" y="317" text-anchor="middle" font-size="9" fill="#48bb78">twin.diff() → +1 section</text>
+
+  <rect x="620" y="260" width="150" height="80" rx="8" fill="#faf5ff" stroke="#9f7aea" stroke-width="1.5"/>
+  <text x="695" y="285" text-anchor="middle" font-size="11" font-weight="bold" fill="#553c9a">Submit Evolution</text>
+  <text x="695" y="302" text-anchor="middle" font-size="9" fill="#6b46c1">A2A creates v0.0.2</text>
+  <text x="695" y="317" text-anchor="middle" font-size="9" fill="#6b46c1">Links: tasks, reqs</text>
+
+  <line x1="200" y1="300" x2="235" y2="300" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="390" y1="300" x2="425" y2="300" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="580" y1="300" x2="615" y2="300" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Bottom: three validation layers -->
+  <rect x="150" y="375" width="600" height="55" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="450" y="395" text-anchor="middle" font-size="11" font-weight="bold" fill="#4a5568">Three Validation Layers</text>
+  <text x="250" y="415" text-anchor="middle" font-size="9" fill="#4299e1">Twin (client) — fast, local</text>
+  <text x="450" y="415" text-anchor="middle" font-size="9" fill="#9f7aea">A2A (server) — authoritative</text>
+  <text x="650" y="415" text-anchor="middle" font-size="9" fill="#276749">DB (storage) — last defense</text>
+</svg>

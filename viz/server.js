@@ -30,7 +30,9 @@ const PUBLIC_PATHS = [
   '/invite/',
   '/health',
   '/api/auth/',
+  '/api/health',
   '/assets/',
+  '/docs/',
   '/favicon.ico',
 ];
 
@@ -298,7 +300,9 @@ function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   // Render markdown with marked.parse if available, fallback to pre-formatted
   let renderedContent;
   if (marked && marked.parse) {
-    renderedContent = marked.parse(content);
+    // Rewrite diagram image paths: docs/diagrams/... → /docs/diagrams/...
+    const rewritten = content.replace(/\!\[([^\]]*)\]\(docs\//g, '![$1](/docs/');
+    renderedContent = marked.parse(rewritten);
   } else {
     renderedContent = '<div style="white-space:pre-wrap;">' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
   }
@@ -356,6 +360,14 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 .content table{width:100%;border-collapse:collapse;margin:12px 0;}
 .content th,.content td{border:1px solid var(--border);padding:8px;text-align:left;}
 .content th{background:var(--surface);}
+.content img{max-width:100%;height:auto;margin:16px 0;border-radius:6px;border:1px solid var(--border);}
+.content a{color:var(--link);text-decoration:none;}
+.content a:hover{text-decoration:underline;}
+.content ul,.content ol{margin:8px 0 8px 24px;}
+.content li{margin:4px 0;}
+.content blockquote{border-left:3px solid var(--border);padding-left:12px;color:var(--muted);margin:12px 0;}
+.content strong{color:var(--text);}
+.content hr{border:none;border-top:1px solid var(--border);margin:24px 0;}
 .children{margin-top:32px;}
 .children h2{color:var(--text);font-size:18px;margin-bottom:12px;}
 .child-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
@@ -1227,6 +1239,16 @@ const server = http.createServer(async (req, res) => {
     }
     send404(res, kbMatch[2], kbMatch[1]);
     return;
+  }
+
+  // Serve docs/ directory (diagrams, etc.) from repo root
+  if (pathname.startsWith('/docs/')) {
+    const repoRoot = path.resolve(__dirname, '..');
+    const docPath = path.join(repoRoot, pathname);
+    if (docPath.startsWith(repoRoot) && fs.existsSync(docPath)) {
+      serveStatic(res, docPath);
+      return;
+    }
   }
 
   // Static files — serve from active/ symlink directory, fallback to root for shared assets

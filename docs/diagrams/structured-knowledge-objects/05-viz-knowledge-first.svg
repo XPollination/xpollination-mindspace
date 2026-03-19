@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550" font-family="system-ui, -apple-system, sans-serif">
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Viz: Knowledge-First Layout</text>
+
+  <!-- Browser frame -->
+  <rect x="50" y="50" width="800" height="480" rx="8" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- Title bar -->
+  <rect x="50" y="50" width="800" height="30" rx="8" fill="#f7fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <circle cx="70" cy="65" r="5" fill="#fc8181"/>
+  <circle cx="85" cy="65" r="5" fill="#fbd38d"/>
+  <circle cx="100" cy="65" r="5" fill="#9ae6b4"/>
+  <text x="450" y="69" text-anchor="middle" font-size="9" fill="#718096">mindspace.xpollination.earth</text>
+
+  <!-- Header -->
+  <rect x="50" y="80" width="800" height="50" fill="#1a202c"/>
+  <text x="80" y="110" font-size="16" font-weight="bold" fill="white">Mindspace</text>
+
+  <!-- Search bar -->
+  <rect x="250" y="94" width="350" height="28" rx="14" fill="#2d3748" stroke="#4a5568"/>
+  <text x="275" y="112" font-size="10" fill="#a0aec0">&#x1F50D; Search the knowledge space...</text>
+
+  <!-- Nav tabs -->
+  <rect x="650" y="94" width="80" height="24" rx="4" fill="#4299e1"/>
+  <text x="690" y="110" text-anchor="middle" font-size="10" font-weight="bold" fill="white">Knowledge</text>
+  <rect x="740" y="94" width="60" height="24" rx="4" fill="#2d3748" stroke="#4a5568"/>
+  <text x="770" y="110" text-anchor="middle" font-size="10" fill="#a0aec0">Tasks</text>
+
+  <!-- Theme toggle -->
+  <circle cx="820" cy="106" r="10" fill="#2d3748" stroke="#4a5568"/>
+  <text x="820" y="110" text-anchor="middle" font-size="10">&#x2600;</text>
+
+  <!-- Mission Map (default view) -->
+  <text x="80" y="158" font-size="14" font-weight="bold" fill="#1a202c">Active Missions</text>
+  <text x="80" y="175" font-size="10" fill="#718096">3 missions driving current work</text>
+
+  <!-- Mission Card 1 -->
+  <rect x="70" y="190" width="240" height="150" rx="8" fill="white" stroke="#4299e1" stroke-width="1.5"/>
+  <rect x="70" y="190" width="240" height="8" rx="8" fill="#4299e1"/>
+  <text x="85" y="218" font-size="12" font-weight="bold" fill="#1a202c">Structured Knowledge</text>
+  <text x="85" y="232" font-size="12" font-weight="bold" fill="#1a202c">Objects</text>
+  <text x="85" y="252" font-size="9" fill="#718096">Self-aware objects with versioned</text>
+  <text x="85" y="264" font-size="9" fill="#718096">interfaces. Digital twin pattern.</text>
+  <text x="85" y="276" font-size="9" fill="#718096">A2A-ready architecture.</text>
+  <rect x="85" y="290" width="60" height="18" rx="3" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="115" y="302" text-anchor="middle" font-size="8" fill="#2b6cb0">4 caps</text>
+  <rect x="155" y="290" width="50" height="18" rx="3" fill="#f0fff4" stroke="#48bb78"/>
+  <text x="180" y="302" text-anchor="middle" font-size="8" fill="#276749">draft</text>
+  <text x="260" y="328" text-anchor="middle" font-size="8" fill="#4299e1">Click to explore &#x2192;</text>
+
+  <!-- Mission Card 2 -->
+  <rect x="330" y="190" width="240" height="150" rx="8" fill="white" stroke="#48bb78" stroke-width="1.5"/>
+  <rect x="330" y="190" width="240" height="8" rx="8" fill="#48bb78"/>
+  <text x="345" y="218" font-size="12" font-weight="bold" fill="#1a202c">Self-Healing</text>
+  <text x="345" y="232" font-size="12" font-weight="bold" fill="#1a202c">Infrastructure</text>
+  <text x="345" y="252" font-size="9" fill="#718096">Health endpoints, watchdog,</text>
+  <text x="345" y="264" font-size="9" fill="#718096">startup checks. The system</text>
+  <text x="345" y="276" font-size="9" fill="#718096">monitors itself.</text>
+  <rect x="345" y="290" width="60" height="18" rx="3" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="375" y="302" text-anchor="middle" font-size="8" fill="#2b6cb0">4 caps</text>
+  <rect x="415" y="290" width="50" height="18" rx="3" fill="#f0fff4" stroke="#48bb78"/>
+  <text x="440" y="302" text-anchor="middle" font-size="8" fill="#276749">active</text>
+  <text x="520" y="328" text-anchor="middle" font-size="8" fill="#48bb78">Click to explore &#x2192;</text>
+
+  <!-- Mission Card 3 -->
+  <rect x="590" y="190" width="240" height="150" rx="8" fill="white" stroke="#d69e2e" stroke-width="1.5"/>
+  <rect x="590" y="190" width="240" height="8" rx="8" fill="#d69e2e"/>
+  <text x="605" y="218" font-size="12" font-weight="bold" fill="#1a202c">Fair Attribution</text>
+  <text x="605" y="252" font-size="9" fill="#718096">Provenance Chain for lossless</text>
+  <text x="605" y="264" font-size="9" fill="#718096">authorship tracking. Token</text>
+  <text x="605" y="276" font-size="9" fill="#718096">distribution via Smart Contract.</text>
+  <rect x="605" y="290" width="60" height="18" rx="3" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="635" y="302" text-anchor="middle" font-size="8" fill="#2b6cb0">2 caps</text>
+  <rect x="675" y="290" width="50" height="18" rx="3" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="700" y="302" text-anchor="middle" font-size="8" fill="#744210">active</text>
+  <text x="780" y="328" text-anchor="middle" font-size="8" fill="#d69e2e">Click to explore &#x2192;</text>
+
+  <!-- Deprecated section -->
+  <text x="80" y="370" font-size="11" fill="#a0aec0">Deprecated Missions</text>
+  <rect x="70" y="380" width="760" height="35" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="85" y="402" font-size="9" fill="#a0aec0">Agent-Human Collaboration &#x2022; Traversable Context &#x2022; Knowledge Space Navigation &#x2022; Mindspace Platform &#x2022; ROAD-001</text>
+
+  <!-- Footer -->
+  <rect x="70" y="430" width="760" height="40" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="85" y="452" font-size="9" fill="#718096">Backlog: 12 tasks planned across 2 missions</text>
+  <text x="450" y="452" text-anchor="middle" font-size="9" fill="#718096">Pipeline: 3 active &#x2022; 2 in review</text>
+  <text x="780" y="452" font-size="9" fill="#718096" text-anchor="end">v0.0.37 &#x2022; Light mode</text>
+
+  <!-- Annotation -->
+  <text x="450" y="510" text-anchor="middle" font-size="10" fill="#4a5568">Mission map is the DEFAULT view. Click any mission → full document page (PLATFORM-001 style).</text>
+  <text x="450" y="525" text-anchor="middle" font-size="10" fill="#4a5568">Search bar queries brain vector space. \"Tasks\" tab switches to kanban. Theme toggle in header.</text>
+</svg>
