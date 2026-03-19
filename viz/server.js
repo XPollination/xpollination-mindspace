@@ -333,9 +333,11 @@ function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
 <meta property="og:description" content="${description.slice(0, 200)}">
 <meta property="og:type" content="article">
 <style>
-:root{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;}
+:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;--content-color:#333;}
+[data-theme="dark"]{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;--content-color:#ccc;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
+.theme-toggle{position:fixed;top:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:14px;color:var(--text);z-index:100;}
 .container{max-width:760px;margin:0 auto;padding:24px 16px;}
 .breadcrumb{font-size:13px;color:var(--muted);margin-bottom:20px;}
 .breadcrumb a{color:var(--muted);text-decoration:none;}
@@ -344,7 +346,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .breadcrumb span:not(:last-child)::after,.breadcrumb a::after{content:" › ";color:#555;}
 .badge{display:inline-block;padding:2px 10px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#fff;background:${typeInfo.color};margin-bottom:8px;}
 h1{font-size:26px;margin:0 0 16px;color:var(--text);}
-.content{line-height:1.7;color:#ccc;}
+.content{line-height:1.7;color:var(--content-color);}
 .content h2{color:var(--text);margin:24px 0 12px;font-size:20px;border-bottom:1px solid var(--border);padding-bottom:4px;}
 .content h3{color:var(--text);margin:16px 0 8px;font-size:16px;}
 .content p{margin:8px 0;}
@@ -365,6 +367,19 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 @media(max-width:600px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;}}
 </style>
 </head><body>
+<button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌓</button>
+<script>
+// Theme toggle with localStorage persistence
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+}
+// Apply saved preference (default: light)
+const saved = localStorage.getItem('theme');
+if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+</script>
 <div class="container">
 <nav class="breadcrumb">${breadcrumb.join('')}</nav>
 <div class="badge">${typeInfo.label}</div>
