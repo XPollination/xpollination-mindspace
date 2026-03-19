@@ -16,7 +16,12 @@
     "api": "node dist/api/server.js",
     "api:dev": "tsx watch api/server.ts",
     "api:migrate": "tsx api/db/migrate.ts",
-    "start:api": "tsx api/db/migrate.ts && tsx api/server.ts"
+    "start:api": "tsx api/db/migrate.ts && tsx api/server.ts",
+    "restart:viz": "node scripts/service-lifecycle.js restart viz",
+    "restart:api": "node scripts/service-lifecycle.js restart api",
+    "deploy:viz": "node scripts/service-lifecycle.js deploy viz",
+    "migrate": "node scripts/service-lifecycle.js migrate",
+    "health": "node scripts/service-lifecycle.js health"
   },
   "keywords": [
     "mcp",
