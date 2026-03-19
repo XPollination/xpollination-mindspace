@@ -229,6 +229,36 @@ const KB_TYPE_MAP = {
 
 const KB_ROUTE = /^\/(m|c|r|t)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/;
 
+function slugify(text) {
+  return (text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function buildBreadcrumb(node, typePrefix) {
+  const crumbs = [];
+  crumbs.push({ label: 'Mindspace', href: '/' });
+  if (node.mission_title && node.mission_short_id) {
+    crumbs.push({ label: node.mission_title, href: `/m/${node.mission_short_id}/${slugify(node.mission_title)}` });
+  }
+  if (node.capability_title && node.capability_short_id) {
+    crumbs.push({ label: node.capability_title, href: `/c/${node.capability_short_id}/${slugify(node.capability_title)}` });
+  }
+  const title = node.title || node.req_id_human || 'Untitled';
+  crumbs.push({ label: title, href: null });
+  return crumbs;
+}
+
+function getSiblings(db, node, typePrefix) {
+  try {
+    if (typePrefix === 'c' && node.mission_id) {
+      return db.prepare("SELECT id, title, short_id, status FROM capabilities WHERE mission_id = ? AND id != ? ORDER BY sort_order ASC").all(node.mission_id, node.id);
+    }
+    if (typePrefix === 'r' && node.capability_id) {
+      return db.prepare("SELECT id, req_id_human, title, short_id, status FROM requirements WHERE capability_id = ? AND id != ? ORDER BY req_id_human ASC").all(node.capability_id, node.id);
+    }
+  } catch (e) { /* table may not exist */ }
+  return [];
+}
+
 function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   const typeInfo = KB_TYPE_MAP[typePrefix];
   if (!typeInfo || !typeInfo.query) {
@@ -251,15 +281,16 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
       } else if (typePrefix === 'c') {
         children = db.prepare("SELECT id, req_id_human, title, description, short_id, status FROM requirements WHERE capability_id = ? ORDER BY req_id_human ASC").all(node.id);
       }
+      const siblings = getSiblings(db, node, typePrefix);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(renderNodePage(node, typePrefix, typeInfo, children));
+      res.end(renderNodePage(node, typePrefix, typeInfo, children, siblings));
       return;
     }
   } catch (err) { /* table may not exist */ }
   send404(res, shortId, typePrefix);
 }
 
-function renderNodePage(node, typePrefix, typeInfo, children) {
+function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
   const content = node.content_md || description;
@@ -273,15 +304,10 @@ function renderNodePage(node, typePrefix, typeInfo, children) {
   }
 
   // Build breadcrumb with short_id links
-  const breadcrumb = [];
-  breadcrumb.push('<a href="/">Mindspace</a>');
-  if (node.mission_title && node.mission_short_id) {
-    breadcrumb.push(`<a href="/m/${node.mission_short_id}">${node.mission_title}</a>`);
-  }
-  if (node.capability_title && node.capability_short_id) {
-    breadcrumb.push(`<a href="/c/${node.capability_short_id}">${node.capability_title}</a>`);
-  }
-  breadcrumb.push(`<span class="current">${title}</span>`);
+  const crumbs = buildBreadcrumb(node, typePrefix);
+  const breadcrumb = crumbs.map(c =>
+    c.href ? `<a href="${c.href}">${c.label}</a>` : `<span class="current">${c.label}</span>`
+  );
 
   // Children cards
   const childPrefix = typePrefix === 'm' ? 'c' : typePrefix === 'c' ? 'r' : 't';
@@ -345,6 +371,17 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 <h1>${title}</h1>
 <div class="content">${renderedContent}</div>
 ${childrenHtml}
+${(siblings || []).length > 0 ? `
+<section class="siblings" style="margin-top:24px;">
+  <h3 style="font-size:14px;color:var(--muted);margin-bottom:8px;">Also under ${node.mission_title || 'this parent'}</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;">
+    ${siblings.map(s => {
+      const prefix = typePrefix;
+      const sTitle = s.title || s.req_id_human || s.id;
+      return `<a href="/${prefix}/${s.short_id || s.id}/${slugify(sTitle)}" style="padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--link);text-decoration:none;">${sTitle}</a>`;
+    }).join('')}
+  </div>
+</section>` : ''}
 <div class="metadata">Version ${node.content_version || 0}</div>
 </div></body></html>`;
 }
