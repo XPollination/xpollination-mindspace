@@ -231,6 +231,12 @@ const KB_TYPE_MAP = {
   t: { table: 'mindspace_nodes', label: 'Task', color: '#ef4444', query: null },
 };
 
+// Mission lifecycle status color mapping
+const MISSION_STATUS_COLORS = {
+  draft: '#666', active: '#22c55e', complete: '#eab308', cancelled: '#ef4444', deprecated: '#444',
+  ready: '#3b82f6', blocked: '#ef4444'
+};
+
 const KB_ROUTE = /^\/(m|c|r|t)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/;
 
 function slugify(text) {
