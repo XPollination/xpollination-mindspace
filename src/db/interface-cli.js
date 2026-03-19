@@ -45,6 +45,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // 'backlog' → pre-queue, excluded from monitor/kanban. Transitions: backlog→pending, pending→backlog
 // 'pending' → queued, awaiting PDSA start
 // Full list: backlog, pending, ready, active, approval, approved, testing, review, rework, complete, blocked, cancelled
+//
+// Mission lifecycle (state machine): draft → ready → active → complete → deprecated
+// Mission transitions:
+//   draft→ready: mission design approved, capabilities defined
+//   ready→active: mission launched — triggers backlog release (backlog→pending for linked tasks)
+//   active→complete: all capabilities delivered
+//   complete→deprecated: mission archived, read-only
+// Backlog release side effect: when mission transitions ready→active,
+// all tasks linked to mission capabilities move from backlog→pending
 
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
