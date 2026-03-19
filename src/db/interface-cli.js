@@ -55,6 +55,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Backlog release side effect: when mission transitions ready→active,
 // all tasks linked to mission capabilities move from backlog→pending
 
+// Node relationship types (SpiceDB-compatible)
+// Used in node_relationships table: source_type:source_id#relation@target_type:target_id
+const VALID_RELATIONSHIP_TYPES = [
+  'COMPOSES', 'IMPLEMENTS', 'DEPENDS_ON', 'ASSIGNED_TO', 'DRIVEN_BY', 'SATISFIED_BY', 'TESTS', 'REVIEWS'
+];
+
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
 
