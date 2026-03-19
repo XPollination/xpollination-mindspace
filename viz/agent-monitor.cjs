@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 /**
- * Agent Monitor v0.0.2 — Role-based work detection
+ * Agent Monitor v0.0.3 — Direct DB queries (no CLI subprocess)
+ *
+ * v0.0.3 fixes (2026-03-19):
+ *   - Replaced CLI subprocess queries with direct better-sqlite3 queries
+ *   - Root cause: --role=liaison returned ALL 403 tasks (121KB JSON) through 64KB pipe buffer
+ *     causing intermittent silent failures caught by try/catch { return [] }
+ *   - Direct queries: WHERE role=? AND status NOT IN ('complete','cancelled') — returns only actionable data
+ *   - Eliminates 8 node subprocess spawns per poll cycle
+ *
+ * Previous: Agent Monitor v0.0.2 — Role-based work detection
  *
  * Simple principle: find tasks assigned to your role + role-agnostic statuses.
  * The workflow engine validates transitions — the monitor just surfaces work.
@@ -19,7 +28,6 @@
  *   - PDSA trace: HomeAssistant/systems/hetzner-cx22-ubuntu/pdca/monitoring/v0.0.2/
  */
 
-const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -42,9 +50,8 @@ const projects = _discoverProjects(WORKSPACE_PATH).map(p => ({ ...p, cliPath: CL
  *   1. ALL tasks with role={role} (excluding terminal statuses)
  *   2. Role-agnostic statuses (e.g., liaison sees all 'approval' tasks)
  *
- * Terminal statuses (not actionable): complete, cancelled
+ * Terminal statuses (filtered in SQL): complete, cancelled
  */
-const TERMINAL_STATUSES = ['complete', 'cancelled'];
 
 // Role-agnostic: statuses a role monitors regardless of task role assignment
 const ROLE_AGNOSTIC = {
@@ -91,14 +98,44 @@ function addIfNew(list, node, project, role) {
   }
 }
 
-function queryList(dbPath, cliPath, args) {
+/**
+ * Direct DB query — replaces CLI subprocess to avoid pipe buffer issues.
+ * v0.0.2 spawned `node interface-cli.js list --role=X` which returned ALL tasks (121KB+).
+ * v0.0.3 queries directly with WHERE filters — only returns non-terminal tasks.
+ */
+function queryDb(dbPath, { role, status } = {}) {
   try {
-    const result = execSync(
-      `DATABASE_PATH="${dbPath}" node "${cliPath}" list ${args}`,
-      { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-    return JSON.parse(result).nodes || [];
-  } catch { return []; }
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath, { readonly: true });
+    db.pragma('busy_timeout = 5000');
+
+    let query = `SELECT id, type, status, slug,
+      json_extract(dna_json, '$.title') as title,
+      json_extract(dna_json, '$.role') as role,
+      updated_at
+      FROM mindspace_nodes WHERE status NOT IN ('complete', 'cancelled')`;
+    const params = [];
+
+    if (role) {
+      query += ` AND json_extract(dna_json, '$.role') = ?`;
+      params.push(role);
+    }
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+    query += ' ORDER BY updated_at DESC';
+
+    const rows = db.prepare(query).all(...params);
+    db.close();
+    return rows.map(r => ({
+      id: r.id, type: r.type, status: r.status, slug: r.slug,
+      title: r.title || r.slug, role: r.role || 'unknown', updated_at: r.updated_at
+    }));
+  } catch (err) {
+    console.error(`[queryDb] ${dbPath}: ${err.message}`);
+    return [];
+  }
 }
 
 function getLiaisonApprovalMode() {
@@ -124,16 +161,14 @@ function checkForWork() {
 
   projects.forEach(proj => {
     roles.forEach(role => {
-      // 1. All tasks assigned to this role (any status, filter out terminal)
-      const roleTasks = queryList(proj.dbPath, proj.cliPath, `--role=${role}`);
-      roleTasks
-        .filter(n => !TERMINAL_STATUSES.includes(n.status))
-        .forEach(n => addIfNew(workByRole[role], n, proj.name, role));
+      // 1. All non-terminal tasks assigned to this role (direct DB query, no subprocess)
+      const roleTasks = queryDb(proj.dbPath, { role });
+      roleTasks.forEach(n => addIfNew(workByRole[role], n, proj.name, role));
 
       // 2. Role-agnostic statuses (e.g., liaison sees 'approval', QA sees 'approved')
       const agnostic = ROLE_AGNOSTIC[role] || [];
       agnostic.forEach(status => {
-        const tasks = queryList(proj.dbPath, proj.cliPath, `--status=${status}`);
+        const tasks = queryDb(proj.dbPath, { status });
         tasks.forEach(n => addIfNew(workByRole[role], n, proj.name, role));
       });
     });
@@ -180,39 +215,25 @@ function checkForOrphans() {
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
   projects.forEach(proj => {
-    try {
-      // Get all active tasks
-      const result = execSync(
-        `DATABASE_PATH="${proj.dbPath}" node "${proj.cliPath}" list --status=active`,
-        { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
-      );
-
-      const data = JSON.parse(result);
-
-      if (data.nodes && data.nodes.length > 0) {
-        data.nodes.forEach(n => {
-          // Check if updated_at is older than 24h
-          if (n.updated_at) {
-            const updated = new Date(n.updated_at + ' UTC').getTime();
-            const age = now - updated;
-            if (age > TWENTY_FOUR_HOURS) {
-              orphans.push({
-                project: proj.name,
-                id: n.id,
-                slug: n.slug,
-                title: n.title || n.slug,
-                role: n.role,
-                status: n.status,
-                updated_at: n.updated_at,
-                stale_hours: Math.round(age / (60 * 60 * 1000))
-              });
-            }
-          }
-        });
+    const activeTasks = queryDb(proj.dbPath, { status: 'active' });
+    activeTasks.forEach(n => {
+      if (n.updated_at) {
+        const updated = new Date(n.updated_at + ' UTC').getTime();
+        const age = now - updated;
+        if (age > TWENTY_FOUR_HOURS) {
+          orphans.push({
+            project: proj.name,
+            id: n.id,
+            slug: n.slug,
+            title: n.title || n.slug,
+            role: n.role,
+            status: n.status,
+            updated_at: n.updated_at,
+            stale_hours: Math.round(age / (60 * 60 * 1000))
+          });
+        }
       }
-    } catch (err) {
-      // Skip errors silently
-    }
+    });
   });
 
   // Write orphan alerts

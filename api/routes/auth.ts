@@ -50,7 +50,7 @@ function checkOrigin(req: Request): boolean {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '15m';
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
 function hashToken(token: string): string {
