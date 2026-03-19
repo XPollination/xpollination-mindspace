@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" font-family="system-ui, -apple-system, sans-serif">
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Architecture Migration: SQLite Monolith → Three-Database Architecture</text>
+
+  <!-- BEFORE -->
+  <text x="220" y="65" text-anchor="middle" font-size="14" font-weight="bold" fill="#c53030">BEFORE (current)</text>
+
+  <rect x="40" y="80" width="360" height="280" rx="8" fill="#fff5f5" stroke="#fc8181" stroke-width="2"/>
+
+  <!-- SQLite box -->
+  <rect x="60" y="100" width="320" height="240" rx="6" fill="white" stroke="#e53e3e" stroke-width="1.5"/>
+  <text x="220" y="122" text-anchor="middle" font-size="13" font-weight="bold" fill="#c53030">SQLite (xpollination.db)</text>
+  <text x="220" y="138" text-anchor="middle" font-size="9" fill="#718096">Everything in one database</text>
+
+  <rect x="75" y="150" width="135" height="30" rx="4" fill="#fed7d7" stroke="#fc8181"/>
+  <text x="142" y="169" text-anchor="middle" font-size="9" fill="#c53030">mindspace_nodes (tasks)</text>
+
+  <rect x="225" y="150" width="140" height="30" rx="4" fill="#fed7d7" stroke="#fc8181"/>
+  <text x="295" y="169" text-anchor="middle" font-size="9" fill="#c53030">missions / capabilities</text>
+
+  <rect x="75" y="190" width="135" height="30" rx="4" fill="#fed7d7" stroke="#fc8181"/>
+  <text x="142" y="209" text-anchor="middle" font-size="9" fill="#c53030">requirements</text>
+
+  <rect x="225" y="190" width="140" height="30" rx="4" fill="#fed7d7" stroke="#fc8181"/>
+  <text x="295" y="209" text-anchor="middle" font-size="9" fill="#c53030">users / api_keys</text>
+
+  <rect x="75" y="230" width="135" height="30" rx="4" fill="#fefcbf" stroke="#d69e2e"/>
+  <text x="142" y="249" text-anchor="middle" font-size="9" fill="#744210">FK: cap.mission_id</text>
+
+  <rect x="225" y="230" width="140" height="30" rx="4" fill="#fefcbf" stroke="#d69e2e"/>
+  <text x="295" y="249" text-anchor="middle" font-size="9" fill="#744210">DNA: role, depends_on</text>
+
+  <text x="220" y="285" text-anchor="middle" font-size="9" fill="#e53e3e">Single FK = one parent only</text>
+  <text x="220" y="298" text-anchor="middle" font-size="9" fill="#e53e3e">No realtime, no federation</text>
+  <text x="220" y="311" text-anchor="middle" font-size="9" fill="#e53e3e">Permissions in code, not data</text>
+  <text x="220" y="324" text-anchor="middle" font-size="9" fill="#e53e3e">30s polling for changes</text>
+
+  <!-- Qdrant (Brain) - exists in both -->
+  <rect x="60" y="340" width="150" height="50" rx="6" fill="#f0fff4" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="135" y="362" text-anchor="middle" font-size="10" font-weight="bold" fill="#276749">Qdrant (Brain)</text>
+  <text x="135" y="377" text-anchor="middle" font-size="8" fill="#48bb78">7,592 vectors</text>
+
+  <!-- Arrow -->
+  <text x="450" y="210" text-anchor="middle" font-size="28" fill="#4a5568">&#x2192;</text>
+  <text x="450" y="230" text-anchor="middle" font-size="10" fill="#4a5568">migrate</text>
+
+  <!-- AFTER -->
+  <text x="680" y="65" text-anchor="middle" font-size="14" font-weight="bold" fill="#276749">AFTER (target)</text>
+
+  <rect x="480" y="80" width="400" height="350" rx="8" fill="#f0fff4" stroke="#48bb78" stroke-width="2"/>
+
+  <!-- Three databases -->
+  <!-- 1. Content Store (SQLite/Supabase) -->
+  <rect x="500" y="100" width="160" height="130" rx="6" fill="white" stroke="#4299e1" stroke-width="1.5"/>
+  <text x="580" y="120" text-anchor="middle" font-size="11" font-weight="bold" fill="#2b6cb0">Content Store</text>
+  <text x="580" y="135" text-anchor="middle" font-size="8" fill="#4299e1">SQLite → Supabase</text>
+  <rect x="510" y="145" width="140" height="20" rx="3" fill="#ebf8ff" stroke="#90cdf4"/>
+  <text x="580" y="159" text-anchor="middle" font-size="8" fill="#2b6cb0">DNA content, content_md</text>
+  <rect x="510" y="170" width="140" height="20" rx="3" fill="#ebf8ff" stroke="#90cdf4"/>
+  <text x="580" y="184" text-anchor="middle" font-size="8" fill="#2b6cb0">Users, API keys, sessions</text>
+  <rect x="510" y="195" width="140" height="20" rx="3" fill="#ebf8ff" stroke="#90cdf4"/>
+  <text x="580" y="209" text-anchor="middle" font-size="8" fill="#2b6cb0">Version history, changelogs</text>
+
+  <!-- 2. SpiceDB (Relationships) -->
+  <rect x="690" y="100" width="170" height="130" rx="6" fill="white" stroke="#9f7aea" stroke-width="1.5"/>
+  <text x="775" y="120" text-anchor="middle" font-size="11" font-weight="bold" fill="#553c9a">SpiceDB</text>
+  <text x="775" y="135" text-anchor="middle" font-size="8" fill="#9f7aea">Zanzibar Relationships</text>
+  <rect x="700" y="145" width="150" height="20" rx="3" fill="#faf5ff" stroke="#d6bcfa"/>
+  <text x="775" y="159" text-anchor="middle" font-size="8" fill="#553c9a">COMPOSES tuples</text>
+  <rect x="700" y="170" width="150" height="20" rx="3" fill="#faf5ff" stroke="#d6bcfa"/>
+  <text x="775" y="184" text-anchor="middle" font-size="8" fill="#553c9a">ASSIGNED_TO, DEPENDS_ON</text>
+  <rect x="700" y="195" width="150" height="20" rx="3" fill="#faf5ff" stroke="#d6bcfa"/>
+  <text x="775" y="209" text-anchor="middle" font-size="8" fill="#553c9a">Attestation relations</text>
+
+  <!-- 3. Qdrant (Brain) -->
+  <rect x="500" y="250" width="160" height="80" rx="6" fill="white" stroke="#48bb78" stroke-width="1.5"/>
+  <text x="580" y="272" text-anchor="middle" font-size="11" font-weight="bold" fill="#276749">Qdrant (Brain)</text>
+  <text x="580" y="287" text-anchor="middle" font-size="8" fill="#48bb78">Semantic Vectors</text>
+  <rect x="510" y="297" width="140" height="20" rx="3" fill="#f0fff4" stroke="#9ae6b4"/>
+  <text x="580" y="311" text-anchor="middle" font-size="8" fill="#276749">Thoughts, search, highways</text>
+
+  <!-- SpiceDB features -->
+  <rect x="690" y="250" width="170" height="80" rx="6" fill="white" stroke="#9f7aea" stroke-width="1.5"/>
+  <text x="775" y="268" text-anchor="middle" font-size="9" font-weight="bold" fill="#553c9a">SpiceDB Features</text>
+  <text x="700" y="285" font-size="8" fill="#6b46c1">&#x2713; ZedToken consistency</text>
+  <text x="700" y="298" font-size="8" fill="#6b46c1">&#x2713; Watch API (realtime)</text>
+  <text x="700" y="311" font-size="8" fill="#6b46c1">&#x2713; Transitive closure</text>
+  <text x="700" y="324" font-size="8" fill="#6b46c1">&#x2713; Cross-instance federation</text>
+
+  <!-- Labels -->
+  <text x="580" y="355" text-anchor="middle" font-size="9" fill="#276749">Content = what things CONTAIN</text>
+  <text x="580" y="370" text-anchor="middle" font-size="9" fill="#48bb78">Semantic = what things MEAN</text>
+  <text x="775" y="355" text-anchor="middle" font-size="9" fill="#553c9a">Relationships = what things</text>
+  <text x="775" y="370" text-anchor="middle" font-size="9" fill="#553c9a">CAN DO with each other</text>
+
+  <!-- Migration details -->
+  <rect x="40" y="440" width="840" height="240" rx="8" fill="#f7fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="460" y="465" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">Data Migration Plan</text>
+
+  <!-- Step 1 -->
+  <rect x="60" y="485" width="250" height="80" rx="5" fill="white" stroke="#4299e1"/>
+  <text x="185" y="505" text-anchor="middle" font-size="10" font-weight="bold" fill="#2b6cb0">Step 1: Relationships → SpiceDB</text>
+  <text x="70" y="522" font-size="8" fill="#4a5568">capabilities.mission_id → COMPOSES tuple</text>
+  <text x="70" y="535" font-size="8" fill="#4a5568">requirements.capability_id → IMPLEMENTS tuple</text>
+  <text x="70" y="548" font-size="8" fill="#4a5568">dna.depends_on → DEPENDS_ON tuples</text>
+
+  <!-- Step 2 -->
+  <rect x="325" y="485" width="250" height="80" rx="5" fill="white" stroke="#9f7aea"/>
+  <text x="450" y="505" text-anchor="middle" font-size="10" font-weight="bold" fill="#553c9a">Step 2: Permissions → SpiceDB</text>
+  <text x="335" y="522" font-size="8" fill="#4a5568">dna.role → ASSIGNED_TO tuple</text>
+  <text x="335" y="535" font-size="8" fill="#4a5568">workflow transitions → CHECK calls</text>
+  <text x="335" y="548" font-size="8" fill="#4a5568">attestations → relation tuples</text>
+
+  <!-- Step 3 -->
+  <rect x="590" y="485" width="270" height="80" rx="5" fill="white" stroke="#48bb78"/>
+  <text x="725" y="505" text-anchor="middle" font-size="10" font-weight="bold" fill="#276749">Step 3: Events → Watch API</text>
+  <text x="600" y="522" font-size="8" fill="#4a5568">Monitor polling → Watch subscription</text>
+  <text x="600" y="535" font-size="8" fill="#4a5568">Task assignment → realtime event</text>
+  <text x="600" y="548" font-size="8" fill="#4a5568">Cross-instance → federation sync</text>
+
+  <!-- Backward compat note -->
+  <rect x="60" y="580" width="770" height="45" rx="5" fill="#fffbeb" stroke="#d69e2e"/>
+  <text x="445" y="600" text-anchor="middle" font-size="10" font-weight="bold" fill="#744210">Backward Compatibility</text>
+  <text x="445" y="615" text-anchor="middle" font-size="9" fill="#975a16">FK columns preserved during migration. Read from SpiceDB, fallback to FK. CLI commands unchanged. Gradual cutover.</text>
+
+  <!-- Data stays note -->
+  <rect x="60" y="635" width="770" height="35" rx="5" fill="#ebf8ff" stroke="#4299e1"/>
+  <text x="445" y="657" text-anchor="middle" font-size="9" fill="#2b6cb0">Content (DNA, markdown, users) stays in SQLite/Supabase. Only RELATIONSHIPS and PERMISSIONS move to SpiceDB. Brain stays in Qdrant.</text>
+</svg>
