@@ -170,6 +170,8 @@ function exportProjectData(dbPath, options) {
     const queueCount = allNodes.filter(n => n.status === 'pending' || n.status === 'ready').length;
     const activeCount = allNodes.filter(n => n.status === 'active').length;
     const postWorkStatuses = ['complete', 'completed', 'done', 'review', 'rework', 'blocked', 'cancelled'];
+    // backlog tasks excluded from main kanban view — they are pre-queue, not yet prioritized
+    const backlogCount = allNodes.filter(n => n.status === 'backlog').length;
     const completedCount = allNodes.filter(n => postWorkStatuses.includes(n.status)).length;
 
     const result = {

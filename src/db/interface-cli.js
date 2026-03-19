@@ -41,6 +41,11 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Statuses reference (from workflow-engine.js):
+// 'backlog' → pre-queue, excluded from monitor/kanban. Transitions: backlog→pending, pending→backlog
+// 'pending' → queued, awaiting PDSA start
+// Full list: backlog, pending, ready, active, approval, approved, testing, review, rework, complete, blocked, cancelled
+
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
 
