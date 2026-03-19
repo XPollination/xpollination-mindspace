@@ -211,6 +211,104 @@ function serveStatic(res, filePath) {
 }
 
 /**
+ * Knowledge Browser: resolve hierarchy nodes by short_id
+ * Routes: /m/:id (mission), /c/:id (capability), /r/:id (requirement), /t/:id (task)
+ */
+const KB_TYPE_MAP = {
+  m: { table: 'missions', label: 'Mission',
+    query: "SELECT m.*, m.short_id FROM missions m WHERE m.short_id = ?" },
+  c: { table: 'capabilities', label: 'Capability',
+    query: "SELECT c.*, c.short_id, m.title as mission_title, m.short_id as mission_short_id FROM capabilities c JOIN missions m ON c.mission_id = m.id WHERE c.short_id = ?" },
+  r: { table: 'requirements', label: 'Requirement',
+    query: "SELECT r.*, r.short_id, c.title as capability_title, c.short_id as capability_short_id, m.title as mission_title, m.short_id as mission_short_id FROM requirements r JOIN capabilities c ON r.capability_id = c.id JOIN missions m ON c.mission_id = m.id WHERE r.short_id = ?" },
+  t: { table: 'mindscape_nodes', label: 'Task', query: null },
+};
+
+function handleKbRoute(res, typePrefix, shortId, suffix) {
+  const typeInfo = KB_TYPE_MAP[typePrefix];
+  if (!typeInfo || !typeInfo.query) {
+    send404(res, shortId, typePrefix);
+    return;
+  }
+
+  const projects = discoverProjects();
+  const currentProject = path.basename(__dirname.replace('/viz', ''));
+  const targetProjects = projects.filter(p => p.name === currentProject);
+
+  for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+    try {
+      const db = new Database(proj.dbPath, { readonly: true });
+      try {
+        const node = db.prepare(typeInfo.query).get(shortId);
+        if (node) {
+          db.close();
+          if (suffix === '.md') {
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(node.content_md || node.description || '');
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(renderNodePage(node, typePrefix, typeInfo));
+          return;
+        }
+      } catch (err) { /* table may not exist */ }
+      db.close();
+    } catch (err) { /* skip project */ }
+  }
+  send404(res, shortId, typePrefix);
+}
+
+function renderNodePage(node, typePrefix, typeInfo) {
+  const title = node.title || node.req_id_human || 'Untitled';
+  const description = node.description || '';
+  const breadcrumb = [];
+  breadcrumb.push('<a href="/" style="color:#8ab4f8;text-decoration:none;">Mindspace</a>');
+  if (node.mission_title && node.mission_short_id) {
+    breadcrumb.push(`<a href="/m/${node.mission_short_id}" style="color:#8ab4f8;text-decoration:none;">${node.mission_title}</a>`);
+  }
+  if (node.capability_title && node.capability_short_id) {
+    breadcrumb.push(`<a href="/c/${node.capability_short_id}" style="color:#8ab4f8;text-decoration:none;">${node.capability_title}</a>`);
+  }
+  breadcrumb.push(`<span style="color:#eee;">${title}</span>`);
+
+  const content = node.content_md || description;
+
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title} — Mindspace</title>
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${description.slice(0, 200)}">
+<meta property="og:type" content="article">
+<style>body{margin:0;padding:0;background:#0f1117;color:#eee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
+.container{max-width:720px;margin:0 auto;padding:24px 16px;}
+.breadcrumb{font-size:13px;color:#888;margin-bottom:16px;}
+.breadcrumb a:hover{text-decoration:underline;}
+.breadcrumb span:not(:last-child)::after{content:" › ";color:#555;}
+h1{font-size:24px;margin:0 0 8px;color:#eee;}
+.type-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;}
+.content{line-height:1.6;color:#ccc;margin-top:16px;white-space:pre-wrap;}</style>
+</head><body>
+<div class="container">
+<div class="breadcrumb">${breadcrumb.join('')}</div>
+<div class="type-label">${typeInfo.label}</div>
+<h1>${title}</h1>
+<div class="content">${content}</div>
+</div></body></html>`;
+}
+
+function send404(res, shortId, typePrefix) {
+  res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(`<!DOCTYPE html><html><head><title>Not Found — Mindspace</title>
+<style>body{margin:0;padding:40px;background:#0f1117;color:#eee;font-family:sans-serif;text-align:center;}
+a{color:#8ab4f8;}</style></head><body>
+<h1>404 — Not Found</h1>
+<p>No ${typePrefix === 'm' ? 'mission' : typePrefix === 'c' ? 'capability' : typePrefix === 'r' ? 'requirement' : 'node'} found with ID <code>${shortId}</code></p>
+<p><a href="/">Back to Mindspace</a></p>
+</body></html>`);
+}
+
+/**
  * Send JSON response
  */
 function sendJson(res, data, status = 200, req = null) {
@@ -1006,6 +1104,14 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'API server unreachable' }));
     }
+    return;
+  }
+
+  // Knowledge Browser routes: /m/:id/:slug?, /c/:id/:slug?, /r/:id/:slug?, /t/:id/:slug?
+  const KB_ROUTE = /^\/(m|c|r|t)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/;
+  const kbMatch = pathname.match(KB_ROUTE);
+  if (kbMatch) {
+    handleKbRoute(res, kbMatch[1], kbMatch[2], kbMatch[4]);
     return;
   }
 
