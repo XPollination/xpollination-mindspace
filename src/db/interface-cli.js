@@ -894,6 +894,43 @@ function cmdUpdateDna(id, dnaJson, actor) {
   db.close();
 }
 
+/**
+ * Validate task_type field and enforce type-specific mandatory DNA fields.
+ * task_type is optional for backward compat — only validated when set.
+ * Types: 'design', 'test', 'impl', 'bug', 'research', 'content'
+ */
+const VALID_TASK_TYPES = ['design', 'test', 'impl', 'bug', 'research', 'content'];
+
+function validateTaskType(dna) {
+  const errors = [];
+
+  // Base fields always required: title and role
+  if (!dna.title) errors.push('title is required — missing title in DNA');
+  if (!dna.role) errors.push('role is required — missing role in DNA');
+
+  // task_type is optional — if not set, skip type-specific validation
+  if (!dna.task_type) return errors;
+
+  if (!VALID_TASK_TYPES.includes(dna.task_type)) {
+    errors.push(`Invalid task_type: "${dna.task_type}". Valid: ${VALID_TASK_TYPES.join(', ')}`);
+    return errors;
+  }
+
+  // Type-specific mandatory fields
+  if (dna.task_type === 'design') {
+    if (!dna.acceptance_criteria) errors.push('design type requires acceptance_criteria');
+    if (!dna.scope_boundary) errors.push('design type requires scope_boundary');
+  }
+
+  if (dna.task_type === 'test' || dna.task_type === 'impl') {
+    if (!dna.depends_on || (Array.isArray(dna.depends_on) && dna.depends_on.length === 0)) {
+      errors.push(`${dna.task_type} type requires depends_on — must reference the design task`);
+    }
+  }
+
+  return errors;
+}
+
 function cmdCreate(type, slug, dnaJson, actor) {
   checkPermission(actor, 'create');
 
@@ -913,6 +950,12 @@ function cmdCreate(type, slug, dnaJson, actor) {
   const validationErrors = validateDnaFields(dna);
   if (validationErrors.length > 0) {
     error(`Validation failed:\n${validationErrors.join('\n')}`);
+  }
+
+  // Validate task_type and type-specific fields
+  const typeErrors = validateTaskType(dna);
+  if (typeErrors.length > 0) {
+    error(`Task type validation failed:\n${typeErrors.join('\n')}`);
   }
 
   // Bug type requires parent_ids — every bug must link to the task it originated from
