@@ -1,43 +1,35 @@
-# Mindspace Docker Compose — Production
+# Mindspace Docker Compose — Production (Brain + Qdrant only)
 #
-# Runs the mindspace service on production ports.
-# Replaces systemd mindspace.service.
-# Brain (3200) and Qdrant (6333) are already running on the host.
+# Viz (4200) and API (3100) are served by systemd services on the host.
+# Only brain and qdrant remain in Docker.
 #
 # Usage:
-#   docker compose -f docker-compose.prod.yml up --build -d
-#
-# Ports:
-#   API:  3100 (production — first time online)
-#   Viz:  4200 (production)
+#   docker compose -f docker-compose.prod.yml up -d
 
 services:
-  mindspace:
-    build: .
-    container_name: mindspace-prod
+  brain:
+    build:
+      context: ./brain
+      dockerfile: Dockerfile
+    container_name: mindspace-brain
     ports:
-      - "10.33.33.1:3100:3100"
-      - "10.33.33.1:4200:4200"
-    volumes:
-      - mindspace-prod-data:/app/data
-      - ${XPO_WORKSPACE_PATH:-.}:/workspace
+      - "10.33.33.1:3200:3200"
     environment:
-      - NODE_ENV=production
-      - DATABASE_PATH=/app/data/mindspace.db
-      - API_PORT=3100
-      - VIZ_PORT=4200
-      - XPO_WORKSPACE_PATH=/workspace
-      - BRAIN_API_URL=http://host.docker.internal:3200
+      - QDRANT_URL=http://qdrant:6333
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
-      - JWT_SECRET=${JWT_SECRET:-xpo-prod-jwt-secret-2026}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_CALLBACK_URL=https://mindspace.xpollination.earth/api/auth/oauth/google/callback
-      - FRONTEND_URL=https://mindspace.xpollination.earth
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mindspace-qdrant
+    ports:
+      - "10.33.33.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
     restart: unless-stopped
 
 volumes:
-  mindspace-prod-data:
+  qdrant-data:
     driver: local
