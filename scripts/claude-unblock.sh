@@ -115,6 +115,17 @@ process_pane() {
 
     local bottom_collapsed
     bottom_collapsed=$(echo "$bottom" | tr '\n' ' ' | tr -s ' ')
+
+    # BUG FIX 2026-03-20: "accept edits on" mode also contains "Esc to cancel"
+    # but is NOT a permission prompt. Sending "2" to an agent in edit mode
+    # injects "2" into the input buffer, corrupting the agent's next command.
+    # Root cause: script matched "Esc to cancel" from edit mode, then found
+    # stale "❯ N. Yes" patterns in the 300-line scrollback from old prompts.
+    # Fix: explicitly exclude "accept edits" before processing as a prompt.
+    if echo "$bottom_collapsed" | grep -qiE 'accept edits'; then
+        return 0
+    fi
+
     if ! echo "$bottom_collapsed" | grep -qE 'Esc to cancel|Do you want to allow'; then
         return 0
     fi
@@ -387,14 +398,29 @@ if is_local_or_hetzner; then
     fi
     RUN_FLAG="--run-${MODE}"
 
-    # If session exists, just attach
+    # SINGLETON PATTERN (2026-03-20): Kill any existing unblock processes and tmux
+    # sessions before starting a new one. Prevents orphan instances that accumulate
+    # across restarts and send stale confirmations to agent panes.
+    # Root cause of multiple instances: script was run from different terminals/agents
+    # without cleaning up prior instances. Two orphans from Mar 17+18 were found
+    # still running on Mar 20, sending "2" to panes in "accept edits" mode.
+    #
+    # Kill orphan processes (match our script name, exclude this PID)
+    local my_pid=$$
+    pgrep -f "claude-unblock.sh" | while read pid; do
+        if [[ "$pid" != "$my_pid" ]]; then
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
+    # Kill existing tmux session (clean restart)
     if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-        echo "Monitor already running. Attaching..."
-        exec tmux attach -t "$SESSION_NAME"
+        echo "Killing existing unblock session '$SESSION_NAME' (singleton enforcement)..."
+        tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+        sleep 1
     fi
 
     # Create new session running the monitor
-    echo "Starting unblock monitor in tmux session '$SESSION_NAME'..."
+    echo "Starting unblock monitor in tmux session '$SESSION_NAME' (singleton)..."
     tmux new-session -d -s "$SESSION_NAME" "bash $SELF_PATH $RUN_FLAG"
 
     # Attach

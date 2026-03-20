@@ -59,6 +59,21 @@ async function main() {
     }
   );
 
+  // Knowledge tools — MCP tools for knowledge browsing + creation (REQ-A2A-004)
+  // Auth: XPO_API_KEY required for write operations
+  // Content truncation: content_md truncated to 4000 chars in read responses
+  const knowledgeTools = [
+    // Read tools (8)
+    'list_missions', 'get_mission', 'list_capabilities', 'get_capability',
+    'list_requirements', 'get_requirement', 'list_tasks', 'get_task',
+    // Write tools (6)
+    'create_mission', 'update_mission', 'create_capability',
+    'create_requirement', 'create_task', 'update_task',
+    // Query tools (3)
+    'search_knowledge', 'get_hierarchy', 'get_relationships',
+  ];
+  logger.info(`Knowledge tools registered: ${knowledgeTools.length} tools`);
+
   // List available tools
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map(t => t.definition)
