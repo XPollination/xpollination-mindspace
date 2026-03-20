@@ -292,6 +292,30 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   send404(res, shortId, typePrefix);
 }
 
+/**
+ * Search bar: vector search via brain /api/v1/memory endpoint
+ * Debounce 300ms, dropdown overlay with type badge per result
+ */
+function renderSearchBar() {
+  return `<div class="searchBar" style="position:relative;margin-bottom:16px;">
+    <input type="text" class="search-input" placeholder="Search knowledge..." oninput="debounceSearch(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px;">
+    <div class="search-result-overlay dropdown-result" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:0 0 4px 4px;max-height:300px;overflow-y:auto;z-index:50;"></div>
+  </div>
+  <script>
+  let searchTimeout;
+  function debounceSearch(q){clearTimeout(searchTimeout);searchTimeout=setTimeout(()=>vectorSearch(q),300);}
+  async function vectorSearch(q){
+    if(!q||q.length<2){document.querySelector('.search-result-overlay').style.display='none';return;}
+    const r=await fetch('/api/v1/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,read_only:true})});
+    const d=await r.json();const overlay=document.querySelector('.search-result-overlay');
+    if(d.result&&d.result.sources){
+      overlay.innerHTML=d.result.sources.map(s=>'<div style="padding:8px;border-bottom:1px solid var(--border);"><span class="type-badge result-type" style="font-size:10px;background:var(--surface);padding:1px 6px;border-radius:3px;margin-right:6px;">'+s.thought_category+'</span>'+s.content_preview+'</div>').join('');
+      overlay.style.display='block';
+    }else{overlay.style.display='none';}
+  }
+  </script>`;
+}
+
 function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
