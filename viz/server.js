@@ -416,6 +416,112 @@ ${(siblings || []).length > 0 ? `
 </div></body></html>`;
 }
 
+/**
+ * renderMissionMap — Server-rendered mission map landing page
+ * Replaces kanban as root route. Shows mission cards with status badges.
+ * Active missions first, deprecated dimmed below.
+ */
+function renderMissionMap(missions) {
+  const statusBadgeColor = (status) => {
+    switch (status) {
+      case 'active': return '#48bb78';
+      case 'draft': return '#4299e1';
+      case 'deprecated': return '#a0aec0';
+      default: return '#a0aec0';
+    }
+  };
+
+  const activeMissions = missions.filter(m => m.status === 'active');
+  const deprecatedMissions = missions.filter(m => m.status !== 'active');
+
+  const totalCaps = missions.reduce((sum, m) => sum + (m.capabilities || []).length, 0);
+
+  const renderCard = (m, dimmed) => {
+    const capCount = (m.capabilities || []).length;
+    const color = statusBadgeColor(m.status);
+    const cardStyle = dimmed ? 'opacity:0.6;' : '';
+    const link = m.short_id ? `/m/${m.short_id}` : `/m/${m.id}`;
+    const excerpt = (m.description || '').substring(0, 120);
+    return `
+      <a href="${link}" class="mission-card" style="${cardStyle}border-left:3px solid ${color};">
+        <div class="card-header">
+          <h3 class="card-title">${m.title}</h3>
+          <span class="status-badge" style="background:${color};">${m.status}</span>
+        </div>
+        <p class="card-description">${excerpt}${(m.description || '').length > 120 ? '...' : ''}</p>
+        <span class="cap-count">${capCount} capabilities</span>
+      </a>`;
+  };
+
+  const activeCards = activeMissions.map(m => renderCard(m, false)).join('');
+  const deprecatedCards = deprecatedMissions.length > 0 ? `
+    <section class="deprecated" style="margin-top:32px;">
+      <h2 style="font-size:16px;color:#a0aec0;margin-bottom:12px;">Deprecated</h2>
+      <div class="mission-grid dimmed">${deprecatedMissions.map(m => renderCard(m, true)).join('')}</div>
+    </section>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission Map — Mindspace</title>
+<style>
+:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;}
+[data-theme="dark"]{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
+.theme-toggle{position:fixed;top:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:14px;color:var(--text);z-index:100;}
+.container{max-width:900px;margin:0 auto;padding:24px 16px;}
+h1{font-size:28px;margin-bottom:8px;}
+.subtitle{color:var(--muted);margin-bottom:24px;}
+.mission-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.mission-card{display:block;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text);transition:border-color 0.2s;}
+.mission-card:hover{border-color:var(--link);}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.card-title{font-size:15px;font-weight:600;color:var(--text);}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#fff;flex-shrink:0;margin-left:8px;}
+.card-description{font-size:13px;color:var(--muted);margin-bottom:8px;}
+.cap-count{font-size:11px;color:var(--muted);font-weight:500;}
+.footer-stats{margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;gap:16px;}
+@media(max-width:600px){.mission-grid{grid-template-columns:1fr;}}
+</style>
+</head><body>
+<button class="theme-toggle" onclick="toggleTheme()">&#127763;</button>
+<script>
+function toggleTheme(){const c=document.documentElement.getAttribute('data-theme');const n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('theme',n);}
+const saved=localStorage.getItem('theme');if(saved==='dark')document.documentElement.setAttribute('data-theme','dark');
+</script>
+<div class="container">
+<h1>Mission Map</h1>
+<p class="subtitle">Overview of all missions and their capabilities</p>
+<div class="mission-grid">${activeCards}</div>
+${deprecatedCards}
+<div class="footer-stats">
+  <span>${activeMissions.length} active · ${totalCaps} capabilities · <a href="/kanban" style="color:var(--link);text-decoration:none;">Kanban Board</a></span>
+</div>
+</div></body></html>`;
+}
+
+function getMissionOverview() {
+  const projects = discoverProjects();
+  const currentProject = path.basename(__dirname.replace('/viz', ''));
+  const targetProjects = projects.filter(p => p.name === currentProject);
+  const allMissions = [];
+  for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+    try {
+      const db = new Database(proj.dbPath, { readonly: true });
+      try {
+        const missionRows = db.prepare("SELECT id, slug, title, description, status, short_id FROM missions ORDER BY CASE WHEN status='active' THEN 0 ELSE 1 END, created_at ASC").all();
+        for (const m of missionRows) {
+          const caps = db.prepare("SELECT id, title, description, status, sort_order, short_id FROM capabilities WHERE mission_id = ? ORDER BY sort_order ASC").all(m.id);
+          allMissions.push({ ...m, capabilities: caps });
+        }
+      } catch (err) { /* tables may not exist */ }
+      db.close();
+    } catch (err) { /* skip project */ }
+  }
+  return allMissions;
+}
+
 function send404(res, shortId, typePrefix) {
   res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`<!DOCTYPE html><html><head><title>Not Found — Mindspace</title>
@@ -1251,11 +1357,29 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Root route: serve mission map
+  if (pathname === '/') {
+    const missions = getMissionOverview();
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderMissionMap(missions));
+    return;
+  }
+
+  // /kanban route: serve kanban index.html
+  if (pathname === '/kanban') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    const kanbanPath = path.join(staticRoot, 'index.html');
+    serveStatic(res, kanbanPath);
+    return;
+  }
+
   // Static files — serve from active/ symlink directory, fallback to root for shared assets
   const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
     ? path.resolve(path.join(__dirname, 'active'))
     : __dirname;
-  let filePath = pathname === '/' ? '/index.html' : pathname;
+  let filePath = pathname;
   let resolvedPath = path.join(staticRoot, filePath);
 
   // Try .html extension for extensionless paths (e.g., /login → login.html)
