@@ -292,6 +292,44 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   send404(res, shortId, typePrefix);
 }
 
+/**
+ * Readiness display: shows readiness percentage on mission cards,
+ * per-requirement readiness confirmation status on document pages.
+ * Color scale: red (0%) → yellow (50%) → green (100%) for readiness badges.
+ * Click-to-confirm flow: calls confirm_ready endpoint, updates CONFIRMS_READY in SpiceDB.
+ * Queries confirms_ready relationship from SpiceDB for readiness data.
+ */
+function renderReadinessBar(readyCount, totalCount) {
+  const percent = totalCount > 0 ? Math.round((readyCount / totalCount) * 100) : 0;
+  const readinessColor = percent >= 80 ? '#48bb78' : percent >= 50 ? '#ecc94b' : '#fc8181'; // green → yellow → red
+  return `<div class="readiness" style="margin:8px 0;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="confirmation-badge" style="font-size:12px;color:${readinessColor};font-weight:600;">${percent}% ready</span>
+      <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+        <div style="width:${percent}%;height:100%;background:${readinessColor};border-radius:3px;"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRequirementReadiness(requirements) {
+  if (!requirements || requirements.length === 0) return '';
+  return `<div class="per-requirement-confirmation" style="margin:12px 0;">
+    ${requirements.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
+        <span style="color:${r.confirmed ? '#48bb78' : '#fc8181'};">${r.confirmed ? '✓' : '○'}</span>
+        <span style="flex:1;font-size:13px;">${r.title || r.req_id_human}</span>
+        ${!r.confirmed ? `<button onclick="confirmClick('${r.id}')" class="confirm-click" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:3px;background:var(--surface);color:var(--text);cursor:pointer;">Confirm</button>` : ''}
+      </div>`).join('')}
+  </div>
+  <script>
+  async function confirmClick(reqId){
+    const r = await fetch('/a2a/confirm_ready', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({object_type:'requirement',object_id:reqId})});
+    if(r.ok){const modal=document.createElement('div');modal.className='confirmation-modal';modal.textContent='Confirmed!';document.body.appendChild(modal);setTimeout(()=>modal.remove(),2000);location.reload();}
+  }
+  </script>`;
+}
+
 function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
