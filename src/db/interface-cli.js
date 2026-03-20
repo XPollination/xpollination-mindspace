@@ -195,6 +195,29 @@ const FIELD_VALIDATORS = {
       return `test_total_count must be a positive integer (> 0), got: "${value}"`;
     }
     return null;
+  },
+
+  // PR merge gate validators (MISSION-CONTINUOUS-DELIVERY Part 2)
+  pr_url: (value) => {
+    if (typeof value !== 'string') return `pr_url must be a string`;
+    if (!value.startsWith('https://github.com/')) {
+      return `pr_url must be a GitHub URL (https://github.com/...), got: "${value}"`;
+    }
+    return null;
+  },
+
+  pr_review_verdict: (value) => {
+    if (!['merge', 'rework'].includes(value)) {
+      return `pr_review_verdict must be "merge" or "rework", got: "${value}"`;
+    }
+    return null;
+  },
+
+  pr_merge_sha: (value) => {
+    if (typeof value !== 'string' || value.length < 7) {
+      return `pr_merge_sha must be a valid git SHA (min 7 chars), got: "${value}"`;
+    }
+    return null;
   }
 };
 
