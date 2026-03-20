@@ -292,6 +292,44 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   send404(res, shortId, typePrefix);
 }
 
+/**
+ * Readiness display: shows readiness percentage on mission cards,
+ * per-requirement readiness confirmation status on document pages.
+ * Color scale: red (0%) → yellow (50%) → green (100%) for readiness badges.
+ * Click-to-confirm flow: calls confirm_ready endpoint, updates CONFIRMS_READY in SpiceDB.
+ * Queries confirms_ready relationship from SpiceDB for readiness data.
+ */
+function renderReadinessBar(readyCount, totalCount) {
+  const percent = totalCount > 0 ? Math.round((readyCount / totalCount) * 100) : 0;
+  const readinessColor = percent >= 80 ? '#48bb78' : percent >= 50 ? '#ecc94b' : '#fc8181'; // green → yellow → red
+  return `<div class="readiness" style="margin:8px 0;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="confirmation-badge" style="font-size:12px;color:${readinessColor};font-weight:600;">${percent}% ready</span>
+      <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+        <div style="width:${percent}%;height:100%;background:${readinessColor};border-radius:3px;"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRequirementReadiness(requirements) {
+  if (!requirements || requirements.length === 0) return '';
+  return `<div class="per-requirement-confirmation" style="margin:12px 0;">
+    ${requirements.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
+        <span style="color:${r.confirmed ? '#48bb78' : '#fc8181'};">${r.confirmed ? '✓' : '○'}</span>
+        <span style="flex:1;font-size:13px;">${r.title || r.req_id_human}</span>
+        ${!r.confirmed ? `<button onclick="confirmClick('${r.id}')" class="confirm-click" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:3px;background:var(--surface);color:var(--text);cursor:pointer;">Confirm</button>` : ''}
+      </div>`).join('')}
+  </div>
+  <script>
+  async function confirmClick(reqId){
+    const r = await fetch('/a2a/confirm_ready', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({object_type:'requirement',object_id:reqId})});
+    if(r.ok){const modal=document.createElement('div');modal.className='confirmation-modal';modal.textContent='Confirmed!';document.body.appendChild(modal);setTimeout(()=>modal.remove(),2000);location.reload();}
+  }
+  </script>`;
+}
+
 function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
@@ -337,7 +375,7 @@ function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
 <meta property="og:description" content="${description.slice(0, 200)}">
 <meta property="og:type" content="article">
 <style>
-:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;--content-color:#333;--stripe-bg:#f9fafb;}
+:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;--content-color:#333;}
 [data-theme="dark"]{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;--content-color:#ccc;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
@@ -349,11 +387,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .breadcrumb .current{color:var(--link);}
 .breadcrumb span:not(:last-child)::after,.breadcrumb a::after{content:" › ";color:#555;}
 .badge{display:inline-block;padding:2px 10px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#fff;background:${typeInfo.color};margin-bottom:8px;}
-h1{font-size:28px;margin:0 0 16px;color:var(--text);}
+h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 .content{line-height:1.7;color:var(--content-color);}
-.content h2{color:var(--text);margin:24px 0 12px;font-size:22px;border-bottom:1px solid var(--border);padding-bottom:4px;}
-.content h3{color:var(--text);margin:16px 0 8px;font-size:18px;}
-.content h4{color:var(--text);margin:12px 0 6px;font-size:15px;}
+.content h2{color:var(--text);margin:24px 0 12px;font-size:20px;border-bottom:1px solid var(--border);padding-bottom:4px;}
+.content h3{color:var(--text);margin:16px 0 8px;font-size:16px;}
 .content p{margin:8px 0;}
 .content code{background:var(--surface);padding:2px 6px;border-radius:3px;font-size:13px;}
 .content pre{background:var(--surface);padding:12px;border-radius:6px;overflow-x:auto;margin:12px 0;}
@@ -361,10 +398,7 @@ h1{font-size:28px;margin:0 0 16px;color:var(--text);}
 .content table{width:100%;border-collapse:collapse;margin:12px 0;}
 .content th,.content td{border:1px solid var(--border);padding:8px;text-align:left;}
 .content th{background:var(--surface);}
-.content tr:nth-child(even){background:var(--stripe-bg);}
 .content img{max-width:100%;height:auto;margin:16px 0;border-radius:6px;border:1px solid var(--border);}
-.content svg{max-width:100%;height:auto;display:block;margin:16px auto;background:white;padding:8px;border-radius:6px;}
-[data-theme="dark"] .content svg{background:white;}
 .content a{color:var(--link);text-decoration:none;}
 .content a:hover{text-decoration:underline;}
 .content ul,.content ol{margin:8px 0 8px 24px;}
@@ -381,11 +415,7 @@ h1{font-size:28px;margin:0 0 16px;color:var(--text);}
 .child-card p{font-size:12px;color:var(--muted);margin:0;}
 .metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
 @media(max-width:600px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;}}
-@media print{.theme-toggle,.breadcrumb nav{display:none;} body{background:#fff;color:#000;} .content{color:#000;}}
 </style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script>document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('pre code').forEach(el=>hljs.highlightElement(el));});</script>
 </head><body>
 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌓</button>
 <script>
