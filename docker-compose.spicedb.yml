@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spicedb
+      POSTGRES_PASSWORD: spicedb_secret
+      POSTGRES_DB: spicedb
+    volumes:
+      - spicedb_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spicedb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  spicedb-migrate:
+    image: authzed/spicedb:latest
+    command: migrate head
+    environment:
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: "postgres://spicedb:spicedb_secret@postgres:5432/spicedb?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  spicedb:
+    image: authzed/spicedb:latest
+    command: serve
+    environment:
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_PRESHARED_KEY:-xpollination-dev-key}
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: "postgres://spicedb:spicedb_secret@postgres:5432/spicedb?sslmode=disable"
+    ports:
+      - "50051:50051"  # gRPC
+      - "8443:8443"    # REST gateway
+      - "9090:9090"    # metrics
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  spicedb_pg_data:

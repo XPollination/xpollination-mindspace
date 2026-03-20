@@ -1,0 +1,16 @@
+{
+  "$schema": "service-manifest-v1.0",
+  "name": "xpollination-viz",
+  "version": "0.0.36",
+  "entry": "viz/server.js",
+  "port": 4200,
+  "health_endpoint": "/health",
+  "health_timeout_ms": 30000,
+  "graceful_drain_ms": 5000,
+  "environment": {
+    "NODE_ENV": "production",
+    "VIZ_BIND": "0.0.0.0"
+  },
+  "restart_command": "node viz/server.js",
+  "rollback_versions": 2
+}

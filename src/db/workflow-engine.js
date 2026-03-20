@@ -16,7 +16,7 @@
 // approved = design approved, ready for next phase
 // testing = QA creates tests before dev implements
 export const VALID_STATUSES = [
-  'pending', 'ready', 'active', 'approval', 'approved', 'testing',
+  'backlog', 'pending', 'ready', 'active', 'approval', 'approved', 'testing',
   'review', 'rework', 'complete', 'blocked', 'cancelled'
 ];
 
@@ -31,6 +31,10 @@ export const ALLOWED_TRANSITIONS = {
   // Task flow - role-aware transitions
   // Key principle: Role assigned at creation should be preserved unless explicitly transitioned
   'task': {
+    // Backlog transitions: backlog→pending (mission release), pending→backlog (re-prioritize)
+    'backlog->pending': { allowedActors: ['liaison', 'system', 'pdsa'] },
+    'pending->backlog': { allowedActors: ['liaison', 'system', 'pdsa'] },
+
     // AC1: pending->ready forces PDSA start — all tasks must go through PDSA planning first
     'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'], newRole: 'pdsa' },
 
@@ -82,12 +86,13 @@ export const ALLOWED_TRANSITIONS = {
     // Review flow - per WORKFLOW.md v12: only liaison (human proxy) can complete
     // PDSA forwards via review->review:pdsa, does not complete directly
     'review->complete': { allowedActors: ['liaison'], newRole: 'liaison', requiresHumanConfirm: true, requiresDna: ['abstract_ref', 'test_pass_count', 'test_total_count'] },
-    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id'] },
+    'review->rework': { allowedActors: ['pdsa', 'qa'], newRole: 'dev', clearsDna: ['memory_query_session', 'memory_contribution_id', 'pr_review_verdict', 'pr_review_reasoning', 'pr_merge_sha'] },
     // Per WORKFLOW.md rework entry table: review+liaison → rework
     // Role routing determined by cmdTransition using DNA context:
     //   Design tasks (has pdsa_ref) → rework+pdsa (designer reworks)
     //   Liaison content tasks (no pdsa_ref) → rework+liaison (content creator reworks)
-    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id'], requiresDna: ['rework_target_role'], requiresHumanConfirm: true },
+    // PR fields: verdict+reasoning+sha cleared on rework, pr_url+feature_branch preserved (branch still exists, PR stays open)
+    'review->rework:liaison': { allowedActors: ['liaison'], requireRole: 'liaison', clearsDna: ['memory_query_session', 'memory_contribution_id', 'pr_review_verdict', 'pr_review_reasoning', 'pr_merge_sha'], requiresDna: ['rework_target_role'], requiresHumanConfirm: true },
     // Per WORKFLOW.md v12: review chain transitions (QA->PDSA->Liaison)
     'review->review:qa': { allowedActors: ['qa'], requireRole: 'qa', newRole: 'pdsa' },
     'review->review:pdsa': { allowedActors: ['pdsa'], requireRole: 'pdsa', newRole: 'liaison' },
@@ -325,6 +330,28 @@ export function validateDnaRequirements(nodeType, fromStatus, toStatus, dna, cur
       if (test_pass_count !== test_total_count) {
         return `Test gate blocked: 100% test pass required. test_pass_count=${test_pass_count} but test_total_count=${test_total_count}. All tests must pass before completion.`;
       }
+    }
+  }
+
+  // PR merge gate: tasks with feature_branch require PR review before completion.
+  // When dna.feature_branch exists, the review→complete transition requires:
+  //   pr_url (GitHub URL), pr_review_verdict === "merge",
+  //   pr_review_reasoning (min 50 chars), pr_merge_sha (git SHA).
+  // This ensures branch lifecycle mirrors task lifecycle (REQ-BRANCH-001).
+  // Tasks without feature_branch are unaffected (liaison content, research, etc.).
+  // See: MISSION-CONTINUOUS-DELIVERY Part 2.
+  if (toStatus === 'complete' && dna && dna.feature_branch) {
+    if (!dna.pr_url || typeof dna.pr_url !== 'string' || !dna.pr_url.startsWith('https://github.com/')) {
+      return `PR merge gate: pr_url required (GitHub URL). Task has feature_branch="${dna.feature_branch}" — create a PR and set pr_url before completing.`;
+    }
+    if (dna.pr_review_verdict !== 'merge') {
+      return `PR merge gate: pr_review_verdict must be "merge" to complete. Current: "${dna.pr_review_verdict || 'not set'}". Review the PR diff and set verdict before completing.`;
+    }
+    if (!dna.pr_review_reasoning || typeof dna.pr_review_reasoning !== 'string' || dna.pr_review_reasoning.length < 50) {
+      return `PR merge gate: pr_review_reasoning required (min 50 chars). Document what was checked in the PR diff. Current length: ${(dna.pr_review_reasoning || '').length}.`;
+    }
+    if (!dna.pr_merge_sha || typeof dna.pr_merge_sha !== 'string' || dna.pr_merge_sha.length < 7) {
+      return `PR merge gate: pr_merge_sha required. Merge the PR first (gh pr merge), then record the merge commit SHA.`;
     }
   }
 
