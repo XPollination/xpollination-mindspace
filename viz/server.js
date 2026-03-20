@@ -376,7 +376,10 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 .child-card h3{font-size:14px;margin-bottom:4px;color:var(--link);}
 .child-card p{font-size:12px;color:var(--muted);margin:0;}
 .metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
-@media(max-width:600px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;}}
+@media(max-width:768px){.child-grid,.mission-grid{grid-template-columns:repeat(2,1fr);} .hamburger{display:block;} nav.breadcrumb{overflow-x:auto;white-space:nowrap;}}
+@media(max-width:480px){.container{padding:16px 12px;} .child-grid,.mission-grid{grid-template-columns:1fr;} .content table{display:block;overflow-x:auto;}}
+.child-card,.mission-card,a.nav-link{min-height:44px;}
+.hamburger{display:none;cursor:pointer;font-size:24px;background:none;border:none;color:var(--text);}
 </style>
 </head><body>
 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌓</button>
