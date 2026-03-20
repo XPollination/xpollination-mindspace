@@ -170,8 +170,6 @@ function exportProjectData(dbPath, options) {
     const queueCount = allNodes.filter(n => n.status === 'pending' || n.status === 'ready').length;
     const activeCount = allNodes.filter(n => n.status === 'active').length;
     const postWorkStatuses = ['complete', 'completed', 'done', 'review', 'rework', 'blocked', 'cancelled'];
-    // backlog tasks excluded from main kanban view — they are pre-queue, not yet prioritized
-    const backlogCount = allNodes.filter(n => n.status === 'backlog').length;
     const completedCount = allNodes.filter(n => postWorkStatuses.includes(n.status)).length;
 
     const result = {
@@ -229,12 +227,6 @@ const KB_TYPE_MAP = {
   r: { table: 'requirements', label: 'Requirement', color: '#eab308',
     query: "SELECT r.*, r.short_id, c.title as capability_title, c.short_id as capability_short_id, m.title as mission_title, m.short_id as mission_short_id FROM requirements r JOIN capabilities c ON r.capability_id = c.id JOIN missions m ON c.mission_id = m.id WHERE r.short_id = ?" },
   t: { table: 'mindspace_nodes', label: 'Task', color: '#ef4444', query: null },
-};
-
-// Mission lifecycle status color mapping
-const MISSION_STATUS_COLORS = {
-  draft: '#666', active: '#22c55e', complete: '#eab308', cancelled: '#ef4444', deprecated: '#444',
-  ready: '#3b82f6', blocked: '#ef4444'
 };
 
 const KB_ROUTE = /^\/(m|c|r|t)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/;
@@ -345,7 +337,7 @@ function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
 <meta property="og:description" content="${description.slice(0, 200)}">
 <meta property="og:type" content="article">
 <style>
-:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;--content-color:#333;}
+:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;--content-color:#333;--stripe-bg:#f9fafb;}
 [data-theme="dark"]{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;--content-color:#ccc;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
@@ -357,10 +349,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .breadcrumb .current{color:var(--link);}
 .breadcrumb span:not(:last-child)::after,.breadcrumb a::after{content:" › ";color:#555;}
 .badge{display:inline-block;padding:2px 10px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#fff;background:${typeInfo.color};margin-bottom:8px;}
-h1{font-size:26px;margin:0 0 16px;color:var(--text);}
+h1{font-size:28px;margin:0 0 16px;color:var(--text);}
 .content{line-height:1.7;color:var(--content-color);}
-.content h2{color:var(--text);margin:24px 0 12px;font-size:20px;border-bottom:1px solid var(--border);padding-bottom:4px;}
-.content h3{color:var(--text);margin:16px 0 8px;font-size:16px;}
+.content h2{color:var(--text);margin:24px 0 12px;font-size:22px;border-bottom:1px solid var(--border);padding-bottom:4px;}
+.content h3{color:var(--text);margin:16px 0 8px;font-size:18px;}
+.content h4{color:var(--text);margin:12px 0 6px;font-size:15px;}
 .content p{margin:8px 0;}
 .content code{background:var(--surface);padding:2px 6px;border-radius:3px;font-size:13px;}
 .content pre{background:var(--surface);padding:12px;border-radius:6px;overflow-x:auto;margin:12px 0;}
@@ -368,7 +361,10 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 .content table{width:100%;border-collapse:collapse;margin:12px 0;}
 .content th,.content td{border:1px solid var(--border);padding:8px;text-align:left;}
 .content th{background:var(--surface);}
+.content tr:nth-child(even){background:var(--stripe-bg);}
 .content img{max-width:100%;height:auto;margin:16px 0;border-radius:6px;border:1px solid var(--border);}
+.content svg{max-width:100%;height:auto;display:block;margin:16px auto;background:white;padding:8px;border-radius:6px;}
+[data-theme="dark"] .content svg{background:white;}
 .content a{color:var(--link);text-decoration:none;}
 .content a:hover{text-decoration:underline;}
 .content ul,.content ol{margin:8px 0 8px 24px;}
@@ -385,7 +381,11 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 .child-card p{font-size:12px;color:var(--muted);margin:0;}
 .metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
 @media(max-width:600px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;}}
+@media print{.theme-toggle,.breadcrumb nav{display:none;} body{background:#fff;color:#000;} .content{color:#000;}}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('pre code').forEach(el=>hljs.highlightElement(el));});</script>
 </head><body>
 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌓</button>
 <script>
