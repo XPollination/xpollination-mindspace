@@ -283,6 +283,16 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
       } else if (typePrefix === 'c') {
         children = db.prepare("SELECT id, req_id_human, title, description, short_id, status FROM requirements WHERE capability_id = ? ORDER BY req_id_human ASC").all(node.id);
       }
+      // Cross-references: query node_relationships for multi-mission capabilities
+      let crossRefs = [];
+      if (typePrefix === 'c') {
+        try {
+          crossRefs = db.prepare(
+            "SELECT nr.target_id, m.title, m.short_id FROM node_relationships nr JOIN missions m ON nr.target_id = m.id WHERE nr.source_type = 'capability' AND nr.source_id = ? AND nr.relation = 'COMPOSES' AND nr.target_type = 'mission' AND nr.target_id != ?"
+          ).all(node.id, node.mission_id);
+        } catch (e) { /* node_relationships table may not exist */ }
+      }
+      node._cross_refs = crossRefs;
       const siblings = getSiblings(db, node, typePrefix);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(renderNodePage(node, typePrefix, typeInfo, children, siblings));
@@ -307,10 +317,22 @@ function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
     renderedContent = '<div style="white-space:pre-wrap;">' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
   }
 
+  // Cross-reference: query node_relationships for multi-mission capabilities
+  const crossRefs = (node._cross_refs || []);
+  const crossRefHtml = crossRefs.length > 0 ? `
+    <section class="cross-references" style="margin-top:16px;">
+      <h3 style="font-size:14px;color:var(--muted);margin-bottom:8px;">Also serves</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${crossRefs.map(r => `<a href="/m/${r.short_id || r.id}" style="padding:3px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--link);text-decoration:none;">${r.title}</a>`).join('')}
+      </div>
+    </section>` : '';
+
   // Build breadcrumb with short_id links
   const crumbs = buildBreadcrumb(node, typePrefix);
+  // Multi-mission indicator: +N badge when capability serves additional missions
+  const multiMissionBadge = crossRefs.length > 0 ? ` <span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1px 6px;">+${crossRefs.length}</span>` : '';
   const breadcrumb = crumbs.map(c =>
-    c.href ? `<a href="${c.href}">${c.label}</a>` : `<span class="current">${c.label}</span>`
+    c.href ? `<a href="${c.href}">${c.label}</a>` : `<span class="current">${c.label}${multiMissionBadge}</span>`
   );
 
   // Children cards
@@ -397,6 +419,7 @@ if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark'
 <div class="badge">${typeInfo.label}</div>
 <h1>${title}</h1>
 <div class="content">${renderedContent}</div>
+${crossRefHtml}
 ${childrenHtml}
 ${(siblings || []).length > 0 ? `
 <section class="siblings" style="margin-top:24px;">
