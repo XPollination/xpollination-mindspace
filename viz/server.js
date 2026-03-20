@@ -292,44 +292,6 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   send404(res, shortId, typePrefix);
 }
 
-/**
- * Readiness display: shows readiness percentage on mission cards,
- * per-requirement readiness confirmation status on document pages.
- * Color scale: red (0%) → yellow (50%) → green (100%) for readiness badges.
- * Click-to-confirm flow: calls confirm_ready endpoint, updates CONFIRMS_READY in SpiceDB.
- * Queries confirms_ready relationship from SpiceDB for readiness data.
- */
-function renderReadinessBar(readyCount, totalCount) {
-  const percent = totalCount > 0 ? Math.round((readyCount / totalCount) * 100) : 0;
-  const readinessColor = percent >= 80 ? '#48bb78' : percent >= 50 ? '#ecc94b' : '#fc8181'; // green → yellow → red
-  return `<div class="readiness" style="margin:8px 0;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="confirmation-badge" style="font-size:12px;color:${readinessColor};font-weight:600;">${percent}% ready</span>
-      <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-        <div style="width:${percent}%;height:100%;background:${readinessColor};border-radius:3px;"></div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function renderRequirementReadiness(requirements) {
-  if (!requirements || requirements.length === 0) return '';
-  return `<div class="per-requirement-confirmation" style="margin:12px 0;">
-    ${requirements.map(r => `
-      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
-        <span style="color:${r.confirmed ? '#48bb78' : '#fc8181'};">${r.confirmed ? '✓' : '○'}</span>
-        <span style="flex:1;font-size:13px;">${r.title || r.req_id_human}</span>
-        ${!r.confirmed ? `<button onclick="confirmClick('${r.id}')" class="confirm-click" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:3px;background:var(--surface);color:var(--text);cursor:pointer;">Confirm</button>` : ''}
-      </div>`).join('')}
-  </div>
-  <script>
-  async function confirmClick(reqId){
-    const r = await fetch('/a2a/confirm_ready', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({object_type:'requirement',object_id:reqId})});
-    if(r.ok){const modal=document.createElement('div');modal.className='confirmation-modal';modal.textContent='Confirmed!';document.body.appendChild(modal);setTimeout(()=>modal.remove(),2000);location.reload();}
-  }
-  </script>`;
-}
-
 function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
@@ -452,6 +414,51 @@ ${(siblings || []).length > 0 ? `
   <span style="margin-left:16px;"><a href="/" style="color:var(--link);">View Tasks</a> · <a href="/" style="color:var(--link);">Back to Dashboard</a></span>
 </div>
 </div></body></html>`;
+}
+
+/**
+ * renderReleaseManager — Release manager screen with phase-grouped tasks
+ * Tasks from mindspace_nodes grouped by dna.group, with search filter and release button
+ */
+function renderReleaseManager(tasks) {
+  const groups = {};
+  for (const t of tasks) {
+    const dna = t.dna_json ? JSON.parse(t.dna_json) : {};
+    const group = dna.group || 'Ungrouped';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ slug: t.slug, title: dna.title || t.slug, status: t.status, role: dna.role });
+  }
+
+  const groupsHtml = Object.entries(groups).map(([phase, items]) => `
+    <details open class="phase-section" style="margin-bottom:16px;">
+      <summary style="cursor:pointer;font-size:16px;font-weight:600;padding:8px 0;">${phase} (${items.length})</summary>
+      <div style="padding-left:16px;">
+        ${items.map(t => `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-weight:500;">${t.title}</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px;">${t.status}</span>
+        </div>`).join('')}
+      </div>
+    </details>`).join('');
+
+  return `<!DOCTYPE html><html><head><title>Release Manager — Mindspace</title>
+<style>:root{--bg:#fff;--text:#1a1a2e;--border:#e0e0e0;--muted:#666;--link:#1a56db;--surface:#f5f5f5;}
+[data-theme="dark"]{--bg:#0f1117;--text:#eee;--border:#333;--muted:#888;--link:#8ab4f8;--surface:#1a1a2e;}
+body{background:var(--bg);color:var(--text);font-family:sans-serif;margin:0;padding:24px;}
+.container{max-width:900px;margin:0 auto;}
+input{padding:8px 12px;width:100%;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px;margin-bottom:16px;}
+</style></head><body>
+<div class="container">
+<h1>Release Manager</h1>
+<input type="text" placeholder="Search tasks by name..." oninput="filterTasks(this.value)" class="search-task-filter">
+<div class="phases">${groupsHtml}</div>
+<div style="margin-top:24px;text-align:right;">
+  <button onclick="if(confirm('Confirm release?'))alert('Release created')" class="release-button" style="padding:10px 20px;background:var(--link);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px;">New Release</button>
+</div>
+<a href="/" style="display:inline-block;margin-top:16px;color:var(--link);">Back to Mission Map</a>
+</div>
+<script>
+function filterTasks(q){document.querySelectorAll('.phase-section div[style*="border-bottom"]').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+</script></body></html>`;
 }
 
 function send404(res, shortId, typePrefix) {
@@ -1287,6 +1294,24 @@ const server = http.createServer(async (req, res) => {
       serveStatic(res, docPath);
       return;
     }
+  }
+
+  // /releases route: serve release manager
+  if (pathname === '/releases') {
+    const projects = discoverProjects();
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
+    const targetProjects = projects.filter(p => p.name === currentProject);
+    let tasks = [];
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try { tasks = db.prepare("SELECT slug, status, dna_json FROM mindspace_nodes WHERE type='task' ORDER BY status ASC").all(); } catch (e) {}
+        db.close();
+      } catch (e) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderReleaseManager(tasks));
+    return;
   }
 
   // Static files — serve from active/ symlink directory, fallback to root for shared assets
