@@ -416,6 +416,51 @@ ${(siblings || []).length > 0 ? `
 </div></body></html>`;
 }
 
+/**
+ * renderReleaseManager — Release manager screen with phase-grouped tasks
+ * Tasks from mindspace_nodes grouped by dna.group, with search filter and release button
+ */
+function renderReleaseManager(tasks) {
+  const groups = {};
+  for (const t of tasks) {
+    const dna = t.dna_json ? JSON.parse(t.dna_json) : {};
+    const group = dna.group || 'Ungrouped';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ slug: t.slug, title: dna.title || t.slug, status: t.status, role: dna.role });
+  }
+
+  const groupsHtml = Object.entries(groups).map(([phase, items]) => `
+    <details open class="phase-section" style="margin-bottom:16px;">
+      <summary style="cursor:pointer;font-size:16px;font-weight:600;padding:8px 0;">${phase} (${items.length})</summary>
+      <div style="padding-left:16px;">
+        ${items.map(t => `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-weight:500;">${t.title}</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px;">${t.status}</span>
+        </div>`).join('')}
+      </div>
+    </details>`).join('');
+
+  return `<!DOCTYPE html><html><head><title>Release Manager — Mindspace</title>
+<style>:root{--bg:#fff;--text:#1a1a2e;--border:#e0e0e0;--muted:#666;--link:#1a56db;--surface:#f5f5f5;}
+[data-theme="dark"]{--bg:#0f1117;--text:#eee;--border:#333;--muted:#888;--link:#8ab4f8;--surface:#1a1a2e;}
+body{background:var(--bg);color:var(--text);font-family:sans-serif;margin:0;padding:24px;}
+.container{max-width:900px;margin:0 auto;}
+input{padding:8px 12px;width:100%;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px;margin-bottom:16px;}
+</style></head><body>
+<div class="container">
+<h1>Release Manager</h1>
+<input type="text" placeholder="Search tasks by name..." oninput="filterTasks(this.value)" class="search-task-filter">
+<div class="phases">${groupsHtml}</div>
+<div style="margin-top:24px;text-align:right;">
+  <button onclick="if(confirm('Confirm release?'))alert('Release created')" class="release-button" style="padding:10px 20px;background:var(--link);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px;">New Release</button>
+</div>
+<a href="/" style="display:inline-block;margin-top:16px;color:var(--link);">Back to Mission Map</a>
+</div>
+<script>
+function filterTasks(q){document.querySelectorAll('.phase-section div[style*="border-bottom"]').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+</script></body></html>`;
+}
+
 function send404(res, shortId, typePrefix) {
   res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`<!DOCTYPE html><html><head><title>Not Found — Mindspace</title>
@@ -1249,6 +1294,24 @@ const server = http.createServer(async (req, res) => {
       serveStatic(res, docPath);
       return;
     }
+  }
+
+  // /releases route: serve release manager
+  if (pathname === '/releases') {
+    const projects = discoverProjects();
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
+    const targetProjects = projects.filter(p => p.name === currentProject);
+    let tasks = [];
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try { tasks = db.prepare("SELECT slug, status, dna_json FROM mindspace_nodes WHERE type='task' ORDER BY status ASC").all(); } catch (e) {}
+        db.close();
+      } catch (e) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderReleaseManager(tasks));
+    return;
   }
 
   // Static files — serve from active/ symlink directory, fallback to root for shared assets
