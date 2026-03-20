@@ -292,6 +292,25 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
   send404(res, shortId, typePrefix);
 }
 
+/**
+ * Tab navigation header — Knowledge/Tasks/Releases
+ * Client-side tab switching via pushState, popstate handler for back/forward
+ */
+function renderTabNav(activeTab) {
+  const tabs = [
+    { id: 'knowledge', label: 'Knowledge', href: '/' },
+    { id: 'tasks', label: 'Tasks', href: '/tasks' },
+    { id: 'releases', label: 'Releases', href: '/releases' },
+  ];
+  return `<nav class="tab-nav" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;">
+    ${tabs.map(t => `<a href="${t.href}" class="tab ${t.id === activeTab ? 'tab-active' : ''}" data-tab="${t.id}" onclick="switchTab(event,'${t.id}','${t.href}')" style="padding:8px 16px;text-decoration:none;color:${t.id === activeTab ? 'var(--link)' : 'var(--muted)'};border-bottom:${t.id === activeTab ? '2px solid var(--link)' : 'none'};margin-bottom:-2px;font-size:14px;">${t.label}</a>`).join('')}
+  </nav>
+  <script>
+  function switchTab(e,tabId,href){e.preventDefault();history.pushState({tab:tabId},'',href);location.href=href;}
+  window.addEventListener('popstate',function(e){if(e.state&&e.state.tab)location.href=e.state.tab==='knowledge'?'/':'/'+e.state.tab;});
+  </script>`;
+}
+
 function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
@@ -1249,6 +1268,33 @@ const server = http.createServer(async (req, res) => {
       serveStatic(res, docPath);
       return;
     }
+  }
+
+  // /tasks route: serve kanban (Tasks tab deep link)
+  if (pathname === '/tasks') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'index.html'));
+    return;
+  }
+
+  // /releases route: serve release manager (Releases tab deep link)
+  if (pathname === '/releases') {
+    const projects = discoverProjects();
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
+    const targetProjects = projects.filter(p => p.name === currentProject);
+    let tasks = [];
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        try { tasks = db.prepare("SELECT slug, status, dna_json FROM mindspace_nodes WHERE type='task' ORDER BY status ASC").all(); } catch (e) {}
+        db.close();
+      } catch (e) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderReleaseManager(tasks));
+    return;
   }
 
   // Static files — serve from active/ symlink directory, fallback to root for shared assets
