@@ -1,0 +1,56 @@
+// XPollination SpiceDB Schema — Authorization model
+// Defines permission inheritance for missions, capabilities, requirements, tasks
+
+definition user {}
+
+definition agent {
+  relation owner: user
+}
+
+definition project {
+  relation admin: user | agent
+  relation member: user | agent
+  permission manage = admin
+  permission view = admin + member
+}
+
+definition mission {
+  relation project: project
+  relation owner: user | agent
+  relation contributor: user | agent
+  permission manage = owner + project->admin
+  permission view = owner + contributor + project->member
+  permission compose = owner + project->admin
+}
+
+definition capability {
+  relation mission: mission
+  relation owner: user | agent
+  relation contributor: user | agent
+  permission manage = owner + mission->manage
+  permission view = owner + contributor + mission->view
+  permission implement = owner + contributor + mission->compose
+}
+
+definition requirement {
+  relation capability: capability
+  relation owner: user | agent
+  permission manage = owner + capability->manage
+  permission view = owner + capability->view
+}
+
+definition task {
+  relation requirement: requirement
+  relation assignee: user | agent
+  relation creator: user | agent
+  permission manage = creator + requirement->manage
+  permission view = assignee + creator + requirement->view
+  permission claim = assignee
+}
+
+definition attestation {
+  relation task: task
+  relation attester: user | agent
+  permission verify = attester + task->manage
+  permission view = attester + task->view
+}
