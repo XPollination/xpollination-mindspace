@@ -385,7 +385,10 @@ h1{font-size:26px;margin:0 0 16px;color:var(--text);}
 .child-card h3{font-size:14px;margin-bottom:4px;color:var(--link);}
 .child-card p{font-size:12px;color:var(--muted);margin:0;}
 .metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
-@media(max-width:600px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;}}
+@media(max-width:768px){.child-grid,.mission-grid{grid-template-columns:repeat(2,1fr);} .hamburger{display:block;} nav.breadcrumb{overflow-x:auto;white-space:nowrap;}}
+@media(max-width:480px){.container{padding:16px 12px;} .child-grid,.mission-grid{grid-template-columns:1fr;} .content table{display:block;overflow-x:auto;}}
+.child-card,.mission-card,a.nav-link{min-height:44px;}
+.hamburger{display:none;cursor:pointer;font-size:24px;background:none;border:none;color:var(--text);}
 </style>
 </head><body>
 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌓</button>
@@ -443,6 +446,173 @@ ${(versionHistory || []).length > 0 ? `
   <span style="margin-left:16px;"><a href="/" style="color:var(--link);">View Tasks</a> · <a href="/" style="color:var(--link);">Back to Dashboard</a></span>
 </div>
 </div></body></html>`;
+}
+
+/**
+ * renderSearchBar — Vector search with brain API, debounce, dropdown overlay
+ * Part 18/Part 6 of Structured Knowledge Objects
+ */
+function renderSearchBar() {
+  return `<div style="position:relative;margin-bottom:16px;">
+    <input type="text" placeholder="Search knowledge..." oninput="debounceSearch(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px;">
+    <div class="search-overlay" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:0 0 4px 4px;max-height:300px;overflow-y:auto;z-index:50;"></div>
+  </div>
+  <script>
+  let _st;function debounceSearch(q){clearTimeout(_st);_st=setTimeout(()=>vectorSearch(q),300);}
+  async function vectorSearch(q){if(!q||q.length<2){document.querySelector('.search-overlay').style.display='none';return;}
+    try{const r=await fetch('/api/v1/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,read_only:true})});
+    const d=await r.json();const o=document.querySelector('.search-overlay');
+    if(d.result&&d.result.sources){o.innerHTML=d.result.sources.map(s=>'<div style="padding:8px;border-bottom:1px solid var(--border);cursor:pointer;"><span style="font-size:10px;background:var(--surface);padding:1px 6px;border-radius:3px;margin-right:6px;">'+s.thought_category+'</span>'+s.content_preview+'</div>').join('');o.style.display='block';}else{o.style.display='none';}}catch(e){}}
+  </script>`;
+}
+
+/**
+ * renderReleaseManager — Phase-grouped task view with search and release button
+ * Part 18 of Structured Knowledge Objects
+ */
+function renderReleaseManager(tasks) {
+  const groups = {};
+  for (const t of tasks) {
+    const dna = t.dna_json ? JSON.parse(t.dna_json) : {};
+    const group = dna.group || 'Ungrouped';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ slug: t.slug, title: dna.title || t.slug, status: t.status, role: dna.role });
+  }
+  const groupsHtml = Object.entries(groups).map(([phase, items]) => `
+    <details open style="margin-bottom:16px;">
+      <summary style="cursor:pointer;font-size:16px;font-weight:600;padding:8px 0;">${phase} (${items.length})</summary>
+      <div style="padding-left:16px;">
+        ${items.map(t => `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-weight:500;">${t.title}</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px;">${t.status}</span>
+        </div>`).join('')}
+      </div>
+    </details>`).join('');
+  return `<!DOCTYPE html><html><head><title>Release Manager — Mindspace</title>
+<style>:root{--bg:#fff;--text:#1a1a2e;--border:#e0e0e0;--muted:#666;--link:#1a56db;--surface:#f5f5f5;}[data-theme="dark"]{--bg:#0f1117;--text:#eee;--border:#333;--muted:#888;--link:#8ab4f8;--surface:#1a1a2e;}body{background:var(--bg);color:var(--text);font-family:sans-serif;margin:0;padding:24px;}.container{max-width:900px;margin:0 auto;}input{padding:8px 12px;width:100%;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px;margin-bottom:16px;}</style></head><body>
+<div class="container"><h1>Release Manager</h1>
+<input type="text" placeholder="Search tasks..." oninput="filterTasks(this.value)">
+<div>${groupsHtml}</div>
+<div style="margin-top:24px;text-align:right;"><button onclick="if(confirm('Confirm release?'))alert('Release created')" style="padding:10px 20px;background:var(--link);color:#fff;border:none;border-radius:4px;cursor:pointer;">New Release</button></div>
+<a href="/" style="display:inline-block;margin-top:16px;color:var(--link);">Back</a></div>
+<script>function filterTasks(q){document.querySelectorAll('details div[style*="border-bottom"]').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}</script>
+</body></html>`;
+}
+
+/**
+ * renderReadinessBar — Progress bar for mission/capability readiness
+ * Part 22 of Structured Knowledge Objects
+ */
+function renderReadinessBar(readyCount, totalCount) {
+  const pct = totalCount > 0 ? Math.round((readyCount / totalCount) * 100) : 0;
+  const color = pct === 100 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444';
+  return `<div style="margin:8px 0;"><div style="background:var(--surface);border-radius:4px;height:8px;overflow:hidden;"><div style="width:${pct}%;background:${color};height:100%;border-radius:4px;transition:width 0.3s;"></div></div><span style="font-size:11px;color:var(--muted);">${readyCount}/${totalCount} ready (${pct}%)</span></div>`;
+}
+
+/**
+ * renderMissionMap — Server-rendered mission map landing page
+ * Replaces kanban as root route. Shows mission cards with status badges.
+ * Active missions first, deprecated dimmed below.
+ */
+function renderMissionMap(missions) {
+  const statusBadgeColor = (status) => {
+    switch (status) {
+      case 'active': return '#48bb78';
+      case 'draft': return '#4299e1';
+      case 'deprecated': return '#a0aec0';
+      default: return '#a0aec0';
+    }
+  };
+
+  const activeMissions = missions.filter(m => m.status === 'active');
+  const deprecatedMissions = missions.filter(m => m.status !== 'active');
+
+  const totalCaps = missions.reduce((sum, m) => sum + (m.capabilities || []).length, 0);
+
+  const renderCard = (m, dimmed) => {
+    const capCount = (m.capabilities || []).length;
+    const color = statusBadgeColor(m.status);
+    const cardStyle = dimmed ? 'opacity:0.6;' : '';
+    const link = m.short_id ? `/m/${m.short_id}` : `/m/${m.id}`;
+    const excerpt = (m.description || '').substring(0, 120);
+    return `
+      <a href="${link}" class="mission-card" style="${cardStyle}border-left:3px solid ${color};">
+        <div class="card-header">
+          <h3 class="card-title">${m.title}</h3>
+          <span class="status-badge" style="background:${color};">${m.status}</span>
+        </div>
+        <p class="card-description">${excerpt}${(m.description || '').length > 120 ? '...' : ''}</p>
+        <span class="cap-count">${capCount} capabilities</span>
+      </a>`;
+  };
+
+  const activeCards = activeMissions.map(m => renderCard(m, false)).join('');
+  const deprecatedCards = deprecatedMissions.length > 0 ? `
+    <section class="deprecated" style="margin-top:32px;">
+      <h2 style="font-size:16px;color:#a0aec0;margin-bottom:12px;">Deprecated</h2>
+      <div class="mission-grid dimmed">${deprecatedMissions.map(m => renderCard(m, true)).join('')}</div>
+    </section>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission Map — Mindspace</title>
+<style>
+:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;}
+[data-theme="dark"]{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
+.theme-toggle{position:fixed;top:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:14px;color:var(--text);z-index:100;}
+.container{max-width:900px;margin:0 auto;padding:24px 16px;}
+h1{font-size:28px;margin-bottom:8px;}
+.subtitle{color:var(--muted);margin-bottom:24px;}
+.mission-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.mission-card{display:block;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text);transition:border-color 0.2s;}
+.mission-card:hover{border-color:var(--link);}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.card-title{font-size:15px;font-weight:600;color:var(--text);}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#fff;flex-shrink:0;margin-left:8px;}
+.card-description{font-size:13px;color:var(--muted);margin-bottom:8px;}
+.cap-count{font-size:11px;color:var(--muted);font-weight:500;}
+.footer-stats{margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;gap:16px;}
+@media(max-width:600px){.mission-grid{grid-template-columns:1fr;}}
+</style>
+</head><body>
+<button class="theme-toggle" onclick="toggleTheme()">&#127763;</button>
+<script>
+function toggleTheme(){const c=document.documentElement.getAttribute('data-theme');const n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('theme',n);}
+const saved=localStorage.getItem('theme');if(saved==='dark')document.documentElement.setAttribute('data-theme','dark');
+</script>
+<div class="container">
+<h1>Mission Map</h1>
+<p class="subtitle">Overview of all missions and their capabilities</p>
+<div class="mission-grid">${activeCards}</div>
+${deprecatedCards}
+<div class="footer-stats">
+  <span>${activeMissions.length} active · ${totalCaps} capabilities · <a href="/kanban" style="color:var(--link);text-decoration:none;">Kanban Board</a></span>
+</div>
+</div></body></html>`;
+}
+
+function getMissionOverview() {
+  const projects = discoverProjects();
+  const currentProject = path.basename(__dirname.replace('/viz', ''));
+  const targetProjects = projects.filter(p => p.name === currentProject);
+  const allMissions = [];
+  for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+    try {
+      const db = new Database(proj.dbPath, { readonly: true });
+      try {
+        const missionRows = db.prepare("SELECT id, slug, title, description, status, short_id FROM missions ORDER BY CASE WHEN status='active' THEN 0 ELSE 1 END, created_at ASC").all();
+        for (const m of missionRows) {
+          const caps = db.prepare("SELECT id, title, description, status, sort_order, short_id FROM capabilities WHERE mission_id = ? ORDER BY sort_order ASC").all(m.id);
+          allMissions.push({ ...m, capabilities: caps });
+        }
+      } catch (err) { /* tables may not exist */ }
+      db.close();
+    } catch (err) { /* skip project */ }
+  }
+  return allMissions;
 }
 
 function send404(res, shortId, typePrefix) {
@@ -1280,11 +1450,49 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Root route: serve mission map
+  if (pathname === '/') {
+    const missions = getMissionOverview();
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderMissionMap(missions));
+    return;
+  }
+
+  // /kanban or /tasks route: serve kanban index.html
+  if (pathname === '/kanban' || pathname === '/tasks') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    const kanbanPath = path.join(staticRoot, 'index.html');
+    serveStatic(res, kanbanPath);
+    return;
+  }
+
+  // /releases route: serve release manager
+  if (pathname === '/releases') {
+    const projects = discoverProjects();
+    const currentProject = path.basename(__dirname.replace('/viz', ''));
+    const targetProjects = projects.filter(p => p.name === currentProject);
+    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
+      try {
+        const db = new Database(proj.dbPath, { readonly: true });
+        const tasks = db.prepare("SELECT slug, status, dna_json FROM mindspace_nodes WHERE type='task' AND status NOT IN ('cancelled')").all();
+        db.close();
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(renderReleaseManager(tasks));
+        return;
+      } catch (e) { /* skip */ }
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderReleaseManager([]));
+    return;
+  }
+
   // Static files — serve from active/ symlink directory, fallback to root for shared assets
   const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
     ? path.resolve(path.join(__dirname, 'active'))
     : __dirname;
-  let filePath = pathname === '/' ? '/index.html' : pathname;
+  let filePath = pathname;
   let resolvedPath = path.join(staticRoot, filePath);
 
   // Try .html extension for extensionless paths (e.g., /login → login.html)
