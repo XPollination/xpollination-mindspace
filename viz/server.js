@@ -170,6 +170,8 @@ function exportProjectData(dbPath, options) {
     const queueCount = allNodes.filter(n => n.status === 'pending' || n.status === 'ready').length;
     const activeCount = allNodes.filter(n => n.status === 'active').length;
     const postWorkStatuses = ['complete', 'completed', 'done', 'review', 'rework', 'blocked', 'cancelled'];
+    // backlog tasks excluded from main kanban view — they are pre-queue, not yet prioritized
+    const backlogCount = allNodes.filter(n => n.status === 'backlog').length;
     const completedCount = allNodes.filter(n => postWorkStatuses.includes(n.status)).length;
 
     const result = {
@@ -284,39 +286,22 @@ function handleKbRoute(res, typePrefix, shortId, suffix, db) {
         children = db.prepare("SELECT id, req_id_human, title, description, short_id, status FROM requirements WHERE capability_id = ? ORDER BY req_id_human ASC").all(node.id);
       }
       const siblings = getSiblings(db, node, typePrefix);
+      // Version timeline for capabilities
+      let versionHistory = [];
+      if (typePrefix === 'c') {
+        try {
+          versionHistory = db.prepare("SELECT * FROM capability_version_history WHERE capability_id = ? ORDER BY version DESC").all(node.id);
+        } catch (e) { /* table may not exist */ }
+      }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(renderNodePage(node, typePrefix, typeInfo, children, siblings));
+      res.end(renderNodePage(node, typePrefix, typeInfo, children, siblings, versionHistory));
       return;
     }
   } catch (err) { /* table may not exist */ }
   send404(res, shortId, typePrefix);
 }
 
-/**
- * Search bar: vector search via brain /api/v1/memory endpoint
- * Debounce 300ms, dropdown overlay with type badge per result
- */
-function renderSearchBar() {
-  return `<div class="searchBar" style="position:relative;margin-bottom:16px;">
-    <input type="text" class="search-input" placeholder="Search knowledge..." oninput="debounceSearch(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px;">
-    <div class="search-result-overlay dropdown-result" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:0 0 4px 4px;max-height:300px;overflow-y:auto;z-index:50;"></div>
-  </div>
-  <script>
-  let searchTimeout;
-  function debounceSearch(q){clearTimeout(searchTimeout);searchTimeout=setTimeout(()=>vectorSearch(q),300);}
-  async function vectorSearch(q){
-    if(!q||q.length<2){document.querySelector('.search-result-overlay').style.display='none';return;}
-    const r=await fetch('/api/v1/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,read_only:true})});
-    const d=await r.json();const overlay=document.querySelector('.search-result-overlay');
-    if(d.result&&d.result.sources){
-      overlay.innerHTML=d.result.sources.map(s=>'<div style="padding:8px;border-bottom:1px solid var(--border);"><span class="type-badge result-type" style="font-size:10px;background:var(--surface);padding:1px 6px;border-radius:3px;margin-right:6px;">'+s.thought_category+'</span>'+s.content_preview+'</div>').join('');
-      overlay.style.display='block';
-    }else{overlay.style.display='none';}
-  }
-  </script>`;
-}
-
-function renderNodePage(node, typePrefix, typeInfo, children, siblings) {
+function renderNodePage(node, typePrefix, typeInfo, children, siblings, versionHistory) {
   const title = node.title || node.req_id_human || 'Untitled';
   const description = node.description || '';
   const content = node.content_md || description;
@@ -432,6 +417,26 @@ ${(siblings || []).length > 0 ? `
       return `<a href="/${prefix}/${s.short_id || s.id}/${slugify(sTitle)}" style="padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--link);text-decoration:none;">${sTitle}</a>`;
     }).join('')}
   </div>
+</section>` : ''}
+${(versionHistory || []).length > 0 ? `
+<section class="version-timeline" style="margin-top:24px;">
+  <h2 style="font-size:16px;color:var(--text);margin-bottom:12px;">Version History</h2>
+  ${versionHistory.slice(0, 3).map((v, i) => `
+    <div style="padding:8px 12px;border-left:3px solid ${i === 0 ? '#22c55e' : '#444'};margin-bottom:8px;background:var(--surface);border-radius:0 4px 4px 0;">
+      <strong style="color:var(--text);">v${v.version}</strong> <span style="color:var(--muted);font-size:11px;">${v.changed_at || ''} by ${v.changed_by}</span>
+      ${v.changelog ? `<p style="margin:4px 0 0;font-size:12px;color:var(--muted);">${v.changelog}</p>` : ''}
+    </div>
+  `).join('')}
+  ${versionHistory.length > 3 ? `
+    <details style="margin-top:4px;">
+      <summary style="cursor:pointer;color:var(--link);font-size:12px;">Show ${versionHistory.length - 3} more versions</summary>
+      ${versionHistory.slice(3).map(v => `
+        <div style="padding:6px 12px;border-left:3px solid #333;margin-top:4px;font-size:12px;color:var(--muted);">
+          <strong>v${v.version}</strong> — ${v.changelog || 'No changelog'}
+        </div>
+      `).join('')}
+    </details>
+  ` : ''}
 </section>` : ''}
 <div class="metadata">
   Version ${node.content_version || 0}
