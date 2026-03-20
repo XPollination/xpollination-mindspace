@@ -113,7 +113,7 @@ function queryDb(dbPath, { role, status } = {}) {
       json_extract(dna_json, '$.title') as title,
       json_extract(dna_json, '$.role') as role,
       updated_at
-      FROM mindspace_nodes WHERE status NOT IN ('complete', 'cancelled')`;
+      FROM mindspace_nodes WHERE status NOT IN ('complete', 'cancelled', 'backlog')`;
     const params = [];
 
     if (role) {
