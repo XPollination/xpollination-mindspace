@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4299e1"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#48bb78"/>
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a202c">Two-Cycle PR Flow</text>
+
+  <!-- CYCLE 1 Background -->
+  <rect x="20" y="50" width="440" height="350" rx="12" fill="#ebf8ff" stroke="#bee3f8" stroke-width="1" opacity="0.5"/>
+  <text x="240" y="75" text-anchor="middle" font-size="14" font-weight="bold" fill="#2b6cb0">CYCLE 1 — Continuous (per task)</text>
+
+  <!-- CYCLE 2 Background -->
+  <rect x="480" y="50" width="300" height="350" rx="12" fill="#f0fff4" stroke="#c6f6d5" stroke-width="1" opacity="0.5"/>
+  <text x="630" y="75" text-anchor="middle" font-size="14" font-weight="bold" fill="#276749">CYCLE 2 — On Demand</text>
+
+  <!-- Feature Branch -->
+  <rect x="40" y="100" width="160" height="55" rx="8" fill="#edf2f7" stroke="#a0aec0" stroke-width="2"/>
+  <text x="120" y="122" text-anchor="middle" font-size="13" font-weight="bold" fill="#2d3748">Feature Branch</text>
+  <text x="120" y="142" text-anchor="middle" font-size="10" fill="#718096">feature/task-slug</text>
+
+  <!-- PR Arrow -->
+  <line x1="200" y1="127" x2="270" y2="127" stroke="#4299e1" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="235" y="118" text-anchor="middle" font-size="10" font-weight="bold" fill="#4299e1">PR</text>
+
+  <!-- Develop -->
+  <rect x="275" y="100" width="160" height="55" rx="8" fill="#ebf8ff" stroke="#4299e1" stroke-width="2"/>
+  <text x="355" y="122" text-anchor="middle" font-size="13" font-weight="bold" fill="#2b6cb0">develop</text>
+  <text x="355" y="142" text-anchor="middle" font-size="10" fill="#4a7fb5">Wild West integration</text>
+
+  <!-- Batch PR Arrow -->
+  <line x1="435" y1="127" x2="520" y2="127" stroke="#48bb78" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="477" y="118" text-anchor="middle" font-size="10" font-weight="bold" fill="#48bb78">batch PR</text>
+
+  <!-- Main -->
+  <rect x="525" y="100" width="160" height="55" rx="8" fill="#f0fff4" stroke="#276749" stroke-width="2"/>
+  <text x="605" y="122" text-anchor="middle" font-size="13" font-weight="bold" fill="#276749">main</text>
+  <text x="605" y="142" text-anchor="middle" font-size="10" fill="#48bb78">Production</text>
+
+  <!-- LIAISON Review Box -->
+  <rect x="60" y="190" width="180" height="90" rx="8" fill="#fff" stroke="#4299e1" stroke-width="1.5"/>
+  <text x="150" y="212" text-anchor="middle" font-size="12" font-weight="bold" fill="#2b6cb0">LIAISON Reviews PR</text>
+  <text x="150" y="232" text-anchor="middle" font-size="10" fill="#4a5568">• gh pr diff</text>
+  <text x="150" y="248" text-anchor="middle" font-size="10" fill="#4a5568">• Check vs PDSA design</text>
+  <text x="150" y="264" text-anchor="middle" font-size="10" fill="#4a5568">• Merge or Rework</text>
+
+  <!-- Arrow from Feature to LIAISON -->
+  <line x1="120" y1="155" x2="120" y2="185" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Arrow from LIAISON to Develop (merge) -->
+  <path d="M 240 230 Q 310 230 355 160" stroke="#48bb78" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+  <text x="305" y="215" text-anchor="middle" font-size="9" fill="#48bb78">merge</text>
+
+  <!-- Rework Arrow -->
+  <rect x="60" y="310" width="180" height="50" rx="8" fill="#fff5f5" stroke="#e53e3e" stroke-width="1.5"/>
+  <text x="150" y="335" text-anchor="middle" font-size="11" font-weight="bold" fill="#c53030">Rework → Dev fixes</text>
+  <text x="150" y="350" text-anchor="middle" font-size="9" fill="#e53e3e">Same branch, PR updates</text>
+
+  <line x1="150" y1="280" x2="150" y2="305" stroke="#e53e3e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="170" y="297" font-size="9" fill="#e53e3e">reject</text>
+
+  <!-- Rework loop back -->
+  <path d="M 60 335 Q 30 335 30 200 Q 30 127 40 127" stroke="#e53e3e" stroke-width="1" stroke-dasharray="4,3" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Thomas Review Box -->
+  <rect x="520" y="190" width="180" height="90" rx="8" fill="#fff" stroke="#276749" stroke-width="1.5"/>
+  <text x="610" y="212" text-anchor="middle" font-size="12" font-weight="bold" fill="#276749">Thomas Reviews</text>
+  <text x="610" y="232" text-anchor="middle" font-size="10" fill="#4a5568">• beta-mindspace.xpo...</text>
+  <text x="610" y="248" text-anchor="middle" font-size="10" fill="#4a5568">• Aggregate features</text>
+  <text x="610" y="264" text-anchor="middle" font-size="10" fill="#4a5568">• Approve → main</text>
+
+  <!-- Arrow from Develop to Thomas -->
+  <line x1="355" y1="155" x2="355" y2="175" stroke="#4a5568" stroke-width="1" stroke-dasharray="4,3"/>
+  <path d="M 355 175 Q 355 200 515 230" stroke="#4a5568" stroke-width="1" stroke-dasharray="4,3" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Arrow from Thomas to Main -->
+  <path d="M 700 230 Q 730 230 730 155 Q 730 127 690 127" stroke="#48bb78" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+  <text x="740" y="190" font-size="9" fill="#276749">approve</text>
+
+  <!-- Legend -->
+  <rect x="290" y="320" width="170" height="70" rx="6" fill="#f7fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="375" y="338" text-anchor="middle" font-size="10" font-weight="bold" fill="#4a5568">Hard Gates</text>
+  <text x="375" y="355" text-anchor="middle" font-size="9" fill="#4a5568">pr_url + pr_review_verdict</text>
+  <text x="375" y="370" text-anchor="middle" font-size="9" fill="#4a5568">pr_review_reasoning (50+ chars)</text>
+  <text x="375" y="385" text-anchor="middle" font-size="9" fill="#4a5568">pr_merge_sha (commit proof)</text>
+</svg>
