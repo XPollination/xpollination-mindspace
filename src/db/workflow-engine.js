@@ -16,7 +16,7 @@
 // approved = design approved, ready for next phase
 // testing = QA creates tests before dev implements
 export const VALID_STATUSES = [
-  'pending', 'ready', 'active', 'approval', 'approved', 'testing',
+  'backlog', 'pending', 'ready', 'active', 'approval', 'approved', 'testing',
   'review', 'rework', 'complete', 'blocked', 'cancelled'
 ];
 
@@ -31,6 +31,10 @@ export const ALLOWED_TRANSITIONS = {
   // Task flow - role-aware transitions
   // Key principle: Role assigned at creation should be preserved unless explicitly transitioned
   'task': {
+    // Backlog transitions: backlog→pending (mission release), pending→backlog (re-prioritize)
+    'backlog->pending': { allowedActors: ['liaison', 'system', 'pdsa'] },
+    'pending->backlog': { allowedActors: ['liaison', 'system', 'pdsa'] },
+
     // AC1: pending->ready forces PDSA start — all tasks must go through PDSA planning first
     'pending->ready': { allowedActors: ['liaison', 'system', 'pdsa'], newRole: 'pdsa' },
 

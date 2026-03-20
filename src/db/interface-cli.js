@@ -41,6 +41,11 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Statuses reference (from workflow-engine.js):
+// 'backlog' → pre-queue, excluded from monitor/kanban. Transitions: backlog→pending, pending→backlog
+// 'pending' → queued, awaiting PDSA start
+// Full list: backlog, pending, ready, active, approval, approved, testing, review, rework, complete, blocked, cancelled
+
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
 
@@ -892,6 +897,34 @@ function cmdUpdateDna(id, dnaJson, actor) {
   });
 
   db.close();
+}
+
+/**
+ * Validate requirement content_md has 9 mandatory section headings.
+ * Only triggered when task has requirement_ref or requirement_refs.
+ * NULL content_md = skip validation (backward compat).
+ */
+const REQUIRED_SECTIONS = [
+  'Purpose', 'Acceptance Criteria', 'User Stories',
+  'Technical Constraints', 'Dependencies', 'Test Strategy',
+  'Security', 'Performance', 'Version History'
+];
+
+function validateRequirementTemplate(content_md) {
+  if (!content_md) return []; // NULL = skip validation
+
+  const missing = [];
+  for (const section of REQUIRED_SECTIONS) {
+    const pattern = new RegExp(`##\\s*${section}`, 'i');
+    if (!pattern.test(content_md)) {
+      missing.push(section);
+    }
+  }
+
+  if (missing.length > 0) {
+    return [`Missing required heading sections in requirement content_md: ${missing.join(', ')}`];
+  }
+  return [];
 }
 
 function cmdCreate(type, slug, dnaJson, actor) {
