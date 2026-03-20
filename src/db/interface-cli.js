@@ -41,6 +41,20 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Statuses reference (from workflow-engine.js):
+// 'backlog' → pre-queue, excluded from monitor/kanban. Transitions: backlog→pending, pending→backlog
+// 'pending' → queued, awaiting PDSA start
+// Full list: backlog, pending, ready, active, approval, approved, testing, review, rework, complete, blocked, cancelled
+//
+// Mission lifecycle (state machine): draft → ready → active → complete → deprecated
+// Mission transitions:
+//   draft→ready: mission design approved, capabilities defined
+//   ready→active: mission launched — triggers backlog release (backlog→pending for linked tasks)
+//   active→complete: all capabilities delivered
+//   complete→deprecated: mission archived, read-only
+// Backlog release side effect: when mission transitions ready→active,
+// all tasks linked to mission capabilities move from backlog→pending
+
 // Valid actors
 const VALID_ACTORS = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
 
@@ -188,6 +202,29 @@ const FIELD_VALIDATORS = {
     const num = Number(value);
     if (!Number.isInteger(num) || num <= 0) {
       return `test_total_count must be a positive integer (> 0), got: "${value}"`;
+    }
+    return null;
+  },
+
+  // PR merge gate validators (MISSION-CONTINUOUS-DELIVERY Part 2)
+  pr_url: (value) => {
+    if (typeof value !== 'string') return `pr_url must be a string`;
+    if (!value.startsWith('https://github.com/')) {
+      return `pr_url must be a GitHub URL (https://github.com/...), got: "${value}"`;
+    }
+    return null;
+  },
+
+  pr_review_verdict: (value) => {
+    if (!['merge', 'rework'].includes(value)) {
+      return `pr_review_verdict must be "merge" or "rework", got: "${value}"`;
+    }
+    return null;
+  },
+
+  pr_merge_sha: (value) => {
+    if (typeof value !== 'string' || value.length < 7) {
+      return `pr_merge_sha must be a valid git SHA (min 7 chars), got: "${value}"`;
     }
     return null;
   }
@@ -892,6 +929,34 @@ function cmdUpdateDna(id, dnaJson, actor) {
   });
 
   db.close();
+}
+
+/**
+ * Validate requirement content_md has 9 mandatory section headings.
+ * Only triggered when task has requirement_ref or requirement_refs.
+ * NULL content_md = skip validation (backward compat).
+ */
+const REQUIRED_SECTIONS = [
+  'Purpose', 'Acceptance Criteria', 'User Stories',
+  'Technical Constraints', 'Dependencies', 'Test Strategy',
+  'Security', 'Performance', 'Version History'
+];
+
+function validateRequirementTemplate(content_md) {
+  if (!content_md) return []; // NULL = skip validation
+
+  const missing = [];
+  for (const section of REQUIRED_SECTIONS) {
+    const pattern = new RegExp(`##\\s*${section}`, 'i');
+    if (!pattern.test(content_md)) {
+      missing.push(section);
+    }
+  }
+
+  if (missing.length > 0) {
+    return [`Missing required heading sections in requirement content_md: ${missing.join(', ')}`];
+  }
+  return [];
 }
 
 function cmdCreate(type, slug, dnaJson, actor) {
