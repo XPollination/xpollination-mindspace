@@ -215,7 +215,11 @@ async function init() {
     }
   } catch (err) {
     console.error('Knowledge browser init failed:', err);
-    showError(`Failed to load: ${err.message}`);
+    if (err.message.includes('Access denied') || err.message.includes('Authentication')) {
+      showError('Session expired or access denied. <a href="/login" style="color:var(--link);">Please log in again</a>');
+    } else {
+      showError(`Failed to load: ${err.message}`);
+    }
   }
 }
 
