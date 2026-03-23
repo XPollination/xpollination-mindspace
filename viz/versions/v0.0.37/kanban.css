@@ -114,11 +114,19 @@
 }
 .detail-link:hover { text-decoration: underline; }
 
+/* Overlay behind detail panel (mobile: tap to close) */
+.detail-overlay {
+  display: none; position: fixed; inset: 0; z-index: 799;
+  background: rgba(0,0,0,0.3);
+}
+.detail-overlay.open { display: block; }
+
 /* --- Responsive --- */
 @media (max-width: 768px) {
   .kanban-board { flex-direction: column; }
   .kanban-column { max-width: none; min-width: 0; }
-  .detail-panel { width: 100%; right: -100%; }
+  .detail-panel { width: 85%; right: -85%; top: 0; }
+  .detail-header { padding-top: 16px; }
   .kanban-toolbar { flex-wrap: wrap; gap: 4px; }
   .kanban-toolbar .ms-input { width: 100% !important; }
 }
