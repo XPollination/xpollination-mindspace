@@ -5,63 +5,25 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
 <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
 <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
+<link rel="stylesheet" href="/mindspace.css">
 <style>
-:root{--bg:#ffffff;--surface:#f5f5f5;--border:#e0e0e0;--text:#1a1a2e;--muted:#666;--link:#1a56db;--content-color:#333;}
-[data-theme="dark"]{--bg:#0f1117;--surface:#1a1a2e;--border:#333;--text:#eee;--muted:#888;--link:#8ab4f8;--content-color:#ccc;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;}
-.theme-toggle{position:fixed;top:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:14px;color:var(--text);z-index:100;}
-.container{max-width:760px;margin:0 auto;padding:24px 16px;}
-.breadcrumb{font-size:13px;color:var(--muted);margin-bottom:20px;}
-.breadcrumb a{color:var(--muted);text-decoration:none;}
-.breadcrumb a:hover{text-decoration:underline;color:var(--link);}
-.breadcrumb .current{color:var(--link);}
-.breadcrumb span:not(:last-child)::after,.breadcrumb a::after{content:" > ";color:#555;}
-.badge{display:inline-block;padding:2px 10px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#fff;margin-bottom:8px;}
-h1{font-size:26px;margin:0 0 16px;color:var(--text);}
-.content{line-height:1.7;color:var(--content-color);}
-.content h2{color:var(--text);margin:24px 0 12px;font-size:20px;border-bottom:1px solid var(--border);padding-bottom:4px;}
-.content h3{color:var(--text);margin:16px 0 8px;font-size:16px;}
-.content p{margin:8px 0;}
-.content code{background:var(--surface);padding:2px 6px;border-radius:3px;font-size:13px;}
-.content pre{background:var(--surface);padding:12px;border-radius:6px;overflow-x:auto;margin:12px 0;}
-.content pre code{background:none;padding:0;}
-.content table{width:100%;border-collapse:collapse;margin:12px 0;}
-.content th,.content td{border:1px solid var(--border);padding:8px;text-align:left;}
-.content th{background:var(--surface);}
-.content img{max-width:100%;height:auto;margin:16px 0;border-radius:6px;border:1px solid var(--border);}
-.content a{color:var(--link);text-decoration:none;}
-.content a:hover{text-decoration:underline;}
-.content ul,.content ol{margin:8px 0 8px 24px;}
-.content li{margin:4px 0;}
-.content blockquote{border-left:3px solid var(--border);padding-left:12px;color:var(--muted);margin:12px 0;}
-.content strong{color:var(--text);}
-.content hr{border:none;border-top:1px solid var(--border);margin:24px 0;}
 .children{margin-top:32px;}
-.children h2{color:var(--text);font-size:18px;margin-bottom:12px;}
+.children h2{font-size:18px;margin-bottom:12px;}
 .child-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
-.child-card{display:block;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text);transition:border-color 0.2s;}
-.child-card:hover{border-color:var(--link);}
-.child-card h3{font-size:14px;margin-bottom:4px;color:var(--link);}
-.child-card p{font-size:12px;color:var(--muted);margin:0;}
-.metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
-.loading{text-align:center;padding:60px 0;color:var(--muted);}
-.loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top:3px solid var(--link);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;}
-@keyframes spin{to{transform:rotate(360deg)}}
-.error{text-align:center;padding:40px;color:#d32f2f;}
+.child-card{display:block;padding:14px;background:var(--ms-surface);border:1px solid var(--ms-border);border-radius:var(--ms-radius);text-decoration:none;color:var(--ms-text);transition:border-color 0.2s;}
+.child-card:hover{border-color:var(--ms-link);text-decoration:none;}
+.child-card h3{font-size:14px;margin-bottom:4px;color:var(--ms-link);}
+.child-card p{font-size:12px;color:var(--ms-muted);margin:0;}
+.metadata{margin-top:24px;padding-top:16px;border-top:1px solid var(--ms-border);font-size:12px;color:var(--ms-muted);}
 @media(max-width:768px){.child-grid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:480px){.container{padding:16px 12px;} .child-grid{grid-template-columns:1fr;} .content table{display:block;overflow-x:auto;}}
+@media(max-width:480px){.child-grid{grid-template-columns:1fr;}}
 </style>
 </head><body>
-<button class="theme-toggle" onclick="toggleTheme()">&#127763;</button>
-<script>
-function toggleTheme(){const c=document.documentElement.getAttribute('data-theme');const n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('theme',n);}
-const saved=localStorage.getItem('theme');if(saved==='dark')document.documentElement.setAttribute('data-theme','dark');
-</script>
-<div class="container">
-<nav class="breadcrumb" id="breadcrumb"></nav>
+<script type="module" src="/js/mindspace-nav.js"></script>
+<div class="ms-container" style="max-width:760px;">
+<nav class="ms-breadcrumb" id="breadcrumb"></nav>
 <div id="page-content">
-  <div class="loading"><div class="spinner"></div><br>Loading...</div>
+  <div class="ms-loading"><div class="ms-spinner"></div><br>Loading...</div>
 </div>
 <div class="metadata" id="metadata"></div>
 </div>
