@@ -14,6 +14,7 @@ const cache = new TwinCache();
 
 const boardEl = document.getElementById('board');
 const statsEl = document.getElementById('stats');
+const detailOverlay = document.getElementById('detail-overlay');
 const detailPanel = document.getElementById('detail-panel');
 const detailTitle = document.getElementById('detail-title');
 const detailBody = document.getElementById('detail-body');
@@ -148,6 +149,7 @@ function showDetail(task) {
   selectedTaskId = task.slug || task.id;
   detailTitle.textContent = task.dna?.title || task.slug || 'Task Detail';
   detailPanel.classList.add('open');
+  detailOverlay.classList.add('open');
 
   const dna = task.dna || {};
   let html = '';
@@ -265,6 +267,7 @@ function formatReview(review) {
 
 window.closeDetail = function() {
   detailPanel.classList.remove('open');
+  detailOverlay.classList.remove('open');
   selectedTaskId = null;
   renderBoard();
 };
