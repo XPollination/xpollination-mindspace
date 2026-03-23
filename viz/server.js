@@ -38,6 +38,10 @@ const PUBLIC_PATHS = [
   '/authorize',
   '/token',
   '/revoke',
+  '/mindspace.css',
+  '/kanban.css',
+  '/js/',
+  '/sw.js',
 ];
 
 /**
