@@ -118,11 +118,31 @@ export async function startMcpServer(): Promise<void> {
       return;
     }
 
+    // RFC 9728: OAuth Protected Resource Metadata discovery
+    const BRAIN_PUBLIC_URL = process.env.BRAIN_PUBLIC_URL || "https://hive.xpollination.earth";
+    const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL || "https://mindspace.xpollination.earth";
+    if (req.url === "/.well-known/oauth-protected-resource") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        resource: BRAIN_PUBLIC_URL,
+        authorization_servers: [AUTH_SERVER_URL],
+        scopes_supported: ["brain:read", "brain:write"],
+        bearer_methods_supported: ["header"],
+        resource_name: "XPollination Brain",
+        resource_documentation: `${AUTH_SERVER_URL}/docs`,
+      }));
+      return;
+    }
+
     // Extract Bearer token from client request — pass through to brain API
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
-      res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Missing Authorization: Bearer <api-key> header. Create an API key at https://mindspace.xpollination.earth/settings" }));
+      // RFC 9728: WWW-Authenticate with resource_metadata for OAuth discovery
+      res.writeHead(401, {
+        "Content-Type": "application/json",
+        "WWW-Authenticate": `Bearer resource_metadata="${BRAIN_PUBLIC_URL}/.well-known/oauth-protected-resource"`,
+      });
+      res.end(JSON.stringify({ error: "Authorization required. Use OAuth or provide Bearer token." }));
       return;
     }
     const bearerToken = authHeader.slice("bearer ".length);

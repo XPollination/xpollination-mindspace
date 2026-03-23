@@ -21,12 +21,31 @@ import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { logger } from './lib/logger.js';
+import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import { mindspaceOAuthProvider } from './routes/mcp-oauth.js';
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
 
 app.use(express.json());
 app.use(requestLogger);
+
+// MCP OAuth 2.1 authorization server (RFC 9728)
+// Must be mounted at root — handles /.well-known/*, /authorize, /token, /register, /revoke
+const ISSUER_URL = process.env.FRONTEND_URL || 'https://mindspace.xpollination.earth';
+try {
+  app.use(mcpAuthRouter({
+    provider: mindspaceOAuthProvider,
+    issuerUrl: new URL(ISSUER_URL),
+    serviceDocumentationUrl: new URL(`${ISSUER_URL}/docs`),
+    scopesSupported: ['brain:read', 'brain:write'],
+    resourceName: 'XPollination Brain',
+    resourceServerUrl: new URL(process.env.BRAIN_PUBLIC_URL || 'https://hive.xpollination.earth'),
+  }));
+  logger.info('MCP OAuth authorization server mounted');
+} catch (err) {
+  logger.warn({ err }, 'MCP OAuth router failed to mount — OAuth disabled');
+}
 
 // Initialize database before starting
 const db = getDb();
