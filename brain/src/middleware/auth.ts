@@ -51,19 +51,33 @@ export async function authHook(request: FastifyRequest, reply: FastifyReply): Pr
   }
 
   const keyHash = createHash("sha256").update(token).digest("hex");
-  const row = msDb.prepare(
+
+  // Try API keys first
+  let row = msDb.prepare(
     `SELECT ak.id AS key_id, ak.revoked_at, u.id AS user_id, u.name AS display_name
      FROM api_keys ak JOIN users u ON ak.user_id = u.id
      WHERE ak.key_hash = ?`
   ).get(keyHash) as MindspaceKeyRow | undefined;
 
+  // If not an API key, try OAuth access tokens
   if (!row) {
-    reply.code(401).send({ error: "Invalid API key" });
+    const oauthRow = msDb.prepare(
+      `SELECT oat.revoked_at, oat.user_id, u.name AS display_name
+       FROM oauth_access_tokens oat JOIN users u ON oat.user_id = u.id
+       WHERE oat.token_hash = ? AND oat.expires_at > datetime('now')`
+    ).get(keyHash) as any;
+    if (oauthRow) {
+      row = { key_id: "oauth", revoked_at: oauthRow.revoked_at, user_id: oauthRow.user_id, display_name: oauthRow.display_name };
+    }
+  }
+
+  if (!row) {
+    reply.code(401).send({ error: "Invalid API key or token" });
     return;
   }
 
   if (row.revoked_at) {
-    reply.code(401).send({ error: "API key has been revoked" });
+    reply.code(401).send({ error: "Token has been revoked" });
     return;
   }
 
