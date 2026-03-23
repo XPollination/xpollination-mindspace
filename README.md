@@ -149,12 +149,32 @@ npm test             # Run all tests (vitest)
 npm run health       # Check service health
 ```
 
+## Test System
+
+A fully isolated test stack runs alongside production. Own qdrant, own brain, own database — shares nothing with prod.
+
+```bash
+npm run start:test    # Start test system
+npm run stop:test     # Stop test system
+npm run logs:test     # Follow test logs
+```
+
+| Service | Prod Port | Test Port |
+|---------|-----------|-----------|
+| Qdrant  | 6333      | 6334      |
+| Brain   | 3200      | 3201      |
+| API     | 3100      | 3101      |
+| Viz     | 4200      | 4201      |
+
+Test data is isolated — destroying test containers does not affect production.
+
 ## Docker Compose Variants
 
 | File | Use Case | Services |
 |------|----------|----------|
 | `docker-compose.yml` | Production / `npm start` | Qdrant + Brain + Mindspace |
-| `docker-compose.prod.yml` | VPN-bound production | Mindspace only (host brain/qdrant) |
+| `docker-compose.prod.yml` | VPN-bound production | Full stack with bind mounts |
+| `docker-compose.test.yml` | Autonomous test system | Full stack on offset ports |
 | `docker-compose.dev.yml` | Dev overlay (hot-reload) | Adds source mounts to base |
 | `docker-compose.dev-standalone.yml` | Dev standalone | Mindspace only (host brain/qdrant) |
 
