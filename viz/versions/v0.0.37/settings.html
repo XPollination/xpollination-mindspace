@@ -4,83 +4,74 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings — XPollination Mindspace</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="stylesheet" href="/mindspace.css">
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #fafafa; color: #222; max-width: 600px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #222; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; }
-    h2 { color: #444; margin-top: 2rem; }
-    .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-    label { display: block; margin-bottom: 0.3rem; font-weight: 500; color: #333; }
-    input[type="password"], input[type="text"] { width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-    button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
-    .btn-primary { background: #3070c0; color: #fff; }
-    .btn-danger { background: #d32f2f; color: #fff; }
-    .btn-secondary { background: #666; color: #fff; }
-    .message { padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem; display: none; }
-    .success { background: #e8f5e9; color: #2e7d32; }
-    .error { background: #ffebee; color: #c62828; }
-    .api-key-display { font-family: monospace; background: #f5f5f5; padding: 0.5rem; border-radius: 4px; word-break: break-all; }
-    .nav { margin-bottom: 2rem; }
-    .nav a { color: #3070c0; text-decoration: none; margin-right: 1rem; }
+    label { margin-bottom: 0.3rem; }
+    .ms-input { margin-bottom: 1rem; }
+    .api-key-display { font-family: monospace; background: var(--ms-surface); padding: 0.5rem; border-radius: var(--ms-radius-sm); word-break: break-all; border: 1px solid var(--ms-border); }
+    .msg { padding: 0.5rem; border-radius: var(--ms-radius-sm); margin-bottom: 1rem; display: none; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <div class="nav">
-    <a href="/">Dashboard</a>
-    <a href="/logout">Logout</a>
-  </div>
+  <script type="module" src="/js/mindspace-nav.js"></script>
 
-  <h1>Settings</h1>
+  <div class="ms-container-narrow">
+    <h1 style="border-bottom:2px solid var(--ms-border);padding-bottom:0.5rem;margin-bottom:1.5rem;">Settings</h1>
 
-  <!-- Change Password -->
-  <div class="card">
-    <h2>Change Password</h2>
-    <div class="message" id="pw-msg"></div>
-    <form id="change-password-form">
-      <label for="current-password">Current Password</label>
-      <input type="password" id="current-password" name="current_password" required>
-      <label for="new-password">New Password</label>
-      <input type="password" id="new-password" name="new_password" required>
-      <label for="confirm-password">Confirm New Password</label>
-      <input type="password" id="confirm-password" required>
-      <button type="submit" class="btn-primary">Change Password</button>
-    </form>
-  </div>
-
-  <!-- My Projects -->
-  <div class="card">
-    <h2>My Projects</h2>
-    <div id="projects-list">Loading...</div>
-    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;">
-      <label for="git-url">Add Project via Git URL</label>
-      <div style="display:flex;gap:0.5rem;">
-        <input type="text" id="git-url" placeholder="https://github.com/org/repo.git" style="flex:1;">
-        <button class="btn-primary" onclick="addProject()">Add</button>
+    <!-- My Projects -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">My Projects</h2>
+      <div id="projects-list"><div class="ms-loading" style="padding:16px 0;"><div class="ms-spinner"></div></div></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--ms-border);">
+        <label for="git-url">Add Project via Git URL</label>
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="git-url" placeholder="https://github.com/org/repo.git" class="ms-input" style="margin-bottom:0;">
+          <button class="ms-btn ms-btn-primary" onclick="addProject()">Add</button>
+        </div>
+        <div class="msg" id="project-msg"></div>
       </div>
-      <div class="message" id="project-msg"></div>
     </div>
-  </div>
 
-  <!-- API Key -->
-  <div class="card">
-    <h2>API Key</h2>
-    <p>Use this key to authenticate CLI tools and agents.</p>
-    <div class="api-key-display" id="api-key-value">••••••••••••</div>
-    <br>
-    <button class="btn-secondary" onclick="revealApiKey()">Show API Key</button>
-    <button class="btn-danger" onclick="regenerateApiKey()">Regenerate API Key</button>
-  </div>
+    <!-- Change Password -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Change Password</h2>
+      <div class="msg" id="pw-msg"></div>
+      <form id="change-password-form">
+        <label for="current-password">Current Password</label>
+        <input type="password" id="current-password" name="current_password" required class="ms-input">
+        <label for="new-password">New Password</label>
+        <input type="password" id="new-password" name="new_password" required class="ms-input">
+        <label for="confirm-password">Confirm New Password</label>
+        <input type="password" id="confirm-password" required class="ms-input">
+        <button type="submit" class="ms-btn ms-btn-primary">Change Password</button>
+      </form>
+    </div>
 
-  <!-- Active Sessions -->
-  <div class="card">
-    <h2>Active Sessions</h2>
-    <div id="sessions-list">Loading...</div>
-  </div>
+    <!-- API Key -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">API Key</h2>
+      <p style="font-size:0.85rem;color:var(--ms-muted);margin-bottom:0.5rem;">Use this key to authenticate CLI tools and agents.</p>
+      <div class="api-key-display" id="api-key-value">••••••••••••</div>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+        <button class="ms-btn ms-btn-ghost" onclick="revealApiKey()">Show API Key</button>
+        <button class="ms-btn ms-btn-danger" onclick="regenerateApiKey()">Regenerate</button>
+      </div>
+    </div>
 
-  <!-- Account -->
-  <div class="card">
-    <h2>Account</h2>
-    <p>Signed in as <strong id="user-email">...</strong></p>
-    <a href="/logout" class="btn-danger" style="text-decoration:none;display:inline-block;">Logout</a>
+    <!-- Active Sessions -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Active Sessions</h2>
+      <div id="sessions-list"><div class="ms-loading" style="padding:8px 0;"><div class="ms-spinner"></div></div></div>
+    </div>
+
+    <!-- Account -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Account</h2>
+      <p>Signed in as <strong id="user-email">...</strong></p>
+      <a href="/logout" class="ms-btn ms-btn-danger" style="text-decoration:none;display:inline-block;margin-top:0.5rem;">Logout</a>
+    </div>
   </div>
 
   <script>
@@ -90,28 +81,25 @@
       const newPw = document.getElementById('new-password').value;
       const confirm = document.getElementById('confirm-password').value;
       const msg = document.getElementById('pw-msg');
-      if (newPw !== confirm) { msg.textContent = 'Passwords do not match'; msg.className = 'message error'; msg.style.display = 'block'; return; }
+      if (newPw !== confirm) { msg.textContent = 'Passwords do not match'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; return; }
       try {
         const res = await fetch('/api/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({current_password: current, new_password: newPw}) });
         const data = await res.json();
-        if (res.ok) { msg.textContent = 'Password changed'; msg.className = 'message success'; } else { msg.textContent = data.error; msg.className = 'message error'; }
+        if (res.ok) { msg.textContent = 'Password changed'; msg.className = 'msg ms-msg-success'; } else { msg.textContent = data.error; msg.className = 'msg ms-msg-error'; }
         msg.style.display = 'block';
-      } catch { msg.textContent = 'Network error'; msg.className = 'message error'; msg.style.display = 'block'; }
+      } catch { msg.textContent = 'Network error'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
     });
-    let lastGeneratedKey = null;
 
+    let lastGeneratedKey = null;
     async function revealApiKey() {
       const el = document.getElementById('api-key-value');
-      if (lastGeneratedKey) {
-        el.textContent = lastGeneratedKey;
-        return;
-      }
+      if (lastGeneratedKey) { el.textContent = lastGeneratedKey; return; }
       try {
         const res = await fetch('/api/keys');
         const keys = await res.json();
         if (Array.isArray(keys) && keys.length > 0) {
           const k = keys[0];
-          el.innerHTML = '<strong>' + (k.name || 'API Key') + '</strong><br><span style="color:#888;font-size:0.85rem;">Key value is not retrievable after creation. Click Regenerate to create a new key that will be shown once.</span>';
+          el.innerHTML = '<strong>' + (k.name || 'API Key') + '</strong><br><span style="color:var(--ms-muted);font-size:0.85rem;">Key value is not retrievable after creation. Click Regenerate to create a new key.</span>';
         } else {
           el.textContent = 'No API key found. Click Regenerate to create one.';
         }
@@ -127,14 +115,11 @@
         const data = await res.json();
         if (data.key) {
           lastGeneratedKey = data.key;
-          el.innerHTML = '<strong style="color:#2e7d32;">NEW KEY (copy now):</strong><br>' + data.key + '<br><span style="color:#c62828;font-size:0.85rem;">This key will not be shown again after you leave this page.</span>';
-        } else {
-          el.textContent = data.error || 'Failed to generate key';
-        }
+          el.innerHTML = '<strong style="color:#2e7d32;">NEW KEY (copy now):</strong><br>' + data.key + '<br><span style="color:#c62828;font-size:0.85rem;">This key will not be shown again.</span>';
+        } else { el.textContent = data.error || 'Failed to generate key'; }
       } catch { el.textContent = 'Network error'; }
     }
 
-    // Load sessions on page load
     async function loadSessions() {
       try {
         const res = await fetch('/api/auth/sessions');
@@ -142,48 +127,35 @@
         const el = document.getElementById('sessions-list');
         if (data.sessions && data.sessions.length > 0) {
           el.innerHTML = data.sessions.map(s =>
-            '<div style="padding:0.3rem 0;border-bottom:1px solid #eee;font-size:0.85rem;">' +
-            '<strong>' + (s.user_agent || 'unknown') + '</strong> — ' +
-            s.ip_address + ' — ' +
-            new Date(s.created_at).toLocaleDateString() +
-            '</div>'
+            '<div style="padding:0.3rem 0;border-bottom:1px solid var(--ms-border);font-size:0.85rem;">' +
+            '<strong>' + (s.user_agent || 'unknown') + '</strong> — ' + s.ip_address + ' — ' + new Date(s.created_at).toLocaleDateString() + '</div>'
           ).join('');
-        } else {
-          el.textContent = 'No active sessions';
-        }
+        } else { el.textContent = 'No active sessions'; }
       } catch { document.getElementById('sessions-list').textContent = 'Failed to load sessions'; }
     }
 
-    // Load account info on page load
     async function loadAccount() {
       try {
         const res = await fetch('/api/auth/me');
         const data = await res.json();
-        if (data.email) {
-          document.getElementById('user-email').textContent = data.name + ' (' + data.email + ')';
-        }
-      } catch { /* silent — shows default "..." */ }
+        if (data.email) document.getElementById('user-email').textContent = data.name + ' (' + data.email + ')';
+      } catch {}
     }
 
-    // Load user's projects
     async function loadMyProjects() {
       const el = document.getElementById('projects-list');
       try {
         const res = await fetch('/api/projects');
         const projects = await res.json();
         const list = Array.isArray(projects) ? projects : (projects.projects || []);
-        if (list.length === 0) {
-          el.innerHTML = '<p style="color:#888;font-size:0.85rem;">No projects yet. Add one via git URL below.</p>';
-          return;
-        }
+        if (list.length === 0) { el.innerHTML = '<p style="color:var(--ms-muted);font-size:0.85rem;">No projects yet. Add one via git URL below.</p>'; return; }
         el.innerHTML = list.map(p =>
-          '<div style="padding:0.5rem 0;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div style="padding:0.5rem 0;border-bottom:1px solid var(--ms-border);display:flex;justify-content:space-between;align-items:center;">' +
           '<div style="flex:1;"><strong>' + (p.name || p.slug) + '</strong>' +
-          (p.git_url ? '<br><span style="font-size:0.8rem;color:#888;">' + p.git_url + '</span>' : '') +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:0.5rem;">' +
-          '<span style="font-size:0.75rem;color:#aaa;">' + p.slug + '</span>' +
-          '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" style="padding:2px 8px;font-size:0.75rem;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;cursor:pointer;color:#999;" onmouseover="this.style.color=\'#d32f2f\';this.style.borderColor=\'#d32f2f\'" onmouseout="this.style.color=\'#999\';this.style.borderColor=\'#ddd\'">Remove</button>' +
+          (p.git_url ? '<br><span style="font-size:0.8rem;color:var(--ms-muted);">' + p.git_url + '</span>' : '') +
+          '</div><div style="display:flex;align-items:center;gap:0.5rem;">' +
+          '<span style="font-size:0.75rem;color:var(--ms-muted);">' + p.slug + '</span>' +
+          '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" style="padding:2px 8px;font-size:0.75rem;">Remove</button>' +
           '</div></div>'
         ).join('');
       } catch { el.textContent = 'Failed to load projects'; }
@@ -193,58 +165,26 @@
       const gitUrl = document.getElementById('git-url').value.trim();
       const msg = document.getElementById('project-msg');
       msg.style.display = 'none';
-
-      if (!gitUrl) {
-        msg.textContent = 'Please enter a git URL';
-        msg.className = 'message error';
-        msg.style.display = 'block';
-        return;
-      }
-
+      if (!gitUrl) { msg.textContent = 'Please enter a git URL'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; return; }
       try {
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ git_url: gitUrl })
-        });
+        const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ git_url: gitUrl }) });
         const data = await res.json();
-        if (res.ok) {
-          msg.textContent = 'Project "' + data.name + '" added successfully';
-          msg.className = 'message success';
-          msg.style.display = 'block';
-          document.getElementById('git-url').value = '';
-          loadMyProjects();
-        } else {
-          msg.textContent = data.error || 'Failed to add project';
-          msg.className = 'message error';
-          msg.style.display = 'block';
-        }
-      } catch {
-        msg.textContent = 'Network error';
-        msg.className = 'message error';
-        msg.style.display = 'block';
-      }
+        if (res.ok) { msg.textContent = 'Project "' + data.name + '" added'; msg.className = 'msg ms-msg-success'; msg.style.display = 'block'; document.getElementById('git-url').value = ''; loadMyProjects(); }
+        else { msg.textContent = data.error || 'Failed'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
+      } catch { msg.textContent = 'Network error'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
     }
 
     async function removeProject(slug, name) {
-      if (!confirm('Remove project "' + name + '"? This removes your access, not the project data.')) return;
+      if (!confirm('Remove project "' + name + '"?')) return;
       try {
         const res = await fetch('/api/projects/' + slug, { method: 'DELETE' });
-        if (res.ok || res.status === 404) {
-          loadMyProjects();
-        } else {
-          const data = await res.json();
-          alert(data.error || 'Failed to remove project');
-        }
+        if (res.ok || res.status === 404) loadMyProjects();
+        else { const data = await res.json(); alert(data.error || 'Failed'); }
       } catch { alert('Network error'); }
     }
 
-    // Allow Enter key in git URL input
-    document.getElementById('git-url').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addProject(); }
-    });
+    document.getElementById('git-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addProject(); } });
 
-    // Init
     loadMyProjects();
     loadSessions();
     loadAccount();
