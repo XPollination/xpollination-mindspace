@@ -89,7 +89,6 @@ run_remote() {
 
 # Global confirm counter file for cross-subshell tracking
 CONFIRM_FILE="/tmp/claude-unblock-confirms"
-echo 0 > "$CONFIRM_FILE" 2>/dev/null || true
 
 increment_confirms() {
     local count
@@ -216,6 +215,9 @@ discover_targets() {
 run_monitor() {
     # This function runs inside the tmux session — it IS the monitor loop.
     local mode="$1"
+
+    # Initialize confirm counter (inside function, always runs as developer)
+    echo 0 > "$CONFIRM_FILE" 2>/dev/null || true
 
     # --- "all" mode: auto-discover ALL sessions and panes ---
     if [[ "$mode" == "all" ]]; then
@@ -405,10 +407,13 @@ if is_local_or_hetzner; then
     # without cleaning up prior instances. Two orphans from Mar 17+18 were found
     # still running on Mar 20, sending "2" to panes in "accept edits" mode.
     #
-    # Kill orphan processes (match our script name, exclude this PID)
+    # Kill orphan processes (match our script name, exclude this PID and parent)
+    # Must exclude PPID too: when thomas runs via sudo, the sudo parent process
+    # also matches pgrep -f and killing it terminates our own process chain.
     local my_pid=$$
-    pgrep -f "claude-unblock.sh" | while read pid; do
-        if [[ "$pid" != "$my_pid" ]]; then
+    local my_ppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')
+    pgrep -f "claude-unblock" | while read pid; do
+        if [[ "$pid" != "$my_pid" && "$pid" != "$my_ppid" ]]; then
             kill "$pid" 2>/dev/null || true
         fi
     done
