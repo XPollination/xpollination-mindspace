@@ -25,9 +25,16 @@ keysRouter.post('/', (req: Request, res: Response) => {
   const id = randomUUID();
 
   const db = getDb();
+
+  // Revoke ALL existing active keys for this user before creating the new one.
+  // "Regenerate" means exactly one active key per user at any time.
+  const revoked = db.prepare(
+    "UPDATE api_keys SET revoked_at = datetime('now') WHERE user_id = ? AND revoked_at IS NULL"
+  ).run(user_id);
+
   db.prepare('INSERT INTO api_keys (id, user_id, key_hash, name) VALUES (?, ?, ?, ?)').run(id, user_id, key_hash, name || null);
 
-  res.status(201).json({ id, key: rawKey, name: name || null });
+  res.status(201).json({ id, key: rawKey, name: name || null, revoked_count: revoked.changes });
 });
 
 // GET / - List user's API keys (from JWT user or query param)
