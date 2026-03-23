@@ -658,10 +658,15 @@ function readBody(req) {
 }
 
 /**
- * Get or create system_settings table, return DB handle (writable)
+ * Get or create system_settings table, return DB handle (writable).
+ * Uses /app/data/settings.db (writable volume) — never a project DB
+ * which may be mounted read-only via workspace volume.
  */
+const SETTINGS_DB_PATH = path.join(process.env.DATABASE_PATH ? path.dirname(process.env.DATABASE_PATH) : '/app/data', 'settings.db');
+
 function getSettingsDb(dbPath) {
-  const db = new Database(dbPath);
+  // Ignore dbPath — always use writable settings DB to avoid readonly errors
+  const db = new Database(SETTINGS_DB_PATH);
   db.exec(`
     CREATE TABLE IF NOT EXISTS system_settings (
       key TEXT PRIMARY KEY,
