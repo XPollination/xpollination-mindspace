@@ -125,8 +125,8 @@
 @media (max-width: 768px) {
   .kanban-board { flex-direction: column; }
   .kanban-column { max-width: none; min-width: 0; }
-  .detail-panel { width: 85%; right: -85%; top: 0; }
-  .detail-header { padding-top: 16px; }
+  .detail-panel { width: 85%; right: -85%; top: var(--ms-nav-height); }
+  .detail-header { padding-top: 8px; }
   .kanban-toolbar { flex-wrap: wrap; gap: 4px; }
   .kanban-toolbar .ms-input { width: 100% !important; }
 }
