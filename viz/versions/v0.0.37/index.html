@@ -1203,7 +1203,9 @@
     async function loadProjects() {
       try {
         const response = await fetch('/api/projects');
-        const data = await response.json();
+        const raw = await response.json();
+        // API returns bare array or {projects: [...]} — normalize
+        const projects = Array.isArray(raw) ? raw : (raw.projects || []);
 
         projectSelector.innerHTML = '';
 
@@ -1214,7 +1216,7 @@
         projectSelector.appendChild(allOption);
         currentProject = 'all';
 
-        data.projects.forEach(project => {
+        projects.forEach(project => {
           const option = document.createElement('option');
           option.value = project.path || project.slug || project.name;
           option.textContent = project.name;
