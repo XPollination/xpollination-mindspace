@@ -410,8 +410,8 @@ if is_local_or_hetzner; then
     # Kill orphan processes (match our script name, exclude this PID and parent)
     # Must exclude PPID too: when thomas runs via sudo, the sudo parent process
     # also matches pgrep -f and killing it terminates our own process chain.
-    local my_pid=$$
-    local my_ppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')
+    my_pid=$$
+    my_ppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')
     pgrep -f "claude-unblock" | while read pid; do
         if [[ "$pid" != "$my_pid" && "$pid" != "$my_ppid" ]]; then
             kill "$pid" 2>/dev/null || true
