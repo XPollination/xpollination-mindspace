@@ -217,7 +217,13 @@ label { display: block; margin-bottom: 0.3rem; font-weight: 500; color: var(--ms
   .ms-nav { padding: 0 8px; }
   .ms-nav-brand span { display: none; }
   .ms-nav-link { padding: 6px 8px; font-size: 13px; }
+  .ms-auth-box { padding: 1.5rem; margin: 0 0.5rem; }
+  .ms-auth-logo img { width: 80px; height: 80px; }
+  .ms-auth-title { font-size: 1.2rem; }
+  .ms-auth-tagline { font-size: 0.85rem; margin-bottom: 1rem; }
 }
 @media (max-width: 480px) {
   .ms-container, .ms-container-narrow { padding: 16px 12px; }
+  .ms-auth-page { padding: 0.5rem; align-items: flex-start; padding-top: 2rem; }
+  .ms-auth-box { padding: 1.25rem; border-radius: 8px; }
 }
