@@ -1,12 +1,16 @@
-# Mindspace Docker Compose — Production (Brain + Qdrant only)
+# Mindspace Docker Compose — Production (full stack)
 #
-# Viz (4200) and API (3100) are served by systemd services on the host.
-# Only brain and qdrant remain in Docker.
+# Runs the complete Mindspace system in Docker:
+#   qdrant (6333) → brain (3200) → mindspace (API 3100 + viz 4200)
 #
-# Startup order: qdrant (healthy) → brain
+# Health-checked startup order ensures each service is ready before
+# the next one starts. All data on bind mounts (survives container
+# destruction). restart: unless-stopped handles reboots.
 #
 # Usage:
-#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Requires .env with: BRAIN_API_KEY, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 services:
   qdrant:
@@ -15,7 +19,7 @@ services:
     ports:
       - "10.33.33.1:6333:6333"
     volumes:
-      - qdrant-data:/qdrant/storage
+      - /home/developer/workspaces/github/PichlerThomas/xpollination-hive/api/qdrant_data:/qdrant/storage
     healthcheck:
       test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333' || exit 1"]
       interval: 10s
@@ -26,14 +30,16 @@ services:
 
   brain:
     build:
-      context: ./brain
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.brain
     container_name: mindspace-brain
     ports:
-      - "10.33.33.1:3200:3200"
+      - "3200:3200"
     environment:
+      - NODE_ENV=production
       - QDRANT_URL=http://qdrant:6333
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
+      - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
     depends_on:
       qdrant:
         condition: service_healthy
@@ -45,6 +51,35 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-volumes:
-  qdrant-data:
-    driver: local
+  mindspace:
+    build: .
+    container_name: mindspace-prod
+    ports:
+      - "10.33.33.1:3100:3100"
+      - "10.33.33.1:4200:4200"
+    volumes:
+      - /mnt/HC_Volume_105173237/mindspace/data-prod:/app/data
+      - /home/developer/workspaces/github/PichlerThomas:/workspace:ro
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/mindspace.db
+      - API_PORT=3100
+      - VIZ_PORT=4200
+      - XPO_WORKSPACE_PATH=/workspace
+      - BRAIN_API_URL=http://brain:3200
+      - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
+      - JWT_SECRET=${JWT_SECRET:-changeme}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=https://mindspace.xpollination.earth/api/auth/oauth/google/callback
+      - FRONTEND_URL=https://mindspace.xpollination.earth
+    depends_on:
+      brain:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
