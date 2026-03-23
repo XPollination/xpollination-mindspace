@@ -68,7 +68,10 @@
           errorEl.style.display = 'block';
           return;
         }
-        window.location.href = '/';
+        // OAuth flow: return_to param redirects back to /authorize after login
+        const params = new URLSearchParams(window.location.search);
+        const returnTo = params.get('return_to');
+        window.location.href = returnTo || '/';
       } catch (err) {
         errorEl.textContent = 'Network error';
         errorEl.style.display = 'block';
