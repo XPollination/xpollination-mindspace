@@ -136,7 +136,7 @@ export const mindspaceOAuthProvider: OAuthServerProvider = {
 
     // Look up and validate authorization code
     const codeRow = db.prepare(
-      'SELECT * FROM oauth_authorization_codes WHERE code = ? AND client_id = ? AND used = 0 AND expires_at > datetime("now")'
+      'SELECT * FROM oauth_authorization_codes WHERE code = ? AND client_id = ? AND used = 0 AND expires_at > datetime('now')'
     ).get(authorizationCode, client.client_id) as any;
 
     if (!codeRow) throw new Error('Invalid, expired, or already used authorization code');
@@ -172,7 +172,7 @@ export const mindspaceOAuthProvider: OAuthServerProvider = {
     const refreshHash = hashToken(refreshToken);
 
     const row = db.prepare(
-      'SELECT * FROM oauth_refresh_tokens WHERE token_hash = ? AND client_id = ? AND revoked_at IS NULL AND expires_at > datetime("now")'
+      'SELECT * FROM oauth_refresh_tokens WHERE token_hash = ? AND client_id = ? AND revoked_at IS NULL AND expires_at > datetime('now')'
     ).get(refreshHash, client.client_id) as any;
 
     if (!row) throw new Error('Invalid or expired refresh token');
@@ -205,7 +205,7 @@ export const mindspaceOAuthProvider: OAuthServerProvider = {
     const tokenHash = hashToken(token);
 
     const row = db.prepare(
-      'SELECT * FROM oauth_access_tokens WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > datetime("now")'
+      'SELECT * FROM oauth_access_tokens WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > datetime('now')'
     ).get(tokenHash) as any;
 
     if (!row) throw new Error('Invalid or expired access token');
