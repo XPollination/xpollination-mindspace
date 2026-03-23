@@ -110,6 +110,14 @@ echo ""
 # Start viz in background
 node viz/server.js ${VIZ_PORT:-4200} &
 VIZ_PID=$!
+sleep 2
+
+# Verify viz actually started (catches permission errors, port conflicts, crashes)
+if ! kill -0 $VIZ_PID 2>/dev/null; then
+  echo "  ✗ Viz server FAILED to start on port ${VIZ_PORT:-4200}"
+  echo "    Check file permissions on /app/data and port availability."
+  exit 1
+fi
 
 echo "  Viz server  → http://localhost:${VIZ_PORT:-4200}  (Dashboard UI)"
 echo "  API server  → http://localhost:${API_PORT:-3100}  (REST API with auth)"

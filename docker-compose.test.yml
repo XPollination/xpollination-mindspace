@@ -1,4 +1,8 @@
-# Mindspace Docker Compose — Test System (fully isolated)
+# Mindspace Docker Compose — Test System (DISABLED during bootstrapping)
+#
+# DISABLED: All services commented out to prevent knowledge split.
+# During bootstrapping, all agents use the prod brain only.
+# Re-enable when prod brain auth migration is complete.
 #
 # Autonomous test stack on offset ports — shares NO infrastructure with prod.
 #   qdrant-test (6334) → brain-test (3201) → mindspace-test (API 3101 + viz 4201)

@@ -4,18 +4,13 @@ import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 
 const BRAIN_API = "http://localhost:3200/api/v1/memory";
-// Per-user config via env vars — BRAIN_API_KEY is required
-// Config template: set BRAIN_API_KEY, BRAIN_AGENT_ID, BRAIN_AGENT_NAME per user
-const BRAIN_API_KEY = process.env.BRAIN_API_KEY;
-if (!BRAIN_API_KEY) {
-  throw new Error("BRAIN_API_KEY environment variable is required but not set");
-}
-const BRAIN_AGENT_ID = process.env.BRAIN_AGENT_ID || "thomas";
-const BRAIN_AGENT_NAME = process.env.BRAIN_AGENT_NAME || "Thomas Pichler";
-const MCP_PORT = 3201;
+const MCP_PORT = parseInt(process.env.MCP_PORT || "3201", 10);
 
-async function callBrain(prompt: string, context?: string, session_id?: string, full_content?: boolean, read_only?: boolean): Promise<unknown> {
-  const body: Record<string, unknown> = { prompt, agent_id: BRAIN_AGENT_ID, agent_name: BRAIN_AGENT_NAME };
+// Per-user auth: MCP passes the client's Bearer token through to brain API.
+// No hardcoded API key — each user authenticates with their Mindspace API key.
+
+async function callBrain(prompt: string, bearerToken: string, context?: string, session_id?: string, full_content?: boolean, read_only?: boolean): Promise<unknown> {
+  const body: Record<string, unknown> = { prompt, agent_id: "mcp-client", agent_name: "MCP Client" };
   if (context) body.context = context;
   if (session_id) body.session_id = session_id;
   if (full_content) body.full_content = true;
@@ -25,7 +20,7 @@ async function callBrain(prompt: string, context?: string, session_id?: string, 
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${BRAIN_API_KEY}`,
+      "Authorization": `Bearer ${bearerToken}`,
     },
     body: JSON.stringify(body),
   });
@@ -37,9 +32,9 @@ async function callBrain(prompt: string, context?: string, session_id?: string, 
   return res.json();
 }
 
-async function getThought(thought_id: string): Promise<unknown> {
+async function getThought(thought_id: string, bearerToken: string): Promise<unknown> {
   const res = await fetch(`${BRAIN_API}/thought/${thought_id}`, {
-    headers: { "Authorization": `Bearer ${BRAIN_API_KEY}` },
+    headers: { "Authorization": `Bearer ${bearerToken}` },
   });
   if (!res.ok) {
     const err = await res.text();
@@ -48,7 +43,7 @@ async function getThought(thought_id: string): Promise<unknown> {
   return res.json();
 }
 
-function createMcpServer(): McpServer {
+function createMcpServer(bearerToken: string): McpServer {
   const mcp = new McpServer(
     { name: "xpollination-brain", version: "0.1.0" },
     { capabilities: { tools: {} } }
@@ -65,7 +60,7 @@ function createMcpServer(): McpServer {
       read_only: z.boolean().optional().describe("When true, query is not persisted as a thought — use for research sessions to avoid noise"),
     },
     async ({ prompt, context, session_id, include_full_content, read_only }) => {
-      const data = await callBrain(prompt, context, session_id, include_full_content ?? undefined, read_only ?? undefined) as Record<string, unknown>;
+      const data = await callBrain(prompt, bearerToken, context, session_id, include_full_content ?? undefined, read_only ?? undefined) as Record<string, unknown>;
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -79,7 +74,7 @@ function createMcpServer(): McpServer {
       session_id: z.string().optional().describe("Reuse from previous call for conversation continuity"),
     },
     async ({ prompt, context, session_id }) => {
-      const data = await callBrain(prompt, context, session_id) as Record<string, unknown>;
+      const data = await callBrain(prompt, bearerToken, context, session_id) as Record<string, unknown>;
       const trace = data.trace as Record<string, unknown> | undefined;
       const contributed = trace?.thoughts_contributed ?? 0;
       const prefix = contributed > 0
@@ -97,7 +92,7 @@ function createMcpServer(): McpServer {
     },
     async ({ thought_id }) => {
       try {
-        const data = await getThought(thought_id);
+        const data = await getThought(thought_id, bearerToken);
         return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -114,7 +109,7 @@ export async function startMcpServer(): Promise<void> {
     // CORS for Claude.ai
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, mcp-session-id");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, mcp-session-id, Authorization");
     res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
 
     if (req.method === "OPTIONS") {
@@ -123,9 +118,18 @@ export async function startMcpServer(): Promise<void> {
       return;
     }
 
+    // Extract Bearer token from client request — pass through to brain API
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing Authorization: Bearer <api-key> header. Create an API key at https://mindspace.xpollination.earth/settings" }));
+      return;
+    }
+    const bearerToken = authHeader.slice("bearer ".length);
+
     // Stateless mode: new server+transport per request
     try {
-      const mcp = createMcpServer();
+      const mcp = createMcpServer(bearerToken);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // stateless
       });

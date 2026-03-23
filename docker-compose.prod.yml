@@ -10,7 +10,7 @@
 # Usage:
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
-# Requires .env with: BRAIN_API_KEY, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+# Requires .env with: JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 services:
   qdrant:
@@ -35,12 +35,13 @@ services:
     container_name: mindspace-brain
     ports:
       - "3200:3200"
+      - "127.0.0.1:3201:3201"
     volumes:
       - /mnt/HC_Volume_105173237/mindspace/brain-data:/app/data
+      - /mnt/HC_Volume_105173237/mindspace/data-prod:/app/mindspace-data:ro
     environment:
       - NODE_ENV=production
       - QDRANT_URL=http://qdrant:6333
-      - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
       - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
     depends_on:
       qdrant:
@@ -69,7 +70,6 @@ services:
       - VIZ_PORT=4200
       - XPO_WORKSPACE_PATH=/workspace
       - BRAIN_API_URL=http://brain:3200
-      - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
       - JWT_SECRET=${JWT_SECRET:-changeme}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -79,7 +79,7 @@ services:
       brain:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "Promise.all([fetch('http://localhost:3100/health'),fetch('http://localhost:4200/')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
