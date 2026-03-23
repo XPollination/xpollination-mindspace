@@ -23,6 +23,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { logger } from './lib/logger.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { mindspaceOAuthProvider } from './routes/mcp-oauth.js';
+import { nodeActionsRouter } from './routes/node-actions.js';
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
@@ -67,6 +68,7 @@ app.use('/a2a/message', a2aMessageRouter);
 app.use('/api/marketplace/announcements', requireApiKeyOrJwt, marketplaceAnnouncementsRouter);
 app.use('/api/marketplace/requests', requireApiKeyOrJwt, marketplaceRequestsRouter);
 app.use('/api/settings', requireApiKeyOrJwt, settingsRouter);
+app.use('/api/node', nodeActionsRouter);
 
 // Error handling (after routes)
 app.use(notFoundHandler);
