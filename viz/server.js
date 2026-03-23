@@ -1300,7 +1300,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Catch-all API proxy: any /api/* or /a2a/* not handled above → forward to API server
-  if (pathname.startsWith('/api/') || pathname.startsWith('/a2a/') || pathname === '/.well-known/agent.json') {
+  if (pathname.startsWith('/api/') || pathname.startsWith('/a2a/') || pathname.startsWith('/.well-known/') || pathname === '/authorize' || pathname === '/token' || pathname === '/register' || pathname === '/revoke') {
     try {
       const cookies = parseCookies(req);
       const headers = { 'Content-Type': req.headers['content-type'] || 'application/json' };
