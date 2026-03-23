@@ -24,6 +24,7 @@ import { logger } from './lib/logger.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { mindspaceOAuthProvider } from './routes/mcp-oauth.js';
 import { nodeActionsRouter } from './routes/node-actions.js';
+import { dataRouter } from './routes/data.js';
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
@@ -69,6 +70,23 @@ app.use('/api/marketplace/announcements', requireApiKeyOrJwt, marketplaceAnnounc
 app.use('/api/marketplace/requests', requireApiKeyOrJwt, marketplaceRequestsRouter);
 app.use('/api/settings', requireApiKeyOrJwt, settingsRouter);
 app.use('/api/node', nodeActionsRouter);
+app.use('/api/data', dataRouter);
+
+// Global suspect-links stats endpoint (kanban calls /api/suspect-links/stats?project=all)
+app.get('/api/suspect-links/stats', requireApiKeyOrJwt, (req, res) => {
+  const db = getDb();
+  const merged: Record<string, number> = { suspect: 0, cleared: 0, accepted_risk: 0, total: 0 };
+  try {
+    const projectSlug = req.query.project as string;
+    let sql = 'SELECT status, COUNT(*) as count FROM suspect_links';
+    const params: any[] = [];
+    if (projectSlug && projectSlug !== 'all') { sql += ' WHERE project_slug = ?'; params.push(projectSlug); }
+    sql += ' GROUP BY status';
+    const rows = db.prepare(sql).all(...params) as any[];
+    for (const row of rows) { if (merged[(row as any).status] !== undefined) merged[(row as any).status] += (row as any).count; merged.total += (row as any).count; }
+  } catch { /* table may not exist */ }
+  res.json(merged);
+});
 
 // Error handling (after routes)
 app.use(notFoundHandler);
