@@ -81,31 +81,47 @@ projectsRouter.get('/:slug/deployment-readiness', requireProjectAccess('viewer')
   });
 });
 
-// POST / — create project
+// POST / — create project (with optional git_url)
 projectsRouter.post('/', (req: Request, res: Response) => {
-  const { slug, name, description } = req.body;
+  const { slug, name, description, git_url } = req.body;
   const user = (req as any).user;
 
-  if (!slug || !name) {
-    res.status(400).json({ error: 'Missing required fields: slug, name' });
+  // UX: if git_url provided without slug/name, derive them from URL
+  let projectSlug = slug;
+  let projectName = name;
+  if (git_url && !projectSlug) {
+    // https://github.com/XPollination/xpollination-mindspace.git → xpollination-mindspace
+    const match = git_url.match(/\/([^/]+?)(?:\.git)?$/);
+    projectSlug = match ? match[1].toLowerCase() : undefined;
+  }
+  if (git_url && !projectName && projectSlug) {
+    projectName = projectSlug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+  }
+
+  if (!projectSlug || !projectName) {
+    res.status(400).json({ error: 'Missing required fields: slug and name (or provide git_url to auto-derive)' });
     return;
   }
 
-  if (!SLUG_REGEX.test(slug)) {
+  if (!SLUG_REGEX.test(projectSlug)) {
     res.status(400).json({ error: 'Invalid slug format. Must be lowercase alphanumeric + hyphens, 2-50 chars' });
     return;
   }
 
   const db = getDb();
-  const existing = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug);
+  const existing = db.prepare('SELECT id FROM projects WHERE slug = ?').get(projectSlug);
   if (existing) {
     res.status(409).json({ error: 'Slug already exists' });
     return;
   }
 
   const id = randomUUID();
-  db.prepare('INSERT INTO projects (id, slug, name, description, created_by) VALUES (?, ?, ?, ?, ?)')
-    .run(id, slug, name, description || null, user.id);
+  db.prepare('INSERT INTO projects (id, slug, name, description, git_url, created_by) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, projectSlug, projectName, description || null, git_url || null, user.id);
+
+  // Auto-grant admin access to creator
+  db.prepare('INSERT OR IGNORE INTO project_access (user_id, project_slug, role, granted_by) VALUES (?, ?, ?, ?)')
+    .run(user.id, projectSlug, 'admin', user.id);
 
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   res.status(201).json(project);

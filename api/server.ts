@@ -63,6 +63,16 @@ app.use('/api/auth', authRouter);
 app.use('/api/keys', requireApiKeyOrJwt, keysRouter);
 app.use('/api/auth/oauth', oauthRouter);
 app.use('/api/projects', requireApiKeyOrJwt, projectsRouter);
+// Agent pool must be before agentsRouter (which has /:agentId catch-all)
+app.get('/api/agents/pool', requireApiKeyOrJwt, (req, res) => {
+  const db = getDb();
+  try {
+    const agents = db.prepare(
+      "SELECT id, name, current_role, status, project_slug, last_seen FROM agents WHERE status != 'disconnected' ORDER BY last_seen DESC"
+    ).all();
+    res.json(agents);
+  } catch { res.json([]); }
+});
 app.use('/api/agents', requireApiKeyOrJwt, agentsRouter);
 app.use('/api/invites', requireApiKeyOrJwt, invitesRouter);
 app.use('/a2a/message', a2aMessageRouter);
@@ -86,30 +96,6 @@ app.get('/api/suspect-links/stats', requireApiKeyOrJwt, (req, res) => {
     for (const row of rows) { if (merged[(row as any).status] !== undefined) merged[(row as any).status] += (row as any).count; merged.total += (row as any).count; }
   } catch { /* table may not exist */ }
   res.json(merged);
-});
-
-// Global agent pool endpoint (kanban calls /api/agents/pool)
-app.get('/api/agents/pool', requireApiKeyOrJwt, (req, res) => {
-  const db = getDb();
-  try {
-    const agents = db.prepare(
-      "SELECT id, name, current_role, status, project_slug, last_seen FROM agents WHERE status != 'disconnected' ORDER BY last_seen DESC"
-    ).all();
-    res.json({ agents });
-  } catch { res.json({ agents: [] }); }
-});
-
-// Global project list (kanban expects {projects: [...]}, not bare array)
-app.get('/api/projects/list', requireApiKeyOrJwt, (req, res) => {
-  const db = getDb();
-  const user = (req as any).user;
-  const projects = db.prepare(
-    `SELECT p.slug, p.name, p.git_url FROM projects p
-     JOIN project_access pa ON pa.project_slug = p.slug
-     WHERE pa.user_id = ?
-     ORDER BY p.name`
-  ).all(user.id);
-  res.json({ projects: projects.map((p: any) => ({ name: p.name, slug: p.slug, path: p.slug, git_url: p.git_url })) });
 });
 
 // Error handling (after routes)
