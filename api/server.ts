@@ -28,6 +28,7 @@ const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));  // OAuth /token uses application/x-www-form-urlencoded
 app.use(requestLogger);
 
 // MCP OAuth 2.1 authorization server (RFC 9728)
