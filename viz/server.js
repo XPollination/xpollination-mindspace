@@ -1388,11 +1388,12 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Root route: serve mission map
+  // Root route: serve client-rendered Mission Map (Model B — browser as A2A client)
   if (pathname === '/') {
-    const missions = getMissionOverview();
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(renderMissionMap(missions));
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'mission-map.html'));
     return;
   }
 
