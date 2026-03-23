@@ -1,37 +1,29 @@
-# Mindspace Docker Compose — Production
+# Mindspace Docker Compose
 #
 # Start the full Mindspace system:
 #   docker compose up --build
 #
-# 3 services:
-#   mindspace — API (3100) + viz (4200) + SQLite
+# 3 services (health-checked, ordered startup):
 #   qdrant    — Vector database for brain knowledge storage
 #   brain     — Knowledge API (3200) for agent shared memory
+#   mindspace — API (3100) + viz (4200) + SQLite
 #
-# Data persists via named volumes (survives container restarts).
+# Startup order: qdrant (healthy) → brain (healthy) → mindspace
+# Data persists via named volumes (survives container restarts and reboots).
 
 services:
-  mindspace:
-    build: .
-    ports:
-      - "3100:3100"   # Mindspace API
-      - "4200:4200"   # Mindspace viz dashboard
-    volumes:
-      - mindspace-data:/app/data
-    environment:
-      - NODE_ENV=production
-      - DATABASE_PATH=/app/data/mindspace.db
-      - BRAIN_API_URL=http://brain:3200
-    depends_on:
-      - brain
-    restart: unless-stopped
-
   qdrant:
     image: qdrant/qdrant:latest
     ports:
       - "6333:6333"
     volumes:
       - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   brain:
@@ -46,7 +38,36 @@ services:
       - BRAIN_API_KEY=${BRAIN_API_KEY:-changeme}
       - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
     depends_on:
-      - qdrant
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3200/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  mindspace:
+    build: .
+    ports:
+      - "3100:3100"   # Mindspace API
+      - "4200:4200"   # Mindspace viz dashboard
+    volumes:
+      - mindspace-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/mindspace.db
+      - BRAIN_API_URL=http://brain:3200
+    depends_on:
+      brain:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

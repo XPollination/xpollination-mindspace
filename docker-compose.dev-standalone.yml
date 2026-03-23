@@ -2,6 +2,7 @@
 #
 # Runs only the mindspace service on dev ports.
 # Brain (3200) and Qdrant (6333) are already running on the host.
+# startup.sh waits for Brain API before running migrations.
 #
 # Usage:
 #   docker compose -f docker-compose.dev-standalone.yml up --build
@@ -30,6 +31,12 @@ services:
       - JWT_SECRET=${JWT_SECRET:-xpo-dev-jwt-secret-2026}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3101/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: "no"
 
 volumes:

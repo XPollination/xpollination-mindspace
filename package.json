@@ -33,10 +33,12 @@
   "author": "Thomas Pichler <herr.thomas.pichler@gmail.com>",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@authzed/authzed-node": "^1.2.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@qdrant/js-client-rest": "^1.17.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.0.0",
+    "highlight.js": "^11.9.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "marked": "^17.0.4",

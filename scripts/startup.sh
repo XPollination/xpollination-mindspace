@@ -27,6 +27,34 @@ echo "════════════════════════�
 echo ""
 
 # ---------------------------------------------------------------------------
+# Step 0: Wait for dependencies
+# ---------------------------------------------------------------------------
+# Brain API must be reachable before we run migrations or start servers.
+# Docker Compose health checks handle startup ordering, but startup.sh
+# also validates independently — belt and suspenders.
+if [ -n "$BRAIN_API_URL" ] && [ "$BRAIN_API_URL" != "disabled" ]; then
+  echo "▸ Step 0: Waiting for Brain API at $BRAIN_API_URL..."
+  BRAIN_READY=0
+  for i in $(seq 1 30); do
+    if node -e "fetch('${BRAIN_API_URL}/api/v1/health').then(r=>{if(!r.ok)throw 1;process.exit(0)}).catch(()=>process.exit(1))" 2>/dev/null; then
+      echo "  ✓ Brain API ready"
+      BRAIN_READY=1
+      break
+    fi
+    echo "  Attempt $i/30 — waiting 2s..."
+    sleep 2
+  done
+  if [ "$BRAIN_READY" -eq 0 ]; then
+    echo "  ⚠ Brain API not reachable after 60s — continuing without brain"
+    echo "    Agent memory features will be unavailable until brain is up."
+  fi
+  echo ""
+else
+  echo "▸ Step 0: BRAIN_API_URL not set — skipping brain dependency check."
+  echo ""
+fi
+
+# ---------------------------------------------------------------------------
 # Step 1: Database migrations
 # ---------------------------------------------------------------------------
 echo "▸ Step 1: Running database migrations..."
@@ -78,17 +106,18 @@ fi
 # ---------------------------------------------------------------------------
 echo "▸ Step 4: Starting Mindspace servers..."
 echo ""
-echo "  API server  → http://localhost:3100  (REST API with auth)"
-echo "  Viz server  → http://localhost:4200  (Dashboard UI)"
+
+# Start viz in background
+node viz/server.js ${VIZ_PORT:-4200} &
+VIZ_PID=$!
+
+echo "  Viz server  → http://localhost:${VIZ_PORT:-4200}  (Dashboard UI)"
+echo "  API server  → http://localhost:${API_PORT:-3100}  (REST API with auth)"
 echo ""
 echo "════════════════════════════════════════════════════════════════════════"
 echo "  Mindspace is ready."
 echo "════════════════════════════════════════════════════════════════════════"
 echo ""
-
-# Start viz in background, API in foreground
-node viz/server.js ${VIZ_PORT:-4200} &
-VIZ_PID=$!
 
 # Start API server (foreground — container stays alive)
 npx tsx api/server.ts
