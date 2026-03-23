@@ -46,6 +46,20 @@
     </form>
   </div>
 
+  <!-- My Projects -->
+  <div class="card">
+    <h2>My Projects</h2>
+    <div id="projects-list">Loading...</div>
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;">
+      <label for="git-url">Add Project via Git URL</label>
+      <div style="display:flex;gap:0.5rem;">
+        <input type="text" id="git-url" placeholder="https://github.com/org/repo.git" style="flex:1;">
+        <button class="btn-primary" onclick="addProject()">Add</button>
+      </div>
+      <div class="message" id="project-msg"></div>
+    </div>
+  </div>
+
   <!-- API Key -->
   <div class="card">
     <h2>API Key</h2>
@@ -151,7 +165,72 @@
       } catch { /* silent — shows default "..." */ }
     }
 
+    // Load user's projects
+    async function loadMyProjects() {
+      const el = document.getElementById('projects-list');
+      try {
+        const res = await fetch('/api/projects');
+        const projects = await res.json();
+        const list = Array.isArray(projects) ? projects : (projects.projects || []);
+        if (list.length === 0) {
+          el.innerHTML = '<p style="color:#888;font-size:0.85rem;">No projects yet. Add one via git URL below.</p>';
+          return;
+        }
+        el.innerHTML = list.map(p =>
+          '<div style="padding:0.5rem 0;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><strong>' + (p.name || p.slug) + '</strong>' +
+          (p.git_url ? '<br><span style="font-size:0.8rem;color:#888;">' + p.git_url + '</span>' : '') +
+          '</div>' +
+          '<span style="font-size:0.75rem;color:#aaa;">' + p.slug + '</span>' +
+          '</div>'
+        ).join('');
+      } catch { el.textContent = 'Failed to load projects'; }
+    }
+
+    async function addProject() {
+      const gitUrl = document.getElementById('git-url').value.trim();
+      const msg = document.getElementById('project-msg');
+      msg.style.display = 'none';
+
+      if (!gitUrl) {
+        msg.textContent = 'Please enter a git URL';
+        msg.className = 'message error';
+        msg.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ git_url: gitUrl })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = 'Project "' + data.name + '" added successfully';
+          msg.className = 'message success';
+          msg.style.display = 'block';
+          document.getElementById('git-url').value = '';
+          loadMyProjects();
+        } else {
+          msg.textContent = data.error || 'Failed to add project';
+          msg.className = 'message error';
+          msg.style.display = 'block';
+        }
+      } catch {
+        msg.textContent = 'Network error';
+        msg.className = 'message error';
+        msg.style.display = 'block';
+      }
+    }
+
+    // Allow Enter key in git URL input
+    document.getElementById('git-url').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addProject(); }
+    });
+
     // Init
+    loadMyProjects();
     loadSessions();
     loadAccount();
   </script>
