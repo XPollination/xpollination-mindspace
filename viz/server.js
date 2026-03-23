@@ -1303,6 +1303,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // SSE streaming proxy: pipe /a2a/stream/* without buffering (EventSource needs streaming)
+  if (pathname.startsWith('/a2a/stream/')) {
+    const cookies = parseCookies(req);
+    const proxyHeaders = { ...req.headers, host: `localhost:${API_PORT}` };
+    if (cookies.ms_session) proxyHeaders['authorization'] = `Bearer ${cookies.ms_session}`;
+    const apiReq = http.request({
+      hostname: 'localhost', port: API_PORT, path: pathname + url.search,
+      method: 'GET', headers: proxyHeaders
+    }, (apiRes) => {
+      res.writeHead(apiRes.statusCode, apiRes.headers);
+      apiRes.pipe(res);
+    });
+    apiReq.on('error', () => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API server unreachable' }));
+    });
+    req.on('close', () => apiReq.destroy());
+    apiReq.end();
+    return;
+  }
+
   // Catch-all API proxy: any /api/* or /a2a/* not handled above → forward to API server
   if (pathname.startsWith('/api/') || pathname.startsWith('/a2a/') || pathname.startsWith('/.well-known/') || pathname === '/authorize' || pathname === '/token' || pathname === '/register' || pathname === '/revoke') {
     try {

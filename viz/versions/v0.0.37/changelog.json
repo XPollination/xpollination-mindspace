@@ -1,0 +1,11 @@
+{
+  "version": "v0.0.37",
+  "date": "2026-03-23",
+  "title": "Model B: Browser as A2A Client",
+  "changes": [
+    "Add A2A client JS module — browser connects to A2A, holds Digital Twins, validates locally",
+    "Add twin cache for local twin storage with staleness detection",
+    "Add browser-side twin validators (port of src/twins/ validate functions)",
+    "Add SSE streaming proxy for /a2a/stream/* (no buffering)"
+  ]
+}
