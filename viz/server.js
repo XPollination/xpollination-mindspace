@@ -1360,21 +1360,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Knowledge Browser routes: /m/:id/:slug?, /c/:id/:slug?, /r/:id/:slug?, /t/:id/:slug?
-  const kbMatch = pathname.match(KB_ROUTE);
+  // Knowledge Browser routes: /m/:id/:slug?, /c/:id/:slug?, /r/:id/:slug?
+  // Client-rendered via A2A (Model B) — serve knowledge.html, JS handles data loading
+  const kbMatch = pathname.match(/^\/(m|c|r)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/);
   if (kbMatch) {
-    const currentProject = path.basename(__dirname.replace('/viz', ''));
-    const projects = discoverProjects();
-    const targetProjects = projects.filter(p => p.name === currentProject);
-    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
-      try {
-        const db = new Database(proj.dbPath, { readonly: true });
-        handleKbRoute(res, kbMatch[1], kbMatch[2], kbMatch[4], db);
-        db.close();
-        return;
-      } catch (err) { /* skip */ }
-    }
-    send404(res, kbMatch[2], kbMatch[1]);
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'knowledge.html'));
     return;
   }
 
@@ -1407,23 +1400,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // /releases route: serve release manager
+  // /releases route: redirect to kanban for now (release manager will be client-rendered later)
   if (pathname === '/releases') {
-    const projects = discoverProjects();
-    const currentProject = path.basename(__dirname.replace('/viz', ''));
-    const targetProjects = projects.filter(p => p.name === currentProject);
-    for (const proj of (targetProjects.length ? targetProjects : projects.slice(0, 1))) {
-      try {
-        const db = new Database(proj.dbPath, { readonly: true });
-        const tasks = db.prepare("SELECT slug, status, dna_json FROM mindspace_nodes WHERE type='task' AND status NOT IN ('cancelled')").all();
-        db.close();
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(renderReleaseManager(tasks));
-        return;
-      } catch (e) { /* skip */ }
-    }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(renderReleaseManager([]));
+    res.writeHead(302, { 'Location': '/kanban' });
+    res.end();
     return;
   }
 
