@@ -34,6 +34,10 @@ const PUBLIC_PATHS = [
   '/assets/',
   '/docs/',
   '/favicon.ico',
+  '/.well-known/',
+  '/authorize',
+  '/token',
+  '/revoke',
 ];
 
 /**
