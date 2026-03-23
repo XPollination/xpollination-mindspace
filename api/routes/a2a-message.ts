@@ -199,7 +199,9 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
   }
 
   const db = getDb();
-  const projectSlug = filters?.project_slug || agent.project_slug;
+  // __all__ = query across all projects (kanban "All Projects" mode)
+  const rawSlug = filters?.project_slug || agent.project_slug;
+  const projectSlug = rawSlug === '__all__' ? null : rawSlug;
 
   try {
     let objects: any[] = [];

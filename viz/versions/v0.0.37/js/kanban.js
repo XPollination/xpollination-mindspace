@@ -321,8 +321,8 @@ async function init() {
       }
     } catch { /* silent */ }
 
-    // Query tasks
-    const tasks = await client.query('task', { limit: 1000 });
+    // Query tasks from all projects (override A2A project scope)
+    const tasks = await client.query('task', { project_slug: '__all__', limit: 1000 });
     cache.loadAll('task', tasks);
     renderBoard();
 
