@@ -319,7 +319,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Catch-all API proxy: any /api/* or /a2a/* not handled above → forward to API server
-  if (pathname.startsWith('/api/') || pathname.startsWith('/a2a/') || pathname.startsWith('/.well-known/') || pathname === '/authorize' || pathname === '/token' || pathname === '/register' || pathname === '/revoke') {
+  // Note: /register is a user page (register.html), NOT the OAuth dynamic client registration endpoint.
+  // OAuth /register is POST-only and handled by the API's MCP OAuth router directly.
+  if (pathname.startsWith('/api/') || pathname.startsWith('/a2a/') || pathname.startsWith('/.well-known/') || pathname === '/authorize' || pathname === '/token' || pathname === '/revoke') {
     try {
       const cookies = parseCookies(req);
       const headers = { 'Content-Type': req.headers['content-type'] || 'application/json' };
