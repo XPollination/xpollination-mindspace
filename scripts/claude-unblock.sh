@@ -407,10 +407,13 @@ if is_local_or_hetzner; then
     # without cleaning up prior instances. Two orphans from Mar 17+18 were found
     # still running on Mar 20, sending "2" to panes in "accept edits" mode.
     #
-    # Kill orphan processes (match our script name, exclude this PID)
-    my_pid=$$
-    pgrep -f "claude-unblock.sh" | while read pid; do
-        if [[ "$pid" != "$my_pid" ]]; then
+    # Kill orphan processes (match our script name, exclude this PID and parent)
+    # Must exclude PPID too: when thomas runs via sudo, the sudo parent process
+    # also matches pgrep -f and killing it terminates our own process chain.
+    local my_pid=$$
+    local my_ppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')
+    pgrep -f "claude-unblock" | while read pid; do
+        if [[ "$pid" != "$my_pid" && "$pid" != "$my_ppid" ]]; then
             kill "$pid" 2>/dev/null || true
         fi
     done
