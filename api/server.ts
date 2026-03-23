@@ -88,6 +88,30 @@ app.get('/api/suspect-links/stats', requireApiKeyOrJwt, (req, res) => {
   res.json(merged);
 });
 
+// Global agent pool endpoint (kanban calls /api/agents/pool)
+app.get('/api/agents/pool', requireApiKeyOrJwt, (req, res) => {
+  const db = getDb();
+  try {
+    const agents = db.prepare(
+      "SELECT id, name, current_role, status, project_slug, last_seen FROM agents WHERE status != 'disconnected' ORDER BY last_seen DESC"
+    ).all();
+    res.json({ agents });
+  } catch { res.json({ agents: [] }); }
+});
+
+// Global project list (kanban expects {projects: [...]}, not bare array)
+app.get('/api/projects/list', requireApiKeyOrJwt, (req, res) => {
+  const db = getDb();
+  const user = (req as any).user;
+  const projects = db.prepare(
+    `SELECT p.slug, p.name, p.git_url FROM projects p
+     JOIN project_access pa ON pa.project_slug = p.slug
+     WHERE pa.user_id = ?
+     ORDER BY p.name`
+  ).all(user.id);
+  res.json({ projects: projects.map((p: any) => ({ name: p.name, slug: p.slug, path: p.slug, git_url: p.git_url })) });
+});
+
 // Error handling (after routes)
 app.use(notFoundHandler);
 app.use(errorHandler);
