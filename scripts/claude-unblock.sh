@@ -407,17 +407,8 @@ if is_local_or_hetzner; then
     # without cleaning up prior instances. Two orphans from Mar 17+18 were found
     # still running on Mar 20, sending "2" to panes in "accept edits" mode.
     #
-    # Kill orphan processes (match our script name, exclude this PID and parent)
-    # Must exclude PPID too: when thomas runs via sudo, the sudo parent process
-    # also matches pgrep -f and killing it terminates our own process chain.
-    my_pid=$$
-    my_ppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')
-    pgrep -f "claude-unblock" | while read pid; do
-        if [[ "$pid" != "$my_pid" && "$pid" != "$my_ppid" ]]; then
-            kill "$pid" 2>/dev/null || true
-        fi
-    done
-    # Kill existing tmux session (clean restart)
+    # SINGLETON: kill existing tmux session (which also kills its child processes).
+    # No pgrep — it matches the sudo ancestor chain and kills our own process.
     if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
         echo "Killing existing unblock session '$SESSION_NAME' (singleton enforcement)..."
         tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
