@@ -61,11 +61,17 @@ COPY --from=builder /app/viz ./viz
 COPY --from=builder /app/src/db ./src/db
 COPY --from=builder /app/scripts ./scripts
 
-# Create data directory for SQLite database (mounted as Docker volume)
-RUN mkdir -p /app/data
+# Create data directory and set ownership to node user (UID 1000).
+# This prevents SQLite "readonly database" errors when /app/data is bind-mounted.
+# Without this, migrations create files as root and the node process can't write.
+RUN mkdir -p /app/data && chown -R node:node /app/data /app
 
 # Make startup script executable
 RUN chmod +x /app/scripts/startup.sh
+
+# Run as non-root (node user, UID 1000 in node:22-slim).
+# All files created at runtime (SQLite DB, WAL, SHM) will be owned by UID 1000.
+USER node
 
 # Expose API and viz ports
 EXPOSE 3100 4200

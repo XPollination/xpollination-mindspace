@@ -27,6 +27,24 @@ echo "════════════════════════�
 echo ""
 
 # ---------------------------------------------------------------------------
+# Pre-flight: Validate data directory is writable
+# ---------------------------------------------------------------------------
+# SQLite needs write access for DB, WAL, and SHM files. If /app/data is
+# bind-mounted with wrong ownership (root), migrations and viz will crash.
+# Fail immediately with a clear message instead of crashing silently later.
+DATA_DIR="${DATABASE_PATH%/*}"
+DATA_DIR="${DATA_DIR:-/app/data}"
+if ! touch "$DATA_DIR/.write-test" 2>/dev/null; then
+  echo "  ✗ FATAL: Data directory '$DATA_DIR' is not writable."
+  echo "    Fix: chown $(id -u):$(id -g) $DATA_DIR"
+  echo "    The container runs as UID $(id -u). The bind-mounted volume must be writable."
+  exit 1
+fi
+rm -f "$DATA_DIR/.write-test"
+echo "▸ Pre-flight: Data directory writable ✓"
+echo ""
+
+# ---------------------------------------------------------------------------
 # Step 0: Wait for dependencies
 # ---------------------------------------------------------------------------
 # Brain API must be reachable before we run migrations or start servers.
@@ -110,6 +128,14 @@ echo ""
 # Start viz in background
 node viz/server.js ${VIZ_PORT:-4200} &
 VIZ_PID=$!
+sleep 2
+
+# Verify viz actually started (catches permission errors, port conflicts, crashes)
+if ! kill -0 $VIZ_PID 2>/dev/null; then
+  echo "  ✗ Viz server FAILED to start on port ${VIZ_PORT:-4200}"
+  echo "    Check file permissions on /app/data and port availability."
+  exit 1
+fi
 
 echo "  Viz server  → http://localhost:${VIZ_PORT:-4200}  (Dashboard UI)"
 echo "  API server  → http://localhost:${API_PORT:-3100}  (REST API with auth)"
