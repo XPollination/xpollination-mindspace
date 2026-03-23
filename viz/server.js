@@ -657,35 +657,9 @@ function readBody(req) {
   });
 }
 
-/**
- * Get or create system_settings table, return DB handle (writable).
- * Uses /app/data/settings.db (writable volume) — never a project DB
- * which may be mounted read-only via workspace volume.
- */
-const SETTINGS_DB_PATH = path.join(process.env.DATABASE_PATH ? path.dirname(process.env.DATABASE_PATH) : '/app/data', 'settings.db');
-
-function getSettingsDb(dbPath) {
-  // Ignore dbPath — always use writable settings DB to avoid readonly errors
-  const db = new Database(SETTINGS_DB_PATH);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS system_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_by TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS system_settings_audit (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      key TEXT NOT NULL,
-      old_value TEXT,
-      new_value TEXT NOT NULL,
-      changed_by TEXT NOT NULL,
-      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    INSERT OR IGNORE INTO system_settings (key, value, updated_by) VALUES ('liaison_approval_mode', 'manual', 'system');
-  `);
-  return db;
-}
+// Settings are managed by the API server (Express, port 3100).
+// The viz catch-all proxy at /api/* forwards settings requests to the API.
+// No direct SQLite access from viz — the viz is a frontend, not a data layer.
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -1227,74 +1201,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: Get LIAISON approval mode
-  if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'GET') {
-    const projects = discoverProjects();
-    // Use first project DB for global settings
-    const dbPath = projects[0]?.dbPath;
-    if (!dbPath) {
-      sendJson(res, { error: 'No project database found' }, 500);
-      return;
-    }
-    const db = getSettingsDb(dbPath);
-    try {
-      const row = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
-      sendJson(res, {
-        mode: row?.value || 'manual',
-        updated_by: row?.updated_by || 'system',
-        updated_at: row?.updated_at || null,
-      });
-    } finally {
-      db.close();
-    }
-    return;
-  }
-
-  // API: Set LIAISON approval mode
-  if (pathname === '/api/settings/liaison-approval-mode' && req.method === 'PUT') {
-    try {
-      const body = await readBody(req);
-      if (!body.mode || !['manual', 'semi', 'auto-approval', 'auto'].includes(body.mode)) {
-        sendJson(res, { error: 'Invalid mode. Must be "manual", "semi", "auto-approval", or "auto".' }, 400);
-        return;
-      }
-      const projects = discoverProjects();
-      if (projects.length === 0) {
-        sendJson(res, { error: 'No project database found' }, 500);
-        return;
-      }
-      // Write setting to ALL project DBs (global setting must be visible from any task DB)
-      const actor = body.actor || body.updated_by || 'viz-ui';
-      let lastRow = null;
-      for (const proj of projects) {
-        const db = getSettingsDb(proj.dbPath);
-        try {
-          // Read old value for audit
-          const oldRow = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
-          const oldValue = oldRow?.value || null;
-
-          // Insert audit record
-          db.prepare("INSERT INTO system_settings_audit (key, old_value, new_value, changed_by, changed_at) VALUES ('liaison_approval_mode', ?, ?, ?, datetime('now'))").run(oldValue, body.mode, actor);
-
-          // Update setting
-          db.prepare("INSERT OR REPLACE INTO system_settings (key, value, updated_by, updated_at) VALUES ('liaison_approval_mode', ?, ?, datetime('now'))").run(body.mode, actor);
-          lastRow = db.prepare("SELECT value, updated_by, updated_at FROM system_settings WHERE key = 'liaison_approval_mode'").get();
-        } finally {
-          db.close();
-        }
-      }
-      console.error(`[SETTINGS] liaison_approval_mode changed: ${lastRow.value} by ${actor}`);
-      sendJson(res, {
-        mode: lastRow.value,
-        updated_by: lastRow.updated_by,
-        updated_at: lastRow.updated_at,
-        synced_to: projects.map(p => p.name),
-      });
-    } catch (e) {
-      sendJson(res, { error: e.message }, 400);
-    }
-    return;
-  }
+  // Settings: /api/settings/* is handled by the API server via catch-all proxy below.
+  // No direct SQLite handling — the viz is a frontend.
 
   // API: Confirm task (set human_confirmed in DNA)
   const confirmMatch = pathname.match(/^\/api\/node\/([^/]+)\/confirm$/);
