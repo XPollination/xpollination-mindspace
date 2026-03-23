@@ -386,13 +386,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // /kanban or /tasks route: serve kanban index.html
+  // /kanban or /tasks route: serve new A2A-powered kanban
   if (pathname === '/kanban' || pathname === '/tasks') {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
       ? path.resolve(path.join(__dirname, 'active'))
       : __dirname;
-    const kanbanPath = path.join(staticRoot, 'index.html');
-    serveStatic(res, kanbanPath);
+    serveStatic(res, path.join(staticRoot, 'kanban.html'));
     return;
   }
 
