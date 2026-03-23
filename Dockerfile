@@ -59,6 +59,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/api ./api
 COPY --from=builder /app/viz ./viz
 COPY --from=builder /app/src/db ./src/db
+COPY --from=builder /app/src/twins ./src/twins
 COPY --from=builder /app/scripts ./scripts
 
 # Create data directory and set ownership to node user (UID 1000).

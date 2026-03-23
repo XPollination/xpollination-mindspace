@@ -17,8 +17,9 @@ const AGENT_CARD = {
     'marketplace'
   ],
   authentication: {
-    type: 'api_key',
-    header: 'X-API-Key',
+    types: ['api_key', 'jwt'],
+    api_key: { header: 'X-API-Key' },
+    jwt: { header: 'Authorization', scheme: 'Bearer', cookie: 'ms_session' },
     registration_url: 'https://mindspace.xpollination.earth/register'
   },
   endpoints: {
