@@ -40,6 +40,7 @@ dataRouter.get('/', (req: Request, res: Response) => {
     let dna: any = {};
     try { dna = JSON.parse(t.dna_json || '{}'); } catch { /* ignore */ }
     return {
+      id: t.slug || t.id,
       slug: t.slug || t.id,
       type: 'task',
       status: t.status,

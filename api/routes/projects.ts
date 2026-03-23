@@ -127,6 +127,23 @@ projectsRouter.post('/', (req: Request, res: Response) => {
   res.status(201).json(project);
 });
 
+// DELETE /:slug — remove user's access to project (does not delete project data)
+projectsRouter.delete('/:slug', (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const result = db.prepare('DELETE FROM project_access WHERE user_id = ? AND project_slug = ?')
+    .run(user.id, slug);
+
+  if (result.changes === 0) {
+    res.status(404).json({ error: 'Project access not found' });
+    return;
+  }
+
+  res.status(200).json({ removed: true, slug });
+});
+
 // GET / — list all projects
 projectsRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();

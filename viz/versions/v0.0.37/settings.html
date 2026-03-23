@@ -178,11 +178,13 @@
         }
         el.innerHTML = list.map(p =>
           '<div style="padding:0.5rem 0;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
-          '<div><strong>' + (p.name || p.slug) + '</strong>' +
+          '<div style="flex:1;"><strong>' + (p.name || p.slug) + '</strong>' +
           (p.git_url ? '<br><span style="font-size:0.8rem;color:#888;">' + p.git_url + '</span>' : '') +
           '</div>' +
+          '<div style="display:flex;align-items:center;gap:0.5rem;">' +
           '<span style="font-size:0.75rem;color:#aaa;">' + p.slug + '</span>' +
-          '</div>'
+          '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" style="padding:2px 8px;font-size:0.75rem;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;cursor:pointer;color:#999;" onmouseover="this.style.color=\'#d32f2f\';this.style.borderColor=\'#d32f2f\'" onmouseout="this.style.color=\'#999\';this.style.borderColor=\'#ddd\'">Remove</button>' +
+          '</div></div>'
         ).join('');
       } catch { el.textContent = 'Failed to load projects'; }
     }
@@ -222,6 +224,19 @@
         msg.className = 'message error';
         msg.style.display = 'block';
       }
+    }
+
+    async function removeProject(slug, name) {
+      if (!confirm('Remove project "' + name + '"? This removes your access, not the project data.')) return;
+      try {
+        const res = await fetch('/api/projects/' + slug, { method: 'DELETE' });
+        if (res.ok || res.status === 404) {
+          loadMyProjects();
+        } else {
+          const data = await res.json();
+          alert(data.error || 'Failed to remove project');
+        }
+      } catch { alert('Network error'); }
     }
 
     // Allow Enter key in git URL input
