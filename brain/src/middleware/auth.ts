@@ -1,10 +1,32 @@
 import { FastifyRequest, FastifyReply } from "fastify";
+import { createHash } from "node:crypto";
+import Database from "better-sqlite3";
 import { getDb } from "../services/database.js";
 
-interface UserRow {
+interface MindspaceKeyRow {
+  key_id: string;
+  revoked_at: string | null;
   user_id: string;
   display_name: string;
+}
+
+interface BrainUserRow {
   qdrant_collection: string;
+}
+
+// Mindspace DB (read-only) — validates API keys from the Mindspace api_keys table.
+// Mounted at /app/mindspace-data/mindspace.db in Docker.
+const MINDSPACE_DB_PATH = process.env.MINDSPACE_DB_PATH || "/app/mindspace-data/mindspace.db";
+let mindspaceDb: Database.Database | null = null;
+
+function getMindspaceDb(): Database.Database | null {
+  if (mindspaceDb) return mindspaceDb;
+  try {
+    mindspaceDb = new Database(MINDSPACE_DB_PATH, { readonly: true });
+    return mindspaceDb;
+  } catch {
+    return null;
+  }
 }
 
 export async function authHook(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -20,15 +42,47 @@ export async function authHook(request: FastifyRequest, reply: FastifyReply): Pr
   }
 
   const token = authorization.slice("bearer ".length);
-  const db = getDb();
-  const user = db.prepare(
-    "SELECT user_id, display_name, qdrant_collection FROM users WHERE api_key = ? AND active = 1"
-  ).get(token) as UserRow | undefined;
 
-  if (!user) {
+  // Validate against Mindspace api_keys table (SHA-256 hashed, revocable)
+  const msDb = getMindspaceDb();
+  if (!msDb) {
+    reply.code(503).send({ error: "Auth database unavailable — mindspace.db not mounted" });
+    return;
+  }
+
+  const keyHash = createHash("sha256").update(token).digest("hex");
+  const row = msDb.prepare(
+    `SELECT ak.id AS key_id, ak.revoked_at, u.id AS user_id, u.name AS display_name
+     FROM api_keys ak JOIN users u ON ak.user_id = u.id
+     WHERE ak.key_hash = ?`
+  ).get(keyHash) as MindspaceKeyRow | undefined;
+
+  if (!row) {
     reply.code(401).send({ error: "Invalid API key" });
     return;
   }
 
-  (request as any).user = user;
+  if (row.revoked_at) {
+    reply.code(401).send({ error: "API key has been revoked" });
+    return;
+  }
+
+  // Resolve qdrant collection from brain's users table (auto-provision if new user)
+  const brainDb = getDb();
+  let brainUser = brainDb.prepare(
+    "SELECT qdrant_collection FROM users WHERE user_id = ?"
+  ).get(row.user_id) as BrainUserRow | undefined;
+
+  if (!brainUser) {
+    brainDb.prepare(
+      "INSERT OR IGNORE INTO users (user_id, display_name, api_key, qdrant_collection) VALUES (?, ?, 'managed-by-mindspace', 'thought_space')"
+    ).run(row.user_id, row.display_name);
+    brainUser = { qdrant_collection: "thought_space" };
+  }
+
+  (request as any).user = {
+    user_id: row.user_id,
+    display_name: row.display_name,
+    qdrant_collection: brainUser.qdrant_collection,
+  };
 }
