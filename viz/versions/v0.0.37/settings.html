@@ -150,15 +150,16 @@
         const projects = await res.json();
         const list = Array.isArray(projects) ? projects : (projects.projects || []);
         if (list.length === 0) { el.innerHTML = '<p style="color:var(--ms-muted);font-size:0.85rem;">No projects yet. Add one via git URL below.</p>'; return; }
-        el.innerHTML = list.map(p =>
-          '<div style="padding:0.5rem 0;border-bottom:1px solid var(--ms-border);display:flex;justify-content:space-between;align-items:center;">' +
-          '<div style="flex:1;"><strong>' + (p.name || p.slug) + '</strong>' +
-          (p.git_url ? '<br><span style="font-size:0.8rem;color:var(--ms-muted);">' + p.git_url + '</span>' : '') +
-          '</div><div style="display:flex;align-items:center;gap:0.5rem;">' +
-          '<span style="font-size:0.75rem;color:var(--ms-muted);">' + p.slug + '</span>' +
-          '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" style="padding:2px 8px;font-size:0.75rem;" title="Leave project — removes your access, tasks stay">Leave</button>' +
-          '</div></div>'
-        ).join('');
+        el.innerHTML = list.map(p => {
+          const vis = p.visibility === 'private' ? '<span style="font-size:0.7rem;background:var(--ms-status-review);color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;">PRIVATE</span>' : '';
+          return '<div style="padding:0.75rem 0;border-bottom:1px solid var(--ms-border);">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">' +
+            '<strong style="font-size:0.95rem;">' + (p.name || p.slug) + vis + '</strong>' +
+            '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" style="padding:2px 8px;font-size:0.75rem;" title="Leave project — removes your access, tasks stay">Leave</button>' +
+            '</div>' +
+            (p.git_url ? '<div style="font-size:0.8rem;color:var(--ms-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.git_url + '</div>' : '') +
+            '</div>';
+        }).join('');
       } catch { el.textContent = 'Failed to load projects'; }
     }
 

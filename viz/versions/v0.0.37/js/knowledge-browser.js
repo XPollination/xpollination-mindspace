@@ -68,9 +68,16 @@ function showError(message) {
   pageContent.innerHTML = `<div class="error"><p>${escapeHtml(message)}</p><p><a href="/" style="color:var(--link);">Back to Mission Map</a></p></div>`;
 }
 
-async function loadMission(shortId) {
-  const missions = await client.query('mission', { short_id: shortId, include_capabilities: true });
-  if (missions.length === 0) { showError(`Mission not found: ${shortId}`); return; }
+async function loadMission(identifier) {
+  // Try short_id first, then full id
+  let missions = await client.query('mission', { short_id: identifier, include_capabilities: true });
+  if (missions.length === 0) {
+    missions = await client.query('mission', { id: identifier, include_capabilities: true });
+  }
+  if (missions.length === 0) {
+    showError(`Mission not found: "${escapeHtml(identifier)}". It may belong to a project you haven't joined yet. <a href="/settings" style="color:var(--ms-link);">Check your projects</a> or <a href="/" style="color:var(--ms-link);">back to Mission Map</a>`);
+    return;
+  }
   const m = missions[0];
 
   document.title = `${m.title} — Mindspace`;
@@ -92,8 +99,12 @@ async function loadMission(shortId) {
 }
 
 async function loadCapability(shortId) {
-  const caps = await client.query('capability', { short_id: shortId, include_requirements: true, include_tasks: true });
-  if (caps.length === 0) { showError(`Capability not found: ${shortId}`); return; }
+  let caps = await client.query('capability', { short_id: shortId, include_requirements: true, include_tasks: true });
+  if (caps.length === 0) caps = await client.query('capability', { id: shortId, include_requirements: true, include_tasks: true });
+  if (caps.length === 0) {
+    showError(`Capability not found: "${escapeHtml(shortId)}". <a href="/" style="color:var(--ms-link);">Back to Mission Map</a>`);
+    return;
+  }
   const c = caps[0];
 
   // Get parent mission for breadcrumb
@@ -123,8 +134,12 @@ async function loadCapability(shortId) {
 }
 
 async function loadRequirement(shortId) {
-  const reqs = await client.query('requirement', { short_id: shortId });
-  if (reqs.length === 0) { showError(`Requirement not found: ${shortId}`); return; }
+  let reqs = await client.query('requirement', { short_id: shortId });
+  if (reqs.length === 0) reqs = await client.query('requirement', { id: shortId });
+  if (reqs.length === 0) {
+    showError(`Requirement not found: "${escapeHtml(shortId)}". <a href="/" style="color:var(--ms-link);">Back to Mission Map</a>`);
+    return;
+  }
   const r = reqs[0];
 
   document.title = `${r.title || r.req_id_human} — Mindspace`;
@@ -157,8 +172,8 @@ async function loadRequirement(shortId) {
 }
 
 async function init() {
-  // Parse URL: /m/{id}, /c/{id}, /r/{id}
-  const match = window.location.pathname.match(/^\/(m|c|r)\/([a-zA-Z0-9]{1,12})/);
+  // Parse URL: /m/{id}, /c/{id}, /r/{id} — accepts short_id, UUID, or slug (with hyphens)
+  const match = window.location.pathname.match(/^\/(m|c|r)\/([a-zA-Z0-9_-]{1,100})/);
   if (!match) {
     showError('Invalid URL. Expected /m/{id}, /c/{id}, or /r/{id}');
     return;
@@ -172,7 +187,15 @@ async function init() {
   }
 
   try {
-    await client.connect('mindspace');
+    // Connect using first available project
+    const projRes = await fetch('/api/projects');
+    const projList = await projRes.json();
+    const projects = Array.isArray(projList) ? projList : [];
+    if (projects.length === 0) {
+      showError('No projects yet. <a href="/settings" style="color:var(--ms-link);">Add a project</a> to browse knowledge.');
+      return;
+    }
+    await client.connect(projects[0].slug);
 
     switch (typePrefix) {
       case 'm': await loadMission(shortId); break;
