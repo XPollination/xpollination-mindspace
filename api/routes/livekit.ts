@@ -24,7 +24,7 @@ function userHasFlag(userId: string, projectSlug: string): boolean {
 }
 
 // GET /token?room=mindspace-admin
-livekitRouter.get('/token', (req: Request, res: Response) => {
+livekitRouter.get('/token', async (req: Request, res: Response) => {
   const user = (req as any).user;
   const room = (req.query.room as string) || 'mindspace-admin';
 
@@ -52,7 +52,7 @@ livekitRouter.get('/token', (req: Request, res: Response) => {
   });
 
   res.status(200).json({
-    token: token.toJwt(),
+    token: await token.toJwt(),
     url: LIVEKIT_URL,
     roomName: room,
     participantName: user.name || user.email,
