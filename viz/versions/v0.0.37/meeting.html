@@ -121,6 +121,23 @@
     .chat-msg .sender { font-weight: 600; color: var(--ms-accent); margin-right: 0.3rem; }
     .chat-msg .text { color: var(--ms-text); word-break: break-word; }
     .chat-msg .time { color: var(--ms-muted); font-size: 0.7rem; margin-left: 0.3rem; }
+    /* Agent context cards */
+    .agent-card {
+      background: var(--ms-surface); border: 1px solid var(--ms-border); border-left: 3px solid var(--ms-accent);
+      border-radius: var(--ms-radius); padding: 0.6rem; margin: 0.4rem 0; font-size: 0.8rem;
+    }
+    .agent-card .agent-topic { font-weight: 600; color: var(--ms-accent); margin-bottom: 0.4rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .agent-card .agent-insight { padding: 0.25rem 0; border-bottom: 1px solid var(--ms-border); line-height: 1.4; }
+    .agent-card .agent-insight:last-of-type { border-bottom: none; }
+    .agent-card .agent-insight .contributor { color: var(--ms-muted); font-size: 0.7rem; }
+    .agent-card .agent-insight .content { color: var(--ms-text); }
+    .agent-card .agent-actions { margin-top: 0.4rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .agent-drill-btn {
+      background: none; border: 1px solid var(--ms-border); color: var(--ms-link); border-radius: 12px;
+      padding: 0.2rem 0.6rem; font-size: 0.7rem; cursor: pointer;
+    }
+    .agent-drill-btn:hover { background: var(--ms-surface); border-color: var(--ms-accent); }
+    .agent-listening { color: var(--ms-muted); font-size: 0.75rem; font-style: italic; padding: 0.2rem 0; }
     .chat-input-row {
       display: flex; border-top: 1px solid var(--ms-border); padding: 0.4rem;
     }
@@ -630,20 +647,113 @@
       } catch (e) { addChatMessage('System', 'Mute failed: ' + e.message); }
     }
 
-    // --- Companion Agent: Speech Recognition → Brain → Chat ---
+    // --- Companion Agent: Silent listening → Topic extraction → Brain context cards ---
     let recognition = null;
     let agentActive = false;
-    const BRAIN_URL = '/api/livekit/brain-query'; // proxied to Brain API
+    let transcriptBuffer = '';
+    let debounceTimer = null;
+    let lastQueryTime = 0;
+    const QUERY_COOLDOWN = 8000; // min 8s between Brain queries
 
     document.getElementById('btn-agent').addEventListener('click', () => {
       if (agentActive) { stopAgent(); return; }
       startAgent();
     });
 
+    function extractTopic(text) {
+      // Simple keyword extraction: take meaningful words >3 chars, deduplicate
+      const stopwords = new Set(['aber','auch','dass','dies','eine','einen','einem','einer','haben','hatte','sein','seine','seiner','sind','wird','wurde','über','nach','noch','oder','wenn','will','alle','kann','mehr','muss','soll','weil','denn','dann','hier','dort','jetzt','schon','nicht','sehr','ganz','doch','also','etwa','wohl','quasi','halt']);
+      const words = text.toLowerCase().replace(/[^a-zäöüß\s]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      const unique = [...new Set(words)];
+      return unique.slice(0, 5).join(' ');
+    }
+
+    function renderAgentCard(data) {
+      if (!data.insights || data.insights.length === 0) return;
+      const el = document.getElementById('chat-messages');
+      const topic = data.topic || 'Context';
+
+      let html = `<div class="agent-card">`;
+      html += `<div class="agent-topic">&#129302; ${topic}</div>`;
+      for (const insight of data.insights) {
+        const preview = insight.content.length > 150 ? insight.content.slice(0, 150) + '...' : insight.content;
+        html += `<div class="agent-insight"><span class="content">${preview.replace(/</g,'&lt;')}</span><br><span class="contributor">— ${insight.contributor}</span></div>`;
+      }
+      // Drill-down suggestions from highways
+      if (data.highways && data.highways.length > 0) {
+        html += `<div class="agent-actions">`;
+        for (const hw of data.highways) {
+          const label = typeof hw === 'string' ? hw : (hw.label || hw.topic || JSON.stringify(hw));
+          html += `<button class="agent-drill-btn" onclick="drillDown('${label.replace(/'/g, '')}')">Explore: ${label}</button>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+      el.innerHTML += html;
+      el.scrollTop = el.scrollHeight;
+
+      // Share a concise version with other participants
+      if (room) {
+        const summary = `[🧠 ${topic}] ${data.insights[0]?.content?.slice(0, 100) || ''}`;
+        const msg = new TextEncoder().encode(JSON.stringify({ type: 'chat', text: summary }));
+        room.localParticipant.publishData(msg, { reliable: true });
+      }
+    }
+
+    window.drillDown = async function(topic) {
+      addAgentListening(`Exploring "${topic}"...`);
+      try {
+        const resp = await fetch('/api/livekit/brain-query', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: topic, topic })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          removeAgentListening();
+          if (data.insights?.length > 0) renderAgentCard(data);
+          else addChatMessage('Agent', `No additional context found for "${topic}".`);
+        }
+      } catch { removeAgentListening(); }
+    };
+
+    function addAgentListening(text) {
+      removeAgentListening();
+      const el = document.getElementById('chat-messages');
+      el.innerHTML += `<div class="agent-listening" id="agent-status">${text}</div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+    function removeAgentListening() {
+      document.getElementById('agent-status')?.remove();
+    }
+
+    async function processTranscript() {
+      const text = transcriptBuffer.trim();
+      transcriptBuffer = '';
+      if (text.length < 10) return;
+      if (Date.now() - lastQueryTime < QUERY_COOLDOWN) return;
+      lastQueryTime = Date.now();
+
+      const topic = extractTopic(text);
+      if (topic.length < 3) return;
+
+      addAgentListening(`Listening... heard "${topic}"`);
+      try {
+        const resp = await fetch('/api/livekit/brain-query', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: text, topic })
+        });
+        removeAgentListening();
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.insights?.length > 0) renderAgentCard(data);
+        }
+      } catch { removeAgentListening(); }
+    }
+
     function startAgent() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        addChatMessage('System', 'Speech recognition not supported in this browser. Use Chrome desktop.');
+        addChatMessage('System', 'Speech recognition not available. Use Chrome desktop.');
         return;
       }
       recognition = new SpeechRecognition();
@@ -652,52 +762,44 @@
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
-      recognition.onresult = async (event) => {
+      recognition.onresult = (event) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (!event.results[i].isFinal) continue;
-          const transcript = event.results[i][0].transcript.trim();
-          if (transcript.length < 5) continue;
-          addChatMessage('Transcript', transcript);
-          // Query Brain with transcript
-          try {
-            const resp = await fetch('/api/livekit/brain-query', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query: transcript })
-            });
-            if (resp.ok) {
-              const data = await resp.json();
-              if (data.context) {
-                addChatMessage('Agent', data.context);
-                // Share with other participants
-                const msg = new TextEncoder().encode(JSON.stringify({ type: 'chat', text: `[Agent] ${data.context}` }));
-                room.localParticipant.publishData(msg, { reliable: true });
-              }
-            }
-          } catch {}
+          const text = event.results[i][0].transcript.trim();
+          if (text.length < 3) continue;
+          transcriptBuffer += ' ' + text;
+          // Debounce: wait 3s of silence before querying
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(processTranscript, 3000);
         }
       };
 
       recognition.onerror = (event) => {
-        if (event.error === 'no-speech') return; // normal, just no speech detected
-        addChatMessage('System', `Speech error: ${event.error}`);
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        addChatMessage('System', `Speech: ${event.error}`);
       };
 
       recognition.onend = () => {
-        // Auto-restart if agent is still active (recognition stops after silence)
         if (agentActive) { try { recognition.start(); } catch {} }
       };
 
       recognition.start();
       agentActive = true;
       document.getElementById('btn-agent').classList.add('active');
-      addChatMessage('System', 'Companion Agent started (German). Listening...');
+      // Open chat panel automatically so user sees agent output
+      document.getElementById('chat').classList.remove('hidden');
+      document.getElementById('btn-chat').classList.add('active');
+      addChatMessage('System', '🤖 Agent listening (German). Relevant context will appear here.');
     }
 
     function stopAgent() {
       agentActive = false;
+      clearTimeout(debounceTimer);
+      transcriptBuffer = '';
       if (recognition) { recognition.stop(); recognition = null; }
       document.getElementById('btn-agent').classList.remove('active');
-      addChatMessage('System', 'Companion Agent stopped.');
+      removeAgentListening();
+      addChatMessage('System', '🤖 Agent stopped.');
     }
   </script>
 </body>
