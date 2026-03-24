@@ -235,8 +235,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Authentication required' }));
         return;
       }
-      // D1: Redirect browser requests to /login
-      res.writeHead(302, { 'Location': '/login' });
+      // D1: Redirect browser requests to /login with return_to
+      const returnTo = pathname !== '/' ? `?return_to=${encodeURIComponent(pathname)}` : '';
+      res.writeHead(302, { 'Location': `/login${returnTo}` });
       res.end();
       return;
     }
@@ -360,9 +361,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Knowledge Browser routes: /m/:id/:slug?, /c/:id/:slug?, /r/:id/:slug?
+  // Knowledge Browser routes: /m/:id, /c/:id, /r/:id (short_id, UUID, or slug with hyphens)
   // Client-rendered via A2A (Model B) — serve knowledge.html, JS handles data loading
-  const kbMatch = pathname.match(/^\/(m|c|r)\/([a-zA-Z0-9]{1,12})(\/[^.]*)?(\.\w+)?$/);
+  const kbMatch = pathname.match(/^\/(m|c|r)\/([a-zA-Z0-9_-]{1,100})(\/[^.]*)?(\.\w+)?$/);
   if (kbMatch) {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
       ? path.resolve(path.join(__dirname, 'active'))
@@ -387,6 +388,15 @@ const server = http.createServer(async (req, res) => {
       ? path.resolve(path.join(__dirname, 'active'))
       : __dirname;
     serveStatic(res, path.join(staticRoot, 'mission-map.html'));
+    return;
+  }
+
+  // /meeting or /meeting/:roomName — LiveKit meeting page
+  if (pathname === '/meeting' || pathname.startsWith('/meeting/')) {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'meeting.html'));
     return;
   }
 
