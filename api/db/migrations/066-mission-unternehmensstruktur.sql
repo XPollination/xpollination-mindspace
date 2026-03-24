@@ -7,7 +7,7 @@ VALUES (
   'Unternehmensstruktur',
   'Organisationsstruktur erarbeiten: welche Instanz besitzt welche Assets, Investitionspläne, Open-Source-Ansatz, Non-Profit-Organisationsstruktur.',
   'draft',
-  'xpollination-mindspace',
+  'xpollination-governance',
   lower(hex(randomblob(4))),
   '# Mission: Unternehmensstruktur
 
