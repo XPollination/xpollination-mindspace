@@ -31,6 +31,7 @@
           <button class="ms-btn ms-btn-primary" onclick="addProject()">Add</button>
         </div>
         <div class="msg" id="project-msg"></div>
+        <p style="font-size:0.8rem;color:var(--ms-muted);margin-top:0.75rem;line-height:1.4;">Works with public and private repositories. Private projects use your local knowledge space. For token generation and provenance chain features, a commercial license is available at <a href="https://xpollination.earth" style="color:var(--ms-link);">xpollination.earth</a></p>
       </div>
     </div>
 
@@ -169,8 +170,20 @@
       try {
         const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ git_url: gitUrl }) });
         const data = await res.json();
-        if (res.ok) { msg.textContent = 'Project "' + data.name + '" added'; msg.className = 'msg ms-msg-success'; msg.style.display = 'block'; document.getElementById('git-url').value = ''; loadMyProjects(); }
-        else { msg.textContent = data.error || 'Failed'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
+        if (res.ok) {
+          const action = data.action || 'created';
+          if (action === 'already_member') {
+            msg.textContent = 'You\'re already a member of "' + data.name + '"';
+            msg.className = 'msg'; msg.style.cssText = 'display:block;background:var(--ms-surface);color:var(--ms-link);padding:0.5rem;border-radius:4px;font-size:0.85rem;';
+          } else if (action === 'joined') {
+            msg.textContent = 'Joined project "' + data.name + '"!';
+            msg.className = 'msg ms-msg-success'; msg.style.display = 'block';
+          } else {
+            msg.textContent = 'Project "' + data.name + '" created!';
+            msg.className = 'msg ms-msg-success'; msg.style.display = 'block';
+          }
+          document.getElementById('git-url').value = ''; loadMyProjects();
+        } else { msg.textContent = data.error || 'Failed'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
       } catch { msg.textContent = 'Network error'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
     }
 
