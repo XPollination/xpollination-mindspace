@@ -391,6 +391,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // /missions — Mission Lifecycle Kanban
+  if (pathname === '/missions') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'missions.html'));
+    return;
+  }
+
   // /meeting or /meeting/:roomName — LiveKit meeting page
   if (pathname === '/meeting' || pathname.startsWith('/meeting/')) {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))

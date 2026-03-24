@@ -104,8 +104,8 @@ async function init() {
     // Connect to A2A using first project
     await client.connect(projectList[0].slug);
 
-    // Query all missions with nested capabilities
-    const missions = await client.query('mission', { include_capabilities: true });
+    // Query only ACTIVE missions (knowledge-first view). Draft/ready/deprecated are on /missions board.
+    const missions = await client.query('mission', { status: 'active', include_capabilities: true });
 
     // Cache them
     cache.loadAll('mission', missions);

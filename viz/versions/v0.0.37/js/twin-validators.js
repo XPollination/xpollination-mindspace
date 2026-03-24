@@ -6,7 +6,7 @@
  * "The object validates itself."
  */
 
-const MISSION_STATUSES = ['draft', 'active'];
+const MISSION_STATUSES = ['draft', 'ready', 'active', 'complete', 'deprecated'];
 const CAPABILITY_STATUSES = ['draft', 'active', 'blocked', 'complete', 'cancelled'];
 const REQUIREMENT_STATUSES = ['draft', 'active'];
 const REQUIREMENT_PRIORITIES = ['low', 'medium', 'high', 'critical'];

@@ -21,7 +21,8 @@ function toggleTheme() {
 const AUTH_PATHS = ['/login', '/register'];
 const NAV_LINKS = [
   { href: '/', label: 'Mission Map', match: (p) => p === '/' },
-  { href: '/kanban', label: 'Kanban', match: (p) => p === '/kanban' || p === '/tasks' },
+  { href: '/missions', label: 'Missions', match: (p) => p === '/missions' },
+  { href: '/kanban', label: 'Tasks', match: (p) => p === '/kanban' || p === '/tasks' },
 ];
 
 function isAuthPage() {

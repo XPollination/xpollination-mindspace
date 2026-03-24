@@ -329,13 +329,46 @@ function handleTransition(agent: any, body: any, res: Response): void {
     return;
   }
 
+  const db = getDb();
+
+  // Check if this is a mission transition (payload.twin_type === 'mission' or ID starts with 'mission-')
+  const isMission = payload?.twin_type === 'mission' || task_slug.startsWith('mission-');
+
+  if (isMission) {
+    const MISSION_STATUSES = ['draft', 'ready', 'active', 'complete', 'deprecated'];
+    if (!MISSION_STATUSES.includes(to_status)) {
+      res.status(400).json({ type: 'ERROR', error: `Invalid mission status. Must be one of: ${MISSION_STATUSES.join(', ')}` });
+      return;
+    }
+    const mission = db.prepare('SELECT * FROM missions WHERE id = ?').get(task_slug) as any;
+    if (!mission) {
+      res.status(404).json({ type: 'ERROR', error: `Mission not found: ${task_slug}` });
+      return;
+    }
+    const previousStatus = mission.status;
+    db.prepare("UPDATE missions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(to_status, mission.id);
+
+    broadcast('transition', {
+      twin_type: 'mission', task_slug: mission.id, task_id: mission.id,
+      from_status: previousStatus, to_status, actor: agent.name || agent.id,
+      timestamp: new Date().toISOString()
+    });
+
+    res.status(200).json({
+      type: 'ACK', original_type: 'TRANSITION', agent_id: agent.id,
+      task_slug: mission.id, from_status: previousStatus, to_status,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  // Task transition
   const VALID_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 'testing', 'review', 'rework', 'complete', 'blocked', 'cancelled'];
   if (!VALID_STATUSES.includes(to_status)) {
     res.status(400).json({ type: 'ERROR', error: `Invalid to_status. Must be one of: ${VALID_STATUSES.join(', ')}` });
     return;
   }
 
-  const db = getDb();
   const task = db.prepare('SELECT * FROM tasks WHERE slug = ? OR id = ?').get(task_slug, task_slug) as any;
 
   if (!task) {
