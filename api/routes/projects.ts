@@ -197,10 +197,16 @@ projectsRouter.delete('/:slug', (req: Request, res: Response) => {
   res.status(200).json({ removed: true, slug });
 });
 
-// GET / — list all projects
-projectsRouter.get('/', (_req: Request, res: Response) => {
+// GET / — list user's projects (only those they have access to)
+projectsRouter.get('/', (req: Request, res: Response) => {
+  const user = (req as any).user;
   const db = getDb();
-  const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all();
+  const projects = db.prepare(
+    `SELECT p.* FROM projects p
+     JOIN project_access pa ON pa.project_slug = p.slug
+     WHERE pa.user_id = ?
+     ORDER BY p.name ASC`
+  ).all(user.id);
   res.status(200).json(projects);
 });
 
