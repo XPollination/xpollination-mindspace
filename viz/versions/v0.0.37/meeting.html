@@ -223,6 +223,7 @@
         <button id="btn-screen" title="Screen Share">&#128187;</button>
         <button id="btn-bg" title="Background">&#127912;</button>
         <button id="btn-chat" title="Chat">&#128172;</button>
+        <button id="btn-agent" title="Companion Agent (German)">&#129302;</button>
         <button id="btn-leave" class="leave" title="Leave">&#9746;</button>
       </div>
     </div>
@@ -355,6 +356,19 @@
           fsBtn.textContent = 'Fullscreen';
           fsBtn.onclick = (e) => { e.stopPropagation(); toggleFullscreen(tile, participant.identity); };
           actions.appendChild(fsBtn);
+          if (!isLocal) {
+            const muteBtn = document.createElement('button');
+            muteBtn.className = 'tile-action-btn';
+            muteBtn.textContent = 'Mute';
+            muteBtn.onclick = (e) => { e.stopPropagation(); muteParticipant(participant); };
+            actions.appendChild(muteBtn);
+            const kickBtn = document.createElement('button');
+            kickBtn.className = 'tile-action-btn';
+            kickBtn.style.background = 'rgba(220,53,69,0.8)';
+            kickBtn.textContent = 'Kick';
+            kickBtn.onclick = (e) => { e.stopPropagation(); kickParticipant(participant); };
+            actions.appendChild(kickBtn);
+          }
           tile.appendChild(actions);
           tile.appendChild(tag);
           videosEl.appendChild(tile);
@@ -591,6 +605,100 @@
     document.getElementById('btn-leave').addEventListener('click', () => {
       if (room) room.disconnect();
     });
+
+    // --- Kick / Mute ---
+    async function kickParticipant(participant) {
+      if (!confirm(`Kick ${participant.name || participant.identity}?`)) return;
+      try {
+        await fetch('/api/livekit/kick', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: meetingRoom, identity: participant.identity })
+        });
+        addChatMessage('System', `${participant.name || participant.identity} was removed.`);
+      } catch (e) { addChatMessage('System', 'Kick failed: ' + e.message); }
+    }
+
+    async function muteParticipant(participant) {
+      const audioTrack = [...participant.trackPublications.values()].find(p => p.track?.kind === Track.Kind.Audio);
+      if (!audioTrack?.track) { addChatMessage('System', 'No audio track to mute.'); return; }
+      try {
+        await fetch('/api/livekit/mute', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: meetingRoom, identity: participant.identity, trackSid: audioTrack.track.sid, muted: !audioTrack.isMuted })
+        });
+        addChatMessage('System', `${participant.name} ${audioTrack.isMuted ? 'unmuted' : 'muted'}.`);
+      } catch (e) { addChatMessage('System', 'Mute failed: ' + e.message); }
+    }
+
+    // --- Companion Agent: Speech Recognition → Brain → Chat ---
+    let recognition = null;
+    let agentActive = false;
+    const BRAIN_URL = '/api/livekit/brain-query'; // proxied to Brain API
+
+    document.getElementById('btn-agent').addEventListener('click', () => {
+      if (agentActive) { stopAgent(); return; }
+      startAgent();
+    });
+
+    function startAgent() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        addChatMessage('System', 'Speech recognition not supported in this browser. Use Chrome desktop.');
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.lang = 'de-DE';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = async (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (!event.results[i].isFinal) continue;
+          const transcript = event.results[i][0].transcript.trim();
+          if (transcript.length < 5) continue;
+          addChatMessage('Transcript', transcript);
+          // Query Brain with transcript
+          try {
+            const resp = await fetch('/api/livekit/brain-query', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: transcript })
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data.context) {
+                addChatMessage('Agent', data.context);
+                // Share with other participants
+                const msg = new TextEncoder().encode(JSON.stringify({ type: 'chat', text: `[Agent] ${data.context}` }));
+                room.localParticipant.publishData(msg, { reliable: true });
+              }
+            }
+          } catch {}
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech') return; // normal, just no speech detected
+        addChatMessage('System', `Speech error: ${event.error}`);
+      };
+
+      recognition.onend = () => {
+        // Auto-restart if agent is still active (recognition stops after silence)
+        if (agentActive) { try { recognition.start(); } catch {} }
+      };
+
+      recognition.start();
+      agentActive = true;
+      document.getElementById('btn-agent').classList.add('active');
+      addChatMessage('System', 'Companion Agent started (German). Listening...');
+    }
+
+    function stopAgent() {
+      agentActive = false;
+      if (recognition) { recognition.stop(); recognition = null; }
+      document.getElementById('btn-agent').classList.remove('active');
+      addChatMessage('System', 'Companion Agent stopped.');
+    }
   </script>
 </body>
 </html>
