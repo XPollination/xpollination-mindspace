@@ -16,6 +16,7 @@ import { marketplaceRequestsRouter } from './routes/marketplace-requests.js';
 import { getDb, closeDb } from './db/connection.js';
 import { invitesRouter } from './routes/invites.js';
 import { settingsRouter } from './routes/settings.js';
+import { livekitRouter } from './routes/livekit.js';
 import { requireApiKeyOrJwt } from './middleware/require-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -79,6 +80,7 @@ app.use('/a2a/message', a2aMessageRouter);
 app.use('/api/marketplace/announcements', requireApiKeyOrJwt, marketplaceAnnouncementsRouter);
 app.use('/api/marketplace/requests', requireApiKeyOrJwt, marketplaceRequestsRouter);
 app.use('/api/settings', requireApiKeyOrJwt, settingsRouter);
+app.use('/api/livekit', requireApiKeyOrJwt, livekitRouter);
 app.use('/api/node', nodeActionsRouter);
 app.use('/api/data', dataRouter);
 

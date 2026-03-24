@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting — XPollination Mindspace</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="stylesheet" href="/mindspace.css">
+  <style>
+    .meeting-container {
+      max-width: 1200px;
+      margin: calc(var(--ms-nav-height) + 1rem) auto 0;
+      padding: 0 1rem;
+      height: calc(100vh - var(--ms-nav-height) - 2rem);
+      display: flex;
+      flex-direction: column;
+    }
+    .meeting-status {
+      text-align: center;
+      padding: 2rem;
+      color: var(--ms-muted);
+    }
+    .video-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 0.75rem;
+      min-height: 0;
+    }
+    .video-tile {
+      position: relative;
+      background: var(--ms-surface);
+      border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius);
+      overflow: hidden;
+      aspect-ratio: 16/9;
+    }
+    .video-tile video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .video-tile .name-tag {
+      position: absolute;
+      bottom: 6px;
+      left: 8px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+    }
+    .controls button {
+      background: var(--ms-surface);
+      border: 1px solid var(--ms-border);
+      color: var(--ms-text);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: background 0.15s;
+    }
+    .controls button:hover { background: var(--ms-border); }
+    .controls button.active { background: var(--ms-accent); color: #fff; border-color: var(--ms-accent); }
+    .controls button.leave { background: #dc3545; color: #fff; border-color: #dc3545; }
+    .controls button.leave:hover { background: #c82333; }
+    .error-msg { color: #dc3545; text-align: center; padding: 2rem; }
+  </style>
+</head>
+<body>
+  <script type="module" src="/js/mindspace-nav.js"></script>
+
+  <div class="meeting-container">
+    <div id="status" class="meeting-status">Connecting to meeting room...</div>
+    <div id="videos" class="video-grid" style="display:none;"></div>
+    <div id="controls" class="controls" style="display:none;">
+      <button id="btn-mic" class="active" title="Microphone">&#127908;</button>
+      <button id="btn-cam" class="active" title="Camera">&#127909;</button>
+      <button id="btn-screen" title="Screen Share">&#128187;</button>
+      <button id="btn-leave" class="leave" title="Leave">&#9746;</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { Room, RoomEvent, Track, VideoPresets, createLocalTracks } from 'https://cdn.jsdelivr.net/npm/livekit-client@2.17.3/dist/livekit-client.esm.mjs';
+
+    const statusEl = document.getElementById('status');
+    const videosEl = document.getElementById('videos');
+    const controlsEl = document.getElementById('controls');
+    let room = null;
+    let micEnabled = true;
+    let camEnabled = true;
+
+    async function start() {
+      try {
+        const resp = await fetch('/api/livekit/token?room=mindspace-admin');
+        if (!resp.ok) {
+          const err = await resp.json();
+          statusEl.innerHTML = `<div class="error-msg">${err.error || 'Cannot access meeting'}</div>`;
+          return;
+        }
+        const { token, url, roomName, participantName } = await resp.json();
+
+        statusEl.textContent = `Joining "${roomName}" as ${participantName}...`;
+
+        room = new Room({
+          videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+        });
+
+        room.on(RoomEvent.Connected, () => {
+          statusEl.style.display = 'none';
+          videosEl.style.display = 'grid';
+          controlsEl.style.display = 'flex';
+        });
+
+        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
+            renderParticipant(participant);
+          }
+        });
+
+        room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+          renderParticipant(participant);
+        });
+
+        room.on(RoomEvent.ParticipantConnected, (participant) => {
+          renderParticipant(participant);
+        });
+
+        room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+          const el = document.getElementById(`tile-${participant.identity}`);
+          if (el) el.remove();
+        });
+
+        room.on(RoomEvent.LocalTrackPublished, () => {
+          renderParticipant(room.localParticipant);
+        });
+
+        room.on(RoomEvent.Disconnected, (reason) => {
+          videosEl.style.display = 'none';
+          controlsEl.style.display = 'none';
+          statusEl.style.display = 'block';
+          statusEl.textContent = 'Disconnected from meeting.';
+          setTimeout(() => { window.location.href = '/'; }, 2000);
+        });
+
+        await room.connect(url, token);
+        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
+        renderParticipant(room.localParticipant);
+      } catch (err) {
+        statusEl.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      }
+    }
+
+    function renderParticipant(participant) {
+      let tile = document.getElementById(`tile-${participant.identity}`);
+      if (!tile) {
+        tile = document.createElement('div');
+        tile.id = `tile-${participant.identity}`;
+        tile.className = 'video-tile';
+        const tag = document.createElement('div');
+        tag.className = 'name-tag';
+        tag.textContent = participant.name || participant.identity;
+        tile.appendChild(tag);
+        videosEl.appendChild(tile);
+      }
+
+      // Remove old media elements (keep name tag)
+      tile.querySelectorAll('video, audio').forEach(el => el.remove());
+
+      for (const pub of participant.trackPublications.values()) {
+        if (!pub.track) continue;
+        const el = pub.track.attach();
+        if (el instanceof HTMLVideoElement) {
+          el.style.width = '100%';
+          el.style.height = '100%';
+          el.style.objectFit = 'cover';
+          tile.insertBefore(el, tile.firstChild);
+        } else {
+          tile.appendChild(el);
+        }
+      }
+    }
+
+    // Controls
+    document.getElementById('btn-mic').addEventListener('click', async () => {
+      if (!room) return;
+      micEnabled = !micEnabled;
+      await room.localParticipant.setMicrophoneEnabled(micEnabled);
+      document.getElementById('btn-mic').classList.toggle('active', micEnabled);
+    });
+
+    document.getElementById('btn-cam').addEventListener('click', async () => {
+      if (!room) return;
+      camEnabled = !camEnabled;
+      await room.localParticipant.setCameraEnabled(camEnabled);
+      document.getElementById('btn-cam').classList.toggle('active', camEnabled);
+    });
+
+    document.getElementById('btn-screen').addEventListener('click', async () => {
+      if (!room) return;
+      const enabled = room.localParticipant.isScreenShareEnabled;
+      await room.localParticipant.setScreenShareEnabled(!enabled);
+      document.getElementById('btn-screen').classList.toggle('active', !enabled);
+    });
+
+    document.getElementById('btn-leave').addEventListener('click', () => {
+      if (room) room.disconnect();
+    });
+
+    start();
+  </script>
+</body>
+</html>
