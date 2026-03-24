@@ -310,21 +310,36 @@ projectFilter.addEventListener('change', () => renderBoard());
 
 async function init() {
   try {
-    await client.connect('mindspace');
+    // Check if user has any projects
+    const projectsRes = await fetch('/api/projects');
+    const projectList = await projectsRes.json();
+    const projects = Array.isArray(projectList) ? projectList : [];
 
-    // Load projects for filter dropdown
-    try {
-      const res = await fetch('/api/projects');
-      const projects = Array.isArray(await res.clone().json()) ? await res.json() : [];
-      for (const p of (Array.isArray(projects) ? projects : [])) {
-        const opt = document.createElement('option');
-        opt.value = p.slug;
-        opt.textContent = p.name;
-        projectFilter.appendChild(opt);
-      }
-    } catch { /* silent */ }
+    if (projects.length === 0) {
+      boardEl.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;grid-column:1/-1;">
+          <div style="font-size:48px;margin-bottom:16px;">📋</div>
+          <h2 style="font-size:20px;margin-bottom:8px;">No projects yet</h2>
+          <p style="color:var(--ms-muted);margin-bottom:24px;">Add a project to start tracking tasks.</p>
+          <a href="/settings" class="ms-btn ms-btn-primary" style="text-decoration:none;display:inline-block;padding:10px 24px;font-size:15px;">Add your first project</a>
+          <p style="color:var(--ms-muted);margin-top:16px;font-size:13px;">Paste a Git URL in Settings to get started.</p>
+        </div>`;
+      statsEl.textContent = '';
+      return;
+    }
 
-    // Query tasks from all projects (override A2A project scope)
+    // Connect to A2A using first project
+    await client.connect(projects[0].slug);
+
+    // Populate project filter dropdown
+    for (const p of projects) {
+      const opt = document.createElement('option');
+      opt.value = p.slug;
+      opt.textContent = p.name;
+      projectFilter.appendChild(opt);
+    }
+
+    // Query tasks from all projects
     const tasks = await client.query('task', { project_slug: '__all__', limit: 1000 });
     cache.loadAll('task', tasks);
     renderBoard();
