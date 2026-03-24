@@ -127,7 +127,60 @@ projectsRouter.post('/', (req: Request, res: Response) => {
   res.status(201).json(project);
 });
 
-// DELETE /:slug — remove user's access to project (does not delete project data)
+// PUT /:slug — update project (name, slug, git_url). Slug change cascades to all FK tables.
+projectsRouter.put('/:slug', (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const { name, slug: newSlug, git_url } = req.body;
+  const db = getDb();
+
+  const existing = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) as any;
+  if (!existing) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const updatedName = name || existing.name;
+  const updatedGitUrl = git_url !== undefined ? git_url : existing.git_url;
+
+  if (newSlug && newSlug !== slug) {
+    if (!SLUG_REGEX.test(newSlug)) {
+      res.status(400).json({ error: 'Invalid slug format' });
+      return;
+    }
+    const collision = db.prepare('SELECT id FROM projects WHERE slug = ?').get(newSlug);
+    if (collision) {
+      res.status(409).json({ error: 'Slug already exists' });
+      return;
+    }
+
+    // Cascade slug rename to all FK tables
+    const FK_TABLES = ['tasks', 'requirements', 'project_access', 'agents', 'project_focus',
+      'attestations', 'feature_flags', 'marketplace_announcements', 'marketplace_requests',
+      'bug_reports', 'releases', 'requirement_approvals', 'attestation_rules',
+      'suspect_links', 'approval_requests', 'user_project_settings'];
+
+    const renameAll = db.transaction(() => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      db.prepare('UPDATE projects SET slug = ?, name = ?, git_url = ? WHERE slug = ?')
+        .run(newSlug, updatedName, updatedGitUrl, slug);
+      for (const table of FK_TABLES) {
+        try {
+          db.prepare(`UPDATE ${table} SET project_slug = ? WHERE project_slug = ?`).run(newSlug, slug);
+        } catch { /* table may not have project_slug column */ }
+      }
+      db.exec('PRAGMA foreign_keys = ON');
+    });
+    renameAll();
+  } else {
+    db.prepare('UPDATE projects SET name = ?, git_url = ? WHERE slug = ?')
+      .run(updatedName, updatedGitUrl, slug);
+  }
+
+  const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(newSlug || slug);
+  res.status(200).json(project);
+});
+
+// DELETE /:slug — leave project (removes YOUR access, not the project data)
 projectsRouter.delete('/:slug', (req: Request, res: Response) => {
   const { slug } = req.params;
   const user = (req as any).user;

@@ -155,7 +155,7 @@
           (p.git_url ? '<br><span style="font-size:0.8rem;color:var(--ms-muted);">' + p.git_url + '</span>' : '') +
           '</div><div style="display:flex;align-items:center;gap:0.5rem;">' +
           '<span style="font-size:0.75rem;color:var(--ms-muted);">' + p.slug + '</span>' +
-          '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" style="padding:2px 8px;font-size:0.75rem;">Remove</button>' +
+          '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" style="padding:2px 8px;font-size:0.75rem;" title="Leave project — removes your access, tasks stay">Leave</button>' +
           '</div></div>'
         ).join('');
       } catch { el.textContent = 'Failed to load projects'; }
@@ -175,7 +175,7 @@
     }
 
     async function removeProject(slug, name) {
-      if (!confirm('Remove project "' + name + '"?')) return;
+      if (!confirm('Leave project "' + name + '"? This removes your access. Tasks and data remain.')) return;
       try {
         const res = await fetch('/api/projects/' + slug, { method: 'DELETE' });
         if (res.ok || res.status === 404) loadMyProjects();
