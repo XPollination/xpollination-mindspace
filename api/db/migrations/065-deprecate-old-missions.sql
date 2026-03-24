@@ -1,6 +1,6 @@
--- Mission Lifecycle (SKO Part 1): Expand status CHECK + deprecate superseded missions.
--- SQLite cannot ALTER CHECK — must recreate table.
--- Note: capabilities.mission_id REFERENCES missions(id) — FK check deferred in transaction.
+-- Mission Lifecycle (SKO Part 1): Expand status CHECK + deprecate missions.
+-- SQLite cannot ALTER CHECK — recreate table with new constraint.
+-- migrate.ts auto-disables FK checks when it sees DROP TABLE.
 
 CREATE TABLE missions_new (
   id TEXT PRIMARY KEY,
@@ -23,11 +23,11 @@ INSERT INTO missions_new (id, title, description, status, created_at, updated_at
 DROP TABLE missions;
 ALTER TABLE missions_new RENAME TO missions;
 
--- Deprecate superseded missions
+-- Deprecate superseded missions per SKO Part 1
 UPDATE missions SET status = 'deprecated' WHERE id IN (
   'mission-agent-human-collab',
   'mission-traversable-context',
   'mission-knowledge-space',
   'mission-mindspace',
-  'mission-road001'
+  'mission-road-001'
 );
