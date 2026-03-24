@@ -10,11 +10,12 @@
   <style>
     .meeting-container {
       max-width: 100%;
-      margin: calc(var(--ms-nav-height) + 0.5rem) auto 0;
+      margin: calc(var(--ms-nav-height)) auto 0;
       padding: 0 0.5rem;
-      height: calc(100vh - var(--ms-nav-height) - 1rem);
+      height: calc(100vh - var(--ms-nav-height));
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
     /* Pre-join */
     .prejoin { text-align: center; padding: 3rem 1rem; max-width: 400px; margin: 0 auto; }
@@ -30,8 +31,9 @@
     .mode-btn strong { display: block; margin-bottom: 0.25rem; }
     .mode-btn small { color: var(--ms-muted); }
     /* Meeting layout — everything must fit viewport, no scroll */
-    .meeting-body { flex: 1; display: flex; min-height: 0; gap: 0.5rem; overflow: hidden; }
+    .meeting-body { flex: 1; display: flex; min-height: 0; gap: 0.5rem; overflow: hidden; margin-bottom: 0; }
     .video-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+    #meeting-ui { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     .video-grid {
       flex: 1; display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -132,9 +134,10 @@
       border: none; border-radius: var(--ms-radius-sm); padding: 0.4rem 0.7rem;
       cursor: pointer; font-size: 0.8rem;
     }
-    /* Controls */
+    /* Controls — always visible at bottom, never scrolled away */
     .controls {
       display: flex; justify-content: center; gap: 0.5rem; padding: 0.5rem 0;
+      flex-shrink: 0; position: relative;
     }
     .controls button {
       background: var(--ms-surface); border: 1px solid var(--ms-border);
@@ -151,15 +154,15 @@
     /* Background selector */
     .bg-selector { display: none; position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
       background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
-      padding: 0.5rem; z-index: 50; white-space: nowrap; }
+      padding: 0.5rem; z-index: 50; white-space: nowrap; flex-wrap: wrap; max-width: 320px; }
     .bg-selector.show { display: flex; gap: 0.4rem; }
     .bg-option {
-      width: 48px; height: 36px; border-radius: 4px; cursor: pointer; border: 2px solid transparent;
-      background-size: cover; background-position: center;
+      width: 56px; height: 42px; border-radius: 4px; cursor: pointer; border: 2px solid transparent;
+      background-size: cover; background-position: center; flex-shrink: 0;
     }
     .bg-option.active { border-color: var(--ms-accent); }
     .bg-option.none { background: var(--ms-bg); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: var(--ms-muted); }
-    .bg-option.blur { background: var(--ms-bg); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+    .bg-option.blur { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff; }
     @media (max-width: 768px) {
       .chat-panel { width: 100%; position: fixed; bottom: 0; left: 0; right: 0; height: 50vh; z-index: 100; }
       .video-grid { grid-template-columns: 1fr; }
@@ -208,7 +211,11 @@
       <div id="pip" class="pip-overlay"></div>
       <div id="bg-selector" class="bg-selector">
         <div class="bg-option none active" onclick="setBg('none')" title="No background">Off</div>
-        <div class="bg-option blur" onclick="setBg('blur')" title="Blur background">&#128065;</div>
+        <div class="bg-option blur" onclick="setBg('blur')" title="Blur background">Blur</div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1497366216548-37526070297c?w=640')" title="Office" style="background-image:url(https://images.unsplash.com/photo-1497366216548-37526070297c?w=80)"></div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=640')" title="Mountains" style="background-image:url(https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=80)"></div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=640')" title="Beach" style="background-image:url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=80)"></div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1519681393784-d120267933ba?w=640')" title="Night sky" style="background-image:url(https://images.unsplash.com/photo-1519681393784-d120267933ba?w=80)"></div>
       </div>
       <div id="controls" class="controls">
         <button id="btn-mic" class="active" title="Microphone">&#127908;</button>
@@ -495,25 +502,63 @@
       if (e.key === 'Enter') window.sendChat();
     });
 
-    // Background blur (try to load processor, gracefully degrade)
-    window.setBg = async function(type) {
+    // Background blur/image — loads @livekit/track-processors on demand
+    let trackProcessorsModule = null;
+    async function loadTrackProcessors() {
+      if (trackProcessorsModule) return trackProcessorsModule;
+      try {
+        trackProcessorsModule = await import('https://cdn.jsdelivr.net/npm/@livekit/track-processors@0.7.0/dist/index.mjs');
+        return trackProcessorsModule;
+      } catch (e) {
+        console.warn('track-processors load failed:', e);
+        return null;
+      }
+    }
+
+    window.setBg = async function(type, imageUrl) {
       if (!room) return;
       const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-      if (!camPub?.track) return;
+      if (!camPub?.track) { addChatMessage('System', 'Enable camera first.'); return; }
+
+      // Clear active state
       document.querySelectorAll('.bg-option').forEach(el => el.classList.remove('active'));
+
+      // Remove current processor
+      try { if (bgProcessor) { await camPub.track.stopProcessor(); bgProcessor = null; } } catch {}
+
       if (type === 'none') {
-        if (bgProcessor) { await camPub.track.stopProcessor(); bgProcessor = null; }
         document.querySelector('.bg-option.none').classList.add('active');
-      } else if (type === 'blur') {
-        try {
-          const { BackgroundBlur } = await import('https://cdn.jsdelivr.net/npm/@livekit/track-processors@0.7.0/dist/index.mjs');
-          bgProcessor = BackgroundBlur(10);
+        return;
+      }
+
+      const mod = await loadTrackProcessors();
+      if (!mod) {
+        addChatMessage('System', 'Background effects not supported on this device/browser.');
+        document.querySelector('.bg-option.none').classList.add('active');
+        return;
+      }
+
+      try {
+        if (type === 'blur') {
+          bgProcessor = mod.BackgroundBlur(10, { delegate: 'GPU' });
           await camPub.track.setProcessor(bgProcessor);
           document.querySelector('.bg-option.blur').classList.add('active');
-        } catch {
-          addChatMessage('System', 'Background blur not available on this device.');
-          document.querySelector('.bg-option.none').classList.add('active');
+        } else if (type === 'image' && imageUrl) {
+          // Load image first
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = imageUrl; });
+          bgProcessor = mod.BackgroundTransformer({ imagePath: imageUrl, delegate: 'GPU' });
+          await camPub.track.setProcessor(bgProcessor);
+          // Mark the clicked option active
+          document.querySelectorAll('.bg-option').forEach(el => {
+            if (el.onclick?.toString().includes(imageUrl)) el.classList.add('active');
+          });
         }
+      } catch (e) {
+        console.warn('Background effect failed:', e);
+        addChatMessage('System', 'Background effect failed: ' + (e.message || 'unknown error'));
+        document.querySelector('.bg-option.none').classList.add('active');
       }
     };
 
