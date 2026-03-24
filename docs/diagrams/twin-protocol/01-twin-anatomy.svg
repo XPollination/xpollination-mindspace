@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <style>
+    .title { font-size: 18px; font-weight: 700; fill: #1a1a2e; }
+    .subtitle { font-size: 12px; fill: #666; }
+    .section-title { font-size: 13px; font-weight: 600; fill: #fff; }
+    .field { font-size: 11px; fill: #333; }
+    .field-type { font-size: 10px; fill: #888; font-style: italic; }
+    .note { font-size: 10px; fill: #666; }
+    .arrow { stroke: #666; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#666"/>
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" class="title">Twin Anatomy — What a Twin Carries</text>
+  <text x="400" y="48" text-anchor="middle" class="subtitle">Every twin is a self-contained, self-describing, self-validating data carrier</text>
+
+  <!-- Main twin box -->
+  <rect x="150" y="70" width="500" height="510" rx="12" fill="#f8f9fa" stroke="#1a1a2e" stroke-width="2"/>
+  <text x="400" y="95" text-anchor="middle" font-size="15" font-weight="700" fill="#1a1a2e">MissionTwin (example)</text>
+
+  <!-- Envelope section -->
+  <rect x="170" y="110" width="460" height="100" rx="6" fill="#e07020" opacity="0.15"/>
+  <rect x="170" y="110" width="460" height="24" rx="6" fill="#e07020"/>
+  <text x="400" y="126" text-anchor="middle" class="section-title">ENVELOPE (protocol metadata)</text>
+  <text x="185" y="150" class="field">_type: 'mission'</text>
+  <text x="400" y="150" class="field-type">← self-identification</text>
+  <text x="185" y="166" class="field">_schema_version: 5</text>
+  <text x="400" y="166" class="field-type">← knows how to upgrade from v1→v2→...→v5</text>
+  <text x="185" y="182" class="field">_cid: 'bafyr...abc'</text>
+  <text x="400" y="182" class="field-type">← content hash = address = integrity proof</text>
+  <text x="185" y="198" class="field">_source: 'edge' | 'station'</text>
+  <text x="400" y="198" class="field-type">← where this twin was last loaded from</text>
+
+  <!-- Provenance section -->
+  <rect x="170" y="220" width="460" height="85" rx="6" fill="#22c55e" opacity="0.15"/>
+  <rect x="170" y="220" width="460" height="24" rx="6" fill="#22c55e"/>
+  <text x="400" y="236" text-anchor="middle" class="section-title">PROVENANCE (who touched this twin)</text>
+  <text x="185" y="258" class="field">created_by: 'thomas.pichler'</text>
+  <text x="460" y="258" class="field">signature: ed25519(...)</text>
+  <text x="185" y="274" class="field">created_at: '2026-03-24T08:30Z'</text>
+  <text x="460" y="274" class="field">owner: 'xp0.ai'</text>
+  <text x="185" y="290" class="field">last_modified_by: 'agent-pdsa'</text>
+  <text x="460" y="290" class="field">event_chain: [cid1→cid2→cid3]</text>
+
+  <!-- Data section -->
+  <rect x="170" y="315" width="460" height="115" rx="6" fill="#3b82f6" opacity="0.15"/>
+  <rect x="170" y="315" width="460" height="24" rx="6" fill="#3b82f6"/>
+  <text x="400" y="331" text-anchor="middle" class="section-title">DATA (the twin's content — EMBEDDED, not referenced)</text>
+  <text x="185" y="353" class="field">id: 'mission-twin-protocol' (UUID)</text>
+  <text x="185" y="369" class="field">title: 'Twin Protocol — Data Carrier Architecture'</text>
+  <text x="185" y="385" class="field">status: 'draft'</text>
+  <text x="185" y="401" class="field">content_md: '# Twin Protocol...' (full markdown)</text>
+  <text x="185" y="417" class="field">diagrams: [ { name: '01-twin-anatomy', svg: '&lt;svg...&gt;' }, ... ]</text>
+  <text x="460" y="417" class="field-type">← EMBEDDED, not file path</text>
+
+  <!-- Schema section -->
+  <rect x="170" y="440" width="220" height="120" rx="6" fill="#8b5cf6" opacity="0.15"/>
+  <rect x="170" y="440" width="220" height="24" rx="6" fill="#8b5cf6"/>
+  <text x="280" y="456" text-anchor="middle" class="section-title">SCHEMA (self-describing)</text>
+  <text x="185" y="478" class="field">validate(): {valid, errors}</text>
+  <text x="185" y="494" class="field">diff(other): {changes}</text>
+  <text x="185" y="510" class="field">migrate(from, to): twin</text>
+  <text x="185" y="526" class="field">downgrade(to): twin</text>
+  <text x="185" y="542" class="field">computeCID(): string</text>
+
+  <!-- Migration section -->
+  <rect x="410" y="440" width="220" height="120" rx="6" fill="#f59e0b" opacity="0.15"/>
+  <rect x="410" y="440" width="220" height="24" rx="6" fill="#f59e0b"/>
+  <text x="520" y="456" text-anchor="middle" class="section-title">MIGRATIONS (in DNA)</text>
+  <text x="425" y="478" class="field">v1→v2: add short_id field</text>
+  <text x="425" y="494" class="field">v2→v3: add content_version</text>
+  <text x="425" y="510" class="field">v3→v4: add diagrams[]</text>
+  <text x="425" y="526" class="field">v4→v5: add owner + signature</text>
+  <text x="425" y="542" class="field-type">Forward only. Add fields, never remove.</text>
+
+  <!-- Legend -->
+  <text x="400" y="590" text-anchor="middle" class="note">The twin carries EVERYTHING. No external database. No file system. No CDN. Self-contained.</text>
+</svg>

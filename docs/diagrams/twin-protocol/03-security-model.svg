@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 520" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <style>
+    .title { font-size: 18px; font-weight: 700; fill: #1a1a2e; }
+    .subtitle { font-size: 12px; fill: #666; }
+    .layer-title { font-size: 13px; font-weight: 600; fill: #fff; }
+    .desc { font-size: 10px; fill: #333; }
+    .math { font-size: 10px; fill: #1a1a2e; font-family: monospace; }
+    .verdict { font-size: 11px; font-weight: 600; }
+  </style>
+
+  <text x="425" y="28" text-anchor="middle" class="title">Forge-Proof Security — Embedded in Twin DNA</text>
+  <text x="425" y="46" text-anchor="middle" class="subtitle">No firewall. No SSL trust. The math IS the trust. Four layers, all verifiable by any peer.</text>
+
+  <!-- Layer 1: Content Integrity -->
+  <rect x="30" y="70" width="380" height="130" rx="8" fill="#ef4444" opacity="0.1" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="30" y="70" width="380" height="26" rx="8" fill="#ef4444"/>
+  <text x="220" y="88" text-anchor="middle" class="layer-title">Layer 1: Content Integrity (CID)</text>
+  <text x="45" y="115" class="desc">Every twin version → SHA-256 hash → CID (Content Identifier)</text>
+  <text x="45" y="133" class="math">twin_v1 content → hash → bafyr...abc</text>
+  <text x="45" y="149" class="math">twin_v1 + 1 byte change → hash → bafyr...xyz (DIFFERENT)</text>
+  <text x="45" y="170" class="desc">Station verifies: hash(received_twin) === claimed_CID?</text>
+  <text x="310" y="170" class="verdict" fill="#22c55e">✓ authentic</text>
+  <text x="45" y="186" class="desc">Forger changes content but keeps old CID?</text>
+  <text x="310" y="186" class="verdict" fill="#ef4444">✗ hash mismatch → REJECT</text>
+
+  <!-- Layer 2: Authorship Integrity -->
+  <rect x="440" y="70" width="380" height="130" rx="8" fill="#8b5cf6" opacity="0.1" stroke="#8b5cf6" stroke-width="1.5"/>
+  <rect x="440" y="70" width="380" height="26" rx="8" fill="#8b5cf6"/>
+  <text x="630" y="88" text-anchor="middle" class="layer-title">Layer 2: Authorship Integrity (Signatures)</text>
+  <text x="455" y="115" class="desc">Every provenance event signed by actor's ed25519 key</text>
+  <text x="455" y="133" class="math">event = { actor, action, cid_before, cid_after, diff }</text>
+  <text x="455" y="149" class="math">signature = ed25519.sign(actor_private_key, hash(event))</text>
+  <text x="455" y="170" class="desc">Any peer verifies: ed25519.verify(actor_public_key, sig, event)?</text>
+  <text x="455" y="186" class="desc">Forger claims thomas wrote something? Needs thomas's private key.</text>
+  <text x="760" y="186" class="verdict" fill="#ef4444">✗ impossible</text>
+
+  <!-- Layer 3: Provenance Integrity -->
+  <rect x="30" y="220" width="380" height="140" rx="8" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="30" y="220" width="380" height="26" rx="8" fill="#22c55e"/>
+  <text x="220" y="238" text-anchor="middle" class="layer-title">Layer 3: Provenance Integrity (Merkle DAG)</text>
+  <text x="45" y="265" class="desc">Each event points to the previous event's hash:</text>
+
+  <!-- Merkle chain -->
+  <rect x="50" y="278" width="70" height="30" rx="4" fill="#22c55e" opacity="0.3"/>
+  <text x="85" y="297" text-anchor="middle" font-size="9" fill="#1a1a2e">create</text>
+  <line x1="120" y1="293" x2="145" y2="293" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="145" y="278" width="70" height="30" rx="4" fill="#22c55e" opacity="0.3"/>
+  <text x="180" y="297" text-anchor="middle" font-size="9" fill="#1a1a2e">update</text>
+  <line x1="215" y1="293" x2="240" y2="293" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="240" y="278" width="70" height="30" rx="4" fill="#22c55e" opacity="0.3"/>
+  <text x="275" y="297" text-anchor="middle" font-size="9" fill="#1a1a2e">transfer</text>
+  <line x1="310" y1="293" x2="335" y2="293" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="335" y="278" width="55" height="30" rx="4" fill="#22c55e" opacity="0.5"/>
+  <text x="362" y="297" text-anchor="middle" font-size="9" fill="#fff">HEAD</text>
+
+  <text x="45" y="330" class="desc">Insert/remove/modify any event → all subsequent hashes break</text>
+  <text x="45" y="346" class="desc">Walk backward from HEAD: verify each step's hash chain</text>
+  <text x="310" y="346" class="verdict" fill="#22c55e">✓ tamper-evident</text>
+
+  <defs><marker id="arr" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0, 6 2.5, 0 5" fill="#22c55e"/></marker></defs>
+
+  <!-- Layer 4: Contribution Integrity -->
+  <rect x="440" y="220" width="380" height="140" rx="8" fill="#f59e0b" opacity="0.1" stroke="#f59e0b" stroke-width="1.5"/>
+  <rect x="440" y="220" width="380" height="26" rx="8" fill="#f59e0b"/>
+  <text x="630" y="238" text-anchor="middle" class="layer-title">Layer 4: Contribution Integrity (Dual-Check)</text>
+  <text x="455" y="265" class="desc">Every derived_from claim validated mathematically:</text>
+  <text x="455" y="285" class="math">relevance_score = cosine_similarity(child, parent)</text>
+  <text x="455" y="301" class="desc">Must exceed floor → proves child builds on parent</text>
+  <text x="455" y="321" class="math">novelty_score = distance(child, parent)</text>
+  <text x="455" y="337" class="desc">Must exceed minimum → proves child adds something new</text>
+  <text x="455" y="353" class="desc">Prevents: plagiarism, false derivation, empty contributions</text>
+  <text x="760" y="353" class="verdict" fill="#22c55e">✓ deterministic</text>
+
+  <!-- Result box -->
+  <rect x="140" y="385" width="570" height="105" rx="8" fill="#1a1a2e" opacity="0.05" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text x="425" y="410" text-anchor="middle" font-size="14" font-weight="700" fill="#1a1a2e">Any Peer Can Validate the Entire Chain</text>
+  <text x="425" y="432" text-anchor="middle" font-size="11" fill="#666">No central authority needed. Every station, every device, every agent can independently verify:</text>
+  <text x="425" y="452" text-anchor="middle" font-size="11" fill="#333">1. Content matches CID (not forged) → 2. Author signed it (not impersonated)</text>
+  <text x="425" y="470" text-anchor="middle" font-size="11" fill="#333">3. Chain is unbroken (not tampered) → 4. Contribution is genuine (not plagiarized)</text>
+  <text x="425" y="488" text-anchor="middle" font-size="10" fill="#e07020" font-weight="600">Security is not a feature. Security IS the protocol.</text>
+</svg>
