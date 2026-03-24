@@ -246,6 +246,7 @@
         room.on(RoomEvent.ParticipantDisconnected, (p) => {
           document.getElementById(`tile-${p.identity}`)?.remove();
           document.getElementById(`tile-screen-${p.identity}`)?.remove();
+          document.getElementById(`audio-${p.identity}`)?.remove();
         });
         room.on(RoomEvent.LocalTrackPublished, () => renderParticipant(room.localParticipant));
         room.on(RoomEvent.LocalTrackUnpublished, () => renderParticipant(room.localParticipant));
@@ -296,37 +297,50 @@
 
       const isLocal = room && participant.identity === room.localParticipant.identity;
 
-      // Camera/audio tile
+      // Camera/audio tile — only show if participant has a video track (Google Meet companion style)
+      const hasVideo = mediaPubs.some(p => p.track.kind === Track.Kind.Video);
       let tile = document.getElementById(`tile-${participant.identity}`);
-      if (!tile) {
-        tile = document.createElement('div');
-        tile.id = `tile-${participant.identity}`;
-        tile.className = 'video-tile';
-        const tag = document.createElement('div');
-        tag.className = 'name-tag';
-        tag.textContent = (participant.name || participant.identity) + (isLocal ? ' (you)' : '');
-        const actions = document.createElement('div');
-        actions.className = 'tile-actions';
-        const fsBtn = document.createElement('button');
-        fsBtn.className = 'tile-action-btn';
-        fsBtn.textContent = 'Fullscreen';
-        fsBtn.onclick = (e) => { e.stopPropagation(); toggleFullscreen(tile, participant.identity); };
-        actions.appendChild(fsBtn);
-        tile.appendChild(actions);
-        tile.appendChild(tag);
-        videosEl.appendChild(tile);
-      }
-      tile.querySelectorAll('video, audio').forEach(el => el.remove());
-      for (const pub of mediaPubs) {
-        // Skip local audio (prevents echo) and ALL audio in companion mode (no speakers)
-        if (pub.track.kind === Track.Kind.Audio && (isLocal || joinMode === 'companion')) continue;
-        const el = pub.track.attach();
-        if (el instanceof HTMLVideoElement) {
-          el.style.width = '100%'; el.style.height = '100%'; el.style.objectFit = 'cover';
-          if (isLocal) el.style.transform = 'scaleX(-1)';
-          tile.insertBefore(el, tile.firstChild);
-        } else {
-          tile.appendChild(el);
+
+      if (hasVideo) {
+        if (!tile) {
+          tile = document.createElement('div');
+          tile.id = `tile-${participant.identity}`;
+          tile.className = 'video-tile';
+          const tag = document.createElement('div');
+          tag.className = 'name-tag';
+          tag.textContent = (participant.name || participant.identity) + (isLocal ? ' (you)' : '');
+          const actions = document.createElement('div');
+          actions.className = 'tile-actions';
+          const fsBtn = document.createElement('button');
+          fsBtn.className = 'tile-action-btn';
+          fsBtn.textContent = 'Fullscreen';
+          fsBtn.onclick = (e) => { e.stopPropagation(); toggleFullscreen(tile, participant.identity); };
+          actions.appendChild(fsBtn);
+          tile.appendChild(actions);
+          tile.appendChild(tag);
+          videosEl.appendChild(tile);
+        }
+        tile.querySelectorAll('video, audio').forEach(el => el.remove());
+        for (const pub of mediaPubs) {
+          if (pub.track.kind === Track.Kind.Audio && (isLocal || joinMode === 'companion')) continue;
+          const el = pub.track.attach();
+          if (el instanceof HTMLVideoElement) {
+            el.style.width = '100%'; el.style.height = '100%'; el.style.objectFit = 'cover';
+            if (isLocal) el.style.transform = 'scaleX(-1)';
+            tile.insertBefore(el, tile.firstChild);
+          } else {
+            tile.appendChild(el);
+          }
+        }
+      } else {
+        // No video — remove camera tile (companion/listen-only devices don't take space)
+        if (tile) tile.remove();
+        // Still attach remote audio for non-companion modes
+        for (const pub of mediaPubs) {
+          if (pub.track.kind === Track.Kind.Audio && !isLocal && joinMode !== 'companion') {
+            const existing = document.getElementById(`audio-${participant.identity}`);
+            if (!existing) { const el = pub.track.attach(); el.id = `audio-${participant.identity}`; el.style.display = 'none'; document.body.appendChild(el); }
+          }
         }
       }
 
