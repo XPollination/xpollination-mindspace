@@ -21,6 +21,7 @@ export function formatMissionTwin(row: any) {
     short_id: row.short_id || undefined,
     content_md: row.content_md || undefined,
     content_version: row.content_version || 0,
+    project_slug: row.project_slug || undefined,
   });
   const validation = validateMission(twin);
   return { ...twin, _valid: validation.valid, _errors: validation.errors };

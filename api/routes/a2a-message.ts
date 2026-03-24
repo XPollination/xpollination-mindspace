@@ -210,6 +210,17 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
       case 'mission': {
         let sql = 'SELECT * FROM missions WHERE 1=1';
         const params: any[] = [];
+        // Scope to user's projects (unless querying by specific id/short_id)
+        if (!filters?.id && !filters?.short_id && projectSlug) {
+          sql += ' AND project_slug = ?'; params.push(projectSlug);
+        } else if (!filters?.id && !filters?.short_id && !projectSlug) {
+          // __all__ mode: scope to user's accessible projects
+          const userId = agent.user_id;
+          if (userId) {
+            sql += ' AND (project_slug IN (SELECT project_slug FROM project_access WHERE user_id = ?) OR project_slug IS NULL)';
+            params.push(userId);
+          }
+        }
         if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
         if (filters?.id) { sql += ' AND id = ?'; params.push(filters.id); }
         if (filters?.short_id) { sql += ' AND short_id = ?'; params.push(filters.short_id); }
