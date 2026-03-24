@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import { AccessToken } from 'livekit-server-sdk';
 import { getDb } from '../db/connection.js';
 
@@ -38,8 +39,11 @@ livekitRouter.get('/token', async (req: Request, res: Response) => {
     return;
   }
 
+  // Each device gets a unique identity so multiple devices can join simultaneously.
+  // Display name stays the same — others see "Thomas" twice, LiveKit sees two distinct participants.
+  const deviceSuffix = randomUUID().slice(0, 6);
   const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-    identity: user.id,
+    identity: `${user.id}_${deviceSuffix}`,
     name: user.name || user.email,
     ttl: '10m',
   });
