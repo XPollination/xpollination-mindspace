@@ -151,13 +151,13 @@
         const list = Array.isArray(projects) ? projects : (projects.projects || []);
         if (list.length === 0) { el.innerHTML = '<p style="color:var(--ms-muted);font-size:0.85rem;">No projects yet. Add one via git URL below.</p>'; return; }
         el.innerHTML = list.map(p => {
-          const vis = p.visibility === 'private' ? '<span style="font-size:0.7rem;background:var(--ms-status-review);color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;">PRIVATE</span>' : '';
-          return '<div style="padding:0.75rem 0;border-bottom:1px solid var(--ms-border);">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">' +
-            '<strong style="font-size:0.95rem;">' + (p.name || p.slug) + vis + '</strong>' +
-            '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" title="Leave project — removes your access, tasks stay">Leave</button>' +
+          const vis = p.visibility === 'private' ? ' <span style="font-size:0.65rem;background:var(--ms-status-review);color:#fff;padding:1px 5px;border-radius:3px;vertical-align:middle;">PRIVATE</span>' : '';
+          return '<div style="padding:0.6rem 0;border-bottom:1px solid var(--ms-border);display:flex;align-items:baseline;gap:8px;">' +
+            '<div style="flex:1;min-width:0;">' +
+            '<strong style="font-size:0.9rem;">' + (p.name || p.slug) + '</strong>' + vis +
+            (p.git_url ? '<div style="font-size:0.75rem;color:var(--ms-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.git_url + '</div>' : '') +
             '</div>' +
-            (p.git_url ? '<div style="font-size:0.8rem;color:var(--ms-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.git_url + '</div>' : '') +
+            '<a href="#" onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\');return false;" style="font-size:0.75rem;color:var(--ms-muted);white-space:nowrap;" title="Removes your access, tasks stay">Leave</a>' +
             '</div>';
         }).join('');
       } catch { el.textContent = 'Failed to load projects'; }
