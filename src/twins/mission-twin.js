@@ -21,7 +21,7 @@ export function validateMission(twin) {
     errors.push('title must be <= 200 characters');
   }
 
-  const VALID_STATUSES = ['draft', 'active'];
+  const VALID_STATUSES = ['draft', 'ready', 'active', 'complete', 'deprecated'];
   if (!VALID_STATUSES.includes(twin.status)) {
     errors.push(`status must be one of: ${VALID_STATUSES.join(', ')}`);
   }
