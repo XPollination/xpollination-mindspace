@@ -219,7 +219,10 @@
         videosEl.appendChild(tile);
       }
       tile.querySelectorAll('video, audio').forEach(el => el.remove());
+      const isLocal = room && participant.identity === room.localParticipant.identity;
       for (const pub of mediaPubs) {
+        // Never attach local audio — prevents echo/feedback loop
+        if (isLocal && pub.track.kind === Track.Kind.Audio) continue;
         const el = pub.track.attach();
         if (el instanceof HTMLVideoElement) {
           el.style.width = '100%';
