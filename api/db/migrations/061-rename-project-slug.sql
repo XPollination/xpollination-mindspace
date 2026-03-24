@@ -2,9 +2,10 @@
 -- Strategy: INSERT new slug → UPDATE children → DELETE old slug
 -- This avoids FK violations because children always point to a valid project.
 
--- 1. Create the new project entry (copy from old)
+-- 1. Create the new project entry (new UUID, copy fields from old)
 INSERT INTO projects (id, slug, name, description, created_at, created_by, has_org_brain, org_brain_collection, git_url)
-SELECT id, 'xpollination-mindspace', 'XPollination Mindspace', description, created_at, created_by, has_org_brain, org_brain_collection, 'https://github.com/XPollination/xpollination-mindspace.git'
+SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6))),
+  'xpollination-mindspace', 'XPollination Mindspace', description, created_at, created_by, has_org_brain, org_brain_collection, 'https://github.com/XPollination/xpollination-mindspace.git'
 FROM projects WHERE slug = 'xpollination-mcp-server';
 
 -- 2. Point all children to the new slug (new slug exists, so FK is satisfied)
