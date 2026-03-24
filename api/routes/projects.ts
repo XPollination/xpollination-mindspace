@@ -81,16 +81,15 @@ projectsRouter.get('/:slug/deployment-readiness', requireProjectAccess('viewer')
   });
 });
 
-// POST / — create project (with optional git_url)
+// POST / — smart join-or-create (idempotent, safe to paste same URL twice)
 projectsRouter.post('/', (req: Request, res: Response) => {
-  const { slug, name, description, git_url } = req.body;
+  const { slug, name, description, git_url, visibility } = req.body;
   const user = (req as any).user;
 
-  // UX: if git_url provided without slug/name, derive them from URL
+  // Derive slug/name from git_url if not provided
   let projectSlug = slug;
   let projectName = name;
   if (git_url && !projectSlug) {
-    // https://github.com/XPollination/xpollination-mindspace.git → xpollination-mindspace
     const match = git_url.match(/\/([^/]+?)(?:\.git)?$/);
     projectSlug = match ? match[1].toLowerCase() : undefined;
   }
@@ -109,22 +108,45 @@ projectsRouter.post('/', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const existing = db.prepare('SELECT id FROM projects WHERE slug = ?').get(projectSlug);
+
+  // Check if project exists (by slug OR by git_url)
+  const existing = db.prepare(
+    'SELECT * FROM projects WHERE slug = ? OR (git_url IS NOT NULL AND git_url = ?)'
+  ).get(projectSlug, git_url || '') as any;
+
   if (existing) {
-    res.status(409).json({ error: 'Slug already exists' });
+    // Project exists — check if user already has access
+    const access = db.prepare(
+      'SELECT * FROM project_access WHERE user_id = ? AND project_slug = ?'
+    ).get(user.id, existing.slug);
+
+    if (access) {
+      // Already a member — return project with friendly action
+      res.status(200).json({ ...existing, action: 'already_member' });
+      return;
+    }
+
+    // No access — join the project
+    db.prepare('INSERT OR IGNORE INTO project_access (user_id, project_slug, role, granted_by) VALUES (?, ?, ?, ?)')
+      .run(user.id, existing.slug, 'contributor', user.id);
+
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(existing.slug);
+    res.status(200).json({ ...(project as any), action: 'joined' });
     return;
   }
 
+  // Project doesn't exist — create it
   const id = randomUUID();
-  db.prepare('INSERT INTO projects (id, slug, name, description, git_url, created_by) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(id, projectSlug, projectName, description || null, git_url || null, user.id);
+  const vis = (visibility === 'private') ? 'private' : 'public';
+  db.prepare('INSERT INTO projects (id, slug, name, description, git_url, visibility, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, projectSlug, projectName, description || null, git_url || null, vis, user.id);
 
   // Auto-grant admin access to creator
   db.prepare('INSERT OR IGNORE INTO project_access (user_id, project_slug, role, granted_by) VALUES (?, ?, ?, ?)')
     .run(user.id, projectSlug, 'admin', user.id);
 
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  res.status(201).json(project);
+  res.status(201).json({ ...(project as any), action: 'created' });
 });
 
 // PUT /:slug — update project (name, slug, git_url). Slug change cascades to all FK tables.
