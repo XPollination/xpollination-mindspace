@@ -40,6 +40,16 @@ function renderCard(mission, dimmed = false) {
 }
 
 function renderMissions(missions) {
+  if (missions.length === 0) {
+    content.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--ms-muted);">
+        <p style="font-size:16px;margin-bottom:8px;">No missions yet in your projects.</p>
+        <p style="font-size:13px;">Missions will appear here as they are created in your projects.</p>
+      </div>`;
+    footerStats.innerHTML = '';
+    return;
+  }
+
   const active = missions.filter(m => m.status === 'active');
   const deprecated = missions.filter(m => m.status !== 'active');
   const totalCaps = missions.reduce((sum, m) => sum + (m.capabilities || []).length, 0);
