@@ -318,7 +318,8 @@
       }
       tile.querySelectorAll('video, audio').forEach(el => el.remove());
       for (const pub of mediaPubs) {
-        if (isLocal && pub.track.kind === Track.Kind.Audio) continue;
+        // Skip local audio (prevents echo) and ALL audio in companion mode (no speakers)
+        if (pub.track.kind === Track.Kind.Audio && (isLocal || joinMode === 'companion')) continue;
         const el = pub.track.attach();
         if (el instanceof HTMLVideoElement) {
           el.style.width = '100%'; el.style.height = '100%'; el.style.objectFit = 'cover';
