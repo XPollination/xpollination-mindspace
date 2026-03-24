@@ -104,11 +104,11 @@
 
     // Room name from URL: /meeting/my-room → "my-room", /meeting → "mindspace-admin"
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const roomName = pathParts.length > 1 ? pathParts.slice(1).join('/') : 'mindspace-admin';
+    const meetingRoom = pathParts.length > 1 ? pathParts.slice(1).join('/') : 'mindspace-admin';
 
     async function start() {
       try {
-        const resp = await fetch(`/api/livekit/token?room=${encodeURIComponent(roomName)}`);
+        const resp = await fetch(`/api/livekit/token?room=${encodeURIComponent(meetingRoom)}`);
         if (!resp.ok) {
           const err = await resp.json();
           statusEl.innerHTML = `<div class="error-msg">${err.error || 'Cannot access meeting'}</div>`;
