@@ -27,51 +27,17 @@ function slugify(text) {
   return (text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-/** Simple markdown renderer — handles headers, bold, italic, code, links, lists, blockquotes, hr, tables */
+/** Render markdown using marked.js (loaded via CDN in knowledge.html) */
 function renderMarkdown(md) {
   if (!md) return '';
-  let html = escapeHtml(md);
-
-  // Code blocks (``` ... ```)
-  html = html.replace(/```([^`]*?)```/gs, '<pre><code>$1</code></pre>');
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Headers
-  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  // Bold + italic
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-  // Images (rewrite docs/diagrams paths)
-  html = html.replace(/!\[([^\]]*)\]\(docs\//g, '![$1](/docs/');
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
-  // Blockquotes
-  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-  // Horizontal rule
-  html = html.replace(/^---$/gm, '<hr>');
-  // Unordered lists
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/gs, (m) => '<ul>' + m + '</ul>');
-  // Ordered lists
-  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-  // Tables (simple: | col | col |)
-  html = html.replace(/^\|(.+)\|$/gm, (line) => {
-    const cells = line.split('|').filter(c => c.trim()).map(c => c.trim());
-    if (cells.every(c => /^[-:]+$/.test(c))) return ''; // separator row
-    return '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
-  });
-  html = html.replace(/(<tr>.*<\/tr>\n?)+/gs, (m) => '<table>' + m + '</table>');
-  // Paragraphs (lines not already wrapped)
-  html = html.replace(/^(?!<[hupoltbd]|<blockquote|<hr|<img|<pre|<li|<tr)(.+)$/gm, '<p>$1</p>');
-  // Clean up double newlines
-  html = html.replace(/\n{2,}/g, '\n');
-
-  return html;
+  // Rewrite diagram image paths: docs/diagrams/... → /docs/diagrams/...
+  const rewritten = md.replace(/!\[([^\]]*)\]\(docs\//g, '![$1](/docs/');
+  // Use marked.js if available, fallback to pre-formatted
+  if (typeof marked !== 'undefined' && marked.parse) {
+    return marked.parse(rewritten);
+  }
+  // Fallback: pre-formatted text
+  return '<div style="white-space:pre-wrap;">' + escapeHtml(rewritten) + '</div>';
 }
 
 function renderBreadcrumb(crumbs) {
