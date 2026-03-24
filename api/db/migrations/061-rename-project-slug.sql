@@ -1,17 +1,13 @@
 -- Rename project: xpollination-mcp-server → xpollination-mindspace
--- GitHub repo was renamed. Cascade slug change to all 16 FK-referencing tables.
--- FK enforcement temporarily disabled for the cascade.
+-- Strategy: INSERT new slug → UPDATE children → DELETE old slug
+-- This avoids FK violations because children always point to a valid project.
 
-PRAGMA foreign_keys = OFF;
+-- 1. Create the new project entry (copy from old)
+INSERT INTO projects (id, slug, name, description, created_at, created_by, has_org_brain, org_brain_collection, git_url)
+SELECT id, 'xpollination-mindspace', 'XPollination Mindspace', description, created_at, created_by, has_org_brain, org_brain_collection, 'https://github.com/XPollination/xpollination-mindspace.git'
+FROM projects WHERE slug = 'xpollination-mcp-server';
 
--- 1. Rename the project itself
-UPDATE projects SET
-  slug = 'xpollination-mindspace',
-  name = 'XPollination Mindspace',
-  git_url = 'https://github.com/XPollination/xpollination-mindspace.git'
-WHERE slug = 'xpollination-mcp-server';
-
--- 2. Cascade to ALL referencing tables
+-- 2. Point all children to the new slug (new slug exists, so FK is satisfied)
 UPDATE tasks SET project_slug = 'xpollination-mindspace' WHERE project_slug = 'xpollination-mcp-server';
 UPDATE requirements SET project_slug = 'xpollination-mindspace' WHERE project_slug = 'xpollination-mcp-server';
 UPDATE project_access SET project_slug = 'xpollination-mindspace' WHERE project_slug = 'xpollination-mcp-server';
@@ -29,4 +25,5 @@ UPDATE suspect_links SET project_slug = 'xpollination-mindspace' WHERE project_s
 UPDATE approval_requests SET project_slug = 'xpollination-mindspace' WHERE project_slug = 'xpollination-mcp-server';
 UPDATE user_project_settings SET project_slug = 'xpollination-mindspace' WHERE project_slug = 'xpollination-mcp-server';
 
-PRAGMA foreign_keys = ON;
+-- 3. Delete the old project entry (no children reference it anymore)
+DELETE FROM projects WHERE slug = 'xpollination-mcp-server';
