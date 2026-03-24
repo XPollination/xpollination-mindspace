@@ -81,9 +81,33 @@ projectsRouter.get('/:slug/deployment-readiness', requireProjectAccess('viewer')
   });
 });
 
+/**
+ * Detect repo visibility from GitHub API.
+ * Public repos return { private: false }. Private repos return 404.
+ * Non-GitHub URLs return 'unknown'.
+ */
+async function detectVisibility(gitUrl: string): Promise<'public' | 'private' | 'unknown'> {
+  if (!gitUrl) return 'unknown';
+  // Extract owner/repo from GitHub URL
+  const match = gitUrl.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (!match) return 'unknown'; // not a GitHub URL
+  const [, owner, repo] = match;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Mindspace' }
+    });
+    if (res.status === 404) return 'private';
+    if (res.ok) {
+      const data = await res.json() as any;
+      return data.private ? 'private' : 'public';
+    }
+    return 'unknown';
+  } catch { return 'unknown'; }
+}
+
 // POST / — smart join-or-create (idempotent, safe to paste same URL twice)
-projectsRouter.post('/', (req: Request, res: Response) => {
-  const { slug, name, description, git_url, visibility } = req.body;
+projectsRouter.post('/', async (req: Request, res: Response) => {
+  const { slug, name, description, git_url } = req.body;
   const user = (req as any).user;
 
   // Derive slug/name from git_url if not provided
@@ -121,7 +145,6 @@ projectsRouter.post('/', (req: Request, res: Response) => {
     ).get(user.id, existing.slug);
 
     if (access) {
-      // Already a member — return project with friendly action
       res.status(200).json({ ...existing, action: 'already_member' });
       return;
     }
@@ -135,11 +158,11 @@ projectsRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  // Project doesn't exist — create it
+  // Project doesn't exist — detect visibility from GitHub, then create
+  const detectedVis = await detectVisibility(git_url);
   const id = randomUUID();
-  const vis = (visibility === 'private') ? 'private' : 'public';
   db.prepare('INSERT INTO projects (id, slug, name, description, git_url, visibility, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(id, projectSlug, projectName, description || null, git_url || null, vis, user.id);
+    .run(id, projectSlug, projectName, description || null, git_url || null, detectedVis === 'unknown' ? 'public' : detectedVis, user.id);
 
   // Auto-grant admin access to creator
   db.prepare('INSERT OR IGNORE INTO project_access (user_id, project_slug, role, granted_by) VALUES (?, ?, ?, ?)')
