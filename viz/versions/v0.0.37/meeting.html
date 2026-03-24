@@ -124,20 +124,41 @@
     /* Agent context cards */
     .agent-card {
       background: var(--ms-surface); border: 1px solid var(--ms-border); border-left: 3px solid var(--ms-accent);
-      border-radius: var(--ms-radius); padding: 0.6rem; margin: 0.4rem 0; font-size: 0.8rem;
+      border-radius: var(--ms-radius); padding: 0.75rem; margin: 0.5rem 0; font-size: 0.8rem;
     }
-    .agent-card .agent-topic { font-weight: 600; color: var(--ms-accent); margin-bottom: 0.4rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
-    .agent-card .agent-insight { padding: 0.25rem 0; border-bottom: 1px solid var(--ms-border); line-height: 1.4; }
-    .agent-card .agent-insight:last-of-type { border-bottom: none; }
-    .agent-card .agent-insight .contributor { color: var(--ms-muted); font-size: 0.7rem; }
-    .agent-card .agent-insight .content { color: var(--ms-text); }
-    .agent-card .agent-actions { margin-top: 0.4rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .agent-card .agent-topic {
+      font-weight: 700; color: var(--ms-accent); margin-bottom: 0.5rem; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .agent-card .agent-topic .topic-icon { font-size: 0.9rem; }
+    .agent-card .agent-summary {
+      color: var(--ms-text); line-height: 1.5; margin-bottom: 0.5rem; font-size: 0.8rem;
+    }
+    .agent-card .agent-sources {
+      border-top: 1px solid var(--ms-border); padding-top: 0.4rem; margin-top: 0.3rem;
+    }
+    .agent-card .agent-source {
+      padding: 0.2rem 0; font-size: 0.72rem; color: var(--ms-muted); line-height: 1.3;
+      cursor: pointer; transition: color 0.15s;
+    }
+    .agent-card .agent-source:hover { color: var(--ms-text); }
+    .agent-card .agent-source .src-label { font-weight: 600; }
+    .agent-card .agent-actions { margin-top: 0.5rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
     .agent-drill-btn {
       background: none; border: 1px solid var(--ms-border); color: var(--ms-link); border-radius: 12px;
-      padding: 0.2rem 0.6rem; font-size: 0.7rem; cursor: pointer;
+      padding: 0.25rem 0.7rem; font-size: 0.72rem; cursor: pointer; transition: all 0.15s;
     }
-    .agent-drill-btn:hover { background: var(--ms-surface); border-color: var(--ms-accent); }
-    .agent-listening { color: var(--ms-muted); font-size: 0.75rem; font-style: italic; padding: 0.2rem 0; }
+    .agent-drill-btn:hover { background: var(--ms-accent); color: #fff; border-color: var(--ms-accent); }
+    .agent-searching {
+      color: var(--ms-muted); font-size: 0.78rem; padding: 0.4rem 0; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .agent-searching .search-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--ms-accent); animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+    .agent-searching .search-query { font-style: italic; color: var(--ms-text); font-weight: 500; }
+    @keyframes pulse-dot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+    .agent-listening { display: none; /* transcript echo suppressed */ }
     .chat-input-row {
       display: flex; border-top: 1px solid var(--ms-border); padding: 0.4rem;
     }
@@ -673,58 +694,73 @@
       const el = document.getElementById('chat-messages');
       const topic = data.topic || 'Context';
 
+      // Build a human-readable summary from the top insight
+      const topInsight = data.insights[0];
+      const summary = data.summary || topInsight.content;
+
       let html = `<div class="agent-card">`;
-      html += `<div class="agent-topic">&#129302; ${topic}</div>`;
-      for (const insight of data.insights) {
-        const preview = insight.content.length > 150 ? insight.content.slice(0, 150) + '...' : insight.content;
-        html += `<div class="agent-insight"><span class="content">${preview.replace(/</g,'&lt;')}</span><br><span class="contributor">— ${insight.contributor}</span></div>`;
+      html += `<div class="agent-topic"><span class="topic-icon">&#128161;</span> ${escHtml(topic)}</div>`;
+      html += `<div class="agent-summary">${escHtml(summary)}</div>`;
+
+      // Expandable sources (collapsed by default for clean UX)
+      if (data.insights.length > 1) {
+        const cardId = 'src-' + Date.now();
+        html += `<div class="agent-sources">`;
+        html += `<div class="agent-source" onclick="document.getElementById('${cardId}').style.display=document.getElementById('${cardId}').style.display==='none'?'block':'none'" style="cursor:pointer;color:var(--ms-link)">&#9654; ${data.insights.length} sources</div>`;
+        html += `<div id="${cardId}" style="display:none">`;
+        for (const insight of data.insights.slice(1)) {
+          const preview = insight.content.length > 120 ? insight.content.slice(0, 120) + '...' : insight.content;
+          html += `<div class="agent-source"><span class="src-label">${escHtml(insight.contributor)}:</span> ${escHtml(preview)}</div>`;
+        }
+        html += `</div></div>`;
       }
-      // Drill-down suggestions from highways
-      if (data.highways && data.highways.length > 0) {
+
+      // Drill-down buttons — clean labels extracted from topics
+      const drillTopics = data.drill_topics || [];
+      if (drillTopics.length > 0) {
         html += `<div class="agent-actions">`;
-        for (const hw of data.highways) {
-          const label = typeof hw === 'string' ? hw : (hw.label || hw.topic || JSON.stringify(hw));
-          html += `<button class="agent-drill-btn" onclick="drillDown('${label.replace(/'/g, '')}')">Explore: ${label}</button>`;
+        for (const dt of drillTopics) {
+          const label = escHtml(typeof dt === 'string' ? dt : (dt.label || dt));
+          const query = (typeof dt === 'string' ? dt : (dt.query || dt.label || dt)).replace(/'/g, "\\'");
+          html += `<button class="agent-drill-btn" onclick="drillDown('${query}')">${label}</button>`;
         }
         html += `</div>`;
       }
       html += `</div>`;
       el.innerHTML += html;
       el.scrollTop = el.scrollHeight;
-
-      // Share a concise version with other participants
-      if (room) {
-        const summary = `[🧠 ${topic}] ${data.insights[0]?.content?.slice(0, 100) || ''}`;
-        const msg = new TextEncoder().encode(JSON.stringify({ type: 'chat', text: summary }));
-        room.localParticipant.publishData(msg, { reliable: true });
-      }
     }
 
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
     window.drillDown = async function(topic) {
-      addAgentListening(`Exploring "${topic}"...`);
+      showAgentSearching(topic);
       try {
         const resp = await fetch('/api/livekit/brain-query', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: topic, topic })
+          body: JSON.stringify({ query: topic, topic, drill: true })
         });
+        hideAgentSearching();
         if (resp.ok) {
           const data = await resp.json();
-          removeAgentListening();
           if (data.insights?.length > 0) renderAgentCard(data);
-          else addChatMessage('Agent', `No additional context found for "${topic}".`);
+          else addChatMessage('Agent', `Nothing deeper found for "${topic}".`);
         }
-      } catch { removeAgentListening(); }
+      } catch { hideAgentSearching(); }
     };
 
-    function addAgentListening(text) {
-      removeAgentListening();
+    function showAgentSearching(topic) {
+      hideAgentSearching();
       const el = document.getElementById('chat-messages');
-      el.innerHTML += `<div class="agent-listening" id="agent-status">${text}</div>`;
+      el.innerHTML += `<div class="agent-searching" id="agent-status"><span class="search-dot"></span> Searching for <span class="search-query">${escHtml(topic)}</span></div>`;
       el.scrollTop = el.scrollHeight;
     }
-    function removeAgentListening() {
+    function hideAgentSearching() {
       document.getElementById('agent-status')?.remove();
     }
+    // Keep old name for compat
+    function addAgentListening(text) { showAgentSearching(text); }
+    function removeAgentListening() { hideAgentSearching(); }
 
     async function processTranscript() {
       const text = transcriptBuffer.trim();
@@ -736,18 +772,19 @@
       const topic = extractTopic(text);
       if (topic.length < 3) return;
 
-      addAgentListening(`Listening... heard "${topic}"`);
+      // Show what the agent is searching for — no transcript echo
+      showAgentSearching(topic);
       try {
         const resp = await fetch('/api/livekit/brain-query', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: text, topic })
         });
-        removeAgentListening();
+        hideAgentSearching();
         if (resp.ok) {
           const data = await resp.json();
           if (data.insights?.length > 0) renderAgentCard(data);
         }
-      } catch { removeAgentListening(); }
+      } catch { hideAgentSearching(); }
     }
 
     function startAgent() {
