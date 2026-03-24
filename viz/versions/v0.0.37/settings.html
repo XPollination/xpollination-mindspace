@@ -155,7 +155,7 @@
           return '<div style="padding:0.75rem 0;border-bottom:1px solid var(--ms-border);">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">' +
             '<strong style="font-size:0.95rem;">' + (p.name || p.slug) + vis + '</strong>' +
-            '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" style="padding:2px 8px;font-size:0.75rem;" title="Leave project — removes your access, tasks stay">Leave</button>' +
+            '<button onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\')" class="ms-btn ms-btn-ghost" title="Leave project — removes your access, tasks stay">Leave</button>' +
             '</div>' +
             (p.git_url ? '<div style="font-size:0.8rem;color:var(--ms-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.git_url + '</div>' : '') +
             '</div>';
