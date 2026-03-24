@@ -67,10 +67,32 @@ function escapeHtml(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function showOnboarding() {
+  content.innerHTML = `
+    <div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">🚀</div>
+      <h2 style="font-size:20px;margin-bottom:8px;">Welcome to Mindspace!</h2>
+      <p style="color:var(--ms-muted);margin-bottom:24px;">You're not part of any projects yet.</p>
+      <a href="/settings" class="ms-btn ms-btn-primary" style="text-decoration:none;display:inline-block;padding:10px 24px;font-size:15px;">Add your first project</a>
+      <p style="color:var(--ms-muted);margin-top:16px;font-size:13px;">Paste a Git URL in Settings to get started — or ask a project admin to invite you.</p>
+    </div>`;
+  footerStats.innerHTML = '';
+}
+
 async function init() {
   try {
-    // Connect to A2A (JWT from ms_session cookie forwarded automatically)
-    await client.connect('mindspace');
+    // Check if user has any projects before connecting to A2A
+    const projectsRes = await fetch('/api/projects');
+    const projects = await projectsRes.json();
+    const projectList = Array.isArray(projects) ? projects : [];
+
+    if (projectList.length === 0) {
+      showOnboarding();
+      return;
+    }
+
+    // Connect to A2A using first project
+    await client.connect(projectList[0].slug);
 
     // Query all missions with nested capabilities
     const missions = await client.query('mission', { include_capabilities: true });
@@ -83,17 +105,16 @@ async function init() {
 
     // Listen for live updates
     client.on('transition', (data) => {
-      // Re-query on any transition (simple approach — can optimize later)
       client.query('mission', { include_capabilities: true }).then(updated => {
         cache.loadAll('mission', updated);
         renderMissions(updated);
-      }).catch(() => { /* silent — will catch on next poll */ });
+      }).catch(() => {});
     });
 
   } catch (err) {
     console.error('Mission Map init failed:', err);
     if (err.message.includes('Access denied') || err.message.includes('Authentication')) {
-      showError('Session expired or access denied. <a href="/login" style="color:var(--link);">Please log in again</a>');
+      showError('Session expired. <a href="/login" style="color:var(--link);">Please log in again</a>');
     } else {
       showError(`Failed to load missions: ${err.message}`);
     }
