@@ -61,6 +61,7 @@ COPY --from=builder /app/viz ./viz
 COPY --from=builder /app/src/db ./src/db
 COPY --from=builder /app/src/twins ./src/twins
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/docs ./docs
 
 # Create data directory and set ownership to node user (UID 1000).
 # This prevents SQLite "readonly database" errors when /app/data is bind-mounted.
