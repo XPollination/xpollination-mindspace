@@ -180,7 +180,8 @@
             msg.textContent = 'Joined project "' + data.name + '"!';
             msg.className = 'msg ms-msg-success'; msg.style.display = 'block';
           } else {
-            msg.textContent = 'Project "' + data.name + '" created!';
+            const visNote = data.visibility === 'private' ? ' (private repository detected)' : '';
+            msg.textContent = 'Project "' + data.name + '" created!' + visNote;
             msg.className = 'msg ms-msg-success'; msg.style.display = 'block';
           }
           document.getElementById('git-url').value = ''; loadMyProjects();
