@@ -97,9 +97,9 @@ livekitRouter.post('/mute', async (req: Request, res: Response) => {
   }
 });
 
-// POST /brain-query — proxy transcript to Brain API for context
+// POST /brain-query — proxy transcript to Brain API, return structured context
 livekitRouter.post('/brain-query', async (req: Request, res: Response) => {
-  const { query } = req.body;
+  const { query, topic } = req.body;
   if (!query) { res.status(400).json({ error: 'query required' }); return; }
 
   const brainUrl = process.env.BRAIN_API_URL || 'http://localhost:3200';
@@ -115,21 +115,25 @@ livekitRouter.post('/brain-query', async (req: Request, res: Response) => {
       }),
     });
     if (!brainResp.ok) {
-      res.status(200).json({ context: null });
+      res.status(200).json({ insights: [] });
       return;
     }
     const data = await brainResp.json() as any;
-    // Extract top relevant sources
     const sources = data.result?.sources || [];
     if (sources.length === 0) {
-      res.status(200).json({ context: null });
+      res.status(200).json({ insights: [] });
       return;
     }
-    const top = sources.slice(0, 3);
-    const context = top.map((s: any) => `[${s.contributor || '?'}] ${s.content_preview || ''}`).join(' | ');
-    res.status(200).json({ context, sources: top });
+    const insights = sources.slice(0, 4).map((s: any) => ({
+      contributor: s.contributor || 'Unknown',
+      content: (s.content_preview || '').slice(0, 200),
+      score: s.score || 0,
+      thought_id: s.thought_id || null,
+    }));
+    const highways = data.result?.highways_nearby || [];
+    res.status(200).json({ topic: topic || query, insights, highways: highways.slice(0, 3) });
   } catch (e: any) {
-    res.status(200).json({ context: null, error: e.message });
+    res.status(200).json({ insights: [], error: e.message });
   }
 });
 
