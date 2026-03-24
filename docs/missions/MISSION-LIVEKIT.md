@@ -10,6 +10,10 @@ Meetings are not preparation for work — **meetings ARE the work**. A single co
 
 The meeting room is a dumb pipe (LiveKit WebRTC). Intelligence lives in the A2A protocol. Any agent can connect. The default is efficient: one shared agent per room, token cost socialized.
 
+## System Architecture
+
+![Meeting Companion Agent — System Architecture](docs/missions/diagrams/meeting-agent-system.svg)
+
 ## Three Capabilities (Simultaneous, Not Sequential)
 
 ### CAP-1: Thought Distillation
@@ -90,84 +94,11 @@ Meeting activated → Participants enumerated → Group Token issued
 
 ## System Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        MEETING ROOM (LiveKit)                       │
-│                                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                         │
-│  │ Thomas   │  │ Robin    │  │ Person N │  ← Authenticated users   │
-│  │ (Safari) │  │ (Chrome) │  │ (any)    │    via Mindspace JWT     │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘                         │
-│       │              │              │                               │
-│       └──────────────┼──────────────┘                               │
-│                      │                                              │
-│              ┌───────▼────────┐                                     │
-│              │ Companion Agent│  ← Activated by ANY participant     │
-│              │  (in browser)  │    One per room, serves everyone    │
-│              └───────┬────────┘                                     │
-│                      │                                              │
-│         ┌────────────┼────────────┐                                 │
-│         │            │            │                                  │
-│    Speech API   "Hey Mindspace"  Group Token                        │
-│    (continuous)  (wake word)     (at activation)                    │
-│         │            │            │                                  │
-└─────────┼────────────┼────────────┼─────────────────────────────────┘
-          │            │            │
-          ▼            ▼            ▼
-┌─────────────┐ ┌──────────┐ ┌───────────────┐
-│ LLM         │ │ LLM      │ │ Group Token   │
-│ Distillation│ │ Intent   │ │ Issuance      │
-│             │ │ Parsing  │ │               │
-│ "meaningful │ │ speech → │ │ participants  │
-│  thought?"  │ │ A2A msg  │ │ → anon token  │
-└──────┬──────┘ └────┬─────┘ └───────┬───────┘
-       │             │               │
-       ▼             ▼               │
-┌────────────┐ ┌──────────┐         │
-│ Brain API  │ │ A2A      │         │
-│ (write     │ │ Message  │         │
-│  thought,  │ │ Router   │         │
-│  group_id) │ │          │         │
-└────────────┘ └──────────┘         │
-       ▲             │               │
-       │             ▼               │
-       │      ┌──────────┐          │
-       │      │ Response │          │
-       │      │ → Chat   │          │
-       └──────│   card   │──────────┘
-              └──────────┘    (all writes use group_token)
-```
+*See architecture diagram above — all three capabilities run in parallel during a meeting.*
 
 ## Data Flow: Complete Meeting Lifecycle
 
-```
-BEFORE MEETING
-  Participants log in → Mindspace JWT → LiveKit token → Join room
-
-AGENT ACTIVATION (one person clicks 🤖)
-  1. Enumerate current participants via LiveKit API
-  2. Issue group token: SHA-256(sorted_ids + salt) → grp-xxxxx
-  3. Store mapping server-side: grp-xxxxx → [thomas-id, robin-id, ...]
-  4. Start speech recognition (continuous, all audio)
-  5. Visual: "Agent listening — thoughts shared as group"
-
-DURING MEETING (continuous, parallel)
-  Thought Distillation (background):
-    speech buffer → 3s pause → LLM: "distill or discard"
-    → Brain POST: { contributor_id: grp-xxxxx, content: "distilled thought" }
-
-  Voice Commands (on demand):
-    "Hey Mindspace" detected → command mode
-    → LLM: parse intent → A2A message
-    → POST /a2a/message → response → chat card
-    → Linked thought: "Group created mission X because [context]"
-
-AFTER MEETING
-  Query: "What did the group discuss?"
-  → Brain: all thoughts with contributor_id = grp-xxxxx
-  → Provenance: system resolves → Thomas contributed 60%, Robin 40%
-  → Artifacts: missions/capabilities created during call, linked to thought trail
-```
+![Meeting Lifecycle — From Join to Provenance](docs/missions/diagrams/meeting-lifecycle.svg)
 
 ## What's Already Built (v0.0.37)
 
@@ -199,22 +130,4 @@ AFTER MEETING
 
 ## Provenance Model Detail
 
-```
-External view (brain query):         Internal view (system):
-┌─────────────────────┐              ┌─────────────────────────────────┐
-│ contributor: grp-a7f│              │ group: grp-a7f                  │
-│ thought: "Governance│              │ members: [thomas, robin]        │
-│  should be decent..." │            │ contributions:                  │
-│ topic: governance   │              │   thomas: 12 speech segments    │
-│ meeting: room-xyz   │              │   robin: 8 speech segments      │
-└─────────────────────┘              │ credit: thomas 60%, robin 40%   │
-                                     │ objects_created: [mission-xyz]  │
-  Anyone can see the thought.        │ salt: <random>                  │
-  Nobody can see who was             └─────────────────────────────────┘
-  in the group.
-                                       System can prove to thomas:
-                                       "You contributed to 47 group
-                                        thoughts this month."
-                                       Without telling robin what
-                                       thomas's groups are.
-```
+![Group Provenance — Anonymous Attribution Model](docs/missions/diagrams/group-provenance.svg)
