@@ -24,7 +24,13 @@ export function formatMissionTwin(row: any) {
     project_slug: row.project_slug || undefined,
   });
   const validation = validateMission(twin);
-  return { ...twin, _valid: validation.valid, _errors: validation.errors };
+  return {
+    ...twin,
+    _valid: validation.valid,
+    _errors: validation.errors,
+    _warnings: validation.warnings || [],
+    _interface_compliance: validation.interface_compliance || null,
+  };
 }
 
 export function formatCapabilityTwin(row: any) {
