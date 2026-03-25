@@ -322,23 +322,39 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
   }
 }
 
+// Role consistency enforcement (v17) — fixed-role states
+const EXPECTED_ROLES_BY_STATE: Record<string, string> = {
+  complete: 'liaison', approval: 'liaison', approved: 'qa', testing: 'qa', cancelled: 'liaison',
+};
+
+// Quality gates: transition → required DNA fields
+const QUALITY_GATES: Record<string, { required: string[]; githubUrl?: string[] }> = {
+  'active->approval': { required: ['pdsa_ref', 'memory_contribution_id'], githubUrl: ['pdsa_ref'] },
+  'approval->complete': { required: ['abstract_ref'], githubUrl: ['abstract_ref'] },
+  'review->complete': { required: ['abstract_ref'], githubUrl: ['abstract_ref'] },
+  'any->blocked': { required: ['blocked_reason'] },
+  'ready->active': { required: ['memory_query_session'] },
+};
+
+// Human answer audit trail gate (v19) — required on requiresHumanConfirm transitions
+const HUMAN_CONFIRM_TRANSITIONS = new Set([
+  'approval->approved', 'approval->complete', 'approval->rework',
+  'review->complete', 'review->rework',
+]);
+const VALID_APPROVAL_MODES = ['manual', 'semi', 'auto-approval', 'autonomous'];
+
+function isGitHubUrl(s: string): boolean { return /^https:\/\/github\.com\//.test(s); }
+
 function handleTransition(agent: any, body: any, res: Response): void {
   const { task_slug, to_status, payload } = body;
 
-  if (!task_slug) {
-    res.status(400).json({ type: 'ERROR', error: 'Missing required field: task_slug' });
-    return;
-  }
-  if (!to_status) {
-    res.status(400).json({ type: 'ERROR', error: 'Missing required field: to_status' });
-    return;
-  }
+  if (!task_slug) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: task_slug' }); return; }
+  if (!to_status) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: to_status' }); return; }
 
   const db = getDb();
 
-  // Check if this is a mission transition (payload.twin_type === 'mission' or ID starts with 'mission-')
+  // --- Mission transitions (separate path, simpler rules) ---
   const isMission = payload?.twin_type === 'mission' || task_slug.startsWith('mission-');
-
   if (isMission) {
     const MISSION_STATUSES = ['draft', 'ready', 'active', 'complete', 'deprecated'];
     if (!MISSION_STATUSES.includes(to_status)) {
@@ -346,28 +362,15 @@ function handleTransition(agent: any, body: any, res: Response): void {
       return;
     }
     const mission = db.prepare('SELECT * FROM missions WHERE id = ?').get(task_slug) as any;
-    if (!mission) {
-      res.status(404).json({ type: 'ERROR', error: `Mission not found: ${task_slug}` });
-      return;
-    }
+    if (!mission) { res.status(404).json({ type: 'ERROR', error: `Mission not found: ${task_slug}` }); return; }
     const previousStatus = mission.status;
     db.prepare("UPDATE missions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(to_status, mission.id);
-
-    broadcast('transition', {
-      twin_type: 'mission', task_slug: mission.id, task_id: mission.id,
-      from_status: previousStatus, to_status, actor: agent.name || agent.id,
-      timestamp: new Date().toISOString()
-    });
-
-    res.status(200).json({
-      type: 'ACK', original_type: 'TRANSITION', agent_id: agent.id,
-      task_slug: mission.id, from_status: previousStatus, to_status,
-      timestamp: new Date().toISOString()
-    });
+    broadcast('transition', { twin_type: 'mission', task_slug: mission.id, task_id: mission.id, from_status: previousStatus, to_status, actor: agent.name || agent.id, timestamp: new Date().toISOString() });
+    res.status(200).json({ type: 'ACK', original_type: 'TRANSITION', agent_id: agent.id, task_slug: mission.id, from_status: previousStatus, to_status, timestamp: new Date().toISOString() });
     return;
   }
 
-  // Task transition
+  // --- Task transitions with full validation ---
   const VALID_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 'testing', 'review', 'rework', 'complete', 'blocked', 'cancelled'];
   if (!VALID_STATUSES.includes(to_status)) {
     res.status(400).json({ type: 'ERROR', error: `Invalid to_status. Must be one of: ${VALID_STATUSES.join(', ')}` });
@@ -375,59 +378,137 @@ function handleTransition(agent: any, body: any, res: Response): void {
   }
 
   const task = db.prepare('SELECT * FROM tasks WHERE slug = ? OR id = ?').get(task_slug, task_slug) as any;
+  if (!task) { res.status(404).json({ type: 'ERROR', error: `Task not found: ${task_slug}` }); return; }
 
-  if (!task) {
-    res.status(404).json({ type: 'ERROR', error: `Task not found: ${task_slug}` });
-    return;
-  }
+  const fromStatus = task.status;
+  const actor = agent.name || agent.id;
+  let dna: any = {};
+  try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* ignore */ }
 
-  const previousStatus = task.status;
-
-  // Apply DNA updates from payload
+  // Merge payload into DNA before validation
   if (payload && typeof payload === 'object') {
-    let dna: any = {};
-    try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* ignore */ }
     Object.assign(dna, payload);
-    db.prepare("UPDATE tasks SET dna_json = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(JSON.stringify(dna), task.id);
   }
 
-  // Execute transition
-  db.prepare("UPDATE tasks SET status = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(to_status, task.id);
+  // --- Blocked state: save from_state/from_role ---
+  if (to_status === 'blocked') {
+    if (!dna.blocked_reason) {
+      res.status(422).json({ type: 'ERROR', error: 'Quality gate: blocked_reason required in DNA to transition to blocked' });
+      return;
+    }
+    dna.blocked_from_state = fromStatus;
+    dna.blocked_from_role = task.current_role;
+    dna.blocked_at = new Date().toISOString();
+  }
 
-  // Record in task_transitions
+  // --- Blocked restore: read saved state+role ---
+  let restoreRole: string | null = null;
+  let restoreStatus: string | null = null;
+  if (fromStatus === 'blocked' && to_status !== 'cancelled') {
+    restoreStatus = dna.blocked_from_state;
+    restoreRole = dna.blocked_from_role;
+    if (!restoreStatus || !restoreRole) {
+      res.status(422).json({ type: 'ERROR', error: 'Cannot restore from blocked: missing blocked_from_state or blocked_from_role in DNA' });
+      return;
+    }
+    // Clear blocked fields
+    delete dna.blocked_from_state;
+    delete dna.blocked_from_role;
+    delete dna.blocked_reason;
+    delete dna.blocked_at;
+  }
+
+  const effectiveToStatus = restoreStatus || to_status;
+  const transitionKey = `${fromStatus}->${effectiveToStatus}`;
+
+  // --- Quality gates ---
+  const gate = QUALITY_GATES[transitionKey] || QUALITY_GATES[`any->${effectiveToStatus}`];
+  if (gate) {
+    const missingFields = gate.required.filter(f => !dna[f]);
+    if (missingFields.length > 0) {
+      res.status(422).json({ type: 'ERROR', error: `Quality gate: missing required DNA fields for ${transitionKey}: ${missingFields.join(', ')}` });
+      return;
+    }
+    if (gate.githubUrl) {
+      for (const field of gate.githubUrl) {
+        if (dna[field] && !isGitHubUrl(dna[field])) {
+          res.status(422).json({ type: 'ERROR', error: `Quality gate: ${field} must be a GitHub URL` });
+          return;
+        }
+      }
+    }
+  }
+
+  // --- Cancelled gate: liaison requires abstract_ref (system exempt) ---
+  if (effectiveToStatus === 'cancelled' && actor !== 'system') {
+    if (!dna.abstract_ref || !isGitHubUrl(dna.abstract_ref)) {
+      res.status(422).json({ type: 'ERROR', error: 'Quality gate: abstract_ref (GitHub URL) required to cancel (system exempt)' });
+      return;
+    }
+  }
+
+  // --- Human answer audit trail gate (v19) ---
+  const isLiaison = (agent.current_role === 'liaison' || actor.toLowerCase().includes('liaison'));
+  if (isLiaison && HUMAN_CONFIRM_TRANSITIONS.has(transitionKey)) {
+    const missingAudit = ['human_answer', 'human_answer_at', 'approval_mode'].filter(f => !dna[f]);
+    if (missingAudit.length > 0) {
+      res.status(422).json({ type: 'ERROR', error: `Human answer audit gate (v19): missing ${missingAudit.join(', ')}` });
+      return;
+    }
+    if (!VALID_APPROVAL_MODES.includes(dna.approval_mode)) {
+      res.status(422).json({ type: 'ERROR', error: `Human answer audit gate: approval_mode must be one of: ${VALID_APPROVAL_MODES.join(', ')}` });
+      return;
+    }
+  }
+
+  // --- Rework routing: require rework_target_role for specific transitions ---
+  let newRole = task.current_role;
+  if (effectiveToStatus === 'rework') {
+    if (['review', 'complete', 'approval'].includes(fromStatus)) {
+      if (!dna.rework_target_role) {
+        res.status(422).json({ type: 'ERROR', error: 'Rework routing: dna.rework_target_role required (dev/pdsa/qa/liaison)' });
+        return;
+      }
+      newRole = dna.rework_target_role;
+    }
+  }
+
+  // --- Review chain: same-state role change ---
+  if (fromStatus === 'review' && effectiveToStatus === 'review') {
+    // review+qa → review+pdsa (actor: qa)
+    if (task.current_role === 'qa') { newRole = 'pdsa'; }
+    // review+pdsa → review+liaison (actor: pdsa)
+    else if (task.current_role === 'pdsa') { newRole = 'liaison'; }
+    else {
+      res.status(400).json({ type: 'ERROR', error: `Invalid review chain: cannot transition review+${task.current_role} → review` });
+      return;
+    }
+  }
+
+  // --- Role consistency enforcement (v17) ---
+  if (restoreRole) {
+    newRole = restoreRole;
+  } else if (EXPECTED_ROLES_BY_STATE[effectiveToStatus]) {
+    newRole = EXPECTED_ROLES_BY_STATE[effectiveToStatus];
+  }
+
+  // --- Execute ---
+  const now = new Date().toISOString();
+  db.prepare("UPDATE tasks SET dna_json = ?, status = ?, current_role = ?, updated_at = ? WHERE id = ?")
+    .run(JSON.stringify(dna), effectiveToStatus, newRole, now, task.id);
+
+  // Record transition
   try {
-    db.prepare(
-      'INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(
-      require('node:crypto').randomUUID(),
-      task.id,
-      previousStatus,
-      to_status,
-      agent.name || agent.id,
-      task.project_slug
-    );
-  } catch { /* task_transitions table may not have all columns */ }
+    db.prepare('INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), task.id, fromStatus, effectiveToStatus, actor, task.project_slug);
+  } catch { /* table may not have all columns */ }
 
-  // Broadcast transition via SSE to all connected clients
-  broadcast('transition', {
-    task_slug: task.slug || task.id,
-    task_id: task.id,
-    from_status: previousStatus,
-    to_status,
-    actor: agent.name || agent.id,
-    timestamp: new Date().toISOString()
-  });
+  broadcast('transition', { task_slug: task.slug || task.id, task_id: task.id, from_status: fromStatus, to_status: effectiveToStatus, new_role: newRole, actor, timestamp: now });
 
   res.status(200).json({
-    type: 'ACK',
-    original_type: 'TRANSITION',
-    agent_id: agent.id,
-    task_slug: task.slug || task.id,
-    from_status: previousStatus,
-    to_status,
-    timestamp: new Date().toISOString()
+    type: 'ACK', original_type: 'TRANSITION', agent_id: agent.id,
+    task_slug: task.slug || task.id, from_status: fromStatus, to_status: effectiveToStatus,
+    new_role: newRole, timestamp: now
   });
 }
 
