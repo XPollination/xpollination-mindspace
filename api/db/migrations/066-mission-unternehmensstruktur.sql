@@ -1,6 +1,9 @@
 -- Mission: Unternehmensstruktur — organizational structure, asset ownership, investment plans
 -- Status: draft (pending scope definition with Robin's workspace analysis)
 
+-- Ensure project exists (FK target)
+INSERT OR IGNORE INTO projects (id, slug, name, created_by) VALUES ('proj-governance', 'xpollination-governance', 'Xpollination Governance', 'system');
+
 INSERT OR IGNORE INTO missions (id, title, description, status, project_slug, short_id, content_md, content_version)
 VALUES (
   'mission-unternehmensstruktur',
