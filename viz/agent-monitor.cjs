@@ -109,26 +109,37 @@ function queryDb(dbPath, { role, status } = {}) {
     const db = new Database(dbPath, { readonly: true });
     db.pragma('busy_timeout = 5000');
 
-    let query = `SELECT id, type, status, slug,
-      json_extract(dna_json, '$.title') as title,
-      json_extract(dna_json, '$.role') as role,
-      updated_at
-      FROM mindspace_nodes WHERE status NOT IN ('complete', 'cancelled', 'backlog')`;
-    const params = [];
+    // Query both old (mindspace_nodes) and new (tasks) tables
+    let results = [];
 
-    if (role) {
-      query += ` AND json_extract(dna_json, '$.role') = ?`;
-      params.push(role);
-    }
-    if (status) {
-      query += ' AND status = ?';
-      params.push(status);
-    }
-    query += ' ORDER BY updated_at DESC';
+    // Old system: mindspace_nodes
+    try {
+      let query = `SELECT id, type, status, slug,
+        json_extract(dna_json, '$.title') as title,
+        json_extract(dna_json, '$.role') as role,
+        updated_at
+        FROM mindspace_nodes WHERE status NOT IN ('complete', 'cancelled', 'backlog')`;
+      const params = [];
+      if (role) { query += ` AND json_extract(dna_json, '$.role') = ?`; params.push(role); }
+      if (status) { query += ' AND status = ?'; params.push(status); }
+      query += ' ORDER BY updated_at DESC';
+      results = db.prepare(query).all(...params);
+    } catch { /* mindspace_nodes may not exist */ }
 
-    const rows = db.prepare(query).all(...params);
+    // New system: tasks table (SKO hierarchy)
+    try {
+      let query = `SELECT id, 'task' as type, status, slug, title, current_role as role, updated_at
+        FROM tasks WHERE status NOT IN ('complete', 'cancelled')`;
+      const params = [];
+      if (role) { query += ' AND current_role = ?'; params.push(role); }
+      if (status) { query += ' AND status = ?'; params.push(status); }
+      query += ' ORDER BY updated_at DESC';
+      const taskRows = db.prepare(query).all(...params);
+      results = results.concat(taskRows);
+    } catch { /* tasks table may not exist */ }
+
     db.close();
-    return rows.map(r => ({
+    return results.map(r => ({
       id: r.id, type: r.type, status: r.status, slug: r.slug,
       title: r.title || r.slug, role: r.role || 'unknown', updated_at: r.updated_at
     }));
