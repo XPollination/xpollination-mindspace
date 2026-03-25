@@ -409,6 +409,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // /agents route: Agent OS management page
+  if (pathname === '/agents') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'agents.html'));
+    return;
+  }
+
+  // /settings route: user settings page
+  if (pathname === '/settings') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'settings.html'));
+    return;
+  }
+
   // /kanban or /tasks route: serve new A2A-powered kanban
   if (pathname === '/kanban' || pathname === '/tasks') {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
