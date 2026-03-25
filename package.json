@@ -39,6 +39,7 @@
   "author": "Thomas Pichler <herr.thomas.pichler@gmail.com>",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@authzed/authzed-node": "^1.2.0",
     "@ipld/dag-json": "^10.2.6",
     "@modelcontextprotocol/sdk": "^1.0.0",
