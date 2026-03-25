@@ -9,6 +9,7 @@ import { createMission, validateMission, diffMission } from '../../src/twins/mis
 import { createCapability, validateCapability, diffCapability } from '../../src/twins/capability-twin.js';
 import { createRequirement, validateRequirement, diffRequirement } from '../../src/twins/requirement-twin.js';
 import { createTask, validateTask, diffTask, workflowContext } from '../../src/twins/task-twin.js';
+import { cascadeForward } from '../lib/cascade-engine.js';
 
 export const a2aMessageRouter = Router();
 
@@ -509,6 +510,12 @@ function handleTransition(agent: any, body: any, res: Response): void {
 
   broadcast('transition', { task_slug: task.slug || task.id, task_id: task.id, from_status: fromStatus, to_status: effectiveToStatus, new_role: newRole, actor, timestamp: now });
 
+  // Forward cascade: if task completed, unblock dependents
+  let cascadeResult = null;
+  if (effectiveToStatus === 'complete') {
+    cascadeResult = cascadeForward(task.id, db);
+  }
+
   // Compute workflow context for the new state
   const postTwin = createTask({ slug: task.slug || task.id, status: effectiveToStatus, dna: { ...dna, role: newRole }, project_slug: task.project_slug });
   const wfContext = workflowContext(postTwin);
@@ -516,7 +523,7 @@ function handleTransition(agent: any, body: any, res: Response): void {
   res.status(200).json({
     type: 'ACK', original_type: 'TRANSITION', agent_id: agent.id,
     task_slug: task.slug || task.id, from_status: fromStatus, to_status: effectiveToStatus,
-    new_role: newRole, workflow_context: wfContext, timestamp: now
+    new_role: newRole, workflow_context: wfContext, cascade: cascadeResult, timestamp: now
   });
 }
 
