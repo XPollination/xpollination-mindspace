@@ -10,6 +10,7 @@ import { createCapability, validateCapability, diffCapability } from '../../src/
 import { createRequirement, validateRequirement, diffRequirement } from '../../src/twins/requirement-twin.js';
 import { createTask, validateTask, diffTask, workflowContext } from '../../src/twins/task-twin.js';
 import { cascadeForward } from '../lib/cascade-engine.js';
+import { grantLease, releaseLease, extendLease } from '../lib/lease-manager.js';
 
 export const a2aMessageRouter = Router();
 
@@ -76,6 +77,14 @@ function handleHeartbeat(agent: any, _body: any, res: Response): void {
 
   // Renew active bond
   renewBond(agent.id);
+
+  // Extend lease for any active task
+  try {
+    const activeTasks = db.prepare("SELECT id FROM tasks WHERE claimed_by = ? AND status = 'active'").all(agent.id) as any[];
+    for (const t of activeTasks) {
+      extendLease(db, t.id, agent.user_id || agent.id);
+    }
+  } catch { /* lease table may not exist in all envs */ }
 
   res.status(200).json({
     type: 'ACK',
@@ -507,6 +516,15 @@ function handleTransition(agent: any, body: any, res: Response): void {
     db.prepare('INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)')
       .run(crypto.randomUUID(), task.id, fromStatus, effectiveToStatus, actor, task.project_slug);
   } catch { /* table may not have all columns */ }
+
+  // Lease management: grant on claim, release on exit from active
+  try {
+    if (fromStatus === 'ready' && effectiveToStatus === 'active') {
+      grantLease(db, task.id, agent.user_id || agent.id);
+    } else if (fromStatus === 'active' && ['review', 'complete', 'rework', 'blocked', 'cancelled'].includes(effectiveToStatus)) {
+      releaseLease(db, task.id, agent.user_id || agent.id);
+    }
+  } catch { /* lease table may not exist in all envs */ }
 
   broadcast('transition', { task_slug: task.slug || task.id, task_id: task.id, from_status: fromStatus, to_status: effectiveToStatus, new_role: newRole, actor, timestamp: now });
 
