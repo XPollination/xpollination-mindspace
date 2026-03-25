@@ -19,14 +19,14 @@ function authenticateIdentity(req: Request, apiKey?: string): string | null {
   if (apiKey) {
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
     const keyRow = db.prepare(
-      `SELECT ak.id AS key_id, ak.revoked_at, u.id
+      `SELECT ak.id AS key_id, ak.revoked_at, u.id AS user_id
        FROM api_keys ak
        JOIN users u ON ak.user_id = u.id
        WHERE ak.key_hash = ?`
     ).get(keyHash) as any;
 
     if (!keyRow || keyRow.revoked_at) return null;
-    return keyRow.id;
+    return keyRow.user_id;
   }
 
   // Path 2: JWT from Authorization header (browser — viz proxy sets this from ms_session cookie)

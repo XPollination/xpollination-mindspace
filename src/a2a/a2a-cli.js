@@ -23,6 +23,10 @@ async function send(type, body = {}) {
     body: JSON.stringify({ type, agent_id: AGENT_ID, ...body }),
   });
   const data = await res.json();
+  if (!res.ok) {
+    console.error(JSON.stringify(data, null, 2));
+    process.exit(1);
+  }
   console.log(JSON.stringify(data, null, 2));
   return data;
 }
@@ -32,6 +36,7 @@ async function apiCall(method, path, body) {
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${API_URL}${path}`, opts);
   const data = await res.json();
+  if (!res.ok) { console.error(JSON.stringify(data, null, 2)); process.exit(1); }
   console.log(JSON.stringify(data, null, 2));
   return data;
 }
