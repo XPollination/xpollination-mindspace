@@ -103,12 +103,17 @@ function renderCard(m) {
   const excerpt = (m.description || '').substring(0, 80);
   const isSelected = (m.id || m.short_id) === selectedMissionId;
   const dimmed = m.status === 'deprecated' ? 'opacity:0.6;' : '';
+  const ic = m._interface_compliance;
+  const pct = ic ? ic.completeness_percent : null;
+  const pctColor = pct === null ? '' : pct === 100 ? 'var(--ms-status-complete)' : pct >= 50 ? 'var(--ms-status-review)' : 'var(--ms-status-rework)';
+  const complianceBadge = pct !== null ? `<span style="font-size:9px;color:${pctColor};font-weight:600;">${ic.sections_present}/${ic.sections_required}</span>` : '';
 
   return `<div class="task-card${isSelected ? ' selected' : ''}" data-id="${esc(m.id || m.short_id)}" style="${dimmed}border-left:3px solid ${STATUS_COLORS[m.status] || 'var(--ms-muted)'};">
     <div class="task-title">${esc(m.title)}</div>
     <div class="task-meta">
       <span class="task-badge" style="background:${STATUS_COLORS[m.status]}">${m.status}</span>
       ${capCount ? `<span class="task-project">${capCount} caps</span>` : ''}
+      ${complianceBadge}
     </div>
     ${excerpt ? `<div style="font-size:11px;color:var(--ms-muted);margin-top:4px;">${esc(excerpt)}${(m.description||'').length > 80 ? '...' : ''}</div>` : ''}
   </div>`;
@@ -133,6 +138,8 @@ function showDetail(mission) {
     <div class="detail-section-content">
       <div class="detail-field"><div class="detail-field-label">Status</div><div class="detail-field-value"><span class="task-badge" style="background:${STATUS_COLORS[mission.status]}">${mission.status}</span></div></div>
       ${mission.project_slug ? `<div class="detail-field"><div class="detail-field-label">Project</div><div class="detail-field-value">${esc(mission.project_slug)}</div></div>` : ''}
+      ${mission._interface_compliance ? `<div class="detail-field"><div class="detail-field-label">Interface Compliance</div><div class="detail-field-value">${mission._interface_compliance.interface} v${mission._interface_compliance.version}: <strong style="color:${mission._interface_compliance.completeness_percent === 100 ? 'var(--ms-status-complete)' : mission._interface_compliance.completeness_percent >= 50 ? 'var(--ms-status-review)' : 'var(--ms-status-rework)'}">${mission._interface_compliance.sections_present}/${mission._interface_compliance.sections_required} sections (${mission._interface_compliance.completeness_percent}%)</strong></div></div>` : ''}
+      ${(mission._warnings || []).length > 0 ? `<div class="detail-field"><div class="detail-field-label">Warnings</div><div class="detail-field-value" style="font-size:12px;color:var(--ms-status-review);">${mission._warnings.map(w => esc(w)).join('<br>')}</div></div>` : ''}
       <div class="detail-field"><div class="detail-field-label">Capabilities</div><div class="detail-field-value">${caps.length > 0 ? caps.map(c => `<a href="/c/${c.short_id || c.id}" class="detail-link">${esc(c.title)}</a>`).join(', ') : 'None'}</div></div>
     </div>
   </div>`;

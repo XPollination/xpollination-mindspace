@@ -13,14 +13,22 @@ const REQUIREMENT_PRIORITIES = ['low', 'medium', 'high', 'critical'];
 const TASK_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 'testing', 'review', 'rework', 'complete', 'blocked', 'cancelled'];
 const TASK_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
 
+const MISSION_SECTIONS = ['Vision', 'Rationale', 'Capabilities Composed', 'Current State', 'Evidence', 'Implementation Sequence', 'Gaps', 'Decision Trail', 'Changelog'];
+
 export function validateMission(twin) {
   const errors = [];
+  const warnings = [];
   if (!twin.id || typeof twin.id !== 'string') errors.push('id is required');
   if (!twin.title || typeof twin.title !== 'string') errors.push('title is required');
   else if (twin.title.length > 200) errors.push('title must be <= 200 characters');
   if (!MISSION_STATUSES.includes(twin.status)) errors.push(`status must be one of: ${MISSION_STATUSES.join(', ')}`);
   if (twin.description !== undefined && typeof twin.description === 'string' && twin.description.length > 2000) errors.push('description must be <= 2000 characters');
-  return { valid: errors.length === 0, errors };
+  // MissionInterface v1.0: section check
+  const md = twin.content_md || '';
+  const missing = md ? MISSION_SECTIONS.filter(s => !md.match(new RegExp('##\\s+.*' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) : MISSION_SECTIONS;
+  const present = MISSION_SECTIONS.length - missing.length;
+  if (missing.length > 0) warnings.push(`MissionInterface v1.0: missing ${missing.length} sections: ${missing.join(', ')}`);
+  return { valid: errors.length === 0, errors, warnings, interface_compliance: { interface: 'MissionInterface', version: '1.0', sections_present: present, sections_required: MISSION_SECTIONS.length, completeness_percent: Math.round((present / MISSION_SECTIONS.length) * 100) } };
 }
 
 export function validateCapability(twin) {

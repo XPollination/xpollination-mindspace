@@ -97,9 +97,9 @@ livekitRouter.post('/mute', async (req: Request, res: Response) => {
   }
 });
 
-// POST /brain-query — proxy transcript to Brain API, return structured context
+// POST /brain-query — proxy transcript to Brain API, return structured context cards
 livekitRouter.post('/brain-query', async (req: Request, res: Response) => {
-  const { query, topic } = req.body;
+  const { query, topic, drill } = req.body;
   if (!query) { res.status(400).json({ error: 'query required' }); return; }
 
   const brainUrl = process.env.BRAIN_API_URL || 'http://localhost:3200';
@@ -112,6 +112,7 @@ livekitRouter.post('/brain-query', async (req: Request, res: Response) => {
         agent_id: 'agent-meeting',
         agent_name: 'Meeting Agent',
         session_id: `meeting-${Date.now()}`,
+        read_only: true,
       }),
     });
     if (!brainResp.ok) {
@@ -124,18 +125,87 @@ livekitRouter.post('/brain-query', async (req: Request, res: Response) => {
       res.status(200).json({ insights: [] });
       return;
     }
-    const insights = sources.slice(0, 4).map((s: any) => ({
+
+    // Build human-readable insights from sources
+    const insights = sources.slice(0, 5).map((s: any) => ({
       contributor: s.contributor || 'Unknown',
-      content: (s.content_preview || '').slice(0, 200),
+      content: (s.content_preview || '').slice(0, 250),
       score: s.score || 0,
       thought_id: s.thought_id || null,
+      category: s.thought_category || null,
+      topic: s.topic || null,
     }));
-    const highways = data.result?.highways_nearby || [];
-    res.status(200).json({ topic: topic || query, insights, highways: highways.slice(0, 3) });
+
+    // Create a concise summary from the top result (strip agent metadata noise)
+    const topContent = insights[0].content;
+    const summary = cleanSummary(topContent);
+
+    // Extract drill-down topics from: source topics, highways, categories
+    const drillTopics = extractDrillTopics(sources, data.result?.highways_nearby || [], topic || query);
+
+    // Use a clean display topic
+    const displayTopic = topic || extractDisplayTopic(query);
+
+    res.status(200).json({ topic: displayTopic, summary, insights, drill_topics: drillTopics });
   } catch (e: any) {
     res.status(200).json({ insights: [], error: e.message });
   }
 });
+
+/** Extract a display topic from raw speech text (take first meaningful phrase) */
+function extractDisplayTopic(text: string): string {
+  // Take first 5 meaningful words as topic
+  const stopwords = new Set(['aber','auch','dass','dies','eine','haben','sein','sind','wird','über','nach','noch','oder','wenn','alle','kann','mehr','muss','soll','weil','denn','dann','hier','dort','jetzt','schon','nicht','sehr','ganz','doch','also','gibt','irgendetwas','etwas','zum','thema']);
+  const words = text.split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w.toLowerCase()));
+  return words.slice(0, 5).join(' ') || text.slice(0, 40);
+}
+
+/** Strip agent metadata prefixes (e.g. "[QA] TASK active->review:") to get human-readable text */
+function cleanSummary(text: string): string {
+  return text
+    .replace(/^\[[\w]+\]\s*/g, '')                    // [AGENT] prefix
+    .replace(/^TASK\s+\S+:\s*/g, '')                  // TASK state->state: prefix
+    .replace(/^\*\*[\w\s]+:\*\*\s*/g, '')             // **Label:** prefix
+    .replace(/\([^)]*score[^)]*\)/gi, '')             // (score: 0.xx)
+    .trim();
+}
+
+/** Extract clean drill-down topic labels from brain response */
+function extractDrillTopics(sources: any[], highways: any[], currentTopic: string): string[] {
+  const seen = new Set<string>();
+  const topics: string[] = [];
+  const currentLower = currentTopic.toLowerCase();
+
+  // From source topics (most specific)
+  for (const s of sources) {
+    if (s.topic && !seen.has(s.topic) && s.topic.toLowerCase() !== currentLower) {
+      seen.add(s.topic);
+      topics.push(s.topic);
+    }
+  }
+
+  // From highways — extract a short label (first 40 chars, cut at word boundary)
+  for (const hw of highways) {
+    const raw = typeof hw === 'string' ? hw : (hw.label || hw.topic || '');
+    if (!raw) continue;
+    const label = raw.slice(0, 50).replace(/\s\S*$/, '').replace(/[.,:;—–\-]+$/, '').trim();
+    if (label.length > 5 && !seen.has(label) && label.toLowerCase() !== currentLower) {
+      seen.add(label);
+      topics.push(label);
+    }
+  }
+
+  // From source categories (broadest)
+  for (const s of sources) {
+    const cat = s.thought_category;
+    if (cat && !seen.has(cat) && cat !== 'agent_conclusion') {
+      const label = cat.replace(/_/g, ' ');
+      if (!seen.has(label)) { seen.add(label); topics.push(label); }
+    }
+  }
+
+  return topics.slice(0, 4);
+}
 
 // GET /participants — list participants in a room (for zombie detection)
 livekitRouter.get('/participants', async (req: Request, res: Response) => {

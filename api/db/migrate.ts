@@ -41,12 +41,19 @@ export async function runMigrations(): Promise<void> {
       continue;
     }
 
+    // Disable FK checks for migrations that recreate tables (e.g., ALTER CHECK constraint)
+    // PRAGMA must be outside transaction to take effect.
+    const needsFkOff = sql.includes('DROP TABLE') || sql.includes('PRAGMA foreign_keys');
+    if (needsFkOff) db.pragma('foreign_keys = OFF');
+
     // Apply migration in a transaction
     const run = db.transaction(() => {
       db.exec(sql);
       db.prepare('INSERT INTO migrations (name, checksum) VALUES (?, ?)').run(file, checksum);
     });
     run();
+
+    if (needsFkOff) db.pragma('foreign_keys = ON');
 
     logger.info({ migration: file }, `Applied migration: ${file}`);
   }

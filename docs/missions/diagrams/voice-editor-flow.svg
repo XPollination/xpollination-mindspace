@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" font-family="system-ui, sans-serif">
+  <title>CAP-2: Voice Mission Editor — Jarvis Flow</title>
+  <desc>
+    AGENT-READABLE: The voice mission editor has 5 roles: Creator, Writer, Reviser, Reader, Navigator.
+    Flow: Speech stream shared with CAP-1 → "Hey Mindspace" wake word detected → enters command mode
+    (visual indicator in UI) → captures command speech until natural end → sends to LLM with full
+    context: (1) current mission content_md, (2) recent conversation transcript from CAP-1, (3)
+    dialogue history of previous commands in this session.
+    LLM resolves references: "that" = last discussed topic, "write it" = what someone just said,
+    "the second one" = positional from last query, "what Robin said" = speaker-attributed transcript.
+    LLM determines action type and generates payload: CREATE, UPDATE (including section rewrite),
+    QUERY, TRANSITION. For revisions: LLM finds section by title, understands new framing from
+    conversation context, REWRITES the section (generative, not append), detects cascade implications
+    ("this changes assumptions in section Y — should I update?").
+    Response rendered as chat card. Every edit linked to thought trail. content_version bumped.
+  </desc>
+
+  <rect width="900" height="650" fill="#0d1117" rx="8"/>
+  <text x="450" y="30" fill="#d29922" font-size="15" font-weight="700" text-anchor="middle">CAP-2: Voice Mission Editor — The Five Roles</text>
+
+  <!-- Top: Shared speech stream -->
+  <rect x="30" y="50" width="840" height="50" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="50" y="80" fill="#8b949e" font-size="11">Shared speech stream from CAP-1 (continuous transcript with speaker attribution + synthesized thoughts as context)</text>
+
+  <!-- Wake word detection -->
+  <rect x="280" y="120" width="340" height="50" rx="8" fill="#2b1d0e" stroke="#d29922" stroke-width="2"/>
+  <text x="450" y="142" fill="#d29922" font-size="13" font-weight="700" text-anchor="middle">"Hey Mindspace" → Command Mode</text>
+  <text x="450" y="158" fill="#8b949e" font-size="10" text-anchor="middle">captures speech until natural end</text>
+
+  <line x1="450" y1="100" x2="450" y2="120" stroke="#d29922" stroke-width="2"/>
+
+  <!-- LLM with context -->
+  <rect x="200" y="190" width="500" height="90" rx="8" fill="#1c2333" stroke="#58a6ff" stroke-width="2"/>
+  <text x="450" y="215" fill="#58a6ff" font-size="13" font-weight="700" text-anchor="middle">LLM: Intent + Context Resolution + Content Generation</text>
+  <text x="270" y="240" fill="#c9d1d9" font-size="10">Context inputs:</text>
+  <text x="270" y="255" fill="#8b949e" font-size="9">① Current mission content_md</text>
+  <text x="470" y="255" fill="#8b949e" font-size="9">② Recent transcript (from CAP-1)</text>
+  <text x="270" y="270" fill="#8b949e" font-size="9">③ Command history this session</text>
+  <text x="470" y="270" fill="#8b949e" font-size="9">④ Speaker attributions</text>
+
+  <line x1="450" y1="170" x2="450" y2="190" stroke="#d29922" stroke-width="2"/>
+
+  <!-- Five role branches -->
+  <line x1="200" y1="280" x2="100" y2="320" stroke="#3fb950" stroke-width="2"/>
+  <line x1="310" y1="280" x2="270" y2="320" stroke="#58a6ff" stroke-width="2"/>
+  <line x1="450" y1="280" x2="450" y2="320" stroke="#d29922" stroke-width="2"/>
+  <line x1="590" y1="280" x2="630" y2="320" stroke="#bc8cff" stroke-width="2"/>
+  <line x1="700" y1="280" x2="790" y2="320" stroke="#8b949e" stroke-width="2"/>
+
+  <!-- Role 1: Creator -->
+  <rect x="20" y="320" width="165" height="130" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="102" y="343" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Creator</text>
+  <text x="102" y="363" fill="#c9d1d9" font-size="9" text-anchor="middle">New missions, capabilities,</text>
+  <text x="102" y="377" fill="#c9d1d9" font-size="9" text-anchor="middle">requirements</text>
+  <rect x="35" y="390" width="135" height="22" rx="3" fill="#0d1117" stroke="#3fb950"/>
+  <text x="102" y="406" fill="#3fb950" font-size="9" text-anchor="middle">OBJECT_CREATE</text>
+  <text x="102" y="435" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">"Create a mission</text>
+  <text x="102" y="445" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">called Governance"</text>
+
+  <!-- Role 2: Writer -->
+  <rect x="195" y="320" width="165" height="130" rx="6" fill="#161b22" stroke="#58a6ff"/>
+  <text x="277" y="343" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">Writer</text>
+  <text x="277" y="363" fill="#c9d1d9" font-size="9" text-anchor="middle">Sets content from</text>
+  <text x="277" y="377" fill="#c9d1d9" font-size="9" text-anchor="middle">conversation context</text>
+  <rect x="210" y="390" width="135" height="22" rx="3" fill="#0d1117" stroke="#58a6ff"/>
+  <text x="277" y="406" fill="#58a6ff" font-size="9" text-anchor="middle">OBJECT_UPDATE (new)</text>
+  <text x="277" y="435" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">"That's the vision —</text>
+  <text x="277" y="445" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">write it"</text>
+
+  <!-- Role 3: Reviser (highlighted) -->
+  <rect x="370" y="315" width="165" height="140" rx="6" fill="#2b1d0e" stroke="#d29922" stroke-width="2"/>
+  <text x="452" y="338" fill="#d29922" font-size="12" font-weight="700" text-anchor="middle">Reviser ★</text>
+  <text x="452" y="358" fill="#c9d1d9" font-size="9" text-anchor="middle">Rewrites existing sections</text>
+  <text x="452" y="372" fill="#c9d1d9" font-size="9" text-anchor="middle">with new framing +</text>
+  <text x="452" y="386" fill="#c9d1d9" font-size="9" text-anchor="middle">detects cascades</text>
+  <rect x="385" y="395" width="135" height="22" rx="3" fill="#0d1117" stroke="#d29922"/>
+  <text x="452" y="411" fill="#d29922" font-size="9" text-anchor="middle">OBJECT_UPDATE (rewrite)</text>
+  <text x="452" y="438" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">"Change the architecture —</text>
+  <text x="452" y="448" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">projection is now federation"</text>
+
+  <!-- Role 4: Reader -->
+  <rect x="545" y="320" width="165" height="130" rx="6" fill="#1c1533" stroke="#bc8cff"/>
+  <text x="627" y="343" fill="#bc8cff" font-size="12" font-weight="700" text-anchor="middle">Reader</text>
+  <text x="627" y="363" fill="#c9d1d9" font-size="9" text-anchor="middle">Renders structure,</text>
+  <text x="627" y="377" fill="#c9d1d9" font-size="9" text-anchor="middle">reads back content</text>
+  <rect x="560" y="390" width="135" height="22" rx="3" fill="#0d1117" stroke="#bc8cff"/>
+  <text x="627" y="406" fill="#bc8cff" font-size="9" text-anchor="middle">OBJECT_QUERY</text>
+  <text x="627" y="435" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">"Show me this mission"</text>
+  <text x="627" y="445" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">→ tree in chat</text>
+
+  <!-- Role 5: Navigator -->
+  <rect x="720" y="320" width="155" height="130" rx="6" fill="#161b22" stroke="#8b949e"/>
+  <text x="797" y="343" fill="#c9d1d9" font-size="12" font-weight="700" text-anchor="middle">Navigator</text>
+  <text x="797" y="363" fill="#c9d1d9" font-size="9" text-anchor="middle">Transitions, moves,</text>
+  <text x="797" y="377" fill="#c9d1d9" font-size="9" text-anchor="middle">restructures</text>
+  <rect x="735" y="390" width="125" height="22" rx="3" fill="#0d1117" stroke="#8b949e"/>
+  <text x="797" y="406" fill="#8b949e" font-size="9" text-anchor="middle">TRANSITION</text>
+  <text x="797" y="435" fill="#8b949e" font-size="8" text-anchor="middle" font-style="italic">"Move this to ready"</text>
+
+  <!-- Reference resolution box -->
+  <rect x="30" y="480" width="840" height="75" rx="8" fill="#161b22" stroke="#58a6ff"/>
+  <text x="450" y="503" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">Conversational Reference Resolution</text>
+  <text x="115" y="525" fill="#c9d1d9" font-size="10" text-anchor="middle">"that" →</text>
+  <text x="115" y="540" fill="#8b949e" font-size="9" text-anchor="middle">last discussed topic</text>
+  <text x="285" y="525" fill="#c9d1d9" font-size="10" text-anchor="middle">"write it" →</text>
+  <text x="285" y="540" fill="#8b949e" font-size="9" text-anchor="middle">what someone just said</text>
+  <text x="450" y="525" fill="#c9d1d9" font-size="10" text-anchor="middle">"the second one" →</text>
+  <text x="450" y="540" fill="#8b949e" font-size="9" text-anchor="middle">positional from last query</text>
+  <text x="630" y="525" fill="#c9d1d9" font-size="10" text-anchor="middle">"what Robin said" →</text>
+  <text x="630" y="540" fill="#8b949e" font-size="9" text-anchor="middle">speaker-attributed transcript</text>
+  <text x="800" y="525" fill="#c9d1d9" font-size="10" text-anchor="middle">"update it too" →</text>
+  <text x="800" y="540" fill="#8b949e" font-size="9" text-anchor="middle">cascade from prior edit</text>
+
+  <!-- Output bar -->
+  <rect x="30" y="575" width="840" height="55" rx="8" fill="#0d2818" stroke="#3fb950"/>
+  <text x="450" y="598" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Every Action → Chat Card + Thought Trail Link + content_version++</text>
+  <text x="450" y="618" fill="#8b949e" font-size="10" text-anchor="middle">The meeting trail IS the revision history: why each section changed, who contributed, what triggered it</text>
+</svg>

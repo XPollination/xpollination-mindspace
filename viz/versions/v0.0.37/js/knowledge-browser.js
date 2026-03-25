@@ -92,7 +92,7 @@ async function loadMission(identifier) {
   pageContent.innerHTML = `
     <div class="badge" style="background:#22c55e;">Mission</div>
     <h1>${escapeHtml(m.title)}</h1>
-    <div class="content">${content}</div>
+    <div class="ms-content">${content}</div>
     ${childrenHtml}`;
 
   metadataEl.innerHTML = `Version ${m.content_version || 0} <span style="margin-left:16px;"><a href="/" style="color:var(--link);">Mission Map</a> · <a href="/kanban" style="color:var(--link);">Kanban</a></span>`;
@@ -127,7 +127,7 @@ async function loadCapability(shortId) {
   pageContent.innerHTML = `
     <div class="badge" style="background:#8ab4f8;">Capability</div>
     <h1>${escapeHtml(c.title)}</h1>
-    <div class="content">${content}</div>
+    <div class="ms-content">${content}</div>
     ${childrenHtml}`;
 
   metadataEl.innerHTML = `Version ${c.content_version || 0} <span style="margin-left:16px;"><a href="/" style="color:var(--link);">Mission Map</a> · <a href="/kanban" style="color:var(--link);">Kanban</a></span>`;
@@ -166,7 +166,7 @@ async function loadRequirement(shortId) {
     <div class="badge" style="background:#eab308;">Requirement</div>
     <h1>${escapeHtml(r.title || r.req_id_human)}</h1>
     ${r.req_id_human ? `<p style="color:var(--muted);font-size:13px;">${escapeHtml(r.req_id_human)} · Priority: ${r.priority || 'medium'}</p>` : ''}
-    <div class="content">${content}</div>`;
+    <div class="ms-content">${content}</div>`;
 
   metadataEl.innerHTML = `<a href="/" style="color:var(--link);">Mission Map</a> · <a href="/kanban" style="color:var(--link);">Kanban</a>`;
 }

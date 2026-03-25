@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, sans-serif">
+  <title>Group Provenance — Anonymous Attribution Model</title>
+  <desc>
+    AGENT-READABLE: Group provenance model for GDPR-compliant meeting attribution.
+    TOKEN ISSUANCE: At agent activation, system enumerates current LiveKit participants, sorts their IDs,
+    concatenates with random salt, SHA-256 hashes → anonymous group_token (grp-xxxxx).
+    Server-side mapping stored: { group_token, participant_ids[], salt, meeting_room, created_at }.
+    EXTERNAL VIEW: Brain thoughts show contributor_id = grp-xxxxx. Anyone querying brain sees the thought
+    but cannot determine group membership. Non-reversible: knowing the token doesn't reveal members.
+    INTERNAL VIEW: System resolves grp-xxxxx → [thomas-id, robin-id]. Computes contribution credit
+    based on speech segment attribution (who spoke how much during distilled thoughts).
+    Per-person query: "Thomas contributed to 47 group thoughts this month" — without exposing which groups.
+    PROVENANCE CHAIN: Group thought → linked to objects created via "Hey Mindspace" during same meeting.
+    Credit flows: thought value → object value → back to group members proportionally.
+  </desc>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#0d1117" rx="8"/>
+
+  <text x="450" y="35" fill="#bc8cff" font-size="16" font-weight="700" text-anchor="middle">Group Provenance — Anonymous Attribution</text>
+
+  <!-- Left: Token Issuance -->
+  <rect x="30" y="55" width="260" height="200" rx="8" fill="#1c1533" stroke="#bc8cff"/>
+  <text x="160" y="80" fill="#bc8cff" font-size="13" font-weight="700" text-anchor="middle">Token Issuance</text>
+
+  <text x="50" y="105" fill="#c9d1d9" font-size="11">1. Enumerate participants</text>
+  <text x="60" y="122" fill="#8b949e" font-size="10">[thomas-id, robin-id, ...]</text>
+  <text x="50" y="145" fill="#c9d1d9" font-size="11">2. Sort IDs + add salt</text>
+  <text x="60" y="162" fill="#8b949e" font-size="10">salt = crypto.randomUUID()</text>
+  <text x="50" y="185" fill="#c9d1d9" font-size="11">3. SHA-256 hash</text>
+  <text x="60" y="202" fill="#8b949e" font-size="10">→ grp-a7f3e2b9...</text>
+  <text x="50" y="230" fill="#bc8cff" font-size="11" font-weight="600">4. Store mapping (server-side)</text>
+
+  <!-- Arrow to server store -->
+  <line x1="290" y1="155" x2="340" y2="155" stroke="#bc8cff" stroke-width="2"/>
+
+  <!-- Center: Server-Side Store -->
+  <rect x="340" y="55" width="250" height="200" rx="8" fill="#161b22" stroke="#bc8cff" stroke-dasharray="4"/>
+  <text x="465" y="80" fill="#bc8cff" font-size="13" font-weight="700" text-anchor="middle">Server-Side Store</text>
+  <text x="465" y="100" fill="#8b949e" font-size="10" text-anchor="middle">(never exposed externally)</text>
+
+  <rect x="360" y="115" width="210" height="120" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="370" y="135" fill="#8b949e" font-size="10" font-family="monospace">{</text>
+  <text x="380" y="152" fill="#bc8cff" font-size="10" font-family="monospace">group_token: "grp-a7f3e2"</text>
+  <text x="380" y="169" fill="#c9d1d9" font-size="10" font-family="monospace">members: [thomas, robin]</text>
+  <text x="380" y="186" fill="#c9d1d9" font-size="10" font-family="monospace">salt: "9c4e..."</text>
+  <text x="380" y="203" fill="#c9d1d9" font-size="10" font-family="monospace">room: "mindspace-admin"</text>
+  <text x="380" y="220" fill="#c9d1d9" font-size="10" font-family="monospace">segments: {thomas:12,robin:8}</text>
+  <text x="370" y="232" fill="#8b949e" font-size="10" font-family="monospace">}</text>
+
+  <!-- Right: External vs Internal -->
+  <rect x="610" y="55" width="270" height="90" rx="8" fill="#0d2818" stroke="#3fb950"/>
+  <text x="745" y="78" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">External View (anyone)</text>
+  <text x="745" y="100" fill="#c9d1d9" font-size="11" text-anchor="middle">contributor: grp-a7f3e2</text>
+  <text x="745" y="117" fill="#c9d1d9" font-size="11" text-anchor="middle">thought: "Governance should be..."</text>
+  <text x="745" y="134" fill="#8b949e" font-size="10" text-anchor="middle">Cannot trace → individuals ✓</text>
+
+  <rect x="610" y="160" width="270" height="95" rx="8" fill="#1c1533" stroke="#bc8cff"/>
+  <text x="745" y="183" fill="#bc8cff" font-size="12" font-weight="700" text-anchor="middle">Internal View (system)</text>
+  <text x="745" y="205" fill="#c9d1d9" font-size="11" text-anchor="middle">grp-a7f3e2 → [thomas, robin]</text>
+  <text x="745" y="225" fill="#c9d1d9" font-size="11" text-anchor="middle">credit: thomas 60%, robin 40%</text>
+  <text x="745" y="245" fill="#8b949e" font-size="10" text-anchor="middle">Per-person credit computable ✓</text>
+
+  <!-- Arrows -->
+  <line x1="590" y1="100" x2="610" y2="100" stroke="#3fb950" stroke-width="1.5"/>
+  <line x1="590" y1="200" x2="610" y2="200" stroke="#bc8cff" stroke-width="1.5"/>
+
+  <!-- Bottom: Privacy Properties -->
+  <rect x="30" y="280" width="840" height="80" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="450" y="305" fill="#c9d1d9" font-size="13" font-weight="700" text-anchor="middle">GDPR Privacy Properties</text>
+
+  <text x="80" y="330" fill="#3fb950" font-size="11">✓ Non-reversible</text>
+  <text x="80" y="347" fill="#8b949e" font-size="10">token → members: impossible</text>
+
+  <text x="280" y="330" fill="#3fb950" font-size="11">✓ Non-enumerable</text>
+  <text x="280" y="347" fill="#8b949e" font-size="10">member → groups: system-only</text>
+
+  <text x="490" y="330" fill="#3fb950" font-size="11">✓ Provable credit</text>
+  <text x="490" y="347" fill="#8b949e" font-size="10">"You contributed to 47 thoughts"</text>
+
+  <text x="700" y="330" fill="#3fb950" font-size="11">✓ Shared value</text>
+  <text x="700" y="347" fill="#8b949e" font-size="10">credit flows to all members</text>
+
+  <!-- Bottom: Provenance Chain -->
+  <rect x="30" y="380" width="840" height="100" rx="8" fill="#0d1117" stroke="#d29922"/>
+  <text x="450" y="405" fill="#d29922" font-size="13" font-weight="700" text-anchor="middle">Provenance Chain: Thought → Object → Value → Credit</text>
+
+  <rect x="60" y="420" width="160" height="40" rx="4" fill="#0d2818" stroke="#3fb950"/>
+  <text x="140" y="445" fill="#3fb950" font-size="11" text-anchor="middle">Group Thought</text>
+
+  <text x="235" y="442" fill="#d29922" font-size="14">→</text>
+
+  <rect x="260" y="420" width="160" height="40" rx="4" fill="#2b1d0e" stroke="#d29922"/>
+  <text x="340" y="445" fill="#d29922" font-size="11" text-anchor="middle">Mission Created</text>
+
+  <text x="435" y="442" fill="#d29922" font-size="14">→</text>
+
+  <rect x="460" y="420" width="160" height="40" rx="4" fill="#161b22" stroke="#8b949e"/>
+  <text x="540" y="445" fill="#c9d1d9" font-size="11" text-anchor="middle">Value Generated</text>
+
+  <text x="635" y="442" fill="#bc8cff" font-size="14">→</text>
+
+  <rect x="660" y="420" width="190" height="40" rx="4" fill="#1c1533" stroke="#bc8cff"/>
+  <text x="755" y="445" fill="#bc8cff" font-size="11" text-anchor="middle">Credit → Group Members</text>
+</svg>
