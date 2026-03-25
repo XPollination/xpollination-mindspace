@@ -42,13 +42,11 @@
     <h3>Start Agent</h3>
     <label style="font-size:12px;">Role</label>
     <select id="spawn-role">
+      <option value="liaison">Liaison (Drives the Loop)</option>
       <option value="pdsa">PDSA (Plan/Design)</option>
       <option value="dev">DEV (Implement)</option>
       <option value="qa">QA (Test/Review)</option>
-      <option value="liaison">Liaison (Human Bridge)</option>
     </select>
-    <label style="font-size:12px;">Project</label>
-    <select id="spawn-project"></select>
     <div style="display:flex;gap:8px;margin-top:8px;">
       <button id="spawn-confirm" style="background:var(--ms-accent);color:#fff;cursor:pointer;">Spawn</button>
       <button id="spawn-cancel" style="cursor:pointer;">Cancel</button>
@@ -60,31 +58,18 @@
 const grid = document.getElementById('agents-grid');
 const panels = [];
 
-// Load projects for dropdown
-fetch('/api/projects', { headers: { 'Authorization': `Bearer ${document.cookie.match(/ms_session=([^;]+)/)?.[1] || ''}` } })
-  .then(r => r.json()).then(projects => {
-    const sel = document.getElementById('spawn-project');
-    (Array.isArray(projects) ? projects : []).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.slug; opt.textContent = p.title || p.slug;
-      sel.appendChild(opt);
-    });
-  }).catch(() => {});
-
 // Spawn modal
 document.getElementById('spawn-btn').addEventListener('click', () => document.getElementById('spawn-modal').classList.add('active'));
 document.getElementById('spawn-cancel').addEventListener('click', () => document.getElementById('spawn-modal').classList.remove('active'));
 document.getElementById('spawn-confirm').addEventListener('click', async () => {
   const role = document.getElementById('spawn-role').value;
-  const project = document.getElementById('spawn-project').value;
   document.getElementById('spawn-modal').classList.remove('active');
-  if (!project) { alert('Select a project'); return; }
 
   try {
     const res = await fetch('/api/agents/spawn', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${document.cookie.match(/ms_session=([^;]+)/)?.[1] || ''}` },
-      body: JSON.stringify({ role, project_slug: project })
+      body: JSON.stringify({ role })
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error || 'Spawn failed'); return; }
@@ -103,7 +88,6 @@ document.getElementById('spawn-confirm').addEventListener('click', async () => {
     // Add liaison chat on first spawn
     if (panels.length === 1) {
       const chat = document.createElement('liaison-chat');
-      chat.setAttribute('project-slug', project);
       grid.appendChild(chat);
     }
 

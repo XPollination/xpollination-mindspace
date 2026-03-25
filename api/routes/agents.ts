@@ -208,14 +208,10 @@ agentsRouter.post('/:id/role-switch', (req: Request, res: Response) => {
 // POST /api/agents/spawn — create session and start agent process (MUST be before /:id)
 agentsRouter.post('/spawn', (req: Request, res: Response) => {
   const user = (req as any).user;
-  const { role, project_slug } = req.body;
+  const { role } = req.body;
 
   if (!role || !VALID_ROLES.includes(role)) {
     res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
-    return;
-  }
-  if (!project_slug) {
-    res.status(400).json({ error: 'Missing required field: project_slug' });
     return;
   }
 
@@ -236,14 +232,14 @@ agentsRouter.post('/spawn', (req: Request, res: Response) => {
   // Create agent record
   const agentId = randomUUID();
   db.prepare(
-    "INSERT INTO agents (id, user_id, name, current_role, project_slug, session_id, status) VALUES (?, ?, ?, ?, ?, ?, 'active')"
-  ).run(agentId, user.id, `${role}-agent`, role, project_slug, randomUUID());
+    "INSERT INTO agents (id, user_id, name, current_role, session_id, status) VALUES (?, ?, ?, ?, ?, 'active')"
+  ).run(agentId, user.id, `${role}-agent`, role, randomUUID());
 
-  // Create session
-  const session = createSession(db, agentId, user.id, project_slug, role);
+  // Create session — agent has access to ALL projects, A2A routes work
+  const session = createSession(db, agentId, user.id, null, role);
 
   // Start process
-  const proc = spawnProcess(agentId, { session_id: session.session_id, user_id: user.id, project_slug, role });
+  const proc = spawnProcess(agentId, { session_id: session.session_id, user_id: user.id, role });
 
   res.status(201).json({
     agent_id: agentId,
