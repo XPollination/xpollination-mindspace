@@ -693,7 +693,7 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
 
   if (transitionRule?.requiresHumanConfirm && actor === 'liaison') {
     // Human answer audit trail gate (v0.0.19) — applies in ALL modes
-    const validApprovalModes = ['auto', 'semi', 'auto-approval', 'manual'];
+    const validApprovalModes = ['manual', 'semi', 'auto-approval', 'autonomous'];
     if (!dna.human_answer) {
       db.close();
       error(`Human answer audit gate: human_answer required in DNA for ${transitionKey} (liaison). Set dna.human_answer to the exact human decision text.`);
@@ -714,7 +714,7 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
     // Viz confirmation gate (v0.0.18) — mode-specific enforcement
     db.prepare("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)").run();
     const mode = db.prepare("SELECT value FROM system_settings WHERE key = 'liaison_approval_mode'").get();
-    const modeValue = mode?.value || 'auto';
+    const modeValue = mode?.value === 'auto' ? 'autonomous' : (mode?.value || 'autonomous');
     const isCompletionTransition = (newStatus === 'complete');
     const requiresVizConfirm = (modeValue === 'manual') || (modeValue === 'auto-approval' && isCompletionTransition);
 
