@@ -31,6 +31,9 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   OBJECT_UPDATE: handleObjectUpdate,
   BRAIN_QUERY: handleBrainQuery,
   BRAIN_CONTRIBUTE: handleBrainContribute,
+  CAPABILITY_ACTIVATE: handleCapabilityActivate,
+  CAPABILITY_DEACTIVATE: handleCapabilityDeactivate,
+  CAPABILITY_UPGRADE: handleCapabilityUpgrade,
 };
 
 const JWT_SECRET_MSG = process.env.JWT_SECRET || 'changeme';
@@ -850,6 +853,107 @@ async function handleBrainContribute(agent: any, body: any, res: Response): Prom
   } catch (err: any) {
     res.status(502).json({ type: 'ERROR', error: `Brain proxy failed: ${err.message}` });
   }
+}
+
+function handleCapabilityActivate(agent: any, body: any, res: Response): void {
+  const { capability_id, config_overrides } = body;
+  if (!capability_id) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: capability_id' }); return; }
+
+  const db = getDb();
+  const cap = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capability_id) as any;
+  if (!cap) { res.status(404).json({ type: 'ERROR', error: `Capability not found: ${capability_id}` }); return; }
+
+  if (cap.status === 'active') { res.status(409).json({ type: 'ERROR', error: 'Capability is already active' }); return; }
+
+  // Check dependencies are all active
+  let depIds: string[] = [];
+  try { depIds = JSON.parse(cap.dependency_ids || '[]'); } catch { /* ignore */ }
+  const inactiveDeps: string[] = [];
+  for (const depId of depIds) {
+    const dep = db.prepare('SELECT status FROM capabilities WHERE id = ?').get(depId) as any;
+    if (!dep || dep.status !== 'active') inactiveDeps.push(depId);
+  }
+  if (inactiveDeps.length > 0) {
+    res.status(409).json({ type: 'ERROR', error: `Dependencies not active: ${inactiveDeps.join(', ')}` });
+    return;
+  }
+
+  // Merge config overrides
+  let config: any = {};
+  try { config = JSON.parse(cap.config || '{}'); } catch { /* ignore */ }
+  if (config_overrides && typeof config_overrides === 'object') Object.assign(config, config_overrides);
+
+  const now = new Date().toISOString();
+  db.prepare("UPDATE capabilities SET status = 'active', config = ?, updated_at = ? WHERE id = ?")
+    .run(JSON.stringify(config), now, cap.id);
+
+  // Create/update feature flag
+  try {
+    const flagName = `cap-${cap.id}`;
+    const existing = db.prepare('SELECT name FROM feature_flags WHERE name = ?').get(flagName);
+    if (existing) {
+      db.prepare("UPDATE feature_flags SET enabled = 1, updated_at = ? WHERE name = ?").run(now, flagName);
+    } else {
+      db.prepare("INSERT INTO feature_flags (name, enabled, created_at, updated_at) VALUES (?, 1, ?, ?)").run(flagName, now, now);
+    }
+  } catch { /* feature_flags table may differ */ }
+
+  broadcast('capability_activated', { capability_id: cap.id, title: cap.title, actor: agent.name || agent.id, timestamp: now });
+  res.status(200).json({ type: 'ACK', original_type: 'CAPABILITY_ACTIVATE', agent_id: agent.id, capability_id: cap.id, status: 'active', timestamp: now });
+}
+
+function handleCapabilityDeactivate(agent: any, body: any, res: Response): void {
+  const { capability_id } = body;
+  if (!capability_id) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: capability_id' }); return; }
+
+  const db = getDb();
+  const cap = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capability_id) as any;
+  if (!cap) { res.status(404).json({ type: 'ERROR', error: `Capability not found: ${capability_id}` }); return; }
+
+  if (cap.status !== 'active') { res.status(409).json({ type: 'ERROR', error: 'Capability is not active' }); return; }
+
+  // Check no other active caps depend on this one
+  const dependents = db.prepare("SELECT id, title FROM capabilities WHERE status = 'active' AND dependency_ids LIKE ?").all(`%${cap.id}%`) as any[];
+  if (dependents.length > 0) {
+    res.status(409).json({ type: 'ERROR', error: `Cannot deactivate: active capabilities depend on this: ${dependents.map((d: any) => d.title).join(', ')}` });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  db.prepare("UPDATE capabilities SET status = 'draft', updated_at = ? WHERE id = ?").run(now, cap.id);
+
+  // Disable feature flag
+  try {
+    db.prepare("UPDATE feature_flags SET enabled = 0, updated_at = ? WHERE name = ?").run(now, `cap-${cap.id}`);
+  } catch { /* ignore */ }
+
+  broadcast('capability_deactivated', { capability_id: cap.id, title: cap.title, actor: agent.name || agent.id, timestamp: now });
+  res.status(200).json({ type: 'ACK', original_type: 'CAPABILITY_DEACTIVATE', agent_id: agent.id, capability_id: cap.id, status: 'draft', timestamp: now });
+}
+
+function handleCapabilityUpgrade(agent: any, body: any, res: Response): void {
+  const { capability_id, to_version, migration_ref } = body;
+  if (!capability_id) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: capability_id' }); return; }
+  if (!to_version) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: to_version' }); return; }
+
+  const db = getDb();
+  const cap = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(capability_id) as any;
+  if (!cap) { res.status(404).json({ type: 'ERROR', error: `Capability not found: ${capability_id}` }); return; }
+
+  const fromVersion = cap.version || '1.0.0';
+  if (fromVersion === to_version) { res.status(200).json({ type: 'ACK', original_type: 'CAPABILITY_UPGRADE', agent_id: agent.id, capability_id: cap.id, no_change: true, version: fromVersion, timestamp: new Date().toISOString() }); return; }
+
+  const now = new Date().toISOString();
+  db.prepare("UPDATE capabilities SET version = ?, updated_at = ? WHERE id = ?").run(to_version, now, cap.id);
+
+  // Record version history
+  try {
+    db.prepare("INSERT INTO capability_version_history (id, capability_id, from_version, to_version, migration_ref, upgraded_at, upgraded_by) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(crypto.randomUUID(), cap.id, fromVersion, to_version, migration_ref || null, now, agent.name || agent.id);
+  } catch { /* table may not exist */ }
+
+  broadcast('capability_upgraded', { capability_id: cap.id, from_version: fromVersion, to_version, actor: agent.name || agent.id, timestamp: now });
+  res.status(200).json({ type: 'ACK', original_type: 'CAPABILITY_UPGRADE', agent_id: agent.id, capability_id: cap.id, from_version: fromVersion, to_version, timestamp: now });
 }
 
 function handleStub(_agent: any, body: any, res: Response): void {
