@@ -68,6 +68,39 @@ export function validateTask(twin) {
   return { valid: errors.length === 0, errors, warnings, interface_compliance: compliance };
 }
 
+// Available transitions per status (from WORKFLOW.md v19)
+const TRANSITIONS_BY_STATUS = {
+  pending: [{ to_status: 'ready', actor_constraint: 'liaison' }, { to_status: 'cancelled', required_dna: ['abstract_ref'] }],
+  ready: [{ to_status: 'active', required_dna: ['memory_query_session'] }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  active: [{ to_status: 'approval', required_dna: ['pdsa_ref', 'memory_contribution_id'] }, { to_status: 'review' }, { to_status: 'testing' }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  approval: [{ to_status: 'approved', actor_constraint: 'liaison' }, { to_status: 'complete', actor_constraint: 'liaison', required_dna: ['abstract_ref'] }, { to_status: 'rework', actor_constraint: 'liaison' }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  approved: [{ to_status: 'active' }, { to_status: 'testing' }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  testing: [{ to_status: 'ready' }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  review: [{ to_status: 'review' }, { to_status: 'complete', actor_constraint: 'liaison', required_dna: ['abstract_ref'] }, { to_status: 'rework' }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  rework: [{ to_status: 'active' }, { to_status: 'blocked', required_dna: ['blocked_reason'] }],
+  complete: [{ to_status: 'rework', actor_constraint: 'liaison' }],
+  blocked: [{ to_status: 'restore' }],
+  cancelled: [],
+};
+
+const VIZ_CATEGORIES = { pending: 'queue', ready: 'queue', rework: 'queue', active: 'active', testing: 'active', review: 'review', approval: 'review', approved: 'approved', complete: 'complete', blocked: 'blocked', cancelled: 'blocked' };
+
+export function workflowContext(twin) {
+  const status = twin.status || 'pending';
+  const role = twin.dna?.role || null;
+  const isTerminal = status === 'complete' || status === 'cancelled';
+  const isBlocked = status === 'blocked';
+  const transitions = TRANSITIONS_BY_STATUS[status] || [];
+  return {
+    current_state: status,
+    current_role: role,
+    available_transitions: transitions,
+    is_terminal: isTerminal,
+    is_blocked: isBlocked,
+    progress: VIZ_CATEGORIES[status] || 'unknown',
+  };
+}
+
 export function diffTask(current, original) {
   const diff = {};
   for (const key of Object.keys(current)) {
