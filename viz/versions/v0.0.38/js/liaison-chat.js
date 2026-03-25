@@ -15,12 +15,14 @@ class LiaisonChat extends HTMLElement {
         <div class="lc-messages" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;"></div>
         <div class="lc-cards" style="padding:0 10px;"></div>
         <div style="display:flex;border-top:1px solid #45475a;">
+          <button class="lc-create-task" style="background:#313244;border:none;border-right:1px solid #45475a;color:#50fa7b;padding:8px 10px;cursor:pointer;font-size:12px;" title="Create Task">+ Task</button>
           <input type="text" class="lc-text" placeholder="Type a message..." style="flex:1;background:#181825;border:none;color:#cdd6f4;padding:8px 12px;font-size:13px;outline:none;" />
           <button class="lc-send" style="background:#45475a;border:none;color:#cdd6f4;padding:8px 16px;cursor:pointer;">Send</button>
         </div>
       </div>`;
     this.querySelector('.lc-send').addEventListener('click', () => this._send());
     this.querySelector('.lc-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') this._send(); });
+    this.querySelector('.lc-create-task').addEventListener('click', () => this._createTask());
     this._loadMode();
     this._connectSSE();
   }
@@ -82,6 +84,19 @@ class LiaisonChat extends HTMLElement {
     const m = text.match(/^@(\w+)\s+(.*)/);
     try { await fetch('/a2a/message', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'HUMAN_INPUT', agent_id: m ? m[1] : 'liaison-chat', payload: { text: m ? m[2] : text } }) }); } catch {}
+  }
+
+  async _createTask() {
+    const title = prompt('Task title:');
+    if (!title) return;
+    const role = prompt('Assign to role (pdsa/dev/qa/liaison):', 'pdsa');
+    if (!role) return;
+    try {
+      await fetch('/a2a/message', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'OBJECT_CREATE', agent_id: 'liaison-chat', object_type: 'task',
+          payload: { title, current_role: role, status: 'pending', project_slug: 'xpollination-mindspace' } }) });
+      this._msg('user', `Created task: ${title} (${role})`);
+    } catch (e) { this._msg('sys', `Error: ${e.message}`); }
   }
 }
 customElements.define('liaison-chat', LiaisonChat);

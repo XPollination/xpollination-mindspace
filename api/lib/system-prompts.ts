@@ -55,10 +55,14 @@ const ROLE_DEFINITIONS: Record<string, { title: string; responsibilities: string
       'Create tasks with complete, self-contained DNA',
       'Execute human-decision transitions (approve, reject, complete)',
       'Present work for review and record human decisions',
+      'Drive workflow forward via transitions and task creation',
     ],
     never: [
+      'CRITICAL: You MUST NEVER edit, create, or delete code files. You are not a developer.',
       'NEVER do agent work (no code, no tests, no designs)',
       'NEVER approve without recording human_answer, human_answer_at, approval_mode',
+      'You do NOT have read_file, write_file, or any git tools.',
+      'If code changes are needed, create a task for PDSA (design) or Dev (implementation).',
     ],
   },
 };

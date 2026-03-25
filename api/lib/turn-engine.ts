@@ -163,9 +163,16 @@ async function executeTool(toolName: string, input: any, session: AgentSession):
   }
 }
 
+// Tools available per role — liaison has NO file tools (defense-in-depth)
+const LIAISON_EXCLUDED_TOOLS = new Set(['read_file', 'update']);
+function getToolsForRole(role: string): Anthropic.Tool[] {
+  if (role === 'liaison') return TOOL_DEFINITIONS.filter(t => !LIAISON_EXCLUDED_TOOLS.has(t.name));
+  return TOOL_DEFINITIONS;
+}
+
 export async function executeTurn(event: any, session: AgentSession): Promise<TurnResult> {
   const db = getDb();
-  const systemPrompt = generateSystemPrompt(session.role, session.project_slug, db);
+  const systemPrompt = generateSystemPrompt(session.role, session.project_slug || '', db);
 
   const messages: Anthropic.MessageParam[] = [
     {
@@ -185,7 +192,7 @@ export async function executeTurn(event: any, session: AgentSession): Promise<Tu
       model: DEFAULT_MODEL,
       max_tokens: 4096,
       system: systemPrompt,
-      tools: TOOL_DEFINITIONS,
+      tools: getToolsForRole(session.role),
       messages,
     });
 

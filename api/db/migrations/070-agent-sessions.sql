@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
-  project_slug TEXT NOT NULL,
+  project_slug TEXT,
   role TEXT NOT NULL,
   permissions TEXT DEFAULT '["read","write","transition"]',
   token_hash TEXT NOT NULL,
