@@ -202,9 +202,9 @@ When LIAISON executes any `requiresHumanConfirm` transition, the engine requires
 |-------|------|-------------|---------|
 | `human_answer` | string | Exact text of human decision | `"Approve (Recommended)"`, `"AUTO-APPROVE: Design is solid"`, `"Rework"` |
 | `human_answer_at` | string | ISO 8601 timestamp of when human answered | `"2026-03-12T15:00:00Z"` |
-| `approval_mode` | enum | Active approval mode at decision time | `"auto"`, `"semi"`, `"auto-approval"`, `"manual"` |
+| `approval_mode` | enum | Active approval mode at decision time | `"autonomous"`, `"semi"`, `"auto-approval"`, `"manual"` |
 
-**Valid `approval_mode` values:** `auto`, `semi`, `auto-approval`, `manual`
+**Valid `approval_mode` values:** `manual`, `semi`, `auto-approval`, `autonomous`
 
 **Affected transitions (all `requiresHumanConfirm` transitions):**
 - `approval → approved`
@@ -259,7 +259,7 @@ The mode is stored in `system_settings` as `liaison_approval_mode`. Thomas chang
 
 ### Mode Definitions
 
-**Auto** — No engine enforcement. Liaison executes all human-decision transitions freely. Use only when Thomas is actively monitoring agent output in real-time.
+**Autonomous** — No engine enforcement. Liaison executes all human-decision transitions freely, takes full responsibility, drives without human wait. Use only when Thomas is actively monitoring agent output in real-time.
 
 **Auto-Approval** — Approval transitions are free, completion transitions require viz confirmation. This is the standard operating mode: Thomas trusts the pipeline to move work forward but always signs off on final completion.
 
@@ -271,7 +271,7 @@ The mode is stored in `system_settings` as `liaison_approval_mode`. Thomas chang
 
 This table is the **source of truth** for how the engine gates each human-decision transition per mode.
 
-| Transition | Auto | Auto-Approval | Semi | Manual |
+| Transition | Autonomous | Auto-Approval | Semi | Manual |
 |------------|------|---------------|------|--------|
 | `approval → approved` | free | free | protocol only | `human_confirmed` + `via=viz` |
 | `approval → complete` | free | `human_confirmed` + `via=viz` | protocol only | `human_confirmed` + `via=viz` |

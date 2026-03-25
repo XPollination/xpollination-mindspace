@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 750" font-family="monospace" font-size="11">
+  <rect width="960" height="750" rx="12" fill="#0d1117"/>
+
+  <text x="480" y="30" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="bold">P2P Discovery via "Add Project" — Git URL is the Network Bootstrap</text>
+  <text x="480" y="50" text-anchor="middle" fill="#7d8590" font-size="10">The same Settings page you see today becomes the multiplayer entry point</text>
+
+  <!-- Current UX -->
+  <rect x="30" y="70" width="430" height="180" rx="10" fill="#161b22" stroke="#8ab4f8" stroke-width="1.5"/>
+  <text x="50" y="95" fill="#8ab4f8" font-size="13" font-weight="bold">TODAY: Add Project via Git URL</text>
+
+  <rect x="50" y="110" width="350" height="30" rx="6" fill="#0d1117" stroke="#7d8590"/>
+  <text x="60" y="130" fill="#7d8590" font-size="10">https://github.com/XPollination/xpollination-mindspace.git</text>
+  <rect x="410" y="110" width="35" height="30" rx="6" fill="#e07020"/>
+  <text x="428" y="130" text-anchor="middle" fill="#fff" font-size="10">Add</text>
+
+  <text x="50" y="165" fill="#7d8590" font-size="10">What happens:</text>
+  <text x="60" y="180" fill="#7d8590" font-size="9">1. API detects GitHub visibility (public/private)</text>
+  <text x="60" y="194" fill="#7d8590" font-size="9">2. Creates project row in LOCAL SQLite</text>
+  <text x="60" y="208" fill="#7d8590" font-size="9">3. Grants user access</text>
+  <text x="60" y="222" fill="#7d8590" font-size="9">4. Shows missions/tasks for that project</text>
+  <text x="60" y="240" fill="#ef4444" font-size="9">Problem: data lives only on THIS station. No sync.</text>
+
+  <!-- Target UX -->
+  <rect x="500" y="70" width="430" height="180" rx="10" fill="#161b22" stroke="#22c55e" stroke-width="2"/>
+  <text x="520" y="95" fill="#22c55e" font-size="13" font-weight="bold">TARGET: Same UX, P2P Behind It</text>
+
+  <rect x="520" y="110" width="350" height="30" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="530" y="130" fill="#7d8590" font-size="10">https://github.com/XPollination/xpollination-mindspace.git</text>
+  <rect x="880" y="110" width="35" height="30" rx="6" fill="#22c55e"/>
+  <text x="898" y="130" text-anchor="middle" fill="#fff" font-size="10">Add</text>
+
+  <text x="520" y="165" fill="#22c55e" font-size="10">What happens (NEW):</text>
+  <text x="530" y="180" fill="#7d8590" font-size="9">1. API clones repo → reads .xpollination/station.json</text>
+  <text x="530" y="194" fill="#7d8590" font-size="9">2. Discovers hub URL + trust domain + public keys</text>
+  <text x="530" y="208" fill="#22c55e" font-size="9">3. Connects to hub via A2A → syncs twins (CID delta)</text>
+  <text x="530" y="222" fill="#22c55e" font-size="9">4. Station now has all project twins locally</text>
+  <text x="530" y="240" fill="#22c55e" font-size="9">5. SSE stream opens → real-time updates from hub</text>
+
+  <!-- The .xpollination directory -->
+  <rect x="30" y="275" width="900" height="170" rx="10" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="50" y="300" fill="#eab308" font-size="13" font-weight="bold">.xpollination/ — P2P Config In The Repo</text>
+  <text x="50" y="318" fill="#7d8590" font-size="10">This directory in the git repo IS the network topology. Clone = join.</text>
+
+  <rect x="50" y="330" width="400" height="100" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="70" y="350" fill="#eab308" font-size="10" font-weight="bold">station.json</text>
+  <text x="70" y="368" fill="#7d8590" font-size="9">{</text>
+  <text x="80" y="382" fill="#22c55e" font-size="9">"hub": "hive.xpollination.earth",</text>
+  <text x="80" y="396" fill="#22c55e" font-size="9">"trust_domain": "xpollination.earth",</text>
+  <text x="80" y="410" fill="#22c55e" font-size="9">"project_slug": "xpollination-mindspace"</text>
+  <text x="70" y="424" fill="#7d8590" font-size="9">}</text>
+
+  <rect x="470" y="330" width="220" height="100" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="490" y="350" fill="#eab308" font-size="10" font-weight="bold">public-keys/</text>
+  <text x="490" y="370" fill="#7d8590" font-size="9">thomas.pub (ed25519)</text>
+  <text x="490" y="386" fill="#7d8590" font-size="9">robin.pub  (ed25519)</text>
+  <text x="490" y="402" fill="#7d8590" font-size="9">hub.pub    (ed25519)</text>
+  <text x="490" y="420" fill="#7d8590" font-size="8">→ verify twin signatures</text>
+
+  <rect x="710" y="330" width="200" height="100" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="730" y="350" fill="#eab308" font-size="10" font-weight="bold">schema-versions/</text>
+  <text x="730" y="370" fill="#7d8590" font-size="9">mission-twin.v1.json</text>
+  <text x="730" y="386" fill="#7d8590" font-size="9">task-twin.v19.json</text>
+  <text x="730" y="402" fill="#7d8590" font-size="9">workflow.v19.json</text>
+  <text x="730" y="420" fill="#7d8590" font-size="8">→ version negotiation</text>
+
+  <!-- Three stations -->
+  <rect x="30" y="470" width="280" height="140" rx="10" fill="#161b22" stroke="#8ab4f8" stroke-width="1.5"/>
+  <text x="170" y="495" text-anchor="middle" fill="#8ab4f8" font-size="12" font-weight="bold">Thomas's Hetzner</text>
+  <text x="50" y="515" fill="#7d8590" font-size="9">git clone → reads .xpollination/</text>
+  <text x="50" y="530" fill="#7d8590" font-size="9">Station has: missions, tasks, agents</text>
+  <text x="50" y="545" fill="#7d8590" font-size="9">Connects to hub: A2A + SSE</text>
+  <text x="50" y="560" fill="#22c55e" font-size="9">Creates twins → signed with thomas.key</text>
+  <text x="50" y="575" fill="#22c55e" font-size="9">Pushes to hub → Robin receives via SSE</text>
+  <text x="50" y="595" fill="#8ab4f8" font-size="9">SPIFFE ID: spiffe://xpollination.earth/station/hetzner</text>
+
+  <rect x="340" y="470" width="280" height="140" rx="10" fill="#161b22" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="480" y="495" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Robin's Mac</text>
+  <text x="360" y="515" fill="#7d8590" font-size="9">git clone → reads .xpollination/</text>
+  <text x="360" y="530" fill="#7d8590" font-size="9">Station has: local twins (subset)</text>
+  <text x="360" y="545" fill="#7d8590" font-size="9">Connects to hub: A2A + SSE</text>
+  <text x="360" y="560" fill="#22c55e" font-size="9">Receives Thomas's twins via CID delta</text>
+  <text x="360" y="575" fill="#22c55e" font-size="9">Creates own twins → signed with robin.key</text>
+  <text x="360" y="595" fill="#22c55e" font-size="9">SPIFFE ID: spiffe://xpollination.earth/station/robin-mac</text>
+
+  <rect x="650" y="470" width="280" height="140" rx="10" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="790" y="495" text-anchor="middle" fill="#eab308" font-size="12" font-weight="bold">Hub (xp0.ai)</text>
+  <text x="670" y="515" fill="#7d8590" font-size="9">Always online. Relay + cache.</text>
+  <text x="670" y="530" fill="#7d8590" font-size="9">Has ALL twins (superset)</text>
+  <text x="670" y="545" fill="#7d8590" font-size="9">SpiceDB: who can see what</text>
+  <text x="670" y="560" fill="#7d8590" font-size="9">Qdrant: semantic search across all</text>
+  <text x="670" y="575" fill="#eab308" font-size="9">NOT authority — just a well-connected peer</text>
+  <text x="670" y="595" fill="#eab308" font-size="9">SPIFFE ID: spiffe://xpollination.earth/station/hub</text>
+
+  <!-- Arrows between stations -->
+  <line x1="310" y1="540" x2="335" y2="540" stroke="#8ab4f8" stroke-width="1.5"/>
+  <line x1="620" y1="540" x2="645" y2="540" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="322" y="535" fill="#8ab4f8" font-size="8">twins</text>
+  <text x="632" y="535" fill="#22c55e" font-size="8">twins</text>
+
+  <!-- Bottom: the key insight -->
+  <rect x="30" y="630" width="900" height="105" rx="10" fill="#161b22" stroke="#22c55e" stroke-width="2"/>
+  <text x="480" y="655" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">The Key Insight: Git URL = Network Bootstrap</text>
+
+  <text x="50" y="680" fill="#7d8590" font-size="10">Thomas pastes a GitHub URL → station reads .xpollination/ → discovers hub, peers, keys, schemas</text>
+  <text x="50" y="698" fill="#7d8590" font-size="10">Robin pastes the SAME URL → his station discovers the SAME network → they're peers now</text>
+  <text x="50" y="716" fill="#eab308" font-size="10">git pull updates the network topology. New peer? Add their public key. New schema? Add the version file.</text>
+  <text x="50" y="730" fill="#22c55e" font-size="10" font-weight="bold">The UX doesn't change. "Add Project" stays the same. The P2P happens behind it.</text>
+</svg>

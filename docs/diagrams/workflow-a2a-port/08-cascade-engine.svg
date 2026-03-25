@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 550" font-family="monospace" font-size="11">
+  <defs>
+    <marker id="a8u" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#eab308"/>
+    </marker>
+    <marker id="a8g" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#22c55e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="550" rx="12" fill="#0d1117"/>
+
+  <text x="480" y="30" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="bold">Cascade Engine — Task Completion Propagates Up</text>
+  <text x="480" y="48" text-anchor="middle" fill="#7d8590" font-size="10">When a task completes, A2A checks if parent requirement, capability, and mission should advance</text>
+
+  <!-- Task completes -->
+  <rect x="50" y="80" width="200" height="45" rx="8" fill="#1c2128" stroke="#22c55e" stroke-width="2"/>
+  <text x="150" y="100" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Task → complete</text>
+  <text x="150" y="116" text-anchor="middle" fill="#7d8590" font-size="9">TRANSITION handler fires cascade</text>
+
+  <line x1="250" y1="102" x2="300" y2="102" stroke="#eab308" stroke-width="2" marker-end="url(#a8u)"/>
+
+  <!-- Cascade Step 1 -->
+  <rect x="305" y="75" width="310" height="95" rx="8" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="325" y="98" fill="#eab308" font-size="11" font-weight="bold">Step 1: Check Requirement</text>
+
+  <text x="325" y="118" fill="#7d8590" font-size="9">1. Find requirement linked to this task</text>
+  <text x="325" y="132" fill="#7d8590" font-size="9">2. Query: SELECT COUNT(*) FROM tasks WHERE</text>
+  <text x="325" y="146" fill="#7d8590" font-size="9">   requirement_id = ? AND status != 'complete'</text>
+  <text x="325" y="160" fill="#22c55e" font-size="9">3. If count = 0 → requirement is MET</text>
+
+  <line x1="460" y1="170" x2="460" y2="200" stroke="#eab308" stroke-width="2" marker-end="url(#a8u)"/>
+
+  <!-- Cascade Step 2 -->
+  <rect x="305" y="205" width="310" height="95" rx="8" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="325" y="228" fill="#eab308" font-size="11" font-weight="bold">Step 2: Check Capability</text>
+
+  <text x="325" y="248" fill="#7d8590" font-size="9">1. Find capability linked to this requirement</text>
+  <text x="325" y="262" fill="#7d8590" font-size="9">2. Query: all requirements for this capability</text>
+  <text x="325" y="276" fill="#7d8590" font-size="9">   WHERE status != 'active' (all must be met)</text>
+  <text x="325" y="290" fill="#22c55e" font-size="9">3. If all met → capability status = 'complete'</text>
+
+  <line x1="460" y1="300" x2="460" y2="330" stroke="#eab308" stroke-width="2" marker-end="url(#a8u)"/>
+
+  <!-- Cascade Step 3 -->
+  <rect x="305" y="335" width="310" height="95" rx="8" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="325" y="358" fill="#eab308" font-size="11" font-weight="bold">Step 3: Check Mission</text>
+
+  <text x="325" y="378" fill="#7d8590" font-size="9">1. Find mission for this capability</text>
+  <text x="325" y="392" fill="#7d8590" font-size="9">2. Query: all capabilities for this mission</text>
+  <text x="325" y="406" fill="#7d8590" font-size="9">   WHERE status != 'complete'</text>
+  <text x="325" y="420" fill="#22c55e" font-size="9">3. If all complete → mission status = 'complete'</text>
+
+  <!-- SSE broadcasts at each step -->
+  <rect x="650" y="80" width="280" height="55" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="670" y="100" fill="#22c55e" font-size="10" font-weight="bold">SSE: transition</text>
+  <text x="670" y="118" fill="#7d8590" font-size="9">task_slug, from_status→complete</text>
+  <line x1="615" y1="102" x2="645" y2="102" stroke="#22c55e" stroke-width="1" marker-end="url(#a8g)"/>
+
+  <rect x="650" y="210" width="280" height="55" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="670" y="230" fill="#22c55e" font-size="10" font-weight="bold">SSE: cascade_update</text>
+  <text x="670" y="248" fill="#7d8590" font-size="9">capability_id, new_status: complete</text>
+  <line x1="615" y1="240" x2="645" y2="240" stroke="#22c55e" stroke-width="1" marker-end="url(#a8g)"/>
+
+  <rect x="650" y="340" width="280" height="55" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="670" y="360" fill="#22c55e" font-size="10" font-weight="bold">SSE: cascade_update</text>
+  <text x="670" y="378" fill="#7d8590" font-size="9">mission_id, new_status: complete</text>
+  <line x1="615" y1="370" x2="645" y2="370" stroke="#22c55e" stroke-width="1" marker-end="url(#a8g)"/>
+
+  <!-- Edge cases -->
+  <rect x="50" y="450" width="880" height="85" rx="8" fill="#161b22" stroke="#7d8590"/>
+  <text x="70" y="475" fill="#e6edf3" font-size="11" font-weight="bold">Edge Cases (A2A handles mechanically):</text>
+
+  <text x="70" y="498" fill="#7d8590" font-size="10">- Task has no requirement_id → no cascade (standalone task)</text>
+  <text x="70" y="514" fill="#7d8590" font-size="10">- Requirement has no capability_id → cascade stops at requirement level</text>
+  <text x="500" y="498" fill="#7d8590" font-size="10">- Cancelled tasks don't count (excluded from "all complete" check)</text>
+  <text x="500" y="514" fill="#7d8590" font-size="10">- Blocked tasks block cascade (count as incomplete)</text>
+  <text x="70" y="527" fill="#eab308" font-size="10">- Rework reopens a complete task → parent capability/mission revert to active (reverse cascade)</text>
+</svg>

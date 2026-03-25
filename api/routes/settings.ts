@@ -4,7 +4,7 @@ import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
 
 export const settingsRouter = Router();
 
-const VALID_MODES = ['auto', 'semi', 'manual'];
+const VALID_MODES = ['manual', 'semi', 'auto-approval', 'autonomous'];
 
 settingsRouter.use(requireApiKeyOrJwt);
 

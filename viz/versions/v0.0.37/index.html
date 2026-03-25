@@ -990,7 +990,7 @@
         <option value="manual">Manual</option>
         <option value="semi">Semi</option>
         <option value="auto-approval">Auto-Approval</option>
-        <option value="auto">Auto</option>
+        <option value="autonomous">Autonomous</option>
       </select>
       <span class="stats-bar" id="stats">Loading...</span>
       <button id="refresh-btn">Refresh</button>
@@ -1153,7 +1153,8 @@
     let modeWriteInFlight = false;
     async function loadLiaisonMode() {
       try {
-        const res = await fetch('/api/settings/liaison-approval-mode');
+        const modeProject = currentProject && currentProject !== 'all' ? `?project=${currentProject}` : '';
+        const res = await fetch(`/api/settings/liaison-approval-mode${modeProject}`);
         if (res.ok) {
           const data = await res.json();
           suppressModeChange = true;
@@ -1179,10 +1180,11 @@
         if (modeWriteInFlight) return;
         modeWriteInFlight = true;
         try {
+          const saveProject = currentProject && currentProject !== 'all' ? currentProject : undefined;
           await fetch('/api/settings/liaison-approval-mode', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: newMode })
+            body: JSON.stringify({ mode: newMode, project: saveProject })
           });
           serverMode = newMode;
           // Re-render detail panel to update buttons for new mode
