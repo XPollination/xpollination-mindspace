@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="monospace" font-size="13">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#8ab4f8"/>
+    </marker>
+    <marker id="arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#22c55e"/>
+    </marker>
+    <marker id="arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+    </marker>
+  </defs>
+  <rect width="900" height="520" rx="12" fill="#0d1117"/>
+
+  <text x="450" y="35" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="bold">Twin Lifecycle — Object-Oriented A2A</text>
+  <text x="450" y="55" text-anchor="middle" fill="#7d8590" font-size="11">Every mutation flows through twin validation. No bypass path exists.</text>
+
+  <!-- Agent -->
+  <rect x="30" y="100" width="120" height="50" rx="8" fill="#1c2128" stroke="#8ab4f8" stroke-width="1.5"/>
+  <text x="90" y="130" text-anchor="middle" fill="#8ab4f8" font-size="12">Agent</text>
+
+  <!-- A2A Server -->
+  <rect x="250" y="80" width="180" height="80" rx="8" fill="#1c2128" stroke="#22c55e" stroke-width="2"/>
+  <text x="340" y="110" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">A2A Server</text>
+  <text x="340" y="130" text-anchor="middle" fill="#7d8590" font-size="10">POST /a2a/message</text>
+  <text x="340" y="145" text-anchor="middle" fill="#7d8590" font-size="10">Single write path</text>
+
+  <!-- Twin Module -->
+  <rect x="530" y="80" width="160" height="80" rx="8" fill="#1c2128" stroke="#eab308" stroke-width="1.5"/>
+  <text x="610" y="110" text-anchor="middle" fill="#eab308" font-size="13" font-weight="bold">Twin Module</text>
+  <text x="610" y="130" text-anchor="middle" fill="#7d8590" font-size="10">create() validate()</text>
+  <text x="610" y="145" text-anchor="middle" fill="#7d8590" font-size="10">transition() diff()</text>
+
+  <!-- Database -->
+  <rect x="760" y="100" width="110" height="50" rx="8" fill="#1c2128" stroke="#7d8590" stroke-width="1"/>
+  <text x="815" y="130" text-anchor="middle" fill="#7d8590" font-size="12">SQLite</text>
+
+  <!-- Arrows top row -->
+  <line x1="150" y1="125" x2="245" y2="125" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="430" y1="120" x2="525" y2="120" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <line x1="690" y1="125" x2="755" y2="125" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- OBJECT_CREATE flow -->
+  <rect x="30" y="210" width="840" height="90" rx="8" fill="#161b22" stroke="#1c2128"/>
+  <text x="50" y="235" fill="#22c55e" font-size="13" font-weight="bold">OBJECT_CREATE</text>
+  <text x="50" y="255" fill="#7d8590" font-size="11">1. Agent sends payload</text>
+  <text x="250" y="255" fill="#eab308" font-size="11">2. Twin.create(payload)</text>
+  <text x="450" y="255" fill="#eab308" font-size="11">3. Twin.validate()</text>
+  <text x="630" y="255" fill="#22c55e" font-size="11">4. Persist + Broadcast</text>
+  <text x="50" y="280" fill="#7d8590" font-size="10">→ Returns: twin + workflow_context (what to do next)</text>
+  <text x="450" y="280" fill="#ef4444" font-size="10">✗ Invalid → ERROR with validation details</text>
+
+  <!-- OBJECT_UPDATE flow -->
+  <rect x="30" y="310" width="840" height="90" rx="8" fill="#161b22" stroke="#1c2128"/>
+  <text x="50" y="335" fill="#8ab4f8" font-size="13" font-weight="bold">OBJECT_UPDATE</text>
+  <text x="50" y="355" fill="#7d8590" font-size="11">1. Agent sends updates</text>
+  <text x="250" y="355" fill="#eab308" font-size="11">2. Load → apply → validate</text>
+  <text x="480" y="355" fill="#eab308" font-size="11">3. Twin.diff(old, new)</text>
+  <text x="680" y="355" fill="#22c55e" font-size="11">4. Persist + Broadcast</text>
+  <text x="50" y="380" fill="#7d8590" font-size="10">→ Returns: updated twin + diff + workflow_context</text>
+  <text x="450" y="380" fill="#ef4444" font-size="10">✗ Immutable (complete) → REJECTED</text>
+
+  <!-- TRANSITION flow -->
+  <rect x="30" y="410" width="840" height="90" rx="8" fill="#161b22" stroke="#1c2128"/>
+  <text x="50" y="435" fill="#eab308" font-size="13" font-weight="bold">TRANSITION</text>
+  <text x="50" y="455" fill="#7d8590" font-size="11">1. Agent sends to_status</text>
+  <text x="260" y="455" fill="#eab308" font-size="11">2. Twin.transition(status, actor, dna)</text>
+  <text x="540" y="455" fill="#eab308" font-size="11">3. Quality gates</text>
+  <text x="700" y="455" fill="#22c55e" font-size="11">4. Persist + Broadcast</text>
+  <text x="50" y="480" fill="#7d8590" font-size="10">→ Returns: ACK + new state + workflow_context (next step)</text>
+  <text x="450" y="480" fill="#ef4444" font-size="10">✗ Undefined transition → PROHIBITED</text>
+</svg>

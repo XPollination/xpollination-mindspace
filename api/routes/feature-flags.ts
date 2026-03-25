@@ -89,6 +89,28 @@ featureFlagsRouter.get('/export', requireProjectAccess('viewer'), (req: Request,
   res.status(200).send(yaml);
 });
 
+// GET /mine — flags the current user has access to (viewer)
+// MUST be before /:flagId to avoid "mine" being matched as a flagId
+featureFlagsRouter.get('/mine', requireProjectAccess('viewer'), (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const user = (req as any).user;
+  const db = getDb();
+
+  const allOn = db.prepare(
+    'SELECT * FROM feature_flags WHERE project_slug = ? AND state = ? ORDER BY created_at DESC'
+  ).all(slug, 'on') as any[];
+
+  const accessible = allOn.filter(flag => {
+    if (!flag.allowed_user_ids) return true;
+    try {
+      const ids = JSON.parse(flag.allowed_user_ids);
+      return Array.isArray(ids) && ids.includes(user.id);
+    } catch { return false; }
+  });
+
+  res.status(200).json(accessible);
+});
+
 // GET /:flagId — get single flag (viewer)
 featureFlagsRouter.get('/:flagId', requireProjectAccess('viewer'), (req: Request, res: Response) => {
   const { slug, flagId } = req.params;
@@ -180,6 +202,25 @@ featureFlagsRouter.put('/:flagId/toggle', requireProjectAccess('contributor'), (
     current_state: 'off',
     requested_state: 'on'
   });
+});
+
+// PUT /:flagId/users — set allowed users for a flag (admin)
+featureFlagsRouter.put('/:flagId/users', requireProjectAccess('admin'), (req: Request, res: Response) => {
+  const { slug, flagId } = req.params;
+  const { user_ids } = req.body;
+  const db = getDb();
+
+  const existing = db.prepare('SELECT * FROM feature_flags WHERE id = ? AND project_slug = ?').get(flagId, slug);
+  if (!existing) {
+    res.status(404).json({ error: 'Flag not found' });
+    return;
+  }
+
+  const value = user_ids === null ? null : JSON.stringify(user_ids);
+  db.prepare('UPDATE feature_flags SET allowed_user_ids = ? WHERE id = ? AND project_slug = ?').run(value, flagId, slug);
+
+  const flag = db.prepare('SELECT * FROM feature_flags WHERE id = ?').get(flagId);
+  res.status(200).json(flag);
 });
 
 // DELETE /:flagId — remove flag (admin only)

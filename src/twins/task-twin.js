@@ -12,8 +12,16 @@ export function createTask(input) {
   };
 }
 
+// TaskInterface v1.0 — type-specific required DNA fields (SKO Part 2)
+const TASK_TYPE_FIELDS = {
+  pdsa: { required: ['description', 'requirement_refs'], label: 'PDSA Design' },
+  dev:  { required: ['description', 'requirement_refs'], label: 'DEV Implementation' },
+  qa:   { required: ['description'], label: 'QA Test' },
+};
+
 export function validateTask(twin) {
   const errors = [];
+  const warnings = [];
 
   if (!twin.slug || typeof twin.slug !== 'string') {
     errors.push('slug is required');
@@ -33,7 +41,28 @@ export function validateTask(twin) {
     errors.push(`role must be one of: ${VALID_ROLES.join(', ')}`);
   }
 
-  return { valid: errors.length === 0, errors };
+  // TaskInterface v1.0: type-specific field checks
+  const role = twin.dna?.role;
+  const typeSpec = role ? TASK_TYPE_FIELDS[role] : null;
+  let compliance = null;
+
+  if (typeSpec && twin.dna) {
+    const missing = typeSpec.required.filter(f => !twin.dna[f]);
+    const present = typeSpec.required.length - missing.length;
+    if (missing.length > 0) {
+      warnings.push(`TaskInterface v1.0 (${typeSpec.label}): missing DNA fields: ${missing.join(', ')}`);
+    }
+    compliance = {
+      interface: 'TaskInterface',
+      version: '1.0',
+      task_type: role,
+      fields_present: present,
+      fields_required: typeSpec.required.length,
+      completeness_percent: Math.round((present / typeSpec.required.length) * 100),
+    };
+  }
+
+  return { valid: errors.length === 0, errors, warnings, interface_compliance: compliance };
 }
 
 export function diffTask(current, original) {

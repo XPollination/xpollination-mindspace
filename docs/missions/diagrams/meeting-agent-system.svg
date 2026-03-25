@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" font-family="system-ui, sans-serif">
+  <title>Meeting Companion Agent — System Architecture v2</title>
+  <desc>
+    AGENT-READABLE: Evolved system architecture. Meeting room (LiveKit WebRTC) contains N authenticated
+    participants + 1 companion agent (browser-side, activated by any participant).
+    Agent has 3 COUPLED capabilities sharing one speech stream:
+    CAP-1 (Thought Synthesis): topic-boundary detection → cross-speaker LLM synthesis → brain write with
+    group_token + per-speaker attribution. Provides conversational context to CAP-2.
+    CAP-2 (Voice Mission Editor — Jarvis): "Hey Mindspace" wake word → 5 roles: Creator (OBJECT_CREATE),
+    Writer (OBJECT_UPDATE from conversation), Reviser (section rewrite with new framing + cascade detection),
+    Reader (OBJECT_QUERY → tree in chat), Navigator (TRANSITION). LLM resolves conversational references
+    ("that", "write it", "what Robin said") using CAP-1 context. Reviser is key differentiator: rewrites
+    existing sections based on evolved understanding, not just creates new objects.
+    CAP-3 (Group Provenance): anonymous group token, contribution-to-synthesis credit model (not speech volume),
+    every edit linked to thought trail, content_version tracked.
+    Services: Brain API (thoughts with group_token), A2A Router (LLM-less mechanical execution),
+    LLM (synthesis + intent parsing + content generation), Provenance Store.
+  </desc>
+
+  <rect width="900" height="640" fill="#0d1117" rx="8"/>
+
+  <!-- Meeting Room -->
+  <rect x="30" y="15" width="840" height="180" rx="8" fill="none" stroke="#30363d" stroke-width="2"/>
+  <text x="50" y="40" fill="#58a6ff" font-size="13" font-weight="700">MEETING ROOM (LiveKit WebRTC)</text>
+
+  <!-- Participants -->
+  <rect x="50" y="55" width="100" height="45" rx="5" fill="#161b22" stroke="#30363d"/>
+  <text x="100" y="75" fill="#c9d1d9" font-size="11" text-anchor="middle">Thomas</text>
+  <text x="100" y="90" fill="#8b949e" font-size="9" text-anchor="middle">Safari</text>
+
+  <rect x="165" y="55" width="100" height="45" rx="5" fill="#161b22" stroke="#30363d"/>
+  <text x="215" y="75" fill="#c9d1d9" font-size="11" text-anchor="middle">Robin</text>
+  <text x="215" y="90" fill="#8b949e" font-size="9" text-anchor="middle">Chrome</text>
+
+  <rect x="280" y="55" width="100" height="45" rx="5" fill="#161b22" stroke="#30363d"/>
+  <text x="330" y="75" fill="#c9d1d9" font-size="11" text-anchor="middle">Person N</text>
+  <text x="330" y="90" fill="#8b949e" font-size="9" text-anchor="middle">any</text>
+
+  <!-- Companion Agent -->
+  <rect x="120" y="115" width="320" height="65" rx="8" fill="#1c2333" stroke="#58a6ff" stroke-width="2"/>
+  <text x="280" y="138" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">Companion Agent (in browser)</text>
+  <text x="280" y="155" fill="#8b949e" font-size="10" text-anchor="middle">One per room · Activated by any participant · Serves everyone</text>
+  <text x="280" y="170" fill="#d29922" font-size="10" text-anchor="middle">Jarvis for mission architecture</text>
+
+  <!-- Connection lines -->
+  <line x1="100" y1="100" x2="180" y2="115" stroke="#30363d" stroke-dasharray="3"/>
+  <line x1="215" y1="100" x2="260" y2="115" stroke="#30363d" stroke-dasharray="3"/>
+  <line x1="330" y1="100" x2="340" y2="115" stroke="#30363d" stroke-dasharray="3"/>
+
+  <!-- Shared speech stream -->
+  <rect x="470" y="55" width="380" height="130" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="660" y="78" fill="#c9d1d9" font-size="11" font-weight="600" text-anchor="middle">Shared Speech Stream</text>
+  <text x="660" y="98" fill="#8b949e" font-size="9" text-anchor="middle">Continuous transcript with speaker attribution</text>
+  <text x="660" y="118" fill="#3fb950" font-size="10" text-anchor="middle">→ Feeds CAP-1 (synthesis)</text>
+  <text x="660" y="135" fill="#d29922" font-size="10" text-anchor="middle">→ Feeds CAP-2 (context for voice editor)</text>
+  <text x="660" y="152" fill="#bc8cff" font-size="10" text-anchor="middle">→ Feeds CAP-3 (speaker attribution for credit)</text>
+
+  <!-- Three capability boxes -->
+  <!-- CAP-1 -->
+  <rect x="30" y="215" width="260" height="165" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="2"/>
+  <text x="160" y="240" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">CAP-1: Thought Synthesis</text>
+  <text x="160" y="260" fill="#c9d1d9" font-size="10" text-anchor="middle">Topic-boundary detection</text>
+  <text x="160" y="278" fill="#c9d1d9" font-size="10" text-anchor="middle">Cross-speaker LLM synthesis</text>
+  <text x="160" y="296" fill="#c9d1d9" font-size="10" text-anchor="middle">30-60s dialogue → 1 group thought</text>
+  <text x="160" y="318" fill="#8b949e" font-size="9" text-anchor="middle">Per-speaker attribution:</text>
+  <text x="160" y="333" fill="#8b949e" font-size="9" text-anchor="middle">"thomas: framing, robin: challenge"</text>
+  <rect x="55" y="345" width="210" height="22" rx="3" fill="#0d1117" stroke="#3fb950"/>
+  <text x="160" y="360" fill="#3fb950" font-size="9" text-anchor="middle">→ Brain write (group_token) + context to CAP-2</text>
+
+  <!-- Coupling arrow CAP-1 → CAP-2 -->
+  <line x1="290" y1="300" x2="320" y2="300" stroke="#d29922" stroke-width="3"/>
+  <text x="305" y="290" fill="#d29922" font-size="8" font-weight="700" text-anchor="middle">context</text>
+
+  <!-- CAP-2 -->
+  <rect x="320" y="215" width="290" height="165" rx="8" fill="#2b1d0e" stroke="#d29922" stroke-width="2"/>
+  <text x="465" y="240" fill="#d29922" font-size="12" font-weight="700" text-anchor="middle">CAP-2: Voice Mission Editor</text>
+  <text x="465" y="258" fill="#d29922" font-size="10" text-anchor="middle">"Hey Mindspace"</text>
+
+  <!-- Mini role pills -->
+  <rect x="335" y="268" width="68" height="20" rx="10" fill="#0d1117" stroke="#3fb950"/>
+  <text x="369" y="282" fill="#3fb950" font-size="8" text-anchor="middle">Creator</text>
+  <rect x="410" y="268" width="60" height="20" rx="10" fill="#0d1117" stroke="#58a6ff"/>
+  <text x="440" y="282" fill="#58a6ff" font-size="8" text-anchor="middle">Writer</text>
+  <rect x="477" y="268" width="72" height="20" rx="10" fill="#0d1117" stroke="#d29922" stroke-width="2"/>
+  <text x="513" y="282" fill="#d29922" font-size="8" font-weight="700" text-anchor="middle">Reviser ★</text>
+  <rect x="556" y="268" width="60" height="20" rx="10" fill="#0d1117" stroke="#bc8cff"/>
+  <text x="586" y="282" fill="#bc8cff" font-size="8" text-anchor="middle">Reader</text>
+
+  <rect x="335" y="295" width="60" height="20" rx="10" fill="#0d1117" stroke="#8b949e"/>
+  <text x="365" y="309" fill="#c9d1d9" font-size="8" text-anchor="middle">Navigator</text>
+
+  <text x="465" y="335" fill="#c9d1d9" font-size="9" text-anchor="middle">Reviser: find section → rewrite with</text>
+  <text x="465" y="349" fill="#c9d1d9" font-size="9" text-anchor="middle">new framing → detect cascades</text>
+
+  <rect x="335" y="355" width="260" height="18" rx="3" fill="#0d1117" stroke="#d29922"/>
+  <text x="465" y="368" fill="#d29922" font-size="8" text-anchor="middle">Resolves: "that", "write it", "what Robin said", "update it too"</text>
+
+  <!-- CAP-3 -->
+  <rect x="640" y="215" width="230" height="165" rx="8" fill="#1c1533" stroke="#bc8cff" stroke-width="2"/>
+  <text x="755" y="240" fill="#bc8cff" font-size="12" font-weight="700" text-anchor="middle">CAP-3: Group Provenance</text>
+  <text x="755" y="262" fill="#c9d1d9" font-size="10" text-anchor="middle">Anonymous group token</text>
+  <text x="755" y="280" fill="#c9d1d9" font-size="10" text-anchor="middle">Contribution-to-synthesis</text>
+  <text x="755" y="298" fill="#c9d1d9" font-size="10" text-anchor="middle">credit (not speech volume)</text>
+  <text x="755" y="320" fill="#8b949e" font-size="9" text-anchor="middle">Every edit → thought trail link</text>
+  <text x="755" y="338" fill="#8b949e" font-size="9" text-anchor="middle">content_version tracked</text>
+  <rect x="660" y="350" width="190" height="22" rx="3" fill="#0d1117" stroke="#bc8cff"/>
+  <text x="755" y="365" fill="#bc8cff" font-size="9" text-anchor="middle">Non-reversible · Per-person credit</text>
+
+  <!-- Coupling arrow CAP-2 → CAP-3 -->
+  <line x1="610" y1="300" x2="640" y2="300" stroke="#bc8cff" stroke-width="2"/>
+
+  <!-- Services row -->
+  <rect x="30" y="410" width="195" height="65" rx="6" fill="#161b22" stroke="#3fb950"/>
+  <text x="127" y="435" fill="#3fb950" font-size="12" font-weight="600" text-anchor="middle">Brain API</text>
+  <text x="127" y="455" fill="#8b949e" font-size="9" text-anchor="middle">Group thoughts + attributions</text>
+  <text x="127" y="468" fill="#8b949e" font-size="9" text-anchor="middle">Queryable trail after meeting</text>
+
+  <rect x="240" y="410" width="195" height="65" rx="6" fill="#161b22" stroke="#d29922"/>
+  <text x="337" y="435" fill="#d29922" font-size="12" font-weight="600" text-anchor="middle">A2A Router</text>
+  <text x="337" y="455" fill="#8b949e" font-size="9" text-anchor="middle">LLM-less mechanical routing</text>
+  <text x="337" y="468" fill="#8b949e" font-size="9" text-anchor="middle">CREATE · UPDATE · QUERY · TRANSITION</text>
+
+  <rect x="450" y="410" width="195" height="65" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="547" y="435" fill="#bc8cff" font-size="12" font-weight="600" text-anchor="middle">Provenance Store</text>
+  <text x="547" y="455" fill="#8b949e" font-size="9" text-anchor="middle">group → members mapping</text>
+  <text x="547" y="468" fill="#8b949e" font-size="9" text-anchor="middle">edit → thought → credit chain</text>
+
+  <rect x="660" y="410" width="210" height="65" rx="6" fill="#161b22" stroke="#58a6ff"/>
+  <text x="765" y="435" fill="#58a6ff" font-size="12" font-weight="600" text-anchor="middle">LLM</text>
+  <text x="765" y="452" fill="#8b949e" font-size="9" text-anchor="middle">Synthesis · Intent parsing</text>
+  <text x="765" y="465" fill="#8b949e" font-size="9" text-anchor="middle">Content generation · Rewriting</text>
+
+  <!-- Connection lines to services -->
+  <line x1="160" y1="380" x2="127" y2="410" stroke="#3fb950" stroke-width="1.5"/>
+  <line x1="465" y1="380" x2="337" y2="410" stroke="#d29922" stroke-width="1.5"/>
+  <line x1="755" y1="380" x2="547" y2="410" stroke="#bc8cff" stroke-width="1.5"/>
+  <line x1="160" y1="340" x2="660" y2="430" stroke="#8b949e" stroke-dasharray="3" opacity="0.4"/>
+  <line x1="465" y1="340" x2="660" y2="430" stroke="#8b949e" stroke-dasharray="3" opacity="0.4"/>
+
+  <!-- Legend -->
+  <rect x="30" y="495" width="840" height="130" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="50" y="520" fill="#c9d1d9" font-size="12" font-weight="700">Key Insight: Capabilities Are Coupled, Not Independent</text>
+
+  <text x="50" y="545" fill="#3fb950" font-size="10">■ CAP-1 synthesizes thoughts AND provides context to CAP-2</text>
+  <text x="50" y="565" fill="#d29922" font-size="10">■ CAP-2 creates/revises missions using CAP-1 context — "write what we discussed" resolves from synthesis</text>
+  <text x="50" y="585" fill="#bc8cff" font-size="10">■ CAP-3 wraps everything — every synthesis gets attribution, every edit gets linked to its thought</text>
+  <text x="50" y="610" fill="#8b949e" font-size="10">--- Dashed = LLM calls (synthesis, intent, rewriting)  ─── Solid = data flow</text>
+</svg>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — XPollination Mindspace</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
+  <link rel="stylesheet" href="/mindspace.css">
+  <style>
+    label { margin-bottom: 0.3rem; }
+    .ms-input { margin-bottom: 1rem; }
+    .msg { font-size: 0.85rem; margin-bottom: 0.5rem; display: none; }
+    .msg-error { color: #d32f2f; }
+    .msg-success { color: #2e7d32; }
+    .login-link { text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: var(--ms-muted); }
+  </style>
+</head>
+<body class="ms-auth-page">
+  <script type="module" src="/js/mindspace-nav.js"></script>
+  <div class="ms-auth-box">
+    <div class="ms-auth-logo">
+      <picture>
+        <source srcset="/assets/mindspace-logo-120.webp" type="image/webp">
+        <img src="/assets/mindspace-logo-120.png" alt="XPollination Mindspace" width="120" height="120">
+      </picture>
+    </div>
+    <h1 class="ms-auth-title">Create Account</h1>
+    <p class="ms-auth-tagline">Join the collective intelligence platform</p>
+    <div class="msg" id="msg"></div>
+    <form id="registerForm">
+      <label for="invite-code">Invite Code</label>
+      <input type="text" id="invite-code" name="invite_code" required class="ms-input" placeholder="Enter your invite code">
+      <label for="name">Full Name</label>
+      <input type="text" id="name" name="name" required class="ms-input" autocomplete="name">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required class="ms-input" autocomplete="email">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required class="ms-input" autocomplete="new-password">
+      <button type="submit" class="ms-btn ms-btn-primary" style="width:100%;padding:0.7rem;font-size:1rem;">Register</button>
+    </form>
+    <div class="login-link">Already have an account? <a href="/login">Sign in</a></div>
+  </div>
+  <script>
+    // Pre-fill invite code from URL
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) document.getElementById('invite-code').value = code;
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const invite_code = document.getElementById('invite-code').value;
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const msg = document.getElementById('msg');
+      msg.style.display = 'none';
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invite_code, name, email, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = 'Account created! Redirecting to login...';
+          msg.className = 'msg msg-success';
+          msg.style.display = 'block';
+          setTimeout(() => { window.location.href = '/login'; }, 1500);
+        } else {
+          msg.textContent = data.error || 'Registration failed';
+          msg.className = 'msg msg-error';
+          msg.style.display = 'block';
+        }
+      } catch {
+        msg.textContent = 'Network error';
+        msg.className = 'msg msg-error';
+        msg.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

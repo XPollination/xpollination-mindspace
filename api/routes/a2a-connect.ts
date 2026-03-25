@@ -1,10 +1,46 @@
 import { Router, Request, Response } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { getDb } from '../db/connection.js';
 
 export const a2aConnectRouter = Router();
 
 const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison', 'orchestrator'];
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+
+/**
+ * Authenticate via API key (SHA-256 hash lookup) or JWT.
+ * Returns userId or null.
+ */
+function authenticateIdentity(req: Request, apiKey?: string): string | null {
+  const db = getDb();
+
+  // Path 1: API key in twin identity (agents, CLI)
+  if (apiKey) {
+    const keyHash = createHash('sha256').update(apiKey).digest('hex');
+    const keyRow = db.prepare(
+      `SELECT ak.id AS key_id, ak.revoked_at, u.id
+       FROM api_keys ak
+       JOIN users u ON ak.user_id = u.id
+       WHERE ak.key_hash = ?`
+    ).get(keyHash) as any;
+
+    if (!keyRow || keyRow.revoked_at) return null;
+    return keyRow.id;
+  }
+
+  // Path 2: JWT from Authorization header (browser — viz proxy sets this from ms_session cookie)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.sub) return decoded.sub;
+    } catch { /* invalid JWT */ }
+  }
+
+  return null;
+}
 
 // POST /a2a/connect — A2A CHECKIN handler
 a2aConnectRouter.post('/', (req: Request, res: Response) => {
@@ -19,37 +55,24 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  // 2. Validate identity fields
+  // 2. Validate identity fields — agent_name required, api_key optional (JWT fallback)
   const { agent_name, api_key, session_id } = twin.identity;
-  if (!agent_name || !api_key) {
+  if (!agent_name) {
     res.status(400).json({
       type: 'ERROR',
-      error: 'Invalid identity: agent_name and api_key are required'
+      error: 'Invalid identity: agent_name is required'
     });
     return;
   }
 
-  // 3. Authenticate via API key (SHA-256 hash lookup)
-  const keyHash = createHash('sha256').update(api_key).digest('hex');
+  // 3. Authenticate via API key or JWT
+  const userId = authenticateIdentity(req, api_key);
+  if (!userId) {
+    res.status(401).json({ type: 'ERROR', error: 'Authentication failed: invalid API key or JWT' });
+    return;
+  }
+
   const db = getDb();
-
-  const keyRow = db.prepare(
-    `SELECT ak.id AS key_id, ak.revoked_at, u.id, u.email, u.name
-     FROM api_keys ak
-     JOIN users u ON ak.user_id = u.id
-     WHERE ak.key_hash = ?`
-  ).get(keyHash) as any;
-
-  if (!keyRow) {
-    res.status(401).json({ type: 'ERROR', error: 'Invalid API key' });
-    return;
-  }
-  if (keyRow.revoked_at) {
-    res.status(401).json({ type: 'ERROR', error: 'API key has been revoked' });
-    return;
-  }
-
-  const userId = keyRow.id;
 
   // 4. Validate role
   const currentRole = twin.role?.current;

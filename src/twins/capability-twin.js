@@ -8,8 +8,15 @@ export function createCapability(input) {
   };
 }
 
+// CapabilityInterface v1.0 — 6 required sections (SKO Part 2)
+const CAPABILITY_SECTIONS = [
+  'What It Does', 'Why It Matters', 'Architecture',
+  'Reusability', 'Design Decisions', 'Current State'
+];
+
 export function validateCapability(twin) {
   const errors = [];
+  const warnings = [];
 
   if (!twin.mission_id || typeof twin.mission_id !== 'string') {
     errors.push('mission_id is required');
@@ -19,7 +26,7 @@ export function validateCapability(twin) {
     errors.push('title must be <= 200 characters');
   }
 
-  const VALID_STATUSES = ['draft', 'active'];
+  const VALID_STATUSES = ['draft', 'active', 'blocked', 'complete', 'cancelled'];
   if (!VALID_STATUSES.includes(twin.status)) {
     errors.push(`status must be one of: ${VALID_STATUSES.join(', ')}`);
   }
@@ -28,7 +35,26 @@ export function validateCapability(twin) {
     errors.push('sort_order must be >= 0');
   }
 
-  return { valid: errors.length === 0, errors };
+  // CapabilityInterface v1.0: check required sections
+  const md = twin.content_md || '';
+  const missing = md ? CAPABILITY_SECTIONS.filter(s => !md.match(new RegExp('##\\s+.*' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) : CAPABILITY_SECTIONS;
+  const present = CAPABILITY_SECTIONS.length - missing.length;
+  if (missing.length > 0) {
+    warnings.push(`CapabilityInterface v1.0: missing sections (${missing.length}/${CAPABILITY_SECTIONS.length}): ${missing.join(', ')}`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    interface_compliance: {
+      interface: 'CapabilityInterface',
+      version: '1.0',
+      sections_present: present,
+      sections_required: CAPABILITY_SECTIONS.length,
+      completeness_percent: Math.round((present / CAPABILITY_SECTIONS.length) * 100),
+    }
+  };
 }
 
 export function diffCapability(current, original) {

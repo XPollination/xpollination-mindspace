@@ -41,7 +41,7 @@ export function seed(): void {
 
   // --- Projects ---
   const projects = [
-    { slug: 'xpollination-mcp-server', name: 'XPollination MCP Server', description: 'Content pipeline and PM tool' },
+    { slug: 'xpollination-mindspace', name: 'XPollination Mindspace', description: 'Collaborative intelligence platform' },
     { slug: 'pichler-mindspace', name: 'Pichler Mindspace', description: 'Personal mindspace project' },
   ];
 
