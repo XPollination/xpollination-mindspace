@@ -5,6 +5,10 @@ import { getAttestation, resolveAttestation } from '../lib/attestation.js';
 import { formatMissionTwin, formatCapabilityTwin, formatRequirementTwin, formatTaskTwin } from '../lib/twin-formatter.js';
 import { broadcast } from '../lib/sse-manager.js';
 import crypto from 'node:crypto';
+import { createMission, validateMission, diffMission } from '../../src/twins/mission-twin.js';
+import { createCapability, validateCapability, diffCapability } from '../../src/twins/capability-twin.js';
+import { createRequirement, validateRequirement, diffRequirement } from '../../src/twins/requirement-twin.js';
+import { createTask, validateTask, diffTask } from '../../src/twins/task-twin.js';
 
 export const a2aMessageRouter = Router();
 
@@ -22,7 +26,7 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   ATTESTATION_SUBMITTED: handleAttestationSubmitted,
   OBJECT_QUERY: handleObjectQuery,
   OBJECT_CREATE: handleObjectCreate,
-  OBJECT_UPDATE: handleStub,
+  OBJECT_UPDATE: handleObjectUpdate,
 };
 
 // POST / — unified A2A message endpoint
@@ -523,6 +527,135 @@ function handleObjectCreate(agent: any, body: any, res: Response): void {
       return;
     }
     res.status(500).json({ type: 'ERROR', error: `Create failed: ${err.message}` });
+  }
+}
+
+function handleObjectUpdate(agent: any, body: any, res: Response): void {
+  const { object_type, object_id, payload } = body;
+
+  if (!object_type) {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: object_type' });
+    return;
+  }
+  if (!object_id) {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: object_id' });
+    return;
+  }
+  if (!payload || typeof payload !== 'object') {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: payload' });
+    return;
+  }
+
+  const config = OBJECT_TYPE_CONFIG[object_type];
+  if (!config) {
+    res.status(400).json({ type: 'ERROR', error: `Unknown object_type: ${object_type}. Must be one of: ${Object.keys(OBJECT_TYPE_CONFIG).join(', ')}` });
+    return;
+  }
+
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  try {
+    switch (object_type) {
+      case 'mission': {
+        const row = db.prepare('SELECT * FROM missions WHERE id = ? OR slug = ?').get(object_id, object_id) as any;
+        if (!row) { res.status(404).json({ type: 'ERROR', error: `Mission not found: ${object_id}` }); return; }
+        const originalTwin = createMission({ id: row.id, title: row.title, description: row.description, status: row.status, slug: row.slug, project_slug: row.project_slug, content_md: row.content_md, content_version: row.content_version });
+        const mergedTwin = createMission({ ...originalTwin, ...payload, _type: undefined, _schema_version: undefined, _created_at: undefined, _updated_at: undefined });
+        const validation = validateMission(mergedTwin);
+        if (!validation.valid) { res.status(422).json({ type: 'ERROR', error: `Validation failed: ${validation.errors.join('; ')}` }); return; }
+        const diff = diffMission(mergedTwin, originalTwin);
+        if (Object.keys(diff).length === 0) { res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, no_change: true, timestamp: now }); return; }
+        const updates: string[] = []; const params: any[] = [];
+        for (const key of ['title', 'description', 'status', 'slug', 'content_md', 'content_version', 'project_slug']) {
+          if (payload[key] !== undefined) { updates.push(`${key} = ?`); params.push(payload[key]); }
+        }
+        updates.push("updated_at = ?"); params.push(now); params.push(row.id);
+        db.prepare(`UPDATE missions SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        const updatedRow = db.prepare('SELECT * FROM missions WHERE id = ?').get(row.id);
+        const twin = formatMissionTwin(updatedRow);
+        broadcast('object_update', { object_type, object_id: row.id, diff, actor: agent.name || agent.id, timestamp: now });
+        res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, diff, twin, timestamp: now });
+        return;
+      }
+
+      case 'capability': {
+        const row = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(object_id) as any;
+        if (!row) { res.status(404).json({ type: 'ERROR', error: `Capability not found: ${object_id}` }); return; }
+        const originalTwin = createCapability({ id: row.id, mission_id: row.mission_id, title: row.title, description: row.description, status: row.status, sort_order: row.sort_order, content_md: row.content_md, content_version: row.content_version });
+        const mergedTwin = createCapability({ ...originalTwin, ...payload, _type: undefined, _schema_version: undefined, _created_at: undefined, _updated_at: undefined });
+        const validation = validateCapability(mergedTwin);
+        if (!validation.valid) { res.status(422).json({ type: 'ERROR', error: `Validation failed: ${validation.errors.join('; ')}` }); return; }
+        const diff = diffCapability(mergedTwin, originalTwin);
+        if (Object.keys(diff).length === 0) { res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, no_change: true, timestamp: now }); return; }
+        const updates: string[] = []; const params: any[] = [];
+        for (const key of ['title', 'description', 'status', 'sort_order', 'mission_id', 'content_md', 'content_version']) {
+          if (payload[key] !== undefined) { updates.push(`${key} = ?`); params.push(key === 'sort_order' ? Number(payload[key]) : payload[key]); }
+        }
+        updates.push("updated_at = ?"); params.push(now); params.push(row.id);
+        db.prepare(`UPDATE capabilities SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        const updatedRow = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(row.id);
+        const twin = formatCapabilityTwin(updatedRow);
+        broadcast('object_update', { object_type, object_id: row.id, diff, actor: agent.name || agent.id, timestamp: now });
+        res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, diff, twin, timestamp: now });
+        return;
+      }
+
+      case 'requirement': {
+        const row = db.prepare('SELECT * FROM requirements WHERE id = ? OR req_id_human = ?').get(object_id, object_id) as any;
+        if (!row) { res.status(404).json({ type: 'ERROR', error: `Requirement not found: ${object_id}` }); return; }
+        const originalTwin = createRequirement({ id: row.id, project_slug: row.project_slug, req_id_human: row.req_id_human, title: row.title, description: row.description, status: row.status, priority: row.priority, capability_id: row.capability_id });
+        const mergedTwin = createRequirement({ ...originalTwin, ...payload, _type: undefined, _schema_version: undefined, _created_at: undefined, _updated_at: undefined });
+        const validation = validateRequirement(mergedTwin);
+        if (!validation.valid) { res.status(422).json({ type: 'ERROR', error: `Validation failed: ${validation.errors.join('; ')}` }); return; }
+        const diff = diffRequirement(mergedTwin, originalTwin);
+        if (Object.keys(diff).length === 0) { res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, no_change: true, timestamp: now }); return; }
+        const updates: string[] = []; const params: any[] = [];
+        for (const key of ['title', 'description', 'status', 'priority', 'req_id_human', 'capability_id', 'content_md', 'content_version']) {
+          if (payload[key] !== undefined) { updates.push(`${key} = ?`); params.push(payload[key]); }
+        }
+        updates.push("updated_at = ?"); params.push(now); params.push(row.id);
+        db.prepare(`UPDATE requirements SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        const updatedRow = db.prepare('SELECT * FROM requirements WHERE id = ?').get(row.id);
+        const twin = formatRequirementTwin(updatedRow);
+        broadcast('object_update', { object_type, object_id: row.id, diff, actor: agent.name || agent.id, timestamp: now });
+        res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, diff, twin, timestamp: now });
+        return;
+      }
+
+      case 'task': {
+        const row = db.prepare('SELECT * FROM tasks WHERE id = ? OR slug = ?').get(object_id, object_id) as any;
+        if (!row) { res.status(404).json({ type: 'ERROR', error: `Task not found: ${object_id}` }); return; }
+        let existingDna: any = {};
+        try { existingDna = JSON.parse(row.dna_json || '{}'); } catch { /* ignore */ }
+        const originalTwin = createTask({ slug: row.slug || row.id, status: row.status, dna: { title: row.title || existingDna.title, role: row.current_role || existingDna.role, ...existingDna }, project_slug: row.project_slug });
+        // For tasks, payload.dna merges into existing dna
+        const mergedDna = payload.dna ? { ...existingDna, ...payload.dna } : existingDna;
+        const mergedInput: any = { slug: row.slug || row.id, status: payload.status || row.status, dna: { title: payload.title || row.title || mergedDna.title, role: payload.current_role || row.current_role || mergedDna.role, ...mergedDna }, project_slug: payload.project_slug || row.project_slug };
+        const mergedTwin = createTask(mergedInput);
+        const validation = validateTask(mergedTwin);
+        if (!validation.valid) { res.status(422).json({ type: 'ERROR', error: `Validation failed: ${validation.errors.join('; ')}` }); return; }
+        const diff = diffTask(mergedTwin, originalTwin);
+        if (Object.keys(diff).length === 0) { res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, no_change: true, timestamp: now }); return; }
+        const updates: string[] = []; const params: any[] = [];
+        if (payload.title) { updates.push('title = ?'); params.push(payload.title); }
+        if (payload.description !== undefined) { updates.push('description = ?'); params.push(payload.description); }
+        if (payload.status) { updates.push('status = ?'); params.push(payload.status); }
+        if (payload.current_role) { updates.push('current_role = ?'); params.push(payload.current_role); }
+        if (payload.dna || payload.title || payload.current_role) {
+          updates.push('dna_json = ?'); params.push(JSON.stringify(mergedDna));
+        }
+        updates.push("updated_at = ?"); params.push(now); params.push(row.id);
+        db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        const updatedRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.id);
+        const twin = formatTaskTwin(updatedRow);
+        broadcast('object_update', { object_type, object_id: row.id, diff, actor: agent.name || agent.id, timestamp: now });
+        res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, diff, twin, timestamp: now });
+        return;
+      }
+    }
+  } catch (err: any) {
+    res.status(500).json({ type: 'ERROR', error: `Update failed: ${err.message}` });
   }
 }
 
