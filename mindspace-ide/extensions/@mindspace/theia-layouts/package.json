@@ -1,0 +1,23 @@
+{
+  "name": "@mindspace/theia-layouts",
+  "version": "0.1.0",
+  "description": "Layout presets for Mindspace IDE — single, dual, triple, quad, focus",
+  "keywords": ["theia-extension"],
+  "license": "MIT",
+  "main": "lib/browser/layouts-frontend-module",
+  "typings": "lib/browser/layouts-frontend-module",
+  "files": ["lib", "src"],
+  "dependencies": {
+    "@theia/core": "~1.69.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.4.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "theiaExtensions": [
+    { "frontend": "lib/browser/layouts-frontend-module" }
+  ]
+}

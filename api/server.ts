@@ -29,6 +29,7 @@ import { dataRouter } from './routes/data.js';
 import { apiKeysRouter } from './routes/api-keys.js';
 import { oauthProviderRouter } from './routes/oauth-provider.js';
 import { startMonitor, stopMonitor } from './lib/heartbeat-monitor.js';
+import { workspacesRouter } from './routes/workspaces.js';
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
@@ -87,6 +88,7 @@ app.use('/api/livekit', requireApiKeyOrJwt, livekitRouter);
 app.use('/api/node', nodeActionsRouter);
 app.use('/api/data', dataRouter);
 app.use('/api/settings/api-keys', requireApiKeyOrJwt, apiKeysRouter);
+app.use('/api/settings/workspaces', requireApiKeyOrJwt, workspacesRouter);
 app.use(oauthProviderRouter);
 
 // Global suspect-links stats endpoint (kanban calls /api/suspect-links/stats?project=all)
