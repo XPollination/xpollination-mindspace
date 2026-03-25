@@ -3,11 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
 import { createBond } from './agent-bond.js';
+import { createSession } from '../lib/session-store.js';
+import { spawn as spawnProcess, stop as stopProcess, list as listProcesses, getProcess } from '../lib/process-manager.js';
 
 export const agentsRouter = Router();
 
 const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison', 'orchestrator'];
 const VALID_STATUSES = ['active', 'idle', 'disconnected'];
+const MAX_AGENTS = parseInt(process.env.MAX_AGENTS || '4', 10);
 
 agentsRouter.use(requireApiKeyOrJwt);
 
@@ -214,4 +217,71 @@ agentsRouter.get('/:id', (req: Request, res: Response) => {
   }
 
   res.status(200).json(agent);
+});
+
+// POST /api/agents/spawn — create session and start agent process
+agentsRouter.post('/spawn', (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { role, project_slug } = req.body;
+
+  if (!role || !VALID_ROLES.includes(role)) {
+    res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+    return;
+  }
+  if (!project_slug) {
+    res.status(400).json({ error: 'Missing required field: project_slug' });
+    return;
+  }
+
+  const db = getDb();
+  const project = db.prepare('SELECT slug FROM projects WHERE slug = ?').get(project_slug);
+  if (!project) { res.status(404).json({ error: `Project not found: ${project_slug}` }); return; }
+
+  const access = db.prepare('SELECT role FROM project_access WHERE user_id = ? AND project_slug = ?').get(user.id, project_slug);
+  if (!access) { res.status(403).json({ error: 'No access to this project' }); return; }
+
+  // Check capacity
+  const active = listProcesses(user.id).filter(p => p.status === 'running');
+  if (active.length >= MAX_AGENTS) {
+    res.status(429).json({ error: `Agent capacity exceeded. Max ${MAX_AGENTS}. Active: ${active.length}` });
+    return;
+  }
+
+  // Create agent record
+  const agentId = randomUUID();
+  db.prepare(
+    "INSERT INTO agents (id, user_id, name, current_role, project_slug, session_id, status) VALUES (?, ?, ?, ?, ?, ?, 'active')"
+  ).run(agentId, user.id, `${role}-agent`, role, project_slug, randomUUID());
+
+  // Create session
+  const session = createSession(db, agentId, user.id, project_slug, role);
+
+  // Start process
+  const proc = spawnProcess(agentId, { session_id: session.session_id, user_id: user.id, project_slug, role });
+
+  res.status(201).json({
+    agent_id: agentId,
+    session_id: session.session_id,
+    session_token: session.session_token,
+    role,
+    status: proc.status,
+    stream_url: `/a2a/stream/${agentId}`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// POST /api/agents/:id/stop — gracefully stop an agent process
+agentsRouter.post('/:id/stop', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const proc = getProcess(id);
+  if (!proc) { res.status(404).json({ error: 'Agent process not found' }); return; }
+  stopProcess(id);
+  res.status(200).json({ agent_id: id, status: 'stopped', timestamp: new Date().toISOString() });
+});
+
+// GET /api/agents/processes — list running agent processes
+agentsRouter.get('/processes', (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const agents = listProcesses(user?.id);
+  res.status(200).json({ count: agents.length, agents });
 });
