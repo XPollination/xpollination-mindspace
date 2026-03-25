@@ -16,7 +16,7 @@ export const a2aMessageRouter = Router();
 
 const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison', 'orchestrator'];
 
-type MessageHandler = (agent: any, body: any, res: Response) => void;
+type MessageHandler = (agent: any, body: any, res: Response) => void | Promise<void>;
 
 const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   HEARTBEAT: handleHeartbeat,
@@ -29,6 +29,8 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   OBJECT_QUERY: handleObjectQuery,
   OBJECT_CREATE: handleObjectCreate,
   OBJECT_UPDATE: handleObjectUpdate,
+  BRAIN_QUERY: handleBrainQuery,
+  BRAIN_CONTRIBUTE: handleBrainContribute,
 };
 
 // POST / — unified A2A message endpoint
@@ -774,6 +776,58 @@ function handleObjectUpdate(agent: any, body: any, res: Response): void {
     }
   } catch (err: any) {
     res.status(500).json({ type: 'ERROR', error: `Update failed: ${err.message}` });
+  }
+}
+
+const BRAIN_API_URL = process.env.BRAIN_API_URL || 'http://localhost:3200';
+const BRAIN_SERVICE_KEY = process.env.BRAIN_SERVICE_KEY || process.env.BRAIN_API_KEY || '';
+
+async function handleBrainQuery(agent: any, body: any, res: Response): Promise<void> {
+  const { prompt, read_only, session_id: clientSessionId } = body;
+  if (!prompt) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: prompt' }); return; }
+
+  try {
+    const brainRes = await fetch(`${BRAIN_API_URL}/api/v1/memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BRAIN_SERVICE_KEY}` },
+      body: JSON.stringify({
+        prompt,
+        agent_id: agent.id,
+        agent_name: agent.name || agent.id,
+        session_id: clientSessionId || agent.session_id,
+        read_only: read_only !== false,
+      }),
+    });
+    const data = await brainRes.json();
+    res.status(200).json({ type: 'BRAIN_RESULT', original_type: 'BRAIN_QUERY', agent_id: agent.id, result: data.result || data, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(502).json({ type: 'ERROR', error: `Brain proxy failed: ${err.message}` });
+  }
+}
+
+async function handleBrainContribute(agent: any, body: any, res: Response): Promise<void> {
+  const { prompt, context, thought_category, topic } = body;
+  if (!prompt) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: prompt' }); return; }
+  if (prompt.length < 50) { res.status(400).json({ type: 'ERROR', error: 'Contribution must be at least 50 characters' }); return; }
+
+  try {
+    const brainRes = await fetch(`${BRAIN_API_URL}/api/v1/memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BRAIN_SERVICE_KEY}` },
+      body: JSON.stringify({
+        prompt,
+        agent_id: agent.id,
+        agent_name: agent.name || agent.id,
+        session_id: body.session_id || agent.session_id,
+        context: context || undefined,
+        thought_category: thought_category || undefined,
+        topic: topic || undefined,
+      }),
+    });
+    const data = await brainRes.json();
+    res.status(200).json({ type: 'BRAIN_RESULT', original_type: 'BRAIN_CONTRIBUTE', agent_id: agent.id, result: data.result || data, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(502).json({ type: 'ERROR', error: `Brain proxy failed: ${err.message}` });
   }
 }
 
