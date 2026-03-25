@@ -142,13 +142,21 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   );
   const tokenExpiresAt = new Date(Date.now() + SESSION_TTL * 1000).toISOString();
 
-  // 8. Return WELCOME message with session token
+  // 8. Return WELCOME message with session token and agent identity
   res.status(200).json({
     type: 'WELCOME',
     agent_id: agentId,
     session_id: agentSessionId,
     session_token: sessionToken,
     token_expires_at: tokenExpiresAt,
+    agent_identity: {
+      agent_id: agentId,
+      agent_name: agent_name,
+      role: currentRole || null,
+      user_id: userId,
+      project_slug: projectSlug,
+      permissions: ['read', 'write', 'transition'],
+    },
     reconnect: isReconnect,
     project: {
       slug: projectSlug,

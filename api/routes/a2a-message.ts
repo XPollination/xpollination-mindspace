@@ -33,14 +33,35 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   BRAIN_CONTRIBUTE: handleBrainContribute,
 };
 
+const JWT_SECRET_MSG = process.env.JWT_SECRET || 'changeme';
+
+// Resolve agent from session token (Authorization header) or body agent_id
+function resolveAgent(req: Request, db: any): { agent: any; error?: string; status?: number } {
+  const { agent_id } = req.body;
+
+  // Try session token first (Authorization: Bearer <jwt>)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET_MSG) as any;
+      if (decoded.agent_id) {
+        const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(decoded.agent_id) as any;
+        if (agent) return { agent };
+      }
+    } catch { /* invalid JWT, fall through to agent_id */ }
+  }
+
+  // Fallback: agent_id in body
+  if (!agent_id) return { agent: null, error: 'Missing required field: agent_id', status: 400 };
+  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(agent_id) as any;
+  if (!agent) return { agent: null, error: 'Agent not found', status: 404 };
+  return { agent };
+}
+
 // POST / — unified A2A message endpoint
 a2aMessageRouter.post('/', (req: Request, res: Response) => {
-  const { agent_id, type } = req.body;
-
-  if (!agent_id) {
-    res.status(400).json({ type: 'ERROR', error: 'Missing required field: agent_id' });
-    return;
-  }
+  const { type } = req.body;
 
   if (!type) {
     res.status(400).json({ type: 'ERROR', error: 'Missing required field: type' });
@@ -54,10 +75,10 @@ a2aMessageRouter.post('/', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(agent_id) as any;
+  const { agent, error, status } = resolveAgent(req, db);
 
   if (!agent) {
-    res.status(404).json({ type: 'ERROR', error: 'Agent not found' });
+    res.status(status || 404).json({ type: 'ERROR', error: error || 'Agent not found' });
     return;
   }
 
