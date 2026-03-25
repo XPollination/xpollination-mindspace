@@ -3,7 +3,7 @@ import { getDb } from '../db/connection.js';
 import { renewBond, getActiveBond, expireBond } from './agent-bond.js';
 import { getAttestation, resolveAttestation } from '../lib/attestation.js';
 import { formatMissionTwin, formatCapabilityTwin, formatRequirementTwin, formatTaskTwin } from '../lib/twin-formatter.js';
-import { broadcast } from '../lib/sse-manager.js';
+import { broadcast, sendToRole } from '../lib/sse-manager.js';
 import crypto from 'node:crypto';
 import { createMission, validateMission, diffMission } from '../../src/twins/mission-twin.js';
 import { createCapability, validateCapability, diffCapability } from '../../src/twins/capability-twin.js';
@@ -11,6 +11,7 @@ import { createRequirement, validateRequirement, diffRequirement } from '../../s
 import { createTask, validateTask, diffTask, workflowContext } from '../../src/twins/task-twin.js';
 import { cascadeForward } from '../lib/cascade-engine.js';
 import { grantLease, releaseLease, extendLease } from '../lib/lease-manager.js';
+import { EVENT_TYPES, buildTaskAssigned, buildApprovalNeeded, buildReviewNeeded, buildReworkNeeded, buildTaskBlocked } from '../lib/event-types.js';
 
 export const a2aMessageRouter = Router();
 
@@ -553,6 +554,22 @@ function handleTransition(agent: any, body: any, res: Response): void {
   } catch { /* lease table may not exist in all envs */ }
 
   broadcast('transition', { task_slug: task.slug || task.id, task_id: task.id, from_status: fromStatus, to_status: effectiveToStatus, new_role: newRole, actor, timestamp: now });
+
+  // Role-based event routing — send targeted events to the relevant role
+  try {
+    const wfTransitions = workflowContext(createTask({ slug: task.slug, status: effectiveToStatus, dna: { ...dna, role: newRole } })).available_transitions;
+    if (effectiveToStatus === 'ready') {
+      sendToRole(newRole, EVENT_TYPES.TASK_ASSIGNED, buildTaskAssigned(task, dna, wfTransitions), task.project_slug);
+    } else if (effectiveToStatus === 'approval') {
+      sendToRole('liaison', EVENT_TYPES.APPROVAL_NEEDED, buildApprovalNeeded(task, dna), task.project_slug);
+    } else if (effectiveToStatus === 'review') {
+      sendToRole(newRole, EVENT_TYPES.REVIEW_NEEDED, buildReviewNeeded(task, dna, actor), task.project_slug);
+    } else if (effectiveToStatus === 'rework') {
+      sendToRole(newRole, EVENT_TYPES.REWORK_NEEDED, buildReworkNeeded(task, dna), task.project_slug);
+    } else if (effectiveToStatus === 'blocked') {
+      sendToRole('liaison', EVENT_TYPES.TASK_BLOCKED, buildTaskBlocked(task, dna), task.project_slug);
+    }
+  } catch { /* event routing is best-effort */ }
 
   // Forward cascade: if task completed, unblock dependents
   let cascadeResult = null;
