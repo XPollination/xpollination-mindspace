@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 800" font-family="monospace" font-size="11">
+  <defs>
+    <marker id="m12" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#22c55e"/>
+    </marker>
+    <marker id="m12b" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#8ab4f8"/>
+    </marker>
+    <marker id="m12y" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#eab308"/>
+    </marker>
+  </defs>
+  <rect width="960" height="800" rx="12" fill="#0d1117"/>
+
+  <text x="480" y="30" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="bold">Multiplayer Flow — Thomas Creates, Robin Receives</text>
+  <text x="480" y="50" text-anchor="middle" fill="#7d8590" font-size="10">Step-by-step: how a mission twin travels from Thomas to Robin via A2A</text>
+
+  <!-- Column headers -->
+  <text x="140" y="80" text-anchor="middle" fill="#8ab4f8" font-size="12" font-weight="bold">Thomas (Hetzner)</text>
+  <text x="480" y="80" text-anchor="middle" fill="#eab308" font-size="12" font-weight="bold">Hub (xp0.ai)</text>
+  <text x="820" y="80" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Robin (Mac)</text>
+
+  <line x1="140" y1="90" x2="140" y2="780" stroke="#1c2128" stroke-width="1"/>
+  <line x1="480" y1="90" x2="480" y2="780" stroke="#1c2128" stroke-width="1"/>
+  <line x1="820" y1="90" x2="820" y2="780" stroke="#1c2128" stroke-width="1"/>
+
+  <!-- Step 1: Robin joins -->
+  <rect x="630" y="100" width="380" height="55" rx="6" fill="#161b22" stroke="#22c55e"/>
+  <text x="650" y="120" fill="#22c55e" font-size="10" font-weight="bold">1. Robin: "Add Project via Git URL"</text>
+  <text x="660" y="137" fill="#7d8590" font-size="9">Pastes: github.com/XPollination/xpollination-mindspace</text>
+  <text x="660" y="150" fill="#7d8590" font-size="9">Station reads .xpollination/station.json → connects to hub</text>
+
+  <line x1="820" y1="155" x2="545" y2="180" stroke="#22c55e" stroke-width="1.5" marker-end="url(#m12)"/>
+  <text x="670" y="175" fill="#22c55e" font-size="8">A2A connect + SPIFFE identity</text>
+
+  <!-- Step 2: Hub syncs existing twins to Robin -->
+  <rect x="310" y="185" width="340" height="55" rx="6" fill="#161b22" stroke="#eab308"/>
+  <text x="330" y="205" fill="#eab308" font-size="10" font-weight="bold">2. Hub: CID delta sync</text>
+  <text x="340" y="222" fill="#7d8590" font-size="9">Robin has 0 twins. Hub has 15 missions, 40 tasks.</text>
+  <text x="340" y="235" fill="#7d8590" font-size="9">Hub sends ALL twins Robin has access to (SpiceDB CHECK)</text>
+
+  <line x1="545" y1="220" x2="755" y2="250" stroke="#eab308" stroke-width="1.5" marker-end="url(#m12y)"/>
+  <text x="660" y="243" fill="#eab308" font-size="8">TWIN_DELTA: 15 missions + 40 tasks</text>
+
+  <!-- Step 3: Robin's station stores twins -->
+  <rect x="630" y="255" width="380" height="45" rx="6" fill="#161b22" stroke="#22c55e"/>
+  <text x="650" y="275" fill="#22c55e" font-size="10" font-weight="bold">3. Robin's station stores twins</text>
+  <text x="660" y="292" fill="#7d8590" font-size="9">SQLite cache + Qdrant index + SpiceDB relationships</text>
+
+  <!-- Step 4: Thomas creates a new mission -->
+  <rect x="0" y="320" width="290" height="60" rx="6" fill="#161b22" stroke="#8ab4f8"/>
+  <text x="20" y="340" fill="#8ab4f8" font-size="10" font-weight="bold">4. Thomas: OBJECT_CREATE mission</text>
+  <text x="30" y="357" fill="#7d8590" font-size="9">A2A creates MissionTwin with:</text>
+  <text x="30" y="370" fill="#7d8590" font-size="9">CID, envelope, signed by thomas.key</text>
+
+  <line x1="205" y1="380" x2="415" y2="400" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#m12b)"/>
+  <text x="310" y="393" fill="#8ab4f8" font-size="8">twin + provenance event</text>
+
+  <!-- Step 5: Hub receives, validates, broadcasts -->
+  <rect x="310" y="405" width="340" height="60" rx="6" fill="#161b22" stroke="#eab308"/>
+  <text x="330" y="425" fill="#eab308" font-size="10" font-weight="bold">5. Hub validates + broadcasts</text>
+  <text x="340" y="442" fill="#7d8590" font-size="9">CID check ✓ Signature check ✓ SpiceDB: Thomas can create ✓</text>
+  <text x="340" y="458" fill="#eab308" font-size="9">SSE broadcast: object_created to all connected stations</text>
+
+  <line x1="545" y1="445" x2="755" y2="475" stroke="#22c55e" stroke-width="1.5" marker-end="url(#m12)"/>
+  <text x="660" y="468" fill="#22c55e" font-size="8">SSE: object_created + full twin</text>
+
+  <!-- Step 6: Robin sees the mission appear -->
+  <rect x="630" y="480" width="380" height="50" rx="6" fill="#161b22" stroke="#22c55e" stroke-width="2"/>
+  <text x="650" y="500" fill="#22c55e" font-size="10" font-weight="bold">6. Robin's Mission Map updates instantly</text>
+  <text x="660" y="517" fill="#7d8590" font-size="9">New mission appears. No refresh needed. SSE push.</text>
+  <text x="660" y="530" fill="#22c55e" font-size="9">Robin can open /m/{short_id} and see full content + diagrams</text>
+
+  <!-- Step 7: Robin creates a task -->
+  <rect x="630" y="550" width="380" height="50" rx="6" fill="#161b22" stroke="#22c55e"/>
+  <text x="650" y="570" fill="#22c55e" font-size="10" font-weight="bold">7. Robin: OBJECT_CREATE task</text>
+  <text x="660" y="587" fill="#7d8590" font-size="9">TaskTwin signed by robin.key, linked to Thomas's mission</text>
+
+  <line x1="755" y1="600" x2="545" y2="620" stroke="#22c55e" stroke-width="1.5" marker-end="url(#m12)"/>
+  <text x="660" y="615" fill="#22c55e" font-size="8">twin + provenance event</text>
+
+  <!-- Step 8: Hub forwards to Thomas -->
+  <rect x="310" y="625" width="340" height="50" rx="6" fill="#161b22" stroke="#eab308"/>
+  <text x="330" y="645" fill="#eab308" font-size="10" font-weight="bold">8. Hub validates + forwards</text>
+  <text x="340" y="662" fill="#7d8590" font-size="9">SpiceDB: Robin can create tasks on this project ✓</text>
+
+  <line x1="415" y1="660" x2="205" y2="690" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#m12b)"/>
+  <text x="310" y="685" fill="#8ab4f8" font-size="8">SSE: task_available</text>
+
+  <!-- Step 9: Thomas's kanban updates -->
+  <rect x="0" y="695" width="290" height="50" rx="6" fill="#161b22" stroke="#8ab4f8" stroke-width="2"/>
+  <text x="20" y="715" fill="#8ab4f8" font-size="10" font-weight="bold">9. Thomas's Task Kanban updates</text>
+  <text x="30" y="732" fill="#7d8590" font-size="9">Robin's task appears in pending column. Real-time.</text>
+
+  <!-- Bottom -->
+  <rect x="30" y="755" width="900" height="35" rx="6" fill="#161b22" stroke="#22c55e" stroke-width="2"/>
+  <text x="480" y="778" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">Both work on the same project. Each has their own station. Twins sync via hub. No shared database.</text>
+</svg>

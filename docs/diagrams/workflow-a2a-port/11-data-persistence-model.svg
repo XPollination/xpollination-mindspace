@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700" font-family="monospace" font-size="11">
+  <rect width="960" height="700" rx="12" fill="#0d1117"/>
+
+  <text x="480" y="30" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="bold">Data Persistence — Where Twins Live</text>
+  <text x="480" y="50" text-anchor="middle" fill="#7d8590" font-size="10">Twins persist EVERYWHERE they exist. No single point of failure. Station = cache, twin = authority.</text>
+
+  <!-- Device layer -->
+  <rect x="30" y="75" width="900" height="120" rx="10" fill="#161b22" stroke="#22c55e" stroke-width="2"/>
+  <text x="50" y="100" fill="#22c55e" font-size="13" font-weight="bold">DEVICE LAYER — Where Twins Are Born</text>
+  <text x="50" y="118" fill="#7d8590" font-size="10">Every device that creates or receives a twin holds a copy. The twin exists on the device.</text>
+
+  <rect x="60" y="130" width="200" height="50" rx="6" fill="#0d1117" stroke="#8ab4f8"/>
+  <text x="160" y="150" text-anchor="middle" fill="#8ab4f8" font-size="10" font-weight="bold">Browser IndexedDB</text>
+  <text x="160" y="168" text-anchor="middle" fill="#7d8590" font-size="9">TwinCache → offline access</text>
+
+  <rect x="280" y="130" width="200" height="50" rx="6" fill="#0d1117" stroke="#8ab4f8"/>
+  <text x="380" y="150" text-anchor="middle" fill="#8ab4f8" font-size="10" font-weight="bold">Agent Memory</text>
+  <text x="380" y="168" text-anchor="middle" fill="#7d8590" font-size="9">Agent holds twin during work</text>
+
+  <rect x="500" y="130" width="200" height="50" rx="6" fill="#0d1117" stroke="#8ab4f8"/>
+  <text x="600" y="150" text-anchor="middle" fill="#8ab4f8" font-size="10" font-weight="bold">CLI / Local File</text>
+  <text x="600" y="168" text-anchor="middle" fill="#7d8590" font-size="9">Twin as JSON on disk</text>
+
+  <rect x="720" y="130" width="200" height="50" rx="6" fill="#0d1117" stroke="#8ab4f8"/>
+  <text x="820" y="150" text-anchor="middle" fill="#8ab4f8" font-size="10" font-weight="bold">Git Repo</text>
+  <text x="820" y="168" text-anchor="middle" fill="#7d8590" font-size="9">.xpollination/ twin snapshots</text>
+
+  <!-- Station layer -->
+  <rect x="30" y="215" width="900" height="150" rx="10" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="50" y="240" fill="#eab308" font-size="13" font-weight="bold">STATION LAYER — Where Twins Are Cached + Indexed</text>
+  <text x="50" y="258" fill="#7d8590" font-size="10">Each station stores twins in three databases — cache, not authority.</text>
+
+  <rect x="60" y="270" width="260" height="80" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="190" y="295" text-anchor="middle" fill="#eab308" font-size="11" font-weight="bold">Content Store (SQLite)</text>
+  <text x="190" y="312" text-anchor="middle" fill="#7d8590" font-size="9">What twins CONTAIN</text>
+  <text x="190" y="326" text-anchor="middle" fill="#7d8590" font-size="9">DNA, content_md, metadata</text>
+  <text x="190" y="340" text-anchor="middle" fill="#7d8590" font-size="8">Fast read, local queries</text>
+
+  <rect x="340" y="270" width="260" height="80" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="470" y="295" text-anchor="middle" fill="#eab308" font-size="11" font-weight="bold">SpiceDB (Zanzibar)</text>
+  <text x="470" y="312" text-anchor="middle" fill="#7d8590" font-size="9">What twins CAN DO</text>
+  <text x="470" y="326" text-anchor="middle" fill="#7d8590" font-size="9">Relationships, permissions, attestations</text>
+  <text x="470" y="340" text-anchor="middle" fill="#7d8590" font-size="8">CHECK: can agent X claim task Y?</text>
+
+  <rect x="620" y="270" width="260" height="80" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="750" y="295" text-anchor="middle" fill="#eab308" font-size="11" font-weight="bold">Qdrant (Brain)</text>
+  <text x="750" y="312" text-anchor="middle" fill="#7d8590" font-size="9">What twins MEAN</text>
+  <text x="750" y="326" text-anchor="middle" fill="#7d8590" font-size="9">Semantic vectors, search, similarity</text>
+  <text x="750" y="340" text-anchor="middle" fill="#7d8590" font-size="8">THOUGHT_RELEVANT push on match</text>
+
+  <!-- Network layer -->
+  <rect x="30" y="385" width="900" height="130" rx="10" fill="#161b22" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="50" y="410" fill="#22c55e" font-size="13" font-weight="bold">NETWORK LAYER — How Twins Travel</text>
+
+  <rect x="60" y="425" width="200" height="75" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="160" y="448" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">A2A Protocol</text>
+  <text x="160" y="465" text-anchor="middle" fill="#7d8590" font-size="9">OBJECT_CREATE → twin born</text>
+  <text x="160" y="480" text-anchor="middle" fill="#7d8590" font-size="9">SSE → real-time sync</text>
+  <text x="160" y="493" text-anchor="middle" fill="#7d8590" font-size="9">CID delta → only changes</text>
+
+  <rect x="280" y="425" width="200" height="75" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="380" y="448" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">SPIFFE Identity</text>
+  <text x="380" y="465" text-anchor="middle" fill="#7d8590" font-size="9">Station proves WHO it is</text>
+  <text x="380" y="480" text-anchor="middle" fill="#7d8590" font-size="9">mTLS between stations</text>
+  <text x="380" y="493" text-anchor="middle" fill="#7d8590" font-size="9">No passwords, no API keys</text>
+
+  <rect x="500" y="425" width="200" height="75" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="600" y="448" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">CID Addressing</text>
+  <text x="600" y="465" text-anchor="middle" fill="#7d8590" font-size="9">Content hash = address</text>
+  <text x="600" y="480" text-anchor="middle" fill="#7d8590" font-size="9">Same twin = same CID</text>
+  <text x="600" y="493" text-anchor="middle" fill="#7d8590" font-size="9">Deduplication is free</text>
+
+  <rect x="720" y="425" width="200" height="75" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="820" y="448" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">Ed25519 Signatures</text>
+  <text x="820" y="465" text-anchor="middle" fill="#7d8590" font-size="9">Every provenance event signed</text>
+  <text x="820" y="480" text-anchor="middle" fill="#7d8590" font-size="9">Any peer verifies authorship</text>
+  <text x="820" y="493" text-anchor="middle" fill="#7d8590" font-size="9">Forge-proof by construction</text>
+
+  <!-- Resilience scenarios -->
+  <rect x="30" y="535" width="900" height="150" rx="10" fill="#161b22" stroke="#ef4444" stroke-width="1"/>
+  <text x="50" y="560" fill="#ef4444" font-size="13" font-weight="bold">RESILIENCE — What Happens When Things Die</text>
+
+  <text x="60" y="585" fill="#ef4444" font-size="10" font-weight="bold">Hetzner disk dies:</text>
+  <text x="250" y="585" fill="#7d8590" font-size="10">Robin's Mac + Hub still have all twins. New Hetzner station syncs from either.</text>
+
+  <text x="60" y="608" fill="#ef4444" font-size="10" font-weight="bold">Hub goes offline:</text>
+  <text x="250" y="608" fill="#7d8590" font-size="10">Thomas and Robin work locally. When hub returns, CID delta sync catches up.</text>
+
+  <text x="60" y="631" fill="#ef4444" font-size="10" font-weight="bold">Robin loses laptop:</text>
+  <text x="250" y="631" fill="#7d8590" font-size="10">Robin's twins exist on hub + Thomas's station. New laptop → git clone → Add Project → syncs back.</text>
+
+  <text x="60" y="654" fill="#ef4444" font-size="10" font-weight="bold">ALL stations die:</text>
+  <text x="250" y="654" fill="#7d8590" font-size="10">Twins survive in browser IndexedDB on any device that loaded them. New station → twins dock → rebuild.</text>
+
+  <text x="60" y="677" fill="#22c55e" font-size="10" font-weight="bold">Key principle:</text>
+  <text x="250" y="677" fill="#22c55e" font-size="10">Data is never in ONE place. Twins replicate wherever they're accessed. Destroy one copy, others survive.</text>
+</svg>
