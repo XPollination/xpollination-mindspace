@@ -4,9 +4,12 @@ const VALID_STATUSES = ['pending', 'ready', 'active', 'approval', 'approved', 't
 const VALID_ROLES = ['dev', 'pdsa', 'qa', 'liaison', 'orchestrator', 'system'];
 
 export function createTask(input) {
+  const now = new Date().toISOString();
   return {
     _type: 'task',
-    _created_at: new Date().toISOString(),
+    _schema_version: '1.0.0',
+    _created_at: now,
+    _updated_at: now,
     ...input,
     status: input.status || 'pending',
   };

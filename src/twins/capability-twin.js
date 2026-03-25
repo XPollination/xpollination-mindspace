@@ -1,9 +1,12 @@
 // Capability Twin — create, validate, diff
 
 export function createCapability(input) {
+  const now = new Date().toISOString();
   return {
     _type: 'capability',
-    _created_at: new Date().toISOString(),
+    _schema_version: '1.0.0',
+    _created_at: now,
+    _updated_at: now,
     ...input,
   };
 }

@@ -36,6 +36,17 @@ describe('createTask', () => {
     expect(twin._created_at).toBeDefined();
   });
 
+  it('sets _schema_version to 1.0.0', () => {
+    const twin = createTask({ slug: 's', type: 'task', dna: { title: 'T', role: 'dev' } });
+    expect(twin._schema_version).toBe('1.0.0');
+  });
+
+  it('sets _updated_at equal to _created_at on creation', () => {
+    const twin = createTask({ slug: 's', type: 'task', dna: { title: 'T', role: 'dev' } });
+    expect(twin._updated_at).toBeDefined();
+    expect(twin._updated_at).toBe(twin._created_at);
+  });
+
   it('preserves parent_ids when provided', () => {
     const twin = createTask({
       slug: 's', type: 'task', parent_ids: ['parent-1', 'parent-2'],

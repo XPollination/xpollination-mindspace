@@ -26,6 +26,23 @@ describe('createRequirement', () => {
     });
     expect(twin._created_at).toBeDefined();
   });
+
+  it('sets _schema_version to 1.0.0', () => {
+    const twin = createRequirement({
+      id: 'r1', project_slug: 'p', req_id_human: 'REQ-OG-001',
+      title: 'R', status: 'draft', priority: 'medium'
+    });
+    expect(twin._schema_version).toBe('1.0.0');
+  });
+
+  it('sets _updated_at equal to _created_at on creation', () => {
+    const twin = createRequirement({
+      id: 'r1', project_slug: 'p', req_id_human: 'REQ-OG-001',
+      title: 'R', status: 'draft', priority: 'medium'
+    });
+    expect(twin._updated_at).toBeDefined();
+    expect(twin._updated_at).toBe(twin._created_at);
+  });
 });
 
 describe('validateRequirement', () => {

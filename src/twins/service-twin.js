@@ -11,8 +11,12 @@ import { readFileSync } from 'node:fs';
  */
 export function createServiceTwin(manifestPath) {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  const now = new Date().toISOString();
   return {
     _type: 'service',
+    _schema_version: '1.0.0',
+    _created_at: now,
+    _updated_at: now,
     name: manifest.name,
     version: manifest.version,
     entry: manifest.entry,
@@ -21,7 +25,6 @@ export function createServiceTwin(manifestPath) {
     pid: null,
     process: null,
     manifest,
-    _created_at: new Date().toISOString(),
   };
 }
 
