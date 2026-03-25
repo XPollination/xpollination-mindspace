@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 750" font-family="monospace" font-size="11">
+  <defs>
+    <marker id="a4" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#8ab4f8"/>
+    </marker>
+    <marker id="a4g" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#22c55e"/>
+    </marker>
+    <marker id="a4y" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#eab308"/>
+    </marker>
+  </defs>
+  <rect width="900" height="750" rx="12" fill="#0d1117"/>
+
+  <text x="450" y="30" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="bold">Agent Interaction Loop — A2A as Living Workflow</text>
+  <text x="450" y="48" text-anchor="middle" fill="#7d8590" font-size="10">The protocol guides the agent through the process. Agent follows workflow_context prompts.</text>
+
+  <!-- Columns -->
+  <text x="150" y="80" text-anchor="middle" fill="#8ab4f8" font-size="12" font-weight="bold">Agent</text>
+  <text x="450" y="80" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">A2A Server</text>
+  <text x="750" y="80" text-anchor="middle" fill="#eab308" font-size="12" font-weight="bold">Response</text>
+
+  <line x1="150" y1="90" x2="150" y2="730" stroke="#1c2128" stroke-width="1"/>
+  <line x1="450" y1="90" x2="450" y2="730" stroke="#1c2128" stroke-width="1"/>
+  <line x1="750" y1="90" x2="750" y2="730" stroke="#1c2128" stroke-width="1"/>
+
+  <!-- Step 1: Connect -->
+  <rect x="55" y="105" width="190" height="30" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="150" y="124" text-anchor="middle" fill="#8ab4f8" font-size="10">POST /a2a/connect</text>
+  <line x1="245" y1="120" x2="380" y2="120" stroke="#8ab4f8" stroke-width="1" marker-end="url(#a4)"/>
+  <rect x="380" y="105" width="140" height="30" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="450" y="124" text-anchor="middle" fill="#22c55e" font-size="10">Auth + Register</text>
+  <line x1="520" y1="120" x2="660" y2="120" stroke="#22c55e" stroke-width="1" marker-end="url(#a4g)"/>
+  <rect x="660" y="105" width="180" height="30" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="750" y="124" text-anchor="middle" fill="#eab308" font-size="10">agent_id + SSE stream</text>
+
+  <!-- Step 2: Query work -->
+  <rect x="55" y="155" width="190" height="35" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="150" y="171" text-anchor="middle" fill="#8ab4f8" font-size="10">OBJECT_QUERY task</text>
+  <text x="150" y="183" text-anchor="middle" fill="#7d8590" font-size="8">{current_role: "pdsa"}</text>
+  <line x1="245" y1="172" x2="380" y2="172" stroke="#8ab4f8" stroke-width="1" marker-end="url(#a4)"/>
+  <rect x="380" y="155" width="140" height="35" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="450" y="175" text-anchor="middle" fill="#22c55e" font-size="10">Query DB + format</text>
+  <line x1="520" y1="172" x2="660" y2="172" stroke="#22c55e" stroke-width="1" marker-end="url(#a4g)"/>
+  <rect x="660" y="155" width="180" height="35" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="750" y="171" text-anchor="middle" fill="#eab308" font-size="10">tasks[] + each has</text>
+  <text x="750" y="183" text-anchor="middle" fill="#eab308" font-size="9" font-weight="bold">workflow_context</text>
+
+  <!-- Workflow context detail -->
+  <rect x="570" y="200" width="310" height="90" rx="6" fill="#161b22" stroke="#eab308" stroke-width="1"/>
+  <text x="590" y="220" fill="#eab308" font-size="10" font-weight="bold">workflow_context:</text>
+  <text x="600" y="236" fill="#7d8590" font-size="9">state: "ready+pdsa"</text>
+  <text x="600" y="250" fill="#7d8590" font-size="9">allowed: [{to: "active", ready: true}]</text>
+  <text x="600" y="264" fill="#22c55e" font-size="9">prompt: "Claim this task. Set</text>
+  <text x="600" y="276" fill="#22c55e" font-size="9">  memory_query_session in DNA first."</text>
+
+  <!-- Step 3: Update DNA (set memory_query_session) -->
+  <rect x="55" y="310" width="190" height="35" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="150" y="326" text-anchor="middle" fill="#8ab4f8" font-size="10">OBJECT_UPDATE task</text>
+  <text x="150" y="338" text-anchor="middle" fill="#7d8590" font-size="8">{memory_query_session: "..."}</text>
+  <line x1="245" y1="327" x2="380" y2="327" stroke="#8ab4f8" stroke-width="1" marker-end="url(#a4)"/>
+  <rect x="380" y="310" width="140" height="35" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="450" y="326" text-anchor="middle" fill="#22c55e" font-size="10">Validate DNA</text>
+  <text x="450" y="338" text-anchor="middle" fill="#22c55e" font-size="9">Persist + Broadcast</text>
+  <line x1="520" y1="327" x2="660" y2="327" stroke="#22c55e" stroke-width="1" marker-end="url(#a4g)"/>
+  <rect x="660" y="310" width="180" height="35" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="750" y="326" text-anchor="middle" fill="#eab308" font-size="10">ACK + updated twin</text>
+  <text x="750" y="338" text-anchor="middle" fill="#eab308" font-size="9">active transition: READY</text>
+
+  <!-- Step 4: Transition (claim) -->
+  <rect x="55" y="365" width="190" height="35" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="150" y="381" text-anchor="middle" fill="#8ab4f8" font-size="10">TRANSITION</text>
+  <text x="150" y="393" text-anchor="middle" fill="#7d8590" font-size="8">{to_status: "active"}</text>
+  <line x1="245" y1="382" x2="380" y2="382" stroke="#8ab4f8" stroke-width="1" marker-end="url(#a4)"/>
+  <rect x="380" y="365" width="140" height="35" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="450" y="381" text-anchor="middle" fill="#22c55e" font-size="10">Twin.transition()</text>
+  <text x="450" y="393" text-anchor="middle" fill="#22c55e" font-size="9">gates + role set</text>
+  <line x1="520" y1="382" x2="660" y2="382" stroke="#22c55e" stroke-width="1" marker-end="url(#a4g)"/>
+  <rect x="660" y="365" width="180" height="35" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="750" y="381" text-anchor="middle" fill="#eab308" font-size="10">ACK + new context:</text>
+  <text x="750" y="393" text-anchor="middle" fill="#22c55e" font-size="9">"Deliver pdsa_ref to submit"</text>
+
+  <!-- Step 5: Agent does work (outside A2A) -->
+  <rect x="30" y="420" width="240" height="50" rx="6" fill="#161b22" stroke="#7d8590" stroke-dasharray="4,3"/>
+  <text x="150" y="440" text-anchor="middle" fill="#7d8590" font-size="10">Agent does the actual work:</text>
+  <text x="150" y="455" text-anchor="middle" fill="#7d8590" font-size="9">Write PDSA doc, commit, push, get URL</text>
+
+  <!-- Step 6: Update DNA (pdsa_ref + memory_contribution_id) -->
+  <rect x="55" y="490" width="190" height="40" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="150" y="506" text-anchor="middle" fill="#8ab4f8" font-size="10">OBJECT_UPDATE task</text>
+  <text x="150" y="520" text-anchor="middle" fill="#7d8590" font-size="8">{pdsa_ref: "https://...", ...}</text>
+  <line x1="245" y1="510" x2="380" y2="510" stroke="#8ab4f8" stroke-width="1" marker-end="url(#a4)"/>
+  <rect x="380" y="490" width="140" height="40" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="450" y="506" text-anchor="middle" fill="#22c55e" font-size="10">Validate: pdsa_ref</text>
+  <text x="450" y="520" text-anchor="middle" fill="#22c55e" font-size="9">must be GitHub URL</text>
+  <line x1="520" y1="510" x2="660" y2="510" stroke="#22c55e" stroke-width="1" marker-end="url(#a4g)"/>
+  <rect x="660" y="490" width="180" height="40" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="750" y="506" text-anchor="middle" fill="#eab308" font-size="10">ACK + context:</text>
+  <text x="750" y="520" text-anchor="middle" fill="#22c55e" font-size="9">"approval transition: READY"</text>
+
+  <!-- Step 7: Transition to approval -->
+  <rect x="55" y="550" width="190" height="35" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="150" y="566" text-anchor="middle" fill="#8ab4f8" font-size="10">TRANSITION</text>
+  <text x="150" y="578" text-anchor="middle" fill="#7d8590" font-size="8">{to_status: "approval"}</text>
+  <line x1="245" y1="567" x2="380" y2="567" stroke="#8ab4f8" stroke-width="1" marker-end="url(#a4)"/>
+  <rect x="380" y="550" width="140" height="35" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="450" y="566" text-anchor="middle" fill="#22c55e" font-size="10">Validate gates</text>
+  <text x="450" y="578" text-anchor="middle" fill="#22c55e" font-size="9">role → liaison</text>
+  <line x1="520" y1="567" x2="660" y2="567" stroke="#22c55e" stroke-width="1" marker-end="url(#a4g)"/>
+  <rect x="660" y="550" width="180" height="35" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="750" y="566" text-anchor="middle" fill="#eab308" font-size="10">ACK. Task leaves PDSA.</text>
+  <text x="750" y="578" text-anchor="middle" fill="#7d8590" font-size="9">Now assigned to liaison.</text>
+
+  <!-- SSE notification -->
+  <rect x="380" y="600" width="500" height="35" rx="4" fill="#1c2128" stroke="#22c55e" stroke-dasharray="4,3"/>
+  <text x="630" y="622" text-anchor="middle" fill="#22c55e" font-size="10">SSE broadcast → all connected agents + viz: task moved to approval</text>
+
+  <!-- Summary -->
+  <rect x="30" y="650" width="840" height="85" rx="8" fill="#161b22" stroke="#22c55e" stroke-width="1"/>
+  <text x="450" y="675" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">The Living Workflow Pattern</text>
+  <text x="50" y="698" fill="#7d8590" font-size="10">1. Agent asks A2A what to do → workflow_context tells them</text>
+  <text x="450" y="698" fill="#7d8590" font-size="10">2. Agent does the work (code, docs, tests)</text>
+  <text x="50" y="718" fill="#7d8590" font-size="10">3. Agent reports back via OBJECT_UPDATE → A2A validates</text>
+  <text x="450" y="718" fill="#7d8590" font-size="10">4. Agent transitions → A2A enforces gates → next step</text>
+</svg>
