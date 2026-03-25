@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting — XPollination Mindspace</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="stylesheet" href="/mindspace.css">
+  <style>
+    .meeting-container {
+      max-width: 100%;
+      margin: calc(var(--ms-nav-height)) auto 0;
+      padding: 0 0.5rem;
+      height: calc(100vh - var(--ms-nav-height));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* Pre-join */
+    .prejoin { text-align: center; padding: 3rem 1rem; max-width: 400px; margin: 0 auto; }
+    .prejoin h2 { margin-bottom: 1.5rem; color: var(--ms-text); }
+    .prejoin .room-name { color: var(--ms-accent); font-family: monospace; }
+    .mode-buttons { display: flex; flex-direction: column; gap: 0.75rem; }
+    .mode-btn {
+      padding: 1rem; border: 2px solid var(--ms-border); border-radius: var(--ms-radius);
+      background: var(--ms-surface); color: var(--ms-text); cursor: pointer; text-align: left;
+      transition: border-color 0.15s;
+    }
+    .mode-btn:hover { border-color: var(--ms-accent); }
+    .mode-btn strong { display: block; margin-bottom: 0.25rem; }
+    .mode-btn small { color: var(--ms-muted); }
+    /* Meeting layout — everything must fit viewport, no scroll */
+    .meeting-body { flex: 1; display: flex; min-height: 0; gap: 0.5rem; overflow: hidden; margin-bottom: 0; }
+    .video-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+    #meeting-ui { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+    .video-grid {
+      flex: 1; display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-rows: auto;
+      gap: 0.5rem; min-height: 0; align-content: start;
+      overflow: hidden;
+    }
+    .video-tile {
+      position: relative; background: var(--ms-surface); border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius); overflow: hidden;
+      max-height: calc(100vh - var(--ms-nav-height) - 6rem);
+    }
+    .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+    .video-tile.screen-share {
+      grid-column: 1 / -1; cursor: default;
+    }
+    .video-tile.screen-share video { object-fit: contain; background: #000; }
+    /* Single video: fill available space */
+    .video-grid:has(> :only-child) .video-tile { max-height: calc(100vh - var(--ms-nav-height) - 6rem); }
+    .video-grid:has(> :only-child) .video-tile video { object-fit: contain; }
+    /* When screen share is present: camera tiles become small strip at bottom */
+    .video-grid:has(.screen-share) {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr auto;
+    }
+    .video-grid:has(.screen-share) .video-tile:not(.screen-share) {
+      max-height: 120px; max-width: 180px;
+      aspect-ratio: auto;
+    }
+    .video-grid:has(.screen-share) .screen-share {
+      max-height: calc(100vh - var(--ms-nav-height) - 10rem);
+    }
+    .video-tile .name-tag {
+      position: absolute; bottom: 6px; left: 8px;
+      background: rgba(0,0,0,0.6); color: #fff; padding: 2px 8px;
+      border-radius: 4px; font-size: 0.75rem;
+    }
+    .video-tile .tile-actions {
+      position: absolute; top: 6px; right: 8px; display: flex; gap: 4px;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .video-tile:hover .tile-actions { opacity: 1; }
+    @media (hover: none) { .video-tile .tile-actions { opacity: 0.8; } }
+    .tile-action-btn {
+      background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 4px;
+      padding: 4px 8px; cursor: pointer; font-size: 0.75rem;
+    }
+    .tile-action-btn:hover { background: rgba(0,0,0,0.85); }
+    /* Fullscreen: native + iOS CSS fallback */
+    .video-tile:fullscreen { border-radius: 0; max-height: none; aspect-ratio: auto; }
+    .video-tile.css-fullscreen {
+      position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important;
+      max-height: none !important; max-width: none !important; z-index: 10000;
+      border-radius: 0; margin: 0; aspect-ratio: auto;
+    }
+    .video-tile.css-fullscreen video { object-fit: contain; }
+    .css-fs-close {
+      display: none; position: fixed; top: 12px; right: 12px; z-index: 10001;
+      background: rgba(0,0,0,0.7); color: #fff; border: none; border-radius: 50%;
+      width: 40px; height: 40px; font-size: 1.3rem; cursor: pointer;
+    }
+    .css-fs-close.show { display: block; }
+    .pip-overlay {
+      position: fixed; bottom: 16px; right: 16px; width: 200px; aspect-ratio: 16/9;
+      border-radius: 8px; overflow: hidden; z-index: 9999;
+      border: 2px solid rgba(255,255,255,0.3); display: none;
+    }
+    .pip-overlay video { width: 100%; height: 100%; object-fit: cover; }
+    /* Chat */
+    .chat-panel {
+      width: 300px; display: flex; flex-direction: column;
+      background: var(--ms-surface); border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius); overflow: hidden;
+    }
+    .chat-panel.hidden { display: none; }
+    .chat-header {
+      padding: 0.5rem 0.75rem; font-weight: 600; font-size: 0.85rem;
+      border-bottom: 1px solid var(--ms-border); color: var(--ms-text);
+    }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 0.5rem; font-size: 0.8rem;
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .chat-msg { padding: 0.3rem 0; }
+    .chat-msg .sender { font-weight: 600; color: var(--ms-accent); margin-right: 0.3rem; }
+    .chat-msg .text { color: var(--ms-text); word-break: break-word; }
+    .chat-msg .time { color: var(--ms-muted); font-size: 0.7rem; margin-left: 0.3rem; }
+    /* Agent context cards */
+    .agent-card {
+      background: var(--ms-surface); border: 1px solid var(--ms-border); border-left: 3px solid var(--ms-accent);
+      border-radius: var(--ms-radius); padding: 0.75rem; margin: 0.5rem 0; font-size: 0.8rem;
+    }
+    .agent-card .agent-topic {
+      font-weight: 700; color: var(--ms-accent); margin-bottom: 0.5rem; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .agent-card .agent-topic .topic-icon { font-size: 0.9rem; }
+    .agent-card .agent-summary {
+      color: var(--ms-text); line-height: 1.5; margin-bottom: 0.5rem; font-size: 0.8rem;
+    }
+    .agent-card .agent-sources {
+      border-top: 1px solid var(--ms-border); padding-top: 0.4rem; margin-top: 0.3rem;
+    }
+    .agent-card .agent-source {
+      padding: 0.2rem 0; font-size: 0.72rem; color: var(--ms-muted); line-height: 1.3;
+      cursor: pointer; transition: color 0.15s;
+    }
+    .agent-card .agent-source:hover { color: var(--ms-text); }
+    .agent-card .agent-source .src-label { font-weight: 600; }
+    .agent-card .agent-actions { margin-top: 0.5rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .agent-drill-btn {
+      background: none; border: 1px solid var(--ms-border); color: var(--ms-link); border-radius: 12px;
+      padding: 0.25rem 0.7rem; font-size: 0.72rem; cursor: pointer; transition: all 0.15s;
+    }
+    .agent-drill-btn:hover { background: var(--ms-accent); color: #fff; border-color: var(--ms-accent); }
+    .agent-searching {
+      color: var(--ms-muted); font-size: 0.78rem; padding: 0.4rem 0; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .agent-searching .search-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--ms-accent); animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+    .agent-searching .search-query { font-style: italic; color: var(--ms-text); font-weight: 500; }
+    @keyframes pulse-dot { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+    .agent-listening { display: none; /* transcript echo suppressed */ }
+    .chat-input-row {
+      display: flex; border-top: 1px solid var(--ms-border); padding: 0.4rem;
+    }
+    .chat-input-row input {
+      flex: 1; background: var(--ms-bg); color: var(--ms-text);
+      border: 1px solid var(--ms-border); border-radius: var(--ms-radius-sm);
+      padding: 0.4rem 0.6rem; font-size: 0.8rem; outline: none;
+    }
+    .chat-input-row button {
+      margin-left: 0.3rem; background: var(--ms-accent); color: #fff;
+      border: none; border-radius: var(--ms-radius-sm); padding: 0.4rem 0.7rem;
+      cursor: pointer; font-size: 0.8rem;
+    }
+    /* Controls — always visible at bottom, never scrolled away */
+    .controls {
+      display: flex; justify-content: center; gap: 0.5rem; padding: 0.5rem 0;
+      flex-shrink: 0; position: relative;
+    }
+    .controls button {
+      background: var(--ms-surface); border: 1px solid var(--ms-border);
+      color: var(--ms-text); border-radius: 50%; width: 44px; height: 44px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: background 0.15s;
+    }
+    .controls button:hover { background: var(--ms-border); }
+    .controls button.active { background: var(--ms-accent); color: #fff; border-color: var(--ms-accent); }
+    .controls button.leave { background: #dc3545; color: #fff; border-color: #dc3545; }
+    .controls button.leave:hover { background: #c82333; }
+    .meeting-status { text-align: center; padding: 2rem; color: var(--ms-muted); }
+    .error-msg { color: #dc3545; text-align: center; padding: 2rem; }
+    /* Background selector */
+    .bg-selector { display: none; position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
+      background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+      padding: 0.5rem; z-index: 50; white-space: nowrap; flex-wrap: wrap; max-width: 320px; }
+    .bg-selector.show { display: flex; gap: 0.4rem; }
+    .bg-option {
+      width: 56px; height: 42px; border-radius: 4px; cursor: pointer; border: 2px solid transparent;
+      background-size: cover; background-position: center; flex-shrink: 0;
+    }
+    .bg-option.active { border-color: var(--ms-accent); }
+    .bg-option.none { background: var(--ms-bg); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: var(--ms-muted); }
+    .bg-option.blur { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff; }
+    @media (max-width: 768px) {
+      .chat-panel { width: 100%; position: fixed; bottom: 0; left: 0; right: 0; height: 50vh; z-index: 100; }
+      .video-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <script type="module" src="/js/mindspace-nav.js"></script>
+
+  <button id="css-fs-close" class="css-fs-close" onclick="exitCssFullscreen()">&#10005;</button>
+  <div class="meeting-container">
+    <!-- Pre-join screen -->
+    <div id="prejoin" class="prejoin">
+      <h2>Join <span class="room-name" id="room-label"></span></h2>
+      <div class="mode-buttons">
+        <button class="mode-btn" onclick="joinMeeting('full')">
+          <strong>Camera + Microphone</strong>
+          <small>Join with video and audio — standard meeting mode</small>
+        </button>
+        <button class="mode-btn" onclick="joinMeeting('companion')">
+          <strong>Companion (Screen Share)</strong>
+          <small>Join for screen sharing only — use another device for camera</small>
+        </button>
+        <button class="mode-btn" onclick="joinMeeting('listen')">
+          <strong>Listen Only</strong>
+          <small>Join without publishing — observe and chat only</small>
+        </button>
+      </div>
+    </div>
+
+    <!-- Meeting UI (hidden until joined) -->
+    <div id="meeting-ui" style="display:none;flex:1;display:none;flex-direction:column;">
+      <div class="meeting-body">
+        <div class="video-area">
+          <div id="videos" class="video-grid"></div>
+        </div>
+        <div id="chat" class="chat-panel hidden">
+          <div class="chat-header">Chat</div>
+          <div id="chat-messages" class="chat-messages"></div>
+          <div class="chat-input-row">
+            <input id="chat-input" type="text" placeholder="Type a message..." />
+            <button onclick="sendChat()">Send</button>
+          </div>
+        </div>
+      </div>
+      <div id="pip" class="pip-overlay"></div>
+      <div id="bg-selector" class="bg-selector">
+        <div class="bg-option none active" onclick="setBg('none')" title="No background">Off</div>
+        <div class="bg-option blur" onclick="setBg('blur')" title="Blur background">Blur</div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1497366216548-37526070297c?w=640')" title="Office" style="background-image:url(https://images.unsplash.com/photo-1497366216548-37526070297c?w=80)"></div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=640')" title="Mountains" style="background-image:url(https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=80)"></div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=640')" title="Beach" style="background-image:url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=80)"></div>
+        <div class="bg-option" onclick="setBg('image','https://images.unsplash.com/photo-1519681393784-d120267933ba?w=640')" title="Night sky" style="background-image:url(https://images.unsplash.com/photo-1519681393784-d120267933ba?w=80)"></div>
+      </div>
+      <div id="controls" class="controls">
+        <button id="btn-mic" class="active" title="Microphone">&#127908;</button>
+        <button id="btn-cam" class="active" title="Camera">&#127909;</button>
+        <button id="btn-screen" title="Screen Share">&#128187;</button>
+        <button id="btn-bg" title="Background">&#127912;</button>
+        <button id="btn-chat" title="Chat">&#128172;</button>
+        <button id="btn-agent" title="Companion Agent (German)">&#129302;</button>
+        <button id="btn-leave" class="leave" title="Leave">&#9746;</button>
+      </div>
+    </div>
+    <div id="status" class="meeting-status" style="display:none;"></div>
+  </div>
+
+  <script type="module">
+    import { Room, RoomEvent, Track, VideoPresets, DataPacket_Kind } from 'https://cdn.jsdelivr.net/npm/livekit-client@2.17.3/dist/livekit-client.esm.mjs';
+
+    const videosEl = document.getElementById('videos');
+    const statusEl = document.getElementById('status');
+    const pipEl = document.getElementById('pip');
+    let room = null;
+    let micEnabled = true, camEnabled = true;
+    let joinMode = 'full';
+    let bgProcessor = null;
+
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const meetingRoom = pathParts.length > 1 ? pathParts.slice(1).join('/') : 'mindspace-admin';
+    document.getElementById('room-label').textContent = meetingRoom;
+
+    // Expose to onclick handlers
+    window.joinMeeting = async function(mode) {
+      joinMode = mode;
+      document.getElementById('prejoin').style.display = 'none';
+      const meetingUi = document.getElementById('meeting-ui');
+      meetingUi.style.display = 'flex';
+      meetingUi.style.flexDirection = 'column';
+      meetingUi.style.flex = '1';
+      // Hide mic/cam buttons for companion/listen modes
+      if (mode === 'companion') {
+        document.getElementById('btn-mic').style.display = 'none';
+        document.getElementById('btn-cam').style.display = 'none';
+        document.getElementById('btn-bg').style.display = 'none';
+      } else if (mode === 'listen') {
+        document.getElementById('btn-mic').style.display = 'none';
+        document.getElementById('btn-cam').style.display = 'none';
+        document.getElementById('btn-screen').style.display = 'none';
+        document.getElementById('btn-bg').style.display = 'none';
+      }
+      await start(mode);
+    };
+
+    async function start(mode) {
+      try {
+        const resp = await fetch(`/api/livekit/token?room=${encodeURIComponent(meetingRoom)}`);
+        if (!resp.ok) {
+          const err = await resp.json();
+          statusEl.style.display = 'block';
+          statusEl.innerHTML = `<div class="error-msg">${err.error || 'Cannot access meeting'}</div>`;
+          return;
+        }
+        const { token, url, roomName, participantName } = await resp.json();
+
+        room = new Room({ videoCaptureDefaults: { resolution: VideoPresets.h720.resolution } });
+
+        room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => renderParticipant(participant));
+        room.on(RoomEvent.TrackUnsubscribed, (track, pub, participant) => renderParticipant(participant));
+        room.on(RoomEvent.ParticipantConnected, (p) => renderParticipant(p));
+        room.on(RoomEvent.ParticipantDisconnected, (p) => {
+          document.getElementById(`tile-${p.identity}`)?.remove();
+          document.getElementById(`tile-screen-${p.identity}`)?.remove();
+          document.getElementById(`audio-${p.identity}`)?.remove();
+        });
+        room.on(RoomEvent.LocalTrackPublished, () => renderParticipant(room.localParticipant));
+        room.on(RoomEvent.LocalTrackUnpublished, () => renderParticipant(room.localParticipant));
+        room.on(RoomEvent.Disconnected, () => {
+          document.getElementById('meeting-ui').style.display = 'none';
+          statusEl.style.display = 'block';
+          statusEl.textContent = 'Disconnected.';
+          setTimeout(() => { window.location.href = '/'; }, 2000);
+        });
+
+        // Chat via data messages
+        room.on(RoomEvent.DataReceived, (payload, participant) => {
+          try {
+            const msg = JSON.parse(new TextDecoder().decode(payload));
+            if (msg.type === 'chat') addChatMessage(participant?.name || participant?.identity || 'Unknown', msg.text);
+          } catch {}
+        });
+
+        await room.connect(url, token);
+
+        if (mode === 'full') {
+          await room.localParticipant.setCameraEnabled(true);
+          await room.localParticipant.setMicrophoneEnabled(true);
+        } else if (mode === 'companion') {
+          micEnabled = false; camEnabled = false;
+        } else {
+          micEnabled = false; camEnabled = false;
+        }
+        renderParticipant(room.localParticipant);
+        // Render existing remote participants
+        for (const p of room.remoteParticipants.values()) renderParticipant(p);
+      } catch (err) {
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      }
+    }
+
+    function renderParticipant(participant) {
+      const screenPubs = [], mediaPubs = [];
+      for (const pub of participant.trackPublications.values()) {
+        if (!pub.track) continue;
+        if (pub.source === Track.Source.ScreenShare || pub.source === Track.Source.ScreenShareAudio) {
+          screenPubs.push(pub);
+        } else {
+          mediaPubs.push(pub);
+        }
+      }
+
+      const isLocal = room && participant.identity === room.localParticipant.identity;
+
+      // Camera/audio tile — only show if participant has a video track (Google Meet companion style)
+      const hasVideo = mediaPubs.some(p => p.track.kind === Track.Kind.Video);
+      let tile = document.getElementById(`tile-${participant.identity}`);
+
+      if (hasVideo) {
+        if (!tile) {
+          tile = document.createElement('div');
+          tile.id = `tile-${participant.identity}`;
+          tile.className = 'video-tile';
+          const tag = document.createElement('div');
+          tag.className = 'name-tag';
+          tag.textContent = (participant.name || participant.identity) + (isLocal ? ' (you)' : '');
+          const actions = document.createElement('div');
+          actions.className = 'tile-actions';
+          const fsBtn = document.createElement('button');
+          fsBtn.className = 'tile-action-btn';
+          fsBtn.textContent = 'Fullscreen';
+          fsBtn.onclick = (e) => { e.stopPropagation(); toggleFullscreen(tile, participant.identity); };
+          actions.appendChild(fsBtn);
+          if (!isLocal) {
+            const muteBtn = document.createElement('button');
+            muteBtn.className = 'tile-action-btn';
+            muteBtn.textContent = 'Mute';
+            muteBtn.onclick = (e) => { e.stopPropagation(); muteParticipant(participant); };
+            actions.appendChild(muteBtn);
+            const kickBtn = document.createElement('button');
+            kickBtn.className = 'tile-action-btn';
+            kickBtn.style.background = 'rgba(220,53,69,0.8)';
+            kickBtn.textContent = 'Kick';
+            kickBtn.onclick = (e) => { e.stopPropagation(); kickParticipant(participant); };
+            actions.appendChild(kickBtn);
+          }
+          tile.appendChild(actions);
+          tile.appendChild(tag);
+          videosEl.appendChild(tile);
+        }
+        tile.querySelectorAll('video, audio').forEach(el => el.remove());
+        for (const pub of mediaPubs) {
+          if (pub.track.kind === Track.Kind.Audio && (isLocal || joinMode === 'companion')) continue;
+          const el = pub.track.attach();
+          if (el instanceof HTMLVideoElement) {
+            el.style.width = '100%'; el.style.height = '100%'; el.style.objectFit = 'cover';
+            if (isLocal) el.style.transform = 'scaleX(-1)';
+            tile.insertBefore(el, tile.firstChild);
+          } else {
+            tile.appendChild(el);
+          }
+        }
+      } else {
+        // No video — remove camera tile (companion/listen-only devices don't take space)
+        if (tile) tile.remove();
+        // Still attach remote audio for non-companion modes
+        for (const pub of mediaPubs) {
+          if (pub.track.kind === Track.Kind.Audio && !isLocal && joinMode !== 'companion') {
+            const existing = document.getElementById(`audio-${participant.identity}`);
+            if (!existing) { const el = pub.track.attach(); el.id = `audio-${participant.identity}`; el.style.display = 'none'; document.body.appendChild(el); }
+          }
+        }
+      }
+
+      // Screen share tile
+      const screenTileId = `tile-screen-${participant.identity}`;
+      let screenTile = document.getElementById(screenTileId);
+      if (screenPubs.length > 0) {
+        if (!screenTile) {
+          screenTile = document.createElement('div');
+          screenTile.id = screenTileId;
+          screenTile.className = 'video-tile screen-share';
+          const tag = document.createElement('div');
+          tag.className = 'name-tag';
+          tag.textContent = `${participant.name || participant.identity} (screen)`;
+          const actions = document.createElement('div');
+          actions.className = 'tile-actions';
+          actions.style.opacity = '1';
+          const fsBtn = document.createElement('button');
+          fsBtn.className = 'tile-action-btn';
+          fsBtn.textContent = 'Fullscreen';
+          fsBtn.onclick = (e) => { e.stopPropagation(); toggleFullscreen(screenTile, participant.identity); };
+          actions.appendChild(fsBtn);
+          screenTile.appendChild(actions);
+          screenTile.appendChild(tag);
+          videosEl.insertBefore(screenTile, videosEl.firstChild);
+        }
+        screenTile.querySelectorAll('video, audio').forEach(el => el.remove());
+        for (const pub of screenPubs) {
+          const el = pub.track.attach();
+          if (el instanceof HTMLVideoElement) {
+            el.style.width = '100%'; el.style.height = '100%';
+            el.style.objectFit = 'contain'; el.style.background = '#000';
+            screenTile.insertBefore(el, screenTile.firstChild);
+          } else {
+            screenTile.appendChild(el);
+          }
+        }
+      } else if (screenTile) {
+        screenTile.remove();
+      }
+    }
+
+    // Fullscreen with PiP local camera overlay
+    let cssFsEl = null; // track CSS-fullscreen element for iOS
+    const canNativeFs = document.documentElement.requestFullscreen !== undefined;
+
+    function showPip(participantId) {
+      if (room && participantId !== room.localParticipant.identity) {
+        pipEl.innerHTML = '';
+        const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+        if (camPub?.track) {
+          const vid = camPub.track.attach();
+          vid.style.width = '100%'; vid.style.height = '100%'; vid.style.objectFit = 'cover';
+          vid.style.transform = 'scaleX(-1)';
+          pipEl.appendChild(vid);
+          pipEl.style.display = 'block';
+        }
+      }
+    }
+    function hidePip() { pipEl.style.display = 'none'; pipEl.innerHTML = ''; }
+
+    window.exitCssFullscreen = function() {
+      if (cssFsEl) { cssFsEl.classList.remove('css-fullscreen'); cssFsEl = null; }
+      document.getElementById('css-fs-close').classList.remove('show');
+      hidePip();
+    };
+
+    function toggleFullscreen(tileEl, participantId) {
+      // Exit if already fullscreen (native or CSS)
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+        hidePip();
+        return;
+      }
+      if (cssFsEl) {
+        exitCssFullscreen();
+        return;
+      }
+      // Enter fullscreen
+      if (canNativeFs) {
+        tileEl.requestFullscreen().catch(() => {
+          // Fallback to CSS if native fails (some browsers)
+          tileEl.classList.add('css-fullscreen');
+          cssFsEl = tileEl;
+        });
+      } else {
+        // iOS: CSS-based fullscreen
+        tileEl.classList.add('css-fullscreen');
+        cssFsEl = tileEl;
+      }
+      if (cssFsEl) document.getElementById('css-fs-close').classList.add('show');
+      showPip(participantId);
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) hidePip();
+    });
+    // Escape key exits CSS fullscreen
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && cssFsEl) exitCssFullscreen();
+    });
+
+    // Chat
+    function addChatMessage(sender, text) {
+      const el = document.getElementById('chat-messages');
+      const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      el.innerHTML += `<div class="chat-msg"><span class="sender">${sender}</span><span class="text">${text.replace(/</g,'&lt;')}</span><span class="time">${ts}</span></div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+    window.sendChat = function() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text || !room) return;
+      const data = new TextEncoder().encode(JSON.stringify({ type: 'chat', text }));
+      room.localParticipant.publishData(data, { reliable: true });
+      addChatMessage(room.localParticipant.name || 'You', text);
+      input.value = '';
+    };
+    document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') window.sendChat();
+    });
+
+    // Background blur/image — loads @livekit/track-processors on demand
+    let trackProcessorsModule = null;
+    async function loadTrackProcessors() {
+      if (trackProcessorsModule) return trackProcessorsModule;
+      try {
+        trackProcessorsModule = await import('https://cdn.jsdelivr.net/npm/@livekit/track-processors@0.7.0/dist/index.mjs');
+        return trackProcessorsModule;
+      } catch (e) {
+        console.warn('track-processors load failed:', e);
+        return null;
+      }
+    }
+
+    window.setBg = async function(type, imageUrl) {
+      if (!room) return;
+      const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      if (!camPub?.track) { addChatMessage('System', 'Enable camera first.'); return; }
+
+      // Clear active state
+      document.querySelectorAll('.bg-option').forEach(el => el.classList.remove('active'));
+
+      // Remove current processor
+      try { if (bgProcessor) { await camPub.track.stopProcessor(); bgProcessor = null; } } catch {}
+
+      if (type === 'none') {
+        document.querySelector('.bg-option.none').classList.add('active');
+        return;
+      }
+
+      const mod = await loadTrackProcessors();
+      if (!mod) {
+        addChatMessage('System', 'Background effects not supported on this device/browser.');
+        document.querySelector('.bg-option.none').classList.add('active');
+        return;
+      }
+
+      try {
+        if (type === 'blur') {
+          bgProcessor = mod.BackgroundBlur(10, { delegate: 'GPU' });
+          await camPub.track.setProcessor(bgProcessor);
+          document.querySelector('.bg-option.blur').classList.add('active');
+        } else if (type === 'image' && imageUrl) {
+          // Load image first
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = imageUrl; });
+          bgProcessor = mod.BackgroundTransformer({ imagePath: imageUrl, delegate: 'GPU' });
+          await camPub.track.setProcessor(bgProcessor);
+          // Mark the clicked option active
+          document.querySelectorAll('.bg-option').forEach(el => {
+            if (el.onclick?.toString().includes(imageUrl)) el.classList.add('active');
+          });
+        }
+      } catch (e) {
+        console.warn('Background effect failed:', e);
+        addChatMessage('System', 'Background effect failed: ' + (e.message || 'unknown error'));
+        document.querySelector('.bg-option.none').classList.add('active');
+      }
+    };
+
+    // Control buttons
+    document.getElementById('btn-mic').addEventListener('click', async () => {
+      if (!room) return;
+      micEnabled = !micEnabled;
+      await room.localParticipant.setMicrophoneEnabled(micEnabled);
+      document.getElementById('btn-mic').classList.toggle('active', micEnabled);
+    });
+    document.getElementById('btn-cam').addEventListener('click', async () => {
+      if (!room) return;
+      camEnabled = !camEnabled;
+      await room.localParticipant.setCameraEnabled(camEnabled);
+      document.getElementById('btn-cam').classList.toggle('active', camEnabled);
+    });
+    document.getElementById('btn-screen').addEventListener('click', async () => {
+      if (!room) return;
+      const enabled = room.localParticipant.isScreenShareEnabled;
+      await room.localParticipant.setScreenShareEnabled(!enabled);
+      document.getElementById('btn-screen').classList.toggle('active', !enabled);
+    });
+    document.getElementById('btn-bg').addEventListener('click', () => {
+      document.getElementById('bg-selector').classList.toggle('show');
+    });
+    document.getElementById('btn-chat').addEventListener('click', () => {
+      document.getElementById('chat').classList.toggle('hidden');
+      document.getElementById('btn-chat').classList.toggle('active');
+    });
+    document.getElementById('btn-leave').addEventListener('click', () => {
+      if (room) room.disconnect();
+    });
+
+    // --- Kick / Mute ---
+    async function kickParticipant(participant) {
+      if (!confirm(`Kick ${participant.name || participant.identity}?`)) return;
+      try {
+        await fetch('/api/livekit/kick', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: meetingRoom, identity: participant.identity })
+        });
+        addChatMessage('System', `${participant.name || participant.identity} was removed.`);
+      } catch (e) { addChatMessage('System', 'Kick failed: ' + e.message); }
+    }
+
+    async function muteParticipant(participant) {
+      const audioTrack = [...participant.trackPublications.values()].find(p => p.track?.kind === Track.Kind.Audio);
+      if (!audioTrack?.track) { addChatMessage('System', 'No audio track to mute.'); return; }
+      try {
+        await fetch('/api/livekit/mute', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room: meetingRoom, identity: participant.identity, trackSid: audioTrack.track.sid, muted: !audioTrack.isMuted })
+        });
+        addChatMessage('System', `${participant.name} ${audioTrack.isMuted ? 'unmuted' : 'muted'}.`);
+      } catch (e) { addChatMessage('System', 'Mute failed: ' + e.message); }
+    }
+
+    // --- Companion Agent: Silent listening → Topic extraction → Brain context cards ---
+    let recognition = null;
+    let agentActive = false;
+    let transcriptBuffer = '';
+    let debounceTimer = null;
+    let lastQueryTime = 0;
+    const QUERY_COOLDOWN = 8000; // min 8s between Brain queries
+
+    document.getElementById('btn-agent').addEventListener('click', () => {
+      if (agentActive) { stopAgent(); return; }
+      startAgent();
+    });
+
+    function extractTopic(text) {
+      // Simple keyword extraction: take meaningful words >3 chars, deduplicate
+      const stopwords = new Set(['aber','auch','dass','dies','eine','einen','einem','einer','haben','hatte','sein','seine','seiner','sind','wird','wurde','über','nach','noch','oder','wenn','will','alle','kann','mehr','muss','soll','weil','denn','dann','hier','dort','jetzt','schon','nicht','sehr','ganz','doch','also','etwa','wohl','quasi','halt']);
+      const words = text.toLowerCase().replace(/[^a-zäöüß\s]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      const unique = [...new Set(words)];
+      return unique.slice(0, 5).join(' ');
+    }
+
+    function renderAgentCard(data) {
+      if (!data.insights || data.insights.length === 0) return;
+      const el = document.getElementById('chat-messages');
+      const topic = data.topic || 'Context';
+
+      // Build a human-readable summary from the top insight
+      const topInsight = data.insights[0];
+      const summary = data.summary || topInsight.content;
+
+      let html = `<div class="agent-card">`;
+      html += `<div class="agent-topic"><span class="topic-icon">&#128161;</span> ${escHtml(topic)}</div>`;
+      html += `<div class="agent-summary">${escHtml(summary)}</div>`;
+
+      // Expandable sources (collapsed by default for clean UX)
+      if (data.insights.length > 1) {
+        const cardId = 'src-' + Date.now();
+        html += `<div class="agent-sources">`;
+        html += `<div class="agent-source" onclick="document.getElementById('${cardId}').style.display=document.getElementById('${cardId}').style.display==='none'?'block':'none'" style="cursor:pointer;color:var(--ms-link)">&#9654; ${data.insights.length} sources</div>`;
+        html += `<div id="${cardId}" style="display:none">`;
+        for (const insight of data.insights.slice(1)) {
+          const preview = insight.content.length > 120 ? insight.content.slice(0, 120) + '...' : insight.content;
+          html += `<div class="agent-source"><span class="src-label">${escHtml(insight.contributor)}:</span> ${escHtml(preview)}</div>`;
+        }
+        html += `</div></div>`;
+      }
+
+      // Drill-down buttons — clean labels extracted from topics
+      const drillTopics = data.drill_topics || [];
+      if (drillTopics.length > 0) {
+        html += `<div class="agent-actions">`;
+        for (const dt of drillTopics) {
+          const label = escHtml(typeof dt === 'string' ? dt : (dt.label || dt));
+          const query = (typeof dt === 'string' ? dt : (dt.query || dt.label || dt)).replace(/'/g, "\\'");
+          html += `<button class="agent-drill-btn" onclick="drillDown('${query}')">${label}</button>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+      el.innerHTML += html;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    window.drillDown = async function(topic) {
+      showAgentSearching(topic);
+      try {
+        const resp = await fetch('/api/livekit/brain-query', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: topic, topic, drill: true })
+        });
+        hideAgentSearching();
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.insights?.length > 0) renderAgentCard(data);
+          else addChatMessage('Agent', `Nothing deeper found for "${topic}".`);
+        }
+      } catch { hideAgentSearching(); }
+    };
+
+    function showAgentSearching(topic) {
+      hideAgentSearching();
+      const el = document.getElementById('chat-messages');
+      el.innerHTML += `<div class="agent-searching" id="agent-status"><span class="search-dot"></span> Searching for <span class="search-query">${escHtml(topic)}</span></div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+    function hideAgentSearching() {
+      document.getElementById('agent-status')?.remove();
+    }
+    // Keep old name for compat
+    function addAgentListening(text) { showAgentSearching(text); }
+    function removeAgentListening() { hideAgentSearching(); }
+
+    async function processTranscript() {
+      const text = transcriptBuffer.trim();
+      transcriptBuffer = '';
+      if (text.length < 10) return;
+      if (Date.now() - lastQueryTime < QUERY_COOLDOWN) return;
+      lastQueryTime = Date.now();
+
+      const topic = extractTopic(text);
+      if (topic.length < 3) return;
+
+      // Show what the agent is searching for — no transcript echo
+      showAgentSearching(topic);
+      try {
+        const resp = await fetch('/api/livekit/brain-query', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: text, topic })
+        });
+        hideAgentSearching();
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.insights?.length > 0) renderAgentCard(data);
+        }
+      } catch { hideAgentSearching(); }
+    }
+
+    function startAgent() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        addChatMessage('System', 'Speech recognition not available. Use Chrome desktop.');
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.lang = 'de-DE';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (!event.results[i].isFinal) continue;
+          const text = event.results[i][0].transcript.trim();
+          if (text.length < 3) continue;
+          transcriptBuffer += ' ' + text;
+          // Debounce: wait 3s of silence before querying
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(processTranscript, 3000);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        addChatMessage('System', `Speech: ${event.error}`);
+      };
+
+      recognition.onend = () => {
+        if (agentActive) { try { recognition.start(); } catch {} }
+      };
+
+      recognition.start();
+      agentActive = true;
+      document.getElementById('btn-agent').classList.add('active');
+      // Open chat panel automatically so user sees agent output
+      document.getElementById('chat').classList.remove('hidden');
+      document.getElementById('btn-chat').classList.add('active');
+      addChatMessage('System', '🤖 Agent listening (German). Relevant context will appear here.');
+    }
+
+    function stopAgent() {
+      agentActive = false;
+      clearTimeout(debounceTimer);
+      transcriptBuffer = '';
+      if (recognition) { recognition.stop(); recognition = null; }
+      document.getElementById('btn-agent').classList.remove('active');
+      removeAgentListening();
+      addChatMessage('System', '🤖 Agent stopped.');
+    }
+  </script>
+</body>
+</html>
