@@ -205,21 +205,7 @@ agentsRouter.post('/:id/role-switch', (req: Request, res: Response) => {
   });
 });
 
-// GET /api/agents/:id — get agent by id
-agentsRouter.get('/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const db = getDb();
-  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
-
-  if (!agent) {
-    res.status(404).json({ error: 'Agent not found' });
-    return;
-  }
-
-  res.status(200).json(agent);
-});
-
-// POST /api/agents/spawn — create session and start agent process
+// POST /api/agents/spawn — create session and start agent process (MUST be before /:id)
 agentsRouter.post('/spawn', (req: Request, res: Response) => {
   const user = (req as any).user;
   const { role, project_slug } = req.body;
@@ -279,9 +265,18 @@ agentsRouter.post('/:id/stop', (req: Request, res: Response) => {
   res.status(200).json({ agent_id: id, status: 'stopped', timestamp: new Date().toISOString() });
 });
 
-// GET /api/agents/processes — list running agent processes
+// GET /api/agents/processes — list running agent processes (MUST be before /:id)
 agentsRouter.get('/processes', (req: Request, res: Response) => {
   const user = (req as any).user;
   const agents = listProcesses(user?.id);
   res.status(200).json({ count: agents.length, agents });
+});
+
+// GET /api/agents/:id — get agent by id (catch-all — MUST be last)
+agentsRouter.get('/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const db = getDb();
+  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
+  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+  res.status(200).json(agent);
 });
