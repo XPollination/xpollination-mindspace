@@ -4,6 +4,7 @@ import { renewBond, getActiveBond, expireBond } from './agent-bond.js';
 import { getAttestation, resolveAttestation } from '../lib/attestation.js';
 import { formatMissionTwin, formatCapabilityTwin, formatRequirementTwin, formatTaskTwin } from '../lib/twin-formatter.js';
 import { broadcast } from '../lib/sse-manager.js';
+import crypto from 'node:crypto';
 
 export const a2aMessageRouter = Router();
 
@@ -459,7 +460,6 @@ function handleObjectCreate(agent: any, body: any, res: Response): void {
     return;
   }
 
-  const crypto = require('node:crypto');
   const id = payload.id || crypto.randomUUID();
   const now = new Date().toISOString();
   const db = getDb();
