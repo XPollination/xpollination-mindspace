@@ -20,8 +20,10 @@
     "@theia/output": "~1.69.0",
     "@theia/process": "~1.69.0",
     "@theia/variable-resolver": "~1.69.0",
+    "@theia/scm": "~1.69.0",
     "@mindspace/theia-a2a": "workspace:*",
-    "@mindspace/theia-layouts": "workspace:*"
+    "@mindspace/theia-layouts": "workspace:*",
+    "@mindspace/theia-branding": "workspace:*"
   },
   "devDependencies": {
     "@theia/cli": "~1.69.0"

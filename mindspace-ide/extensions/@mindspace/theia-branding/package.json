@@ -1,0 +1,13 @@
+{
+  "name": "@mindspace/theia-branding",
+  "version": "0.1.0",
+  "description": "White-label Theia as Mindspace IDE — logo, name, colors, about dialog",
+  "keywords": ["theia-extension"],
+  "license": "MIT",
+  "main": "lib/browser/branding-frontend-module",
+  "typings": "lib/browser/branding-frontend-module",
+  "dependencies": { "@theia/core": "~1.69.0" },
+  "devDependencies": { "typescript": "~5.4.0" },
+  "scripts": { "build": "tsc", "watch": "tsc --watch" },
+  "theiaExtensions": [{ "frontend": "lib/browser/branding-frontend-module" }]
+}

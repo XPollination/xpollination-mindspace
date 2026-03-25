@@ -1,10 +1,15 @@
 /**
- * Layouts Frontend Module — Theia extension for panel layout presets
- * Phase 2: will provide layout preset commands, persistence, drag handles
+ * Layouts Frontend Module — terminal grid, layout presets, auto-agent spawning
  */
 import { ContainerModule } from '@theia/core/shared/inversify';
+import { CommandContribution } from '@theia/core';
+import { TerminalGridContribution } from './terminal-grid';
+import { LayoutPresetService } from './layout-presets';
+import { AutoAgentService } from './auto-agent';
 
 export default new ContainerModule(bind => {
-  // Phase 2: bind layout manager service, preset commands, toolbar contributions
+  bind(CommandContribution).to(TerminalGridContribution).inSingletonScope();
+  bind(LayoutPresetService).toSelf().inSingletonScope();
+  bind(AutoAgentService).toSelf().inSingletonScope();
   console.log('@mindspace/theia-layouts extension loaded');
 });
