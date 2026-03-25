@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { createMission, validateMission, diffMission } from '../../src/twins/mission-twin.js';
 import { createCapability, validateCapability, diffCapability } from '../../src/twins/capability-twin.js';
 import { createRequirement, validateRequirement, diffRequirement } from '../../src/twins/requirement-twin.js';
-import { createTask, validateTask, diffTask } from '../../src/twins/task-twin.js';
+import { createTask, validateTask, diffTask, workflowContext } from '../../src/twins/task-twin.js';
 
 export const a2aMessageRouter = Router();
 
@@ -299,7 +299,11 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
         if (filters?.id) { sql += ' AND id = ?'; params.push(filters.id); }
         sql += ' ORDER BY updated_at DESC';
         if (filters?.limit) { sql += ' LIMIT ?'; params.push(filters.limit); }
-        objects = db.prepare(sql).all(...params).map((t: any) => formatTaskTwin(t));
+        objects = db.prepare(sql).all(...params).map((t: any) => {
+          const twin = formatTaskTwin(t);
+          (twin as any)._workflow_context = workflowContext(twin);
+          return twin;
+        });
         break;
       }
 
