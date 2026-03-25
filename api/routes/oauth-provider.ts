@@ -68,12 +68,11 @@ oauthProviderRouter.get('/oauth/authorize', (req: Request, res: Response) => {
 
   // User is authenticated — generate authorization code
   const code = randomBytes(32).toString('hex');
-  const codeHash = createHash('sha256').update(code).digest('hex');
   const expiresAt = new Date(Date.now() + AUTH_CODE_TTL * 1000).toISOString();
 
   db.prepare(
-    'INSERT INTO oauth_authorization_codes (code_hash, client_id, user_id, redirect_uri, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(codeHash, client_id, user.id || user.user_id, redirect_uri, scope || 'openid', expiresAt);
+    'INSERT INTO oauth_authorization_codes (code, client_id, user_id, redirect_uri, code_challenge, code_challenge_method, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(code, client_id, user.id || user.user_id, redirect_uri, '', 'S256', scope || 'openid', expiresAt);
 
   const redirectUrl = new URL(redirect_uri as string);
   redirectUrl.searchParams.set('code', code);
@@ -102,16 +101,15 @@ oauthProviderRouter.post('/oauth/token', (req: Request, res: Response) => {
     }
 
     // Validate code
-    const codeHash = createHash('sha256').update(code).digest('hex');
     const authCode = db.prepare(
-      "SELECT * FROM oauth_authorization_codes WHERE code_hash = ? AND client_id = ? AND expires_at > datetime('now')"
-    ).get(codeHash, client_id) as any;
+      "SELECT * FROM oauth_authorization_codes WHERE code = ? AND client_id = ? AND used = 0 AND expires_at > datetime('now')"
+    ).get(code, client_id) as any;
 
     if (!authCode) { res.status(400).json({ error: 'invalid_grant' }); return; }
     if (redirect_uri && authCode.redirect_uri !== redirect_uri) { res.status(400).json({ error: 'invalid_grant', description: 'redirect_uri mismatch' }); return; }
 
-    // Delete used code
-    db.prepare('DELETE FROM oauth_authorization_codes WHERE code_hash = ?').run(codeHash);
+    // Mark code as used
+    db.prepare('UPDATE oauth_authorization_codes SET used = 1 WHERE code = ?').run(code);
 
     // Generate tokens
     const accessToken = jwt.sign(
@@ -126,11 +124,10 @@ oauthProviderRouter.post('/oauth/token', (req: Request, res: Response) => {
     const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL * 1000).toISOString();
     const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL * 1000).toISOString();
 
-    const accessTokenId = randomUUID();
-    db.prepare('INSERT INTO oauth_access_tokens (id, token_hash, client_id, user_id, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(accessTokenId, accessTokenHash, client_id, authCode.user_id, authCode.scope, accessExpiresAt);
-    db.prepare('INSERT INTO oauth_refresh_tokens (id, token_hash, access_token_id, expires_at) VALUES (?, ?, ?, ?)')
-      .run(randomUUID(), refreshTokenHash, accessTokenId, refreshExpiresAt);
+    db.prepare('INSERT INTO oauth_access_tokens (token_hash, client_id, user_id, scope, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .run(accessTokenHash, client_id, authCode.user_id, authCode.scope, accessExpiresAt);
+    db.prepare('INSERT INTO oauth_refresh_tokens (token_hash, client_id, user_id, access_token_hash, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(refreshTokenHash, client_id, authCode.user_id, accessTokenHash, authCode.scope, refreshExpiresAt);
 
     res.json({
       access_token: accessToken,
@@ -147,7 +144,7 @@ oauthProviderRouter.post('/oauth/token', (req: Request, res: Response) => {
 
     const tokenHash = createHash('sha256').update(refresh_token).digest('hex');
     const stored = db.prepare(
-      "SELECT rt.*, at.user_id, at.client_id, at.scope FROM oauth_refresh_tokens rt JOIN oauth_access_tokens at ON rt.access_token_id = at.id WHERE rt.token_hash = ? AND rt.expires_at > datetime('now') AND rt.revoked_at IS NULL"
+      "SELECT * FROM oauth_refresh_tokens WHERE token_hash = ? AND expires_at > datetime('now') AND revoked_at IS NULL"
     ).get(tokenHash) as any;
 
     if (!stored) { res.status(400).json({ error: 'invalid_grant' }); return; }
@@ -160,12 +157,11 @@ oauthProviderRouter.post('/oauth/token', (req: Request, res: Response) => {
     const newHash = createHash('sha256').update(newAccessToken).digest('hex');
     const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL * 1000).toISOString();
 
-    const newId = randomUUID();
-    db.prepare('INSERT INTO oauth_access_tokens (id, token_hash, client_id, user_id, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(newId, newHash, stored.client_id, stored.user_id, stored.scope, expiresAt);
+    db.prepare('INSERT INTO oauth_access_tokens (token_hash, client_id, user_id, scope, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .run(newHash, stored.client_id, stored.user_id, stored.scope, expiresAt);
 
     // Update refresh token to point to new access token
-    db.prepare('UPDATE oauth_refresh_tokens SET access_token_id = ? WHERE token_hash = ?').run(newId, tokenHash);
+    db.prepare('UPDATE oauth_refresh_tokens SET access_token_hash = ? WHERE token_hash = ?').run(newHash, tokenHash);
 
     res.json({ access_token: newAccessToken, token_type: 'Bearer', expires_in: ACCESS_TOKEN_TTL, scope: stored.scope });
     return;

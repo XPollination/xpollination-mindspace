@@ -78,9 +78,9 @@ export function onAgentConnect(db: any, agentId: string, role: string, projectSl
 }
 
 export function getDistribution(db: any): { role: string; agent_id: string; active_tasks: number }[] {
-  const sessions = db.prepare("SELECT agent_id, role FROM agent_sessions WHERE status = 'active'").all() as any[];
+  const sessions = db.prepare("SELECT id, agent_id, role FROM agent_sessions WHERE status = 'active'").all() as any[];
   return sessions.map((s: any) => {
-    const { count } = db.prepare("SELECT COUNT(*) as count FROM leases WHERE user_id = ? AND status = 'active'").get(s.agent_id) as { count: number };
+    const { count } = db.prepare("SELECT COUNT(*) as count FROM leases WHERE session_id = ? AND status = 'active'").get(s.id) as { count: number };
     return { role: s.role, agent_id: s.agent_id, active_tasks: count };
   });
 }
