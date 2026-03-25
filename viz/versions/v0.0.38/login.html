@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — XPollination Mindspace</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
+  <link rel="stylesheet" href="/mindspace.css">
+  <style>
+    label { margin-bottom: 0.3rem; }
+    .ms-input { margin-bottom: 1rem; }
+    .error { color: #d32f2f; font-size: 0.85rem; display: none; margin-bottom: 0.5rem; }
+    .register-link { text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: var(--ms-muted); }
+    .google-btn { display:block; width:100%; padding:0.7rem; background:var(--ms-surface); border:1px solid var(--ms-border); border-radius:var(--ms-radius-sm); text-align:center; text-decoration:none; color:var(--ms-text); font-size:0.95rem; transition:background 0.2s; box-sizing:border-box; }
+    .google-btn:hover { background:var(--ms-surface-hover); text-decoration:none; }
+  </style>
+</head>
+<body class="ms-auth-page">
+  <script type="module" src="/js/mindspace-nav.js"></script>
+  <div class="ms-auth-box">
+    <div class="ms-auth-logo">
+      <picture>
+        <source srcset="/assets/mindspace-logo-120.webp" type="image/webp">
+        <img src="/assets/mindspace-logo-120.png" alt="XPollination Mindspace" width="120" height="120">
+      </picture>
+    </div>
+    <h1 class="ms-auth-title">Mindspace</h1>
+    <p class="ms-auth-tagline">Collective intelligence — where humans and agents build knowledge together</p>
+    <div class="error" id="error"></div>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autocomplete="email" class="ms-input">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password" class="ms-input">
+      <button type="submit" class="ms-btn ms-btn-primary" style="width:100%;padding:0.7rem;font-size:1rem;">Sign In</button>
+    </form>
+    <div style="text-align:center; margin: 1.2rem 0 0.8rem; color:var(--ms-muted); font-size:0.85rem;">or</div>
+    <a href="/api/auth/oauth/google" class="google-btn">Sign in with Google</a>
+    <div class="register-link">Have an invite? <a href="/register">Register</a></div>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('error');
+      errorEl.style.display = 'none';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Login failed';
+          errorEl.style.display = 'block';
+          return;
+        }
+        const params = new URLSearchParams(window.location.search);
+        const returnTo = params.get('return_to');
+        window.location.href = returnTo || '/';
+      } catch (err) {
+        errorEl.textContent = 'Network error';
+        errorEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

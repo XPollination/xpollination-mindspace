@@ -1,0 +1,132 @@
+/* ============================================================================
+ * Kanban Board — Page-specific CSS (uses mindspace.css variables)
+ * No hardcoded colors — all via var(--ms-*)
+ * ============================================================================ */
+
+/* --- Toolbar --- */
+.kanban-toolbar {
+  position: fixed; top: var(--ms-nav-height); left: 0; right: 0; z-index: 900;
+  background: var(--ms-surface); border-bottom: 1px solid var(--ms-border);
+  display: flex; align-items: center; gap: 8px; padding: 6px 16px;
+  font-size: 13px;
+}
+.kanban-filters { display: flex; gap: 4px; }
+.filter-btn {
+  padding: 3px 10px; border: 1px solid var(--ms-border); border-radius: var(--ms-radius-sm);
+  background: transparent; color: var(--ms-muted); cursor: pointer; font-size: 12px;
+  transition: all 0.15s;
+}
+.filter-btn:hover { border-color: var(--ms-link); color: var(--ms-link); }
+.filter-btn.active { background: var(--ms-link); color: #fff; border-color: var(--ms-link); }
+.kanban-stats { margin-left: auto; color: var(--ms-muted); font-size: 12px; }
+
+/* --- Board --- */
+.kanban-board {
+  display: flex; gap: 12px; padding: 12px 16px;
+  margin-top: calc(var(--ms-nav-height) + 38px); /* nav + toolbar */
+  min-height: calc(100vh - var(--ms-nav-height) - 38px);
+  overflow-x: auto;
+}
+
+/* --- Columns --- */
+.kanban-column {
+  flex: 1; min-width: 220px; max-width: 320px;
+  background: var(--ms-surface); border-radius: var(--ms-radius);
+  display: flex; flex-direction: column;
+}
+.column-header {
+  padding: 8px 12px; font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--ms-muted); border-bottom: 1px solid var(--ms-border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.column-count {
+  background: var(--ms-border); color: var(--ms-text);
+  padding: 1px 6px; border-radius: 10px; font-size: 11px;
+}
+.column-cards {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+/* --- Task Cards --- */
+.task-card {
+  background: var(--ms-bg); border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius-sm); padding: 10px 12px;
+  cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.task-card:hover { border-color: var(--ms-link); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.task-card.selected { border-color: var(--ms-accent); box-shadow: 0 0 0 2px rgba(224,112,32,0.2); }
+.task-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; line-height: 1.3; }
+.task-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.task-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  font-weight: 600; text-transform: uppercase; color: #fff;
+}
+.task-project { font-size: 10px; color: var(--ms-muted); }
+.task-slug { font-size: 10px; color: var(--ms-muted); font-family: monospace; }
+
+/* --- Detail Panel --- */
+.detail-panel {
+  position: fixed; top: var(--ms-nav-height); right: -400px; bottom: 0;
+  width: 400px; background: var(--ms-bg); border-left: 1px solid var(--ms-border);
+  z-index: 800; transition: right 0.2s ease; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.detail-panel.open { right: 0; }
+.detail-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--ms-border);
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; background: var(--ms-bg); z-index: 1;
+}
+.detail-header h2 { font-size: 14px; font-weight: 600; }
+.detail-close {
+  background: none; border: none; font-size: 20px; cursor: pointer;
+  color: var(--ms-muted); padding: 4px 8px; border-radius: var(--ms-radius-sm);
+}
+.detail-close:hover { color: var(--ms-text); background: var(--ms-surface); }
+.detail-body { flex: 1; padding: 16px; }
+.detail-actions {
+  padding: 12px 16px; border-top: 1px solid var(--ms-border);
+  display: flex; gap: 8px;
+}
+
+/* Detail sections */
+.detail-section { margin-bottom: 16px; }
+.detail-section-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--ms-muted); margin-bottom: 6px;
+  cursor: pointer; user-select: none;
+}
+.detail-section-title:hover { color: var(--ms-link); }
+.detail-section-title::before { content: "▸ "; font-size: 10px; }
+.detail-section.expanded .detail-section-title::before { content: "▾ "; }
+.detail-section:not(.expanded) .detail-section-content { display: none; }
+.detail-field { margin-bottom: 8px; }
+.detail-field-label { font-size: 11px; color: var(--ms-muted); margin-bottom: 2px; }
+.detail-field-value { font-size: 13px; color: var(--ms-text); word-break: break-word; }
+.detail-field-value pre {
+  background: var(--ms-surface); padding: 8px; border-radius: var(--ms-radius-sm);
+  font-size: 12px; overflow-x: auto; white-space: pre-wrap;
+}
+.detail-link {
+  color: var(--ms-link); text-decoration: none; font-size: 12px;
+}
+.detail-link:hover { text-decoration: underline; }
+
+/* Overlay behind detail panel (mobile: tap to close) */
+.detail-overlay {
+  display: none; position: fixed; inset: 0; z-index: 799;
+  background: rgba(0,0,0,0.3);
+}
+.detail-overlay.open { display: block; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .kanban-board { flex-direction: column; }
+  .kanban-column { max-width: none; min-width: 0; }
+  .detail-panel { width: 85%; right: -85%; top: var(--ms-nav-height); }
+  .detail-header { padding-top: 8px; }
+  .kanban-toolbar { flex-wrap: wrap; gap: 4px; }
+  .kanban-toolbar .ms-input { width: 100% !important; }
+}
