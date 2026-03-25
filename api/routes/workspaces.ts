@@ -3,7 +3,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getDb } from '../db/connection.js';
@@ -34,10 +34,18 @@ workspacesRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
+  // Validate branch name if provided
+  if (branch && !/^[a-zA-Z0-9\-_.\/]+$/.test(branch)) {
+    res.status(400).json({ error: 'Invalid branch name' });
+    return;
+  }
+
   try {
     mkdirSync(userDir, { recursive: true });
-    const branchArg = branch ? `--branch ${branch}` : '';
-    execSync(`git clone ${branchArg} --depth 1 ${git_url} ${clonePath}`, { timeout: 120000, stdio: 'pipe' });
+    const args = ['clone', '--depth', '1'];
+    if (branch) { args.push('--branch', branch); }
+    args.push(git_url, clonePath);
+    execFileSync('git', args, { timeout: 120000, stdio: 'pipe' });
   } catch (err: any) {
     res.status(500).json({ error: `Clone failed: ${err.message}` });
     return;
