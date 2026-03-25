@@ -355,6 +355,31 @@ async function init() {
       } catch { /* silent */ }
     });
 
+    client.on('object_create', async (data) => {
+      if (data.object_type === 'task') {
+        try {
+          const slug = data.twin?.slug || data.twin?.id;
+          if (slug) {
+            const tasks = await client.query('task', { slug });
+            if (tasks.length) { cache.set('task', slug, tasks[0]); renderBoard(); }
+          }
+        } catch { /* silent */ }
+      }
+    });
+
+    client.on('object_update', async (data) => {
+      if (data.object_type === 'task') {
+        try {
+          const updated = await client.query('task', { id: data.object_id });
+          if (updated.length) {
+            const slug = updated[0].slug || updated[0].id;
+            cache.set('task', slug, updated[0]);
+            renderBoard();
+          }
+        } catch { /* silent */ }
+      }
+    });
+
     // Deep link: /kanban?task=slug
     const params = new URLSearchParams(window.location.search);
     const taskParam = params.get('task');

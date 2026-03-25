@@ -200,6 +200,14 @@ export class A2AClient {
       this._emit('task_available', JSON.parse(e.data));
     });
 
+    this._eventSource.addEventListener('object_create', (e) => {
+      this._emit('object_create', JSON.parse(e.data));
+    });
+
+    this._eventSource.addEventListener('object_update', (e) => {
+      this._emit('object_update', JSON.parse(e.data));
+    });
+
     this._eventSource.onerror = () => {
       this._connected = false;
       this._emit('error', { message: 'SSE connection lost' });
