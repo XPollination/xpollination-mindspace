@@ -1,0 +1,219 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 820" font-family="monospace" font-size="11">
+  <defs>
+    <marker id="a6" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#7d8590"/>
+    </marker>
+    <marker id="a6g" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#22c55e"/>
+    </marker>
+    <marker id="a6y" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#eab308"/>
+    </marker>
+    <marker id="a6b" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="#8ab4f8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="820" rx="12" fill="#0d1117"/>
+
+  <text x="480" y="30" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="bold">Knowledge Hierarchy — Draft to Executable</text>
+  <text x="480" y="50" text-anchor="middle" fill="#7d8590" font-size="10">A2A manages each level's lifecycle AND the cascade between levels</text>
+
+  <!-- MISSION LEVEL -->
+  <rect x="30" y="70" width="900" height="145" rx="10" fill="#161b22" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="50" y="95" fill="#22c55e" font-size="14" font-weight="bold">MISSION</text>
+  <text x="160" y="95" fill="#7d8590" font-size="10">The WHY — vision, rationale, scope definition</text>
+
+  <!-- Mission states -->
+  <rect x="50" y="110" width="80" height="32" rx="6" fill="#0d1117" stroke="#7d8590"/>
+  <text x="90" y="130" text-anchor="middle" fill="#7d8590" font-size="10">draft</text>
+  <line x1="130" y1="126" x2="155" y2="126" stroke="#7d8590" stroke-width="1" marker-end="url(#a6)"/>
+
+  <rect x="160" y="110" width="80" height="32" rx="6" fill="#0d1117" stroke="#eab308"/>
+  <text x="200" y="130" text-anchor="middle" fill="#eab308" font-size="10">ready</text>
+  <line x1="240" y1="126" x2="265" y2="126" stroke="#eab308" stroke-width="1" marker-end="url(#a6y)"/>
+
+  <rect x="270" y="110" width="80" height="32" rx="6" fill="#0d1117" stroke="#22c55e" stroke-width="2"/>
+  <text x="310" y="130" text-anchor="middle" fill="#22c55e" font-size="10">active</text>
+  <line x1="350" y1="126" x2="375" y2="126" stroke="#22c55e" stroke-width="1" marker-end="url(#a6g)"/>
+
+  <rect x="380" y="110" width="90" height="32" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="425" y="130" text-anchor="middle" fill="#22c55e" font-size="10">complete</text>
+
+  <!-- Mission trigger descriptions -->
+  <text x="90" y="160" text-anchor="middle" fill="#7d8590" font-size="9">Vision written</text>
+  <text x="90" y="172" text-anchor="middle" fill="#7d8590" font-size="9">Interface: 9 sections</text>
+
+  <text x="200" y="160" text-anchor="middle" fill="#eab308" font-size="9">Scope approved</text>
+  <text x="200" y="172" text-anchor="middle" fill="#eab308" font-size="9">Capabilities defined</text>
+
+  <text x="310" y="160" text-anchor="middle" fill="#22c55e" font-size="9">Work in progress</text>
+  <text x="310" y="172" text-anchor="middle" fill="#22c55e" font-size="9">Tasks executing</text>
+
+  <text x="425" y="160" text-anchor="middle" fill="#22c55e" font-size="9">All capabilities</text>
+  <text x="425" y="172" text-anchor="middle" fill="#22c55e" font-size="9">complete (CASCADE)</text>
+
+  <!-- A2A role at mission level -->
+  <rect x="530" y="105" width="390" height="95" rx="6" fill="#0d1117" stroke="#22c55e" stroke-width="1"/>
+  <text x="550" y="125" fill="#22c55e" font-size="10" font-weight="bold">A2A at Mission Level:</text>
+  <text x="560" y="142" fill="#7d8590" font-size="9">- Validates MissionInterface v1.0 (9 sections) on CREATE</text>
+  <text x="560" y="156" fill="#7d8590" font-size="9">- draft→ready: interface compliance &gt; 80%</text>
+  <text x="560" y="170" fill="#7d8590" font-size="9">- ready→active: at least 1 capability exists</text>
+  <text x="560" y="184" fill="#eab308" font-size="9">- CASCADE: all capabilities complete → mission complete</text>
+
+  <!-- DOWN ARROW: Mission creates Capabilities -->
+  <line x1="310" y1="215" x2="310" y2="240" stroke="#8ab4f8" stroke-width="2" marker-end="url(#a6b)"/>
+  <text x="320" y="233" fill="#8ab4f8" font-size="9">OBJECT_CREATE capability</text>
+
+  <!-- CAPABILITY LEVEL -->
+  <rect x="30" y="245" width="900" height="145" rx="10" fill="#161b22" stroke="#8ab4f8" stroke-width="1.5"/>
+  <text x="50" y="270" fill="#8ab4f8" font-size="14" font-weight="bold">CAPABILITY</text>
+  <text x="180" y="270" fill="#7d8590" font-size="10">The WHAT — what the system can do when this is built</text>
+
+  <!-- Capability states -->
+  <rect x="50" y="285" width="80" height="32" rx="6" fill="#0d1117" stroke="#7d8590"/>
+  <text x="90" y="305" text-anchor="middle" fill="#7d8590" font-size="10">draft</text>
+  <line x1="130" y1="301" x2="155" y2="301" stroke="#7d8590" stroke-width="1" marker-end="url(#a6)"/>
+
+  <rect x="160" y="285" width="80" height="32" rx="6" fill="#0d1117" stroke="#22c55e" stroke-width="2"/>
+  <text x="200" y="305" text-anchor="middle" fill="#22c55e" font-size="10">active</text>
+  <line x1="240" y1="301" x2="265" y2="301" stroke="#22c55e" stroke-width="1" marker-end="url(#a6g)"/>
+
+  <rect x="270" y="285" width="90" height="32" rx="6" fill="#0d1117" stroke="#22c55e"/>
+  <text x="315" y="305" text-anchor="middle" fill="#22c55e" font-size="10">complete</text>
+
+  <text x="90" y="335" text-anchor="middle" fill="#7d8590" font-size="9">Scope defined</text>
+  <text x="90" y="347" text-anchor="middle" fill="#7d8590" font-size="9">Interface: 6 sections</text>
+
+  <text x="200" y="335" text-anchor="middle" fill="#22c55e" font-size="9">Requirements exist</text>
+  <text x="200" y="347" text-anchor="middle" fill="#22c55e" font-size="9">Tasks in progress</text>
+
+  <text x="315" y="335" text-anchor="middle" fill="#22c55e" font-size="9">All requirements</text>
+  <text x="315" y="347" text-anchor="middle" fill="#22c55e" font-size="9">met (CASCADE)</text>
+
+  <rect x="530" y="280" width="390" height="95" rx="6" fill="#0d1117" stroke="#8ab4f8" stroke-width="1"/>
+  <text x="550" y="300" fill="#8ab4f8" font-size="10" font-weight="bold">A2A at Capability Level:</text>
+  <text x="560" y="317" fill="#7d8590" font-size="9">- Validates CapabilityInterface v1.0 (6 sections) on CREATE</text>
+  <text x="560" y="331" fill="#7d8590" font-size="9">- Links to parent mission_id (required)</text>
+  <text x="560" y="345" fill="#7d8590" font-size="9">- draft→active: at least 1 requirement exists</text>
+  <text x="560" y="359" fill="#eab308" font-size="9">- CASCADE: all requirements met → capability complete</text>
+
+  <!-- DOWN ARROW -->
+  <line x1="200" y1="390" x2="200" y2="415" stroke="#8ab4f8" stroke-width="2" marker-end="url(#a6b)"/>
+  <text x="210" y="408" fill="#8ab4f8" font-size="9">OBJECT_CREATE requirement</text>
+
+  <!-- REQUIREMENT LEVEL -->
+  <rect x="30" y="420" width="900" height="130" rx="10" fill="#161b22" stroke="#eab308" stroke-width="1.5"/>
+  <text x="50" y="445" fill="#eab308" font-size="14" font-weight="bold">REQUIREMENT</text>
+  <text x="210" y="445" fill="#7d8590" font-size="10">The HOW precisely — acceptance criteria, verification method</text>
+
+  <rect x="50" y="460" width="80" height="32" rx="6" fill="#0d1117" stroke="#7d8590"/>
+  <text x="90" y="480" text-anchor="middle" fill="#7d8590" font-size="10">draft</text>
+  <line x1="130" y1="476" x2="155" y2="476" stroke="#7d8590" stroke-width="1" marker-end="url(#a6)"/>
+
+  <rect x="160" y="460" width="80" height="32" rx="6" fill="#0d1117" stroke="#22c55e" stroke-width="2"/>
+  <text x="200" y="480" text-anchor="middle" fill="#22c55e" font-size="10">active</text>
+
+  <text x="90" y="510" text-anchor="middle" fill="#7d8590" font-size="9">Acceptance criteria</text>
+  <text x="90" y="522" text-anchor="middle" fill="#7d8590" font-size="9">defined. REQ-XXX-NNN</text>
+
+  <text x="200" y="510" text-anchor="middle" fill="#22c55e" font-size="9">Tasks created</text>
+  <text x="200" y="522" text-anchor="middle" fill="#22c55e" font-size="9">and executing</text>
+
+  <rect x="530" y="455" width="390" height="80" rx="6" fill="#0d1117" stroke="#eab308" stroke-width="1"/>
+  <text x="550" y="475" fill="#eab308" font-size="10" font-weight="bold">A2A at Requirement Level:</text>
+  <text x="560" y="492" fill="#7d8590" font-size="9">- Validates req_id_human pattern: REQ-[A-Z0-9]{2,3}-\d{2,3}</text>
+  <text x="560" y="506" fill="#7d8590" font-size="9">- Links to parent capability_id</text>
+  <text x="560" y="520" fill="#eab308" font-size="9">- Requirement met when all linked tasks are complete</text>
+
+  <!-- DOWN ARROW -->
+  <line x1="200" y1="550" x2="200" y2="575" stroke="#8ab4f8" stroke-width="2" marker-end="url(#a6b)"/>
+  <text x="210" y="568" fill="#8ab4f8" font-size="9">OBJECT_CREATE task</text>
+
+  <!-- TASK LEVEL -->
+  <rect x="30" y="580" width="900" height="225" rx="10" fill="#161b22" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="50" y="605" fill="#ef4444" font-size="14" font-weight="bold">TASK</text>
+  <text x="110" y="605" fill="#7d8590" font-size="10">The WHO+WHEN — who does what work, PDSA workflow</text>
+
+  <!-- Task mini state machine -->
+  <rect x="50" y="620" width="65" height="28" rx="5" fill="#0d1117" stroke="#7d8590"/>
+  <text x="83" y="638" text-anchor="middle" fill="#7d8590" font-size="9">pending</text>
+
+  <line x1="115" y1="634" x2="130" y2="634" stroke="#7d8590" stroke-width="1" marker-end="url(#a6)"/>
+  <rect x="133" y="620" width="55" height="28" rx="5" fill="#0d1117" stroke="#7d8590"/>
+  <text x="161" y="638" text-anchor="middle" fill="#7d8590" font-size="9">ready</text>
+
+  <line x1="188" y1="634" x2="203" y2="634" stroke="#22c55e" stroke-width="1" marker-end="url(#a6g)"/>
+  <rect x="206" y="620" width="55" height="28" rx="5" fill="#0d1117" stroke="#22c55e" stroke-width="2"/>
+  <text x="234" y="638" text-anchor="middle" fill="#22c55e" font-size="9">active</text>
+
+  <line x1="261" y1="634" x2="276" y2="634" stroke="#eab308" stroke-width="1" marker-end="url(#a6y)"/>
+  <rect x="279" y="620" width="70" height="28" rx="5" fill="#0d1117" stroke="#eab308"/>
+  <text x="314" y="638" text-anchor="middle" fill="#eab308" font-size="9">approval</text>
+
+  <line x1="349" y1="634" x2="364" y2="634" stroke="#22c55e" stroke-width="1" marker-end="url(#a6g)"/>
+  <rect x="367" y="620" width="70" height="28" rx="5" fill="#0d1117" stroke="#22c55e"/>
+  <text x="402" y="638" text-anchor="middle" fill="#22c55e" font-size="9">approved</text>
+
+  <line x1="437" y1="634" x2="452" y2="634" stroke="#22c55e" stroke-width="1" marker-end="url(#a6g)"/>
+  <rect x="455" y="620" width="60" height="28" rx="5" fill="#0d1117" stroke="#22c55e"/>
+  <text x="485" y="638" text-anchor="middle" fill="#22c55e" font-size="9">testing</text>
+
+  <!-- Second row -->
+  <rect x="50" y="660" width="55" height="28" rx="5" fill="#0d1117" stroke="#7d8590"/>
+  <text x="78" y="678" text-anchor="middle" fill="#7d8590" font-size="9">ready</text>
+  <text x="78" y="700" text-anchor="middle" fill="#7d8590" font-size="8">+dev</text>
+
+  <line x1="105" y1="674" x2="120" y2="674" stroke="#22c55e" stroke-width="1" marker-end="url(#a6g)"/>
+  <rect x="123" y="660" width="60" height="28" rx="5" fill="#0d1117" stroke="#22c55e" stroke-width="2"/>
+  <text x="153" y="678" text-anchor="middle" fill="#22c55e" font-size="9">active</text>
+  <text x="153" y="700" text-anchor="middle" fill="#22c55e" font-size="8">+dev</text>
+
+  <line x1="183" y1="674" x2="198" y2="674" stroke="#eab308" stroke-width="1" marker-end="url(#a6y)"/>
+  <rect x="201" y="660" width="60" height="28" rx="5" fill="#0d1117" stroke="#eab308"/>
+  <text x="231" y="678" text-anchor="middle" fill="#eab308" font-size="9">review</text>
+  <text x="231" y="700" text-anchor="middle" fill="#eab308" font-size="8">qa→pdsa→liaison</text>
+
+  <line x1="261" y1="674" x2="276" y2="674" stroke="#22c55e" stroke-width="1.5" marker-end="url(#a6g)"/>
+  <rect x="279" y="660" width="80" height="28" rx="5" fill="#0d1117" stroke="#22c55e" stroke-width="2"/>
+  <text x="319" y="678" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">complete</text>
+
+  <!-- CASCADE arrow up -->
+  <line x1="380" y1="674" x2="500" y2="674" stroke="#eab308" stroke-width="2" stroke-dasharray="6,3"/>
+  <text x="440" y="668" text-anchor="middle" fill="#eab308" font-size="9" font-weight="bold">CASCADE UP</text>
+
+  <rect x="505" y="658" width="190" height="35" rx="6" fill="#0d1117" stroke="#eab308" stroke-width="1.5"/>
+  <text x="600" y="676" text-anchor="middle" fill="#eab308" font-size="9">All tasks complete for REQ?</text>
+  <text x="600" y="688" text-anchor="middle" fill="#eab308" font-size="9">→ Requirement met → Capability? → Mission?</text>
+
+  <!-- A2A role at task level -->
+  <rect x="530" y="615" width="390" height="35" rx="6" fill="#0d1117" stroke="#ef4444" stroke-width="1"/>
+  <text x="550" y="637" fill="#ef4444" font-size="10" font-weight="bold">A2A at Task Level:</text>
+  <text x="710" y="637" fill="#7d8590" font-size="9">Full WORKFLOW.md v19 — twin validates every transition</text>
+
+  <!-- Roles row -->
+  <rect x="50" y="720" width="860" height="70" rx="6" fill="#0d1117" stroke="#7d8590"/>
+  <text x="70" y="740" fill="#e6edf3" font-size="10" font-weight="bold">Roles Through the Flow:</text>
+
+  <rect x="70" y="752" width="80" height="24" rx="4" fill="#1c2128" stroke="#8ab4f8"/>
+  <text x="110" y="768" text-anchor="middle" fill="#8ab4f8" font-size="9">LIAISON</text>
+  <text x="110" y="782" text-anchor="middle" fill="#7d8590" font-size="8">creates, approves</text>
+
+  <rect x="170" y="752" width="80" height="24" rx="4" fill="#1c2128" stroke="#eab308"/>
+  <text x="210" y="768" text-anchor="middle" fill="#eab308" font-size="9">PDSA</text>
+  <text x="210" y="782" text-anchor="middle" fill="#7d8590" font-size="8">designs</text>
+
+  <rect x="270" y="752" width="80" height="24" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="310" y="768" text-anchor="middle" fill="#22c55e" font-size="9">QA</text>
+  <text x="310" y="782" text-anchor="middle" fill="#7d8590" font-size="8">tests</text>
+
+  <rect x="370" y="752" width="80" height="24" rx="4" fill="#1c2128" stroke="#ef4444"/>
+  <text x="410" y="768" text-anchor="middle" fill="#ef4444" font-size="9">DEV</text>
+  <text x="410" y="782" text-anchor="middle" fill="#7d8590" font-size="8">implements</text>
+
+  <rect x="470" y="752" width="80" height="24" rx="4" fill="#1c2128" stroke="#22c55e"/>
+  <text x="510" y="768" text-anchor="middle" fill="#22c55e" font-size="9">HUMAN</text>
+  <text x="510" y="782" text-anchor="middle" fill="#7d8590" font-size="8">decides</text>
+
+  <text x="580" y="768" fill="#7d8590" font-size="9">A2A assigns roles automatically per transition rules.</text>
+  <text x="580" y="782" fill="#7d8590" font-size="9">Agent gets: workflow_context with prompt for what to deliver.</text>
+</svg>
