@@ -373,4 +373,27 @@ async function init() {
   }
 }
 
-init();
+// --- Liaison Approval Mode ---
+const liaisonModeEl = document.getElementById('liaison-mode');
+async function loadApprovalMode() {
+  try {
+    const project = projectFilter?.value !== 'all' ? `?project=${projectFilter.value}` : '';
+    const res = await fetch(`/api/settings/liaison-approval-mode${project}`);
+    if (res.ok) {
+      const { mode } = await res.json();
+      if (liaisonModeEl) liaisonModeEl.value = mode;
+    }
+  } catch { /* ignore */ }
+}
+if (liaisonModeEl) {
+  liaisonModeEl.addEventListener('change', async () => {
+    const project = projectFilter?.value !== 'all' ? projectFilter.value : undefined;
+    await fetch('/api/settings/liaison-approval-mode', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: liaisonModeEl.value, project }),
+    });
+  });
+}
+
+init().then(() => loadApprovalMode());
