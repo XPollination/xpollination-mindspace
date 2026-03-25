@@ -574,8 +574,8 @@ function handleObjectCreate(agent: any, body: any, res: Response): void {
 
       case 'capability': {
         db.prepare(
-          'INSERT INTO capabilities (id, mission_id, title, description, status, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(id, payload.mission_id, payload.title, payload.description || null, payload.status || config.defaults.status, payload.sort_order ?? config.defaults.sort_order, now, now);
+          'INSERT INTO capabilities (id, mission_id, title, description, status, sort_order, config, feature_gate, activation, rollback_plan, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(id, payload.mission_id, payload.title, payload.description || null, payload.status || config.defaults.status, payload.sort_order ?? config.defaults.sort_order, payload.config ? JSON.stringify(payload.config) : null, payload.feature_gate ? JSON.stringify(payload.feature_gate) : null, payload.activation ? JSON.stringify(payload.activation) : null, payload.rollback_plan ? JSON.stringify(payload.rollback_plan) : null, payload.version || '1.0.0', now, now);
 
         const row = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(id);
         const twin = formatCapabilityTwin(row);
@@ -678,8 +678,12 @@ function handleObjectUpdate(agent: any, body: any, res: Response): void {
         const diff = diffCapability(mergedTwin, originalTwin);
         if (Object.keys(diff).length === 0) { res.status(200).json({ type: 'ACK', original_type: 'OBJECT_UPDATE', agent_id: agent.id, object_type, object_id: row.id, no_change: true, timestamp: now }); return; }
         const updates: string[] = []; const params: any[] = [];
-        for (const key of ['title', 'description', 'status', 'sort_order', 'mission_id', 'content_md', 'content_version']) {
-          if (payload[key] !== undefined) { updates.push(`${key} = ?`); params.push(key === 'sort_order' ? Number(payload[key]) : payload[key]); }
+        for (const key of ['title', 'description', 'status', 'sort_order', 'mission_id', 'content_md', 'content_version', 'config', 'feature_gate', 'activation', 'rollback_plan', 'version']) {
+          if (payload[key] !== undefined) {
+            const isJson = ['config', 'feature_gate', 'activation', 'rollback_plan'].includes(key);
+            updates.push(`${key} = ?`);
+            params.push(key === 'sort_order' ? Number(payload[key]) : isJson && typeof payload[key] === 'object' ? JSON.stringify(payload[key]) : payload[key]);
+          }
         }
         updates.push("updated_at = ?"); params.push(now); params.push(row.id);
         db.prepare(`UPDATE capabilities SET ${updates.join(', ')} WHERE id = ?`).run(...params);

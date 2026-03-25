@@ -39,6 +39,15 @@ export function formatCapabilityTwin(row: any) {
     dependencyIds = JSON.parse(row.dependency_ids || '[]');
   } catch { /* ignore */ }
 
+  let config: any = undefined;
+  try { if (row.config) config = JSON.parse(row.config); } catch { /* ignore */ }
+  let featureGate: any = undefined;
+  try { if (row.feature_gate) featureGate = JSON.parse(row.feature_gate); } catch { /* ignore */ }
+  let activation: any = undefined;
+  try { if (row.activation) activation = JSON.parse(row.activation); } catch { /* ignore */ }
+  let rollbackPlan: any = undefined;
+  try { if (row.rollback_plan) rollbackPlan = JSON.parse(row.rollback_plan); } catch { /* ignore */ }
+
   const twin = createCapability({
     id: row.id,
     mission_id: row.mission_id,
@@ -50,6 +59,11 @@ export function formatCapabilityTwin(row: any) {
     dependency_ids: dependencyIds,
     content_md: row.content_md || undefined,
     content_version: row.content_version || 0,
+    config,
+    feature_gate: featureGate,
+    activation,
+    rollback_plan: rollbackPlan,
+    version: row.version || '1.0.0',
   });
   const validation = validateCapability(twin);
   return { ...twin, _valid: validation.valid, _errors: validation.errors, _warnings: validation.warnings || [], _interface_compliance: validation.interface_compliance || null };
