@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "name": "mindspace-ide",
+  "version": "0.1.0",
+  "description": "XPollination Mindspace IDE — Theia-based, A2A-native",
+  "workspaces": [
+    "browser-app",
+    "extensions/@mindspace/*"
+  ],
+  "scripts": {
+    "prepare": "yarn build",
+    "build": "yarn workspace mindspace-ide-browser build",
+    "start": "yarn workspace mindspace-ide-browser start",
+    "watch": "yarn workspace mindspace-ide-browser watch"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
