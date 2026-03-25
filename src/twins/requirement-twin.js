@@ -8,8 +8,15 @@ export function createRequirement(input) {
   };
 }
 
+// RequirementInterface v1.0 — 9 required sections (SKO Part 2)
+const REQUIREMENT_SECTIONS = [
+  'Statement', 'Rationale', 'Scope', 'Acceptance Criteria',
+  'Behavior', 'Constraints', 'Dependencies', 'Verification', 'Change Impact'
+];
+
 export function validateRequirement(twin) {
   const errors = [];
+  const warnings = [];
 
   if (!twin.project_slug || typeof twin.project_slug !== 'string') {
     errors.push('project_slug is required');
@@ -34,7 +41,21 @@ export function validateRequirement(twin) {
     errors.push(`priority must be one of: ${VALID_PRIORITIES.join(', ')}`);
   }
 
-  return { valid: errors.length === 0, errors };
+  // RequirementInterface v1.0: check required sections
+  const md = twin.description || '';
+  if (md.length > 100) {
+    const missing = REQUIREMENT_SECTIONS.filter(s => !md.match(new RegExp('##\\s+.*' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')));
+    const present = REQUIREMENT_SECTIONS.length - missing.length;
+    if (missing.length > 0) {
+      warnings.push(`RequirementInterface v1.0: missing sections (${missing.length}/${REQUIREMENT_SECTIONS.length}): ${missing.join(', ')}`);
+    }
+    return {
+      valid: errors.length === 0, errors, warnings,
+      interface_compliance: { interface: 'RequirementInterface', version: '1.0', sections_present: present, sections_required: REQUIREMENT_SECTIONS.length, completeness_percent: Math.round((present / REQUIREMENT_SECTIONS.length) * 100) }
+    };
+  }
+
+  return { valid: errors.length === 0, errors, warnings, interface_compliance: null };
 }
 
 export function diffRequirement(current, original) {

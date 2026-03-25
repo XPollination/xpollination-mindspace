@@ -52,7 +52,7 @@ export function formatCapabilityTwin(row: any) {
     content_version: row.content_version || 0,
   });
   const validation = validateCapability(twin);
-  return { ...twin, _valid: validation.valid, _errors: validation.errors };
+  return { ...twin, _valid: validation.valid, _errors: validation.errors, _warnings: validation.warnings || [], _interface_compliance: validation.interface_compliance || null };
 }
 
 export function formatRequirementTwin(row: any) {
@@ -68,7 +68,7 @@ export function formatRequirementTwin(row: any) {
     short_id: row.short_id || undefined,
   });
   const validation = validateRequirement(twin);
-  return { ...twin, _valid: validation.valid, _errors: validation.errors };
+  return { ...twin, _valid: validation.valid, _errors: validation.errors, _warnings: validation.warnings || [], _interface_compliance: validation.interface_compliance || null };
 }
 
 export function formatTaskTwin(row: any) {
@@ -93,5 +93,5 @@ export function formatTaskTwin(row: any) {
     requirement_id: row.requirement_id || undefined,
   });
   const validation = validateTask(twin);
-  return { ...twin, _valid: validation.valid, _errors: validation.errors };
+  return { ...twin, _valid: validation.valid, _errors: validation.errors, _warnings: validation.warnings || [], _interface_compliance: validation.interface_compliance || null };
 }
