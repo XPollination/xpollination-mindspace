@@ -1,7 +1,10 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { createHash } from "node:crypto";
+import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
 import { getDb } from "../services/database.js";
+
+const JWT_SECRET = process.env.JWT_SECRET || "changeme";
 
 interface MindspaceKeyRow {
   key_id: string;
@@ -69,6 +72,19 @@ export async function authHook(request: FastifyRequest, reply: FastifyReply): Pr
     if (oauthRow) {
       row = { key_id: "oauth", revoked_at: oauthRow.revoked_at, user_id: oauthRow.user_id, display_name: oauthRow.display_name };
     }
+  }
+
+  // Path 3: JWT session tokens (from A2A connect handshake)
+  if (!row) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.sub) {
+        const jwtUser = msDb.prepare("SELECT id AS user_id, name AS display_name FROM users WHERE id = ?").get(decoded.sub) as any;
+        if (jwtUser) {
+          row = { key_id: "session-token", revoked_at: null, user_id: jwtUser.user_id, display_name: jwtUser.display_name };
+        }
+      }
+    } catch { /* not a valid JWT */ }
   }
 
   if (!row) {

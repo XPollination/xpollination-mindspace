@@ -18,6 +18,7 @@
     "@qdrant/js-client-rest": "^1.13.0",
     "better-sqlite3": "^12.6.2",
     "fastify": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "multiformats": "^13.3.1",
     "uuid": "^11.1.0"
   },
