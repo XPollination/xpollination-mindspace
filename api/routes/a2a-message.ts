@@ -20,7 +20,7 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   RELEASE_TASK: handleStub,
   ATTESTATION_SUBMITTED: handleAttestationSubmitted,
   OBJECT_QUERY: handleObjectQuery,
-  OBJECT_CREATE: handleStub,
+  OBJECT_CREATE: handleObjectCreate,
   OBJECT_UPDATE: handleStub,
 };
 
@@ -424,6 +424,106 @@ function handleTransition(agent: any, body: any, res: Response): void {
     to_status,
     timestamp: new Date().toISOString()
   });
+}
+
+const OBJECT_TYPE_CONFIG: Record<string, { table: string; required: string[]; defaults: Record<string, any> }> = {
+  mission: { table: 'missions', required: ['title', 'project_slug'], defaults: { status: 'draft' } },
+  capability: { table: 'capabilities', required: ['title', 'mission_id'], defaults: { status: 'draft', sort_order: 0 } },
+  requirement: { table: 'requirements', required: ['title', 'project_slug', 'req_id_human'], defaults: { status: 'draft', priority: 'medium' } },
+  task: { table: 'tasks', required: ['title', 'project_slug'], defaults: { status: 'pending' } },
+};
+
+function handleObjectCreate(agent: any, body: any, res: Response): void {
+  const { object_type, payload } = body;
+
+  if (!object_type) {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: object_type' });
+    return;
+  }
+
+  const config = OBJECT_TYPE_CONFIG[object_type];
+  if (!config) {
+    res.status(400).json({ type: 'ERROR', error: `Unknown object_type: ${object_type}. Must be one of: ${Object.keys(OBJECT_TYPE_CONFIG).join(', ')}` });
+    return;
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    res.status(400).json({ type: 'ERROR', error: 'Missing required field: payload' });
+    return;
+  }
+
+  // Check required fields
+  const missing = config.required.filter(f => !payload[f]);
+  if (missing.length > 0) {
+    res.status(400).json({ type: 'ERROR', error: `Missing required payload fields for ${object_type}: ${missing.join(', ')}` });
+    return;
+  }
+
+  const crypto = require('node:crypto');
+  const id = payload.id || crypto.randomUUID();
+  const now = new Date().toISOString();
+  const db = getDb();
+
+  try {
+    switch (object_type) {
+      case 'mission': {
+        const slug = payload.slug || payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        db.prepare(
+          'INSERT INTO missions (id, title, description, status, slug, project_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(id, payload.title, payload.description || null, payload.status || config.defaults.status, slug, payload.project_slug, now, now);
+
+        const row = db.prepare('SELECT * FROM missions WHERE id = ?').get(id);
+        const twin = formatMissionTwin(row);
+        broadcast('object_create', { object_type, twin, actor: agent.name || agent.id, timestamp: now });
+        res.status(201).json({ type: 'ACK', original_type: 'OBJECT_CREATE', agent_id: agent.id, object_type, object_id: id, twin, timestamp: now });
+        return;
+      }
+
+      case 'capability': {
+        db.prepare(
+          'INSERT INTO capabilities (id, mission_id, title, description, status, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(id, payload.mission_id, payload.title, payload.description || null, payload.status || config.defaults.status, payload.sort_order ?? config.defaults.sort_order, now, now);
+
+        const row = db.prepare('SELECT * FROM capabilities WHERE id = ?').get(id);
+        const twin = formatCapabilityTwin(row);
+        broadcast('object_create', { object_type, twin, actor: agent.name || agent.id, timestamp: now });
+        res.status(201).json({ type: 'ACK', original_type: 'OBJECT_CREATE', agent_id: agent.id, object_type, object_id: id, twin, timestamp: now });
+        return;
+      }
+
+      case 'requirement': {
+        db.prepare(
+          'INSERT INTO requirements (id, project_slug, req_id_human, title, description, status, priority, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(id, payload.project_slug, payload.req_id_human, payload.title, payload.description || null, payload.status || config.defaults.status, payload.priority || config.defaults.priority, agent.name || agent.id, now, now);
+
+        const row = db.prepare('SELECT * FROM requirements WHERE id = ?').get(id);
+        const twin = formatRequirementTwin(row);
+        broadcast('object_create', { object_type, twin, actor: agent.name || agent.id, timestamp: now });
+        res.status(201).json({ type: 'ACK', original_type: 'OBJECT_CREATE', agent_id: agent.id, object_type, object_id: id, twin, timestamp: now });
+        return;
+      }
+
+      case 'task': {
+        const slug = payload.slug || payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const dna = { title: payload.title, role: payload.current_role || 'liaison', description: payload.description || undefined, ...payload.dna };
+        db.prepare(
+          'INSERT INTO tasks (id, project_slug, title, description, status, current_role, slug, dna_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(id, payload.project_slug, payload.title, payload.description || null, payload.status || config.defaults.status, payload.current_role || 'liaison', slug, JSON.stringify(dna), now, now);
+
+        const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+        const twin = formatTaskTwin(row);
+        broadcast('object_create', { object_type, twin, actor: agent.name || agent.id, timestamp: now });
+        res.status(201).json({ type: 'ACK', original_type: 'OBJECT_CREATE', agent_id: agent.id, object_type, object_id: id, twin, timestamp: now });
+        return;
+      }
+    }
+  } catch (err: any) {
+    if (err.message?.includes('UNIQUE constraint')) {
+      res.status(409).json({ type: 'ERROR', error: `Duplicate: ${err.message}` });
+      return;
+    }
+    res.status(500).json({ type: 'ERROR', error: `Create failed: ${err.message}` });
+  }
 }
 
 function handleStub(_agent: any, body: any, res: Response): void {
