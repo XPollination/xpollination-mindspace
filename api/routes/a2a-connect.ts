@@ -8,6 +8,19 @@ export const a2aConnectRouter = Router();
 const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison', 'orchestrator'];
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
+// A2A Protocol v2: agents discover capabilities at runtime from WELCOME
+const ROLE_ACTIONS: Record<string, string[]> = {
+  liaison: ['TRANSITION', 'DECISION_RESPONSE', 'HUMAN_INPUT', 'OBJECT_QUERY', 'OBJECT_CREATE', 'OBJECT_UPDATE', 'BRAIN_QUERY', 'BRAIN_CONTRIBUTE', 'WORKSPACE_DOCK', 'WORKSPACE_UNDOCK'],
+  pdsa: ['TRANSITION', 'DECISION_REQUEST', 'OBJECT_QUERY', 'OBJECT_CREATE', 'OBJECT_UPDATE', 'BRAIN_QUERY', 'BRAIN_CONTRIBUTE', 'WORKSPACE_DOCK'],
+  dev: ['TRANSITION', 'OBJECT_QUERY', 'OBJECT_UPDATE', 'BRAIN_QUERY', 'BRAIN_CONTRIBUTE', 'WORKSPACE_DOCK'],
+  qa: ['TRANSITION', 'OBJECT_QUERY', 'OBJECT_UPDATE', 'BRAIN_QUERY', 'BRAIN_CONTRIBUTE'],
+  orchestrator: ['TRANSITION', 'DECISION_REQUEST', 'OBJECT_QUERY', 'OBJECT_CREATE', 'OBJECT_UPDATE', 'BRAIN_QUERY', 'BRAIN_CONTRIBUTE', 'WORKSPACE_DOCK', 'WORKSPACE_UNDOCK'],
+};
+
+function getAvailableActions(role: string | null): string[] {
+  return ROLE_ACTIONS[role || 'dev'] || ROLE_ACTIONS.dev;
+}
+
 /**
  * Authenticate via API key (SHA-256 hash lookup) or JWT.
  * Returns userId or null.
@@ -167,6 +180,8 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
       heartbeat: `/api/agents/${agentId}/heartbeat`,
       disconnect: `/api/agents/${agentId}/status`
     },
+    available_actions: getAvailableActions(currentRole),
+    protocol_version: '2.0',
     timestamp: new Date().toISOString()
   });
 });

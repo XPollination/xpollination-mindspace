@@ -52,7 +52,7 @@ services:
     build: .
     ports:
       - "3100:3100"   # Mindspace API
-      # Port 4200 now served by Theia IDE service
+      - "4200:4200"   # Mindspace Viz + Agent Terminal
     volumes:
       - mindspace-data:/app/data
     environment:
@@ -70,28 +70,8 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  theia:
-    build:
-      context: ./mindspace-ide
-      dockerfile: Dockerfile
-    ports:
-      - "4200:4200"
-    volumes:
-      - theia-workspace:/home/theia/workspace
-      - mindspace-data:/app/data:ro
-    environment:
-      - MINDSPACE_API_URL=http://mindspace:3100
-      - BRAIN_API_URL=http://brain:3200
-      - SHELL=/bin/bash
-    depends_on:
-      mindspace:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   mindspace-data:
     driver: local
   qdrant-data:
-    driver: local
-  theia-workspace:
     driver: local
