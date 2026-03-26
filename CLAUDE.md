@@ -41,19 +41,11 @@ stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
    - `dna.implementation` = what you built (for dev tasks)
 6. Complete task: `node src/db/interface-cli.js transition <slug> review <actor>`
 
-### Monitoring Discipline (CRITICAL)
+### Work Delivery (A2A Event-Driven)
 
-**Poll interval: 30 seconds | Max runtime: 120 minutes** (auto-exits to prevent overnight loops).
+Agents receive work via **SSE events** from the A2A server. No polling. No work files.
 
-**After completing ANY task, check for new work:**
-```
-stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
-```
-
-**Rules:**
-1. **Read the log first** - `tail -20 /tmp/agent-monitor-{role}.log`
-2. **Trust the monitor** - if you miss work, it's because you stopped checking the output file
-3. **Check the work FILE** - `stat -c%s /tmp/agent-work-{role}.json`
+**After completing ANY task:** Send TRANSITION via A2A → server routes next work to you via SSE.
 
 **Workflow source of truth:** `tracks/process/context/WORKFLOW.md`
 
@@ -115,7 +107,7 @@ pending → ready(liaison) → active(liaison) → review(qa) → complete
 - `approval->approved`: Human gate, sets role to liaison for monitoring
 
 ### Multi-Project Support
-Monitor covers: xpollination-mindspace, HomePage (and any project with data/xpollination.db)
+A2A server covers all projects in the workspace. Agents connect once, receive events for their role across projects.
 
 ---
 
