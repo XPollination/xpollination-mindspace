@@ -273,9 +273,25 @@ agentsRouter.get('/:id', (req: Request, res: Response) => {
   res.status(200).json(agent);
 });
 
-// POST /api/agents/start — create tmux session + start Claude Code agent
+// GET /api/agents/me/liaison — check if user's LIAISON is running
+agentsRouter.get('/me/liaison', requireApiKeyOrJwt, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const userId = user?.id || user?.sub;
+  const sessionName = `agent-liaison-${userId}`;
+
+  try {
+    execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
+    res.json({ running: true, sessionName, role: 'liaison', userId });
+  } catch {
+    res.json({ running: false, sessionName, role: 'liaison', userId });
+  }
+});
+
+// POST /api/agents/start — create per-user tmux session + start Claude Code agent
 agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) => {
   const { role } = req.body;
+  const user = (req as any).user;
+  const userId = user?.id || user?.sub;
   const VALID_ROLES = ['liaison', 'pdsa', 'dev', 'qa'];
 
   if (!role || !VALID_ROLES.includes(role)) {
@@ -283,22 +299,30 @@ agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) =>
     return;
   }
 
-  try {
-    const sessionName = `agent-${role}-${Date.now().toString(36)}`;
+  // Deterministic session name per user+role (no duplicates)
+  const sessionName = `agent-${role}-${userId}`;
 
-    // Create tmux session running start-agent.sh
+  try {
+    // Check if session already exists — reuse
+    try {
+      execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
+      res.status(200).json({ sessionName, agentId: sessionName, role, userId, status: 'running', message: 'Agent already running.' });
+      return;
+    } catch { /* session doesn't exist — create it */ }
+
     execFileSync('tmux', [
       'new-session', '-d', '-s', sessionName,
       '-x', '120', '-y', '40',
-      'bash', '/app/scripts/start-agent.sh', role
+      'bash', '/app/scripts/start-agent.sh', role, userId
     ], { stdio: 'pipe' });
 
     res.status(201).json({
       sessionName,
       agentId: sessionName,
       role,
+      userId,
       status: 'starting',
-      message: `Agent ${role} starting in tmux session ${sessionName}. Connect via terminal.`,
+      message: `Agent ${role} starting for user ${userId}.`,
     });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to start agent: ${err.message}` });
