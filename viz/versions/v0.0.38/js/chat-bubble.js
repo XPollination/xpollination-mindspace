@@ -13,7 +13,7 @@ class ChatBubble extends HTMLElement {
     this._expanded = false;
     this._pendingCount = 0;
     this._decisions = [];
-    this._messages = [];
+    this._messages = JSON.parse(sessionStorage.getItem('cb_messages') || '[]');
 
     this.innerHTML = `
       <style>
@@ -56,6 +56,16 @@ class ChatBubble extends HTMLElement {
     this._panel = this.querySelector('.cb-panel');
     this._decisionsEl = this.querySelector('.cb-decisions');
     this._messagesEl = this.querySelector('.cb-messages');
+    // Restore persisted messages from previous page
+    this._messages.forEach(msg => {
+      const div = document.createElement("div");
+      div.style.cssText = "padding:4px 0;font-size:12px;border-bottom:1px solid var(--ms-border,#f1f5f9);";
+      div.innerHTML = `<span style="color:${msg.color || "#94a3b8"};font-weight:bold;font-size:10px;">${msg.from}</span> <span>${msg.text}</span>`;
+      this._messagesEl.appendChild(div);
+    });
+
+    // Restore persisted messages from previous page
+    this._restoreMessages();
 
     // Toggle panel
     this.querySelector('.cb-btn').addEventListener('click', () => {
@@ -165,12 +175,27 @@ class ChatBubble extends HTMLElement {
   }
 
   _addMessage(from, text, color) {
+    const c = color || (from === 'You' ? '#3b82f6' : '#f59e0b');
+    // Persist to sessionStorage (survives page navigation)
+    this._messages.push({ from, text, color: c, time: Date.now() });
+    // Keep last 50 messages
+    if (this._messages.length > 50) this._messages = this._messages.slice(-50);
+    sessionStorage.setItem('cb_messages', JSON.stringify(this._messages));
+    this._renderMessage(from, text, c);
+  }
+
+  _renderMessage(from, text, color) {
     const div = document.createElement('div');
     div.style.cssText = `padding:4px 0;font-size:12px;border-bottom:1px solid var(--ms-border,#f1f5f9);`;
-    const c = color || (from === 'You' ? '#3b82f6' : '#f59e0b');
-    div.innerHTML = `<span style="color:${c};font-weight:bold;font-size:10px;">${from}</span> <span>${text}</span>`;
+    div.innerHTML = `<span style="color:${color};font-weight:bold;font-size:10px;">${from}</span> <span>${text}</span>`;
     this._messagesEl.appendChild(div);
     this._messagesEl.scrollTop = this._messagesEl.scrollHeight;
+  }
+
+  _restoreMessages() {
+    for (const msg of this._messages) {
+      this._renderMessage(msg.from, msg.text, msg.color);
+    }
   }
 
   disconnectedCallback() {
