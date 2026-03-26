@@ -351,8 +351,30 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
         break;
       }
 
+      case 'decision': {
+        let sql = 'SELECT * FROM decisions WHERE 1=1';
+        const params: any[] = [];
+        if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
+        if (filters?.task_ref) { sql += ' AND task_ref = ?'; params.push(filters.task_ref); }
+        if (filters?.id) { sql += ' AND id = ?'; params.push(filters.id); }
+        if (projectSlug) { sql += ' AND project_slug = ?'; params.push(projectSlug); }
+        sql += ' ORDER BY created_at DESC LIMIT 50';
+        try { objects = db.prepare(sql).all(...params); } catch { objects = []; }
+        break;
+      }
+
+      case 'version': {
+        let sql = 'SELECT * FROM version_twins WHERE 1=1';
+        const params: any[] = [];
+        if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
+        if (filters?.version) { sql += ' AND version = ?'; params.push(filters.version); }
+        sql += ' ORDER BY created_at DESC LIMIT 20';
+        try { objects = db.prepare(sql).all(...params); } catch { objects = []; }
+        break;
+      }
+
       default:
-        res.status(400).json({ type: 'ERROR', error: `Unknown object_type: ${object_type}. Must be one of: mission, capability, requirement, task` });
+        res.status(400).json({ type: 'ERROR', error: `Unknown object_type: ${object_type}. Must be one of: mission, capability, requirement, task, decision, version` });
         return;
     }
 
