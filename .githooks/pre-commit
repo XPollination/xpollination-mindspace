@@ -1,0 +1,35 @@
+#!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Thomas Pichler <herr.thomas.pichler@gmail.com>
+#
+# Pre-commit hook: checks staged .ts/.js/.sh files for SPDX-License-Identifier header.
+# Forward-only enforcement — only checks newly staged files, not the entire repo.
+
+FAIL=0
+
+for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|js|sh)$'); do
+    # Skip node_modules and dist
+    case "$file" in
+        node_modules/*|dist/*) continue ;;
+    esac
+
+    # For .sh files, SPDX may be after shebang (check first 3 lines)
+    if ! head -3 "$file" | grep -q "SPDX-License-Identifier"; then
+        echo "Missing SPDX-License-Identifier header: $file"
+        FAIL=1
+    fi
+done
+
+if [ "$FAIL" -eq 1 ]; then
+    echo ""
+    echo "Add the following header to the top of each file:"
+    echo "  // SPDX-License-Identifier: AGPL-3.0-or-later"
+    echo "  // Copyright (C) 2026 Thomas Pichler <herr.thomas.pichler@gmail.com>"
+    echo ""
+    echo "For shell scripts (after shebang):"
+    echo "  # SPDX-License-Identifier: AGPL-3.0-or-later"
+    echo "  # Copyright (C) 2026 Thomas Pichler <herr.thomas.pichler@gmail.com>"
+    exit 1
+fi
+
+exit 0
