@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
 import { createBond } from './agent-bond.js';
@@ -284,7 +285,6 @@ agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) =>
 
   try {
     const sessionName = `agent-${role}-${Date.now().toString(36)}`;
-    const { execFileSync } = require('child_process');
 
     // Create tmux session running start-agent.sh
     execFileSync('tmux', [
