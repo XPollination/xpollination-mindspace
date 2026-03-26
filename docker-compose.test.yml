@@ -37,8 +37,6 @@ services:
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
       - BRAIN_AGENT_KEY=xpo-agent-dev-33c65662-ccc8-4fd4-9f65-7277ba639cdf
-      - THEIA_HOST=theia-test
-      - THEIA_PORT=4200
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -51,31 +49,6 @@ services:
       - beta-net
     restart: unless-stopped
 
-  theia-test:
-    build:
-      context: /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-rc/mindspace-ide
-      dockerfile: Dockerfile
-    container_name: mindspace-theia-test
-    ports:
-      - "127.0.0.1:4202:4200"
-    volumes:
-      - /home/developer/workspaces/github/PichlerThomas:/home/theia/workspace
-      - /mnt/HC_Volume_105173237/mindspace/data-test/mindspace:/app/data:ro
-    environment:
-      - MINDSPACE_API_URL=http://mindspace-test:3101
-      - BRAIN_API_URL=http://host.docker.internal:3200
-      - SHELL=/bin/bash
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - beta-net
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:4200/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
 
 networks:
   beta-net:
