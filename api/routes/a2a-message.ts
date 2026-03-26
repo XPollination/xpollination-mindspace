@@ -9,9 +9,10 @@ import { createMission, validateMission, diffMission } from '../../src/twins/mis
 import { createCapability, validateCapability, diffCapability } from '../../src/twins/capability-twin.js';
 import { createRequirement, validateRequirement, diffRequirement } from '../../src/twins/requirement-twin.js';
 import { createTask, validateTask, diffTask, workflowContext } from '../../src/twins/task-twin.js';
+import { createDecision, validateDecision } from '../../src/twins/decision-twin.js';
 import { cascadeForward } from '../lib/cascade-engine.js';
 import { grantLease, releaseLease, extendLease } from '../lib/lease-manager.js';
-import { EVENT_TYPES, buildTaskAssigned, buildApprovalNeeded, buildReviewNeeded, buildReworkNeeded, buildTaskBlocked } from '../lib/event-types.js';
+import { EVENT_TYPES, buildTaskAssigned, buildApprovalNeeded, buildReviewNeeded, buildReworkNeeded, buildTaskBlocked, buildDecisionNeeded, buildDecisionResolved, buildBrainGate } from '../lib/event-types.js';
 
 export const a2aMessageRouter = Router();
 
@@ -35,6 +36,11 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   CAPABILITY_ACTIVATE: handleCapabilityActivate,
   CAPABILITY_DEACTIVATE: handleCapabilityDeactivate,
   CAPABILITY_UPGRADE: handleCapabilityUpgrade,
+  DECISION_REQUEST: handleDecisionRequest,
+  DECISION_RESPONSE: handleDecisionResponse,
+  WORKSPACE_DOCK: handleWorkspaceDock,
+  WORKSPACE_UNDOCK: handleWorkspaceUndock,
+  HUMAN_INPUT: handleHumanInput,
 };
 
 const JWT_SECRET_MSG = process.env.JWT_SECRET || 'changeme';
@@ -502,6 +508,21 @@ function handleTransition(agent: any, body: any, res: Response): void {
     }
   }
 
+  // --- Brain contribution gate (Agent Experience) ---
+  // Every transition from active work requires a brain contribution.
+  // Agents must send BRAIN_CONTRIBUTE first, get thought_id, then include brain_contribution_id in payload.
+  const BRAIN_GATE_TRANSITIONS = new Set(['active->approval', 'active->review', 'active->testing']);
+  if (BRAIN_GATE_TRANSITIONS.has(transitionKey) && !dna.brain_contribution_id && !(payload?.brain_contribution_id)) {
+    const gateEvent = buildBrainGate(task_slug, { task_slug, to_status, payload });
+    res.status(422).json({
+      type: 'BRAIN_GATE',
+      error: 'Brain contribution required before completing active work',
+      pending_transition: { task_slug, to_status, payload },
+      instruction: 'Send BRAIN_CONTRIBUTE with your findings, receive thought_id, then retry TRANSITION with brain_contribution_id in payload',
+    });
+    return;
+  }
+
   // --- Rework routing: require rework_target_role for specific transitions ---
   let newRole = task.current_role;
   if (effectiveToStatus === 'rework') {
@@ -866,7 +887,9 @@ async function handleBrainContribute(agent: any, body: any, res: Response): Prom
       }),
     });
     const data = await brainRes.json();
-    res.status(200).json({ type: 'BRAIN_RESULT', original_type: 'BRAIN_CONTRIBUTE', agent_id: agent.id, result: data.result || data, timestamp: new Date().toISOString() });
+    // Extract thought_id for brain gate — agents use this in brain_contribution_id
+    const thoughtId = data.result?.sources?.[0]?.thought_id || data.result?.thought_id || data.result?.id || null;
+    res.status(200).json({ type: 'BRAIN_RESULT', original_type: 'BRAIN_CONTRIBUTE', agent_id: agent.id, thought_id: thoughtId, result: data.result || data, timestamp: new Date().toISOString() });
   } catch (err: any) {
     res.status(502).json({ type: 'ERROR', error: `Brain proxy failed: ${err.message}` });
   }
@@ -978,4 +1001,110 @@ function handleStub(_agent: any, body: any, res: Response): void {
     type: 'ERROR',
     error: `Message type ${body.type} is not yet implemented.`
   });
+}
+
+// === DECISION INTERFACE (Agent Experience) ===
+
+async function handleDecisionRequest(agent: any, body: any, res: Response): Promise<void> {
+  const { frame, options, task_ref, mission_ref, chain_parent_cid, human_prompt } = body;
+  if (!frame || !Array.isArray(options) || options.length === 0) {
+    res.status(400).json({ type: 'ERROR', error: 'frame and options[] are required' });
+    return;
+  }
+
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const twin = createDecision({ id, frame, options, task_ref, mission_ref, chain_parent_cid, human_prompt, requesting_agent: agent.name || agent.id, project_slug: agent.project_slug, status: 'pending' });
+  const validation = validateDecision(twin);
+  if (!validation.valid) {
+    res.status(400).json({ type: 'ERROR', error: validation.errors.join(', ') });
+    return;
+  }
+
+  // Store pending transition if this was triggered by a gated TRANSITION
+  const pending_transition = body.pending_transition ? JSON.stringify(body.pending_transition) : null;
+
+  db.prepare(
+    'INSERT INTO decisions (id, task_ref, mission_ref, frame, options, human_prompt, requesting_agent, chain_parent_cid, project_slug, status, pending_transition, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, task_ref || null, mission_ref || null, frame, JSON.stringify(options), human_prompt || null, agent.name || agent.id, chain_parent_cid || null, agent.project_slug || null, 'pending', pending_transition, now);
+
+  const event = buildDecisionNeeded({ ...twin, id });
+  sendToRole('liaison', EVENT_TYPES.DECISION_NEEDED, event, agent.project_slug);
+  broadcast(EVENT_TYPES.DECISION_NEEDED, event);
+
+  res.status(201).json({ type: 'ACK', original_type: 'DECISION_REQUEST', decision_id: id, timestamp: now });
+}
+
+async function handleDecisionResponse(agent: any, body: any, res: Response): Promise<void> {
+  const { decision_id, choice, reasoning, human_prompt } = body;
+  if (!decision_id || !choice) {
+    res.status(400).json({ type: 'ERROR', error: 'decision_id and choice are required' });
+    return;
+  }
+
+  const db = getDb();
+  const decision = db.prepare('SELECT * FROM decisions WHERE id = ?').get(decision_id) as any;
+  if (!decision) {
+    res.status(404).json({ type: 'ERROR', error: 'Decision not found' });
+    return;
+  }
+  if (decision.status !== 'pending') {
+    res.status(409).json({ type: 'ERROR', error: `Decision already ${decision.status}` });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const resolved_by = agent.user_id || agent.name || agent.id;
+  db.prepare(
+    'UPDATE decisions SET choice = ?, reasoning = ?, human_prompt = ?, resolved_by = ?, resolved_at = ?, status = ? WHERE id = ?'
+  ).run(choice, reasoning || null, human_prompt || null, resolved_by, now, 'resolved', decision_id);
+
+  const event = buildDecisionResolved({ ...decision, choice, reasoning, resolved_by });
+  broadcast(EVENT_TYPES.DECISION_RESOLVED, event);
+
+  // If there's a pending transition, execute it now
+  if (decision.pending_transition) {
+    try {
+      const pt = JSON.parse(decision.pending_transition);
+      // Re-invoke transition handler with the original params + brain_contribution_id bypass
+      // This is handled by the caller who receives the ACK and retries
+    } catch { /* ignore parse errors */ }
+  }
+
+  res.status(200).json({ type: 'ACK', original_type: 'DECISION_RESPONSE', decision_id, choice, resolved_by, timestamp: now });
+}
+
+async function handleHumanInput(agent: any, body: any, res: Response): Promise<void> {
+  const { text, target_agent_id } = body;
+  if (!text) {
+    res.status(400).json({ type: 'ERROR', error: 'text is required' });
+    return;
+  }
+
+  // Broadcast human input to target agent or all liaison agents
+  const event = { text, from: agent.name || agent.id, from_user_id: agent.user_id, timestamp: new Date().toISOString() };
+  if (target_agent_id) {
+    const { sendToAgent } = await import('../lib/sse-manager.js');
+    sendToAgent(target_agent_id, EVENT_TYPES.HUMAN_INPUT, event);
+  } else {
+    sendToRole('liaison', EVENT_TYPES.HUMAN_INPUT, event, agent.project_slug);
+  }
+
+  res.status(200).json({ type: 'ACK', original_type: 'HUMAN_INPUT', timestamp: new Date().toISOString() });
+}
+
+async function handleWorkspaceDock(_agent: any, body: any, res: Response): Promise<void> {
+  // Stub — Phase 4 implementation
+  const { git_urls, branch_state } = body;
+  if (!git_urls || !Array.isArray(git_urls)) {
+    res.status(400).json({ type: 'ERROR', error: 'git_urls[] is required' });
+    return;
+  }
+  res.status(200).json({ type: 'ACK', original_type: 'WORKSPACE_DOCK', status: 'stub', message: 'Workspace dock handler — Phase 4 implementation pending', timestamp: new Date().toISOString() });
+}
+
+async function handleWorkspaceUndock(_agent: any, body: any, res: Response): Promise<void> {
+  // Stub — Phase 4 implementation
+  res.status(200).json({ type: 'ACK', original_type: 'WORKSPACE_UNDOCK', status: 'stub', message: 'Workspace undock handler — Phase 4 implementation pending', timestamp: new Date().toISOString() });
 }
