@@ -318,7 +318,7 @@ When Claude's context window fills up, auto-compact triggers. This is handled **
 
 ```bash
 # Install all skills (symlinks — auto-update on git pull)
-for skill in xpo.claude.monitor xpo.claude.unblock xpo.claude.mindspace.brain xpo.claude.mindspace.pm.status; do
+for skill in xpo.claude.monitor xpo.claude.mindspace.brain xpo.claude.mindspace.pm.status; do
   ln -sfn /home/developer/workspaces/github/PichlerThomas/xpollination-best-practices/.claude/skills/$skill ~/.claude/skills/$skill
 done
 
