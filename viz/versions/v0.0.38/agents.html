@@ -5,28 +5,12 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
 <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
 <link rel="stylesheet" href="/mindspace.css">
-<style>
-  .agents-container { display:flex; flex-direction:column; align-items:center; justify-content:center; height:calc(100vh - 56px); text-align:center; padding:24px; }
-  .agents-container h2 { margin:0 0 8px; }
-  .agents-container p { color:var(--ms-muted); margin:0 0 24px; max-width:480px; }
-  .ide-btn { display:inline-flex; align-items:center; gap:8px; padding:12px 24px; border:none; border-radius:var(--ms-radius-sm); background:var(--ms-accent); color:#fff; cursor:pointer; font-weight:bold; font-size:15px; text-decoration:none; }
-  .ide-btn:hover { opacity:0.9; }
-  .feature-list { text-align:left; max-width:400px; margin:0 auto 24px; color:var(--ms-text); }
-  .feature-list li { margin:6px 0; }
-</style>
 </head><body>
 <script type="module" src="/js/mindspace-nav.js"></script>
+<script type="module" src="/js/agent-terminal.js"></script>
+<script type="module" src="/js/agent-card.js"></script>
+<script type="module" src="/js/agent-grid.js"></script>
 
-<div class="agents-container">
-  <h2>Agent OS</h2>
-  <p>Start agents from the Mindspace IDE terminal. Claude Code runs directly in your browser — no API keys needed.</p>
-  <ul class="feature-list">
-    <li><strong>Terminal</strong> — Run Claude Code agents with A2A connection</li>
-    <li><strong>Editor</strong> — Full IDE with file tree, git, search</li>
-    <li><strong>Multi-agent</strong> — Layout presets for agent grid panels</li>
-    <li><strong>Workspace</strong> — Access all your projects in one place</li>
-  </ul>
-  <a href="/ide/" class="ide-btn">Open Mindspace IDE</a>
-</div>
+<agent-grid style="height:calc(100vh - 56px);"></agent-grid>
 
 </body></html>

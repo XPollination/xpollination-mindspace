@@ -11,6 +11,7 @@ import { agentsRouter } from './routes/agents.js';
 import { a2aConnectRouter } from './routes/a2a-connect.js';
 import { startAgentSweep } from './routes/agent-status-sweep.js';
 import { a2aMessageRouter } from './routes/a2a-message.js';
+import { handleTerminalUpgrade } from './routes/terminal-ws.js';
 import { marketplaceAnnouncementsRouter } from './routes/marketplace-announcements.js';
 import { marketplaceRequestsRouter } from './routes/marketplace-requests.js';
 import { getDb, closeDb } from './db/connection.js';
@@ -116,6 +117,16 @@ const server = app.listen(PORT, () => {
   startAgentSweep();
   startMonitor();
   logger.info('Heartbeat monitor started (30s interval)');
+});
+
+// WebSocket upgrade for terminal connections
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url || '/', `http://localhost:${PORT}`);
+  if (url.pathname.startsWith('/ws/terminal/')) {
+    handleTerminalUpgrade(req, socket, head);
+  } else {
+    socket.destroy();
+  }
 });
 
 // Graceful shutdown

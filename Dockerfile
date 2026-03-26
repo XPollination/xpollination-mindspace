@@ -63,6 +63,12 @@ COPY --from=builder /app/src/twins ./src/twins
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/docs ./docs
 
+# Install tmux for persistent agent terminal sessions
+RUN apt-get update && apt-get install -y --no-install-recommends tmux && rm -rf /var/lib/apt/lists/*
+
+# Copy A2A agent scripts needed at runtime
+COPY --from=builder /app/src/a2a ./src/a2a
+
 # Create data directory and set ownership to node user (UID 1000).
 # This prevents SQLite "readonly database" errors when /app/data is bind-mounted.
 # Without this, migrations create files as root and the node process can't write.
