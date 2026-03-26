@@ -13,7 +13,8 @@
 
 services:
   mindspace-test:
-    build: .
+    build:
+      context: /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-rc
     container_name: mindspace-test
     ports:
       - "127.0.0.1:3101:3101"
@@ -35,6 +36,7 @@ services:
       - LIVEKIT_URL=wss://meet.xpollination.earth
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
+      - BRAIN_AGENT_KEY=xpo-agent-dev-33c65662-ccc8-4fd4-9f65-7277ba639cdf
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
