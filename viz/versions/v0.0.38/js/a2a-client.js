@@ -22,13 +22,34 @@ export class A2AClient {
     this._connected = false;
   }
 
-  /** Connect to A2A server. JWT from ms_session cookie is sent automatically by the browser. */
+  /** Connect to A2A server. Reuses existing session if available. */
   async connect(projectSlug) {
     this._projectSlug = projectSlug;
 
+    // Reuse existing session from sessionStorage (prevents zombie agents on page reload)
+    const storageKey = `a2a_session_${projectSlug}`;
+    const saved = sessionStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const { agentId, sessionId } = JSON.parse(saved);
+        this._agentId = agentId;
+        this._sessionId = sessionId;
+        this._connected = true;
+        this._openStream();
+        this._emit('connected', { agent_id: agentId, session_id: sessionId });
+        return { agent_id: agentId, session_id: sessionId, reconnect: true };
+      } catch { /* corrupted storage, reconnect fresh */ }
+    }
+
+    const browserName = 'browser-' + (sessionStorage.getItem('a2a_browser_id') || (() => {
+      const id = (crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : String(Date.now()));
+      sessionStorage.setItem('a2a_browser_id', id);
+      return id;
+    })());
+
     const twin = {
       identity: {
-        agent_name: 'browser-' + (crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now()),
+        agent_name: browserName,
         session_id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       },
       role: {
@@ -58,6 +79,9 @@ export class A2AClient {
     this._agentId = data.agent_id;
     this._sessionId = data.session_id;
     this._connected = true;
+
+    // Save session for reuse on page navigations
+    sessionStorage.setItem(storageKey, JSON.stringify({ agentId: data.agent_id, sessionId: data.session_id }));
 
     // Open SSE stream for push updates
     this._openStream();
@@ -165,6 +189,10 @@ export class A2AClient {
       });
     } catch { /* silent */ }
 
+    // Clear saved session
+    if (this._projectSlug) {
+      sessionStorage.removeItem(`a2a_session_${this._projectSlug}`);
+    }
     this._cleanup();
   }
 
