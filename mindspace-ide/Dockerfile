@@ -6,16 +6,18 @@ RUN corepack enable && corepack prepare yarn@stable --activate
 COPY package.json yarn.lock* ./
 COPY browser-app/package.json browser-app/
 COPY extensions/@mindspace/theia-a2a/package.json extensions/@mindspace/theia-a2a/
+COPY extensions/@mindspace/theia-branding/package.json extensions/@mindspace/theia-branding/
 COPY extensions/@mindspace/theia-layouts/package.json extensions/@mindspace/theia-layouts/
 
 # Install dependencies
-RUN yarn install --frozen-lockfile || yarn install
+RUN yarn install --immutable || yarn install
 
 # Copy source
 COPY . .
 
 # Build extensions then browser app
 RUN yarn workspace @mindspace/theia-a2a build || true
+RUN yarn workspace @mindspace/theia-branding build || true
 RUN yarn workspace @mindspace/theia-layouts build || true
 RUN yarn workspace mindspace-ide-browser build
 
