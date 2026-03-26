@@ -1105,13 +1105,14 @@ async function handleHumanInput(agent: any, body: any, res: Response): Promise<v
     return;
   }
 
-  // Broadcast human input to target agent or all liaison agents
+  // Broadcast human input to ALL connected clients (so sender sees echo + any agent receives it)
   const event = { text, from: agent.name || agent.id, from_user_id: agent.user_id, timestamp: new Date().toISOString() };
   if (target_agent_id) {
     const { sendToAgent } = await import('../lib/sse-manager.js');
     sendToAgent(target_agent_id, EVENT_TYPES.HUMAN_INPUT, event);
   } else {
-    sendToRole('liaison', EVENT_TYPES.HUMAN_INPUT, event, agent.project_slug);
+    // Broadcast to all — not just liaison. Any connected agent or browser client should see human messages.
+    broadcast(EVENT_TYPES.HUMAN_INPUT, event);
   }
 
   res.status(200).json({ type: 'ACK', original_type: 'HUMAN_INPUT', timestamp: new Date().toISOString() });
