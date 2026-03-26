@@ -1,9 +1,12 @@
 // Mission Twin — create, validate, diff
 
 export function createMission(input) {
+  const now = new Date().toISOString();
   return {
     _type: 'mission',
-    _created_at: new Date().toISOString(),
+    _schema_version: '1.0.0',
+    _created_at: now,
+    _updated_at: now,
     ...input,
   };
 }
