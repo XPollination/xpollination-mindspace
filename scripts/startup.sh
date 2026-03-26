@@ -120,6 +120,17 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Step 3.5: Ensure Claude Code is available (self-healing)
+# ---------------------------------------------------------------------------
+if command -v claude &> /dev/null; then
+  echo "▸ Step 3.5: Claude Code available ($(claude --version 2>/dev/null || echo installed))"
+else
+  echo "▸ Step 3.5: Installing Claude Code (agents need it)..."
+  npm install -g @anthropic-ai/claude-code 2>/dev/null && echo "  ✓ Claude Code installed" || echo "  ⚠ Claude Code install failed — agents will install on first start"
+fi
+echo ""
+
 # Step 4: Start servers
 # ---------------------------------------------------------------------------
 echo "▸ Step 4: Starting Mindspace servers..."

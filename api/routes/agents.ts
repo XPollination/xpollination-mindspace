@@ -271,3 +271,36 @@ agentsRouter.get('/:id', (req: Request, res: Response) => {
   if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
   res.status(200).json(agent);
 });
+
+// POST /api/agents/start — create tmux session + start Claude Code agent
+agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) => {
+  const { role } = req.body;
+  const VALID_ROLES = ['liaison', 'pdsa', 'dev', 'qa'];
+
+  if (!role || !VALID_ROLES.includes(role)) {
+    res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+    return;
+  }
+
+  try {
+    const sessionName = `agent-${role}-${Date.now().toString(36)}`;
+    const { execFileSync } = require('child_process');
+
+    // Create tmux session running start-agent.sh
+    execFileSync('tmux', [
+      'new-session', '-d', '-s', sessionName,
+      '-x', '120', '-y', '40',
+      'bash', '/app/scripts/start-agent.sh', role
+    ], { stdio: 'pipe' });
+
+    res.status(201).json({
+      sessionName,
+      agentId: sessionName,
+      role,
+      status: 'starting',
+      message: `Agent ${role} starting in tmux session ${sessionName}. Connect via terminal.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to start agent: ${err.message}` });
+  }
+});
