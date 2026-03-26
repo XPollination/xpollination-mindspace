@@ -216,11 +216,6 @@ agentsRouter.post('/spawn', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const project = db.prepare('SELECT slug FROM projects WHERE slug = ?').get(project_slug);
-  if (!project) { res.status(404).json({ error: `Project not found: ${project_slug}` }); return; }
-
-  const access = db.prepare('SELECT role FROM project_access WHERE user_id = ? AND project_slug = ?').get(user.id, project_slug);
-  if (!access) { res.status(403).json({ error: 'No access to this project' }); return; }
 
   // Check capacity
   const active = listProcesses(user.id).filter(p => p.status === 'running');
