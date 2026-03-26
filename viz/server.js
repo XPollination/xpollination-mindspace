@@ -411,11 +411,12 @@ const server = http.createServer(async (req, res) => {
 
   // /ide/* route: reverse proxy to Theia IDE
   if (pathname.startsWith('/ide')) {
-    const theiaPort = parseInt(process.env.THEIA_PORT || '4202', 10);
+    const theiaHost = process.env.THEIA_HOST || 'theia-test';
+    const theiaPort = parseInt(process.env.THEIA_PORT || '4200', 10);
     const theiaPath = pathname === '/ide' ? '/' : pathname.replace(/^\/ide/, '');
-    const proxyHeaders = { ...req.headers, host: `localhost:${theiaPort}` };
+    const proxyHeaders = { ...req.headers, host: `${theiaHost}:${theiaPort}` };
     const proxyReq = http.request({
-      hostname: 'localhost', port: theiaPort, path: theiaPath + url.search,
+      hostname: theiaHost, port: theiaPort, path: theiaPath + url.search,
       method: req.method, headers: proxyHeaders
     }, (proxyRes) => {
       res.writeHead(proxyRes.statusCode, proxyRes.headers);

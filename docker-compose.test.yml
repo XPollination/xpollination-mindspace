@@ -37,6 +37,8 @@ services:
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
       - BRAIN_AGENT_KEY=xpo-agent-dev-33c65662-ccc8-4fd4-9f65-7277ba639cdf
+      - THEIA_HOST=theia-test
+      - THEIA_PORT=4200
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -45,6 +47,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - beta-net
     restart: unless-stopped
 
   theia-test:
@@ -63,6 +67,8 @@ services:
       - SHELL=/bin/bash
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - beta-net
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:4200/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
@@ -70,3 +76,7 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+
+networks:
+  beta-net:
+    driver: bridge
