@@ -62,6 +62,8 @@ class AgentCard extends HTMLElement {
 
         if (evt === 'connected') {
           this._statusDot.style.background = '#22c55e';
+          if (this._hasConnected) return; // Deduplicate connected events
+          this._hasConnected = true;
         }
         if (evt === 'approval_needed' || evt === 'decision_needed') {
           this._actions.style.display = 'flex';
