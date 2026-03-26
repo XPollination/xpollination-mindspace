@@ -2,11 +2,14 @@
  * <chat-bubble> — Floating Decision Interface on every Mindspace page
  * Bottom-right bubble with badge count of pending decisions.
  * Expand: decision cards + agent status + free text input.
- * Connects to A2A via SSE for real-time events.
+ * Connects to A2A as a client — sends messages with agent identity.
  */
+
+import { A2AClient } from './a2a-client.js';
 
 class ChatBubble extends HTMLElement {
   connectedCallback() {
+    this._client = new A2AClient();
     this._expanded = false;
     this._pendingCount = 0;
     this._decisions = [];
@@ -74,8 +77,8 @@ class ChatBubble extends HTMLElement {
     sendBtn.addEventListener('click', send);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
 
-    // Connect SSE for decision events
-    this._connectSSE();
+    // Connect as A2A client then listen for events
+    this._connectA2A();
 
     // Listen for decision-resolve from child decision-cards
     this.addEventListener('decision-resolve', (e) => {
@@ -83,35 +86,45 @@ class ChatBubble extends HTMLElement {
     });
   }
 
-  _connectSSE() {
-    // Use liaison-chat as the SSE client ID (special known ID)
-    this._es = new EventSource('/a2a/stream/liaison-chat');
+  async _connectA2A() {
+    try {
+      // Determine project slug from page or default
+      const projectSlug = document.querySelector('[data-project-slug]')?.dataset.projectSlug || 'xpollination-mindspace';
+      await this._client.connect(projectSlug);
 
-    this._es.addEventListener('decision_needed', (e) => {
-      const data = JSON.parse(e.data);
-      this._decisions.push(data);
-      this._pendingCount++;
-      this._updateBadge();
-      if (this._expanded) this._renderDecision(data);
-    });
+      this._client.on('decision_needed', (data) => {
+        this._decisions.push(data);
+        this._pendingCount++;
+        this._updateBadge();
+        if (this._expanded) this._renderDecision(data);
+      });
 
-    this._es.addEventListener('decision_resolved', (e) => {
-      const data = JSON.parse(e.data);
-      this._pendingCount = Math.max(0, this._pendingCount - 1);
-      this._updateBadge();
-    });
+      this._client.on('decision_resolved', () => {
+        this._pendingCount = Math.max(0, this._pendingCount - 1);
+        this._updateBadge();
+      });
 
-    this._es.addEventListener('human_input', (e) => {
-      const data = JSON.parse(e.data);
-      if (data.from !== 'You') {
-        this._addMessage(data.from || 'Agent', data.text);
-      }
-    });
+      this._client.on('human_input', (data) => {
+        if (data.from !== 'You') {
+          this._addMessage(data.from || 'Agent', data.text);
+        }
+      });
 
-    this._es.addEventListener('transition', (e) => {
-      const data = JSON.parse(e.data);
-      this._addMessage('System', `${data.task_slug} → ${data.to_status}`, '#94a3b8');
-    });
+      this._client.on('transition', (data) => {
+        this._addMessage('System', `${data.task_slug} → ${data.to_status}`, '#94a3b8');
+      });
+    } catch (err) {
+      console.warn('[chat-bubble] A2A connect failed:', err.message);
+      // Fallback: use raw SSE with special liaison-chat ID
+      this._es = new EventSource('/a2a/stream/liaison-chat');
+      this._es.addEventListener('decision_needed', (e) => {
+        const data = JSON.parse(e.data);
+        this._decisions.push(data);
+        this._pendingCount++;
+        this._updateBadge();
+        if (this._expanded) this._renderDecision(data);
+      });
+    }
   }
 
   _updateBadge() {
@@ -121,19 +134,13 @@ class ChatBubble extends HTMLElement {
 
   async _loadPendingDecisions() {
     try {
-      const res = await fetch('/a2a/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'OBJECT_QUERY', object_type: 'decision', filters: { status: 'pending' } })
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const decisions = data.results || data.data || [];
+      const data = await this._client.query('decision', { status: 'pending' });
+      const decisions = data?.results || data?.data || [];
       this._decisionsEl.innerHTML = '';
       decisions.forEach(d => this._renderDecision(d));
       this._pendingCount = decisions.length;
       this._updateBadge();
-    } catch { /* ignore */ }
+    } catch { /* ignore — decisions table may not have data yet */ }
   }
 
   _renderDecision(dec) {
@@ -144,11 +151,7 @@ class ChatBubble extends HTMLElement {
 
   async _resolveDecision({ decisionId, choice, reasoning }) {
     try {
-      await fetch('/a2a/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'DECISION_RESPONSE', decision_id: decisionId, choice, reasoning, human_prompt: `Chose ${choice}: ${reasoning}` })
-      });
+      await this._client.send('DECISION_RESPONSE', { decision_id: decisionId, choice, reasoning, human_prompt: `Chose ${choice}: ${reasoning}` });
       this._addMessage('You', `Decision: chose ${choice}${reasoning ? ` — ${reasoning}` : ''}`, '#22c55e');
     } catch (err) {
       this._addMessage('Error', err.message, '#ef4444');
@@ -157,11 +160,7 @@ class ChatBubble extends HTMLElement {
 
   async _sendHumanInput(text) {
     try {
-      await fetch('/a2a/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'HUMAN_INPUT', text })
-      });
+      await this._client.send('HUMAN_INPUT', { text });
     } catch { /* ignore */ }
   }
 
@@ -175,6 +174,7 @@ class ChatBubble extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._client) this._client.disconnect();
     if (this._es) this._es.close();
   }
 }

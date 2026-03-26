@@ -121,6 +121,19 @@ export class A2AClient {
     return data;
   }
 
+  /** Send arbitrary A2A message */
+  async send(type, payload = {}) {
+    if (!this._agentId) throw new Error('Not connected. Call connect() first.');
+    const res = await fetch('/a2a/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: this._agentId, type, ...payload }),
+    });
+    const data = await res.json();
+    if (data.type === 'ERROR') throw new Error(`${type} failed: ${data.error}`);
+    return data;
+  }
+
   /** Send heartbeat */
   async heartbeat() {
     if (!this._agentId) return;
