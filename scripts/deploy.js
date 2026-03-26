@@ -83,7 +83,7 @@ if (!twin) {
     version,
     viz_path: `viz/versions/${version}`,
     apply_steps: [
-      { type: 'symlink', from: 'viz/active', to: `viz/versions/${version}` },
+      { type: 'symlink', from: 'active', to: `versions/${version}` },
       { type: 'restart', service: 'viz' },
     ],
     rollback_steps: [],
