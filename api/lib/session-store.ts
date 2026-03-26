@@ -13,7 +13,7 @@ export interface AgentSession {
   id: string;
   agent_id: string;
   user_id: string;
-  project_slug: string;
+  project_slug: string | null;
   role: string;
   permissions: string[];
   token_hash: string;
@@ -25,7 +25,7 @@ export interface AgentSession {
   metadata: any;
 }
 
-export function createSession(db: any, agentId: string, userId: string, projectSlug: string, role: string, ttlHours = 24): { session_id: string; session_token: string; expires_at: string } {
+export function createSession(db: any, agentId: string, userId: string, projectSlug: string | null, role: string, ttlHours = 24): { session_id: string; session_token: string; expires_at: string } {
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ttlHours * 3600 * 1000).toISOString();
   const sessionToken = jwt.sign(
