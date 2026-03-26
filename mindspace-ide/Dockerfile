@@ -2,6 +2,9 @@ FROM node:22-bookworm AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare yarn@stable --activate
 
+# Copy yarn config first (nodeLinker: node-modules)
+COPY .yarnrc.yml ./
+
 # Copy workspace config
 COPY package.json yarn.lock* ./
 COPY browser-app/package.json browser-app/
@@ -12,8 +15,9 @@ COPY extensions/@mindspace/theia-layouts/package.json extensions/@mindspace/thei
 # Install dependencies
 RUN yarn install --immutable || yarn install
 
-# Copy source
-COPY . .
+# Copy source (preserve node_modules from install)
+COPY browser-app/ browser-app/
+COPY extensions/ extensions/
 
 # Build extensions then browser app
 RUN yarn workspace @mindspace/theia-a2a build || true
@@ -29,9 +33,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app /app
-
-# Claude Code binary (mounted or installed at runtime)
-# RUN npm install -g @anthropic-ai/claude-code
 
 EXPOSE 4200
 ENV SHELL=/bin/bash
