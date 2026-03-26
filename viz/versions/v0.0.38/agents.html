@@ -6,102 +6,27 @@
 <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
 <link rel="stylesheet" href="/mindspace.css">
 <style>
-  .agents-container { display:flex; flex-direction:column; height:calc(100vh - 56px); }
-  .agents-toolbar { display:flex; gap:8px; padding:8px 12px; background:var(--ms-surface); border-bottom:1px solid var(--ms-border); align-items:center; }
-  .agents-grid { flex:1; display:grid; gap:4px; padding:4px; overflow:hidden; }
-  .spawn-btn { padding:6px 16px; border:none; border-radius:var(--ms-radius-sm); background:var(--ms-accent); color:#fff; cursor:pointer; font-weight:bold; }
-  .spawn-modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:100; }
-  .spawn-modal.active { display:flex; }
-  .spawn-form { background:var(--ms-bg); border:1px solid var(--ms-border); border-radius:var(--ms-radius); padding:24px; min-width:300px; }
-  .spawn-form h3 { margin:0 0 16px; }
-  .spawn-form select, .spawn-form button { width:100%; padding:8px; margin-bottom:8px; border-radius:var(--ms-radius-sm); border:1px solid var(--ms-border); }
+  .agents-container { display:flex; flex-direction:column; align-items:center; justify-content:center; height:calc(100vh - 56px); text-align:center; padding:24px; }
+  .agents-container h2 { margin:0 0 8px; }
+  .agents-container p { color:var(--ms-muted); margin:0 0 24px; max-width:480px; }
+  .ide-btn { display:inline-flex; align-items:center; gap:8px; padding:12px 24px; border:none; border-radius:var(--ms-radius-sm); background:var(--ms-accent); color:#fff; cursor:pointer; font-weight:bold; font-size:15px; text-decoration:none; }
+  .ide-btn:hover { opacity:0.9; }
+  .feature-list { text-align:left; max-width:400px; margin:0 auto 24px; color:var(--ms-text); }
+  .feature-list li { margin:6px 0; }
 </style>
 </head><body>
 <script type="module" src="/js/mindspace-nav.js"></script>
-<script src="/js/agent-panel.js"></script>
-<script src="/js/liaison-chat.js"></script>
-<script src="/js/layout-manager.js"></script>
 
 <div class="agents-container">
-  <div class="agents-toolbar">
-    <span style="font-weight:bold;">Agent OS</span>
-    <span id="capacity" style="font-size:12px;color:var(--ms-muted);margin-left:8px;"></span>
-    <button class="spawn-btn" id="spawn-btn">+ Start Agent</button>
-    <div style="margin-left:auto;display:flex;gap:4px;" id="preset-btns"></div>
-  </div>
-  <div class="agents-grid" id="agents-grid">
-    <div style="display:flex;align-items:center;justify-content:center;color:var(--ms-muted);font-size:14px;">
-      No agents running. Click <strong style="margin:0 4px;">+ Start Agent</strong> to begin.
-    </div>
-  </div>
+  <h2>Agent OS</h2>
+  <p>Start agents from the Mindspace IDE terminal. Claude Code runs directly in your browser — no API keys needed.</p>
+  <ul class="feature-list">
+    <li><strong>Terminal</strong> — Run Claude Code agents with A2A connection</li>
+    <li><strong>Editor</strong> — Full IDE with file tree, git, search</li>
+    <li><strong>Multi-agent</strong> — Layout presets for agent grid panels</li>
+    <li><strong>Workspace</strong> — Access all your projects in one place</li>
+  </ul>
+  <a href="/ide/" class="ide-btn">Open Mindspace IDE</a>
 </div>
 
-<!-- Spawn Modal -->
-<div class="spawn-modal" id="spawn-modal">
-  <div class="spawn-form">
-    <h3>Start Agent</h3>
-    <label style="font-size:12px;">Role</label>
-    <select id="spawn-role">
-      <option value="liaison">Liaison (Drives the Loop)</option>
-      <option value="pdsa">PDSA (Plan/Design)</option>
-      <option value="dev">DEV (Implement)</option>
-      <option value="qa">QA (Test/Review)</option>
-    </select>
-    <div style="display:flex;gap:8px;margin-top:8px;">
-      <button id="spawn-confirm" style="background:var(--ms-accent);color:#fff;cursor:pointer;">Spawn</button>
-      <button id="spawn-cancel" style="cursor:pointer;">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<script>
-const grid = document.getElementById('agents-grid');
-const panels = [];
-
-// Spawn modal
-document.getElementById('spawn-btn').addEventListener('click', () => document.getElementById('spawn-modal').classList.add('active'));
-document.getElementById('spawn-cancel').addEventListener('click', () => document.getElementById('spawn-modal').classList.remove('active'));
-document.getElementById('spawn-confirm').addEventListener('click', async () => {
-  const role = document.getElementById('spawn-role').value;
-  document.getElementById('spawn-modal').classList.remove('active');
-
-  try {
-    const res = await fetch('/api/agents/spawn', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${document.cookie.match(/ms_session=([^;]+)/)?.[1] || ''}` },
-      body: JSON.stringify({ role })
-    });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Spawn failed'); return; }
-
-    // Clear placeholder
-    if (panels.length === 0) grid.innerHTML = '';
-
-    // Add agent panel
-    const panel = document.createElement('agent-panel');
-    panel.setAttribute('agent-id', data.agent_id);
-    panel.setAttribute('role', role);
-    panel.setAttribute('agent-name', `${role}-agent`);
-    grid.appendChild(panel);
-    panels.push({ agent_id: data.agent_id, role, element: panel });
-
-    // Add liaison chat on first spawn
-    if (panels.length === 1) {
-      const chat = document.createElement('liaison-chat');
-      grid.appendChild(chat);
-    }
-
-    // Update grid layout
-    updateGrid();
-  } catch (err) { alert('Spawn error: ' + err.message); }
-});
-
-function updateGrid() {
-  const total = grid.children.length;
-  if (total <= 1) { grid.style.gridTemplateColumns = '1fr'; grid.style.gridTemplateRows = '1fr'; }
-  else if (total === 2) { grid.style.gridTemplateColumns = '1fr 1fr'; grid.style.gridTemplateRows = '1fr'; }
-  else if (total <= 4) { grid.style.gridTemplateColumns = '1fr 1fr'; grid.style.gridTemplateRows = '1fr 1fr'; }
-  else { grid.style.gridTemplateColumns = 'repeat(3, 1fr)'; grid.style.gridTemplateRows = '1fr 1fr'; }
-}
-</script>
 </body></html>

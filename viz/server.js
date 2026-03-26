@@ -409,6 +409,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // /ide/* route: reverse proxy to Theia IDE
+  if (pathname.startsWith('/ide')) {
+    const theiaPort = parseInt(process.env.THEIA_PORT || '4202', 10);
+    const theiaPath = pathname === '/ide' ? '/' : pathname.replace(/^\/ide/, '');
+    const proxyHeaders = { ...req.headers, host: `localhost:${theiaPort}` };
+    const proxyReq = http.request({
+      hostname: 'localhost', port: theiaPort, path: theiaPath + url.search,
+      method: req.method, headers: proxyHeaders
+    }, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+    proxyReq.on('error', () => { res.writeHead(502); res.end('IDE not available'); });
+    req.pipe(proxyReq, { end: true });
+    return;
+  }
+
   // /agents route: Agent OS management page
   if (pathname === '/agents') {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
