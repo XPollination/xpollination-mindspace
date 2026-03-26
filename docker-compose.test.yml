@@ -46,3 +46,27 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+
+  theia-test:
+    build:
+      context: /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-rc/mindspace-ide
+      dockerfile: Dockerfile
+    container_name: mindspace-theia-test
+    ports:
+      - "127.0.0.1:4202:4200"
+    volumes:
+      - /home/developer/workspaces/github/PichlerThomas:/home/theia/workspace
+      - /mnt/HC_Volume_105173237/mindspace/data-test/mindspace:/app/data:ro
+    environment:
+      - MINDSPACE_API_URL=http://mindspace-test:3101
+      - BRAIN_API_URL=http://host.docker.internal:3200
+      - SHELL=/bin/bash
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4200/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
