@@ -55,7 +55,8 @@ services:
     restart: unless-stopped
 
   mindspace:
-    build: .
+    build:
+      context: /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-prod
     container_name: mindspace-prod
     ports:
       - "10.33.33.1:3100:3100"
