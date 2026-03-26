@@ -4,6 +4,7 @@
  * Protocol: raw binary PTY data over WebSocket (same as xterm.js attach addon)
  */
 
+import jwt from 'jsonwebtoken';
 import { IncomingMessage } from 'node:http';
 import { Duplex } from 'node:stream';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -102,8 +103,7 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
   const token = cookies['ms_session'] || url.searchParams.get('token');
   if (token && sessionUserId && sessionUserId !== 'default') {
     try {
-      const jwt = await import('jsonwebtoken');
-      const decoded = (jwt.default || jwt).verify(token, process.env.JWT_SECRET || 'changeme') as any;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'changeme') as any;
       if (decoded.sub && decoded.sub !== sessionUserId) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
