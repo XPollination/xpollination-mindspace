@@ -27,7 +27,11 @@
     "logs:test": "docker compose -f docker-compose.test.yml logs -f",
     "test:acceptance": "bash scripts/acceptance-test.sh",
     "test:acceptance:beta": "bash scripts/acceptance-test.sh http://127.0.0.1:4201 http://127.0.0.1:3101",
-    "test:acceptance:prod": "bash scripts/acceptance-test.sh http://10.33.33.1:4200 http://10.33.33.1:3100"
+    "test:acceptance:prod": "bash scripts/acceptance-test.sh http://10.33.33.1:4200 http://10.33.33.1:3100",
+    "version:create": "node scripts/create-version.js",
+    "deploy": "node scripts/deploy.js",
+    "deploy:beta": "node scripts/deploy.js",
+    "deploy:prod": "node scripts/deploy.js"
   },
   "keywords": [
     "mcp",
