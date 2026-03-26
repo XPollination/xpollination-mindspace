@@ -27,7 +27,7 @@ const MAX_RESTARTS = 5;
 const MAX_BACKOFF_MS = 60_000;
 const STABLE_RESET_MS = 5 * 60 * 1000; // Reset backoff after 5min stable
 
-export function spawn(agentId: string, config: { session_id: string; user_id: string; project_slug: string; role: string }): AgentProcess {
+export function spawn(agentId: string, config: { session_id: string; user_id: string; project_slug?: string; role: string }): AgentProcess {
   // Stop existing process if any
   const existing = processes.get(agentId);
   if (existing && existing.status === 'running') {
