@@ -88,6 +88,30 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
     return;
   }
 
+  // Security: verify session ownership
+  // Session names are agent-<role>-<userId> — extract userId and match against JWT
+  const sessionName = url.pathname.split('/').pop() || '';
+  const sessionUserId = sessionName.replace(/^agent-[a-z]+-/, '');
+  const cookies = (req.headers.cookie || '').split(';').reduce((acc: Record<string,string>, c) => {
+    const [k, v] = c.trim().split('=');
+    if (k && v) acc[k] = v;
+    return acc;
+  }, {} as Record<string, string>);
+
+  // Best-effort auth check — if JWT available, verify user owns the session
+  const token = cookies['ms_session'] || url.searchParams.get('token');
+  if (token && sessionUserId && sessionUserId !== 'default') {
+    try {
+      const jwt = await import('jsonwebtoken');
+      const decoded = (jwt.default || jwt).verify(token, process.env.JWT_SECRET || 'changeme') as any;
+      if (decoded.sub && decoded.sub !== sessionUserId) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+    } catch { /* JWT verify failed — allow connection (graceful degradation) */ }
+  }
+
   wss.handleUpgrade(req, socket, head, (ws) => {
     wss.emit('connection', ws, req);
   });

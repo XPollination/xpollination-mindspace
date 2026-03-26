@@ -98,9 +98,11 @@ class ChatBubble extends HTMLElement {
 
   async _connectA2A() {
     try {
-      // Determine project slug from page or default
       const projectSlug = document.querySelector('[data-project-slug]')?.dataset.projectSlug || 'xpollination-mindspace';
       await this._client.connect(projectSlug);
+
+      // Auto-start LIAISON if not running
+      this._ensureLiaison();
 
       this._client.on('decision_needed', (data) => {
         this._decisions.push(data);
@@ -170,8 +172,34 @@ class ChatBubble extends HTMLElement {
 
   async _sendHumanInput(text) {
     try {
-      await this._client.send('HUMAN_INPUT', { text });
+      const liaisonId = sessionStorage.getItem('cb_liaison_agent_id');
+      await this._client.send('HUMAN_INPUT', { text, target_agent_id: liaisonId || undefined });
     } catch { /* ignore */ }
+  }
+
+  async _ensureLiaison() {
+    try {
+      const res = await fetch('/api/agents/me/liaison');
+      const data = await res.json();
+      if (data.running) {
+        sessionStorage.setItem('cb_liaison_session', data.sessionName);
+        sessionStorage.setItem('cb_liaison_agent_id', data.agentId || data.sessionName);
+        return;
+      }
+      // Not running — auto-start
+      this._addMessage('System', 'Starting LIAISON...', '#94a3b8');
+      const start = await fetch('/api/agents/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'liaison' }),
+      });
+      const agent = await start.json();
+      if (start.ok) {
+        sessionStorage.setItem('cb_liaison_session', agent.sessionName);
+        sessionStorage.setItem('cb_liaison_agent_id', agent.agentId || agent.sessionName);
+        this._addMessage('System', `LIAISON ${agent.status}. Open Agents page to complete setup.`, '#22c55e');
+      }
+    } catch { /* ignore — LIAISON check is best-effort */ }
   }
 
   _addMessage(from, text, color) {
