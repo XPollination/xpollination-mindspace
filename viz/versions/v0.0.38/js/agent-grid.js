@@ -62,13 +62,21 @@ class AgentGrid extends HTMLElement {
     this._renderAgents();
   }
 
-  _spawnAgent() {
+  async _spawnAgent() {
     const role = prompt('Agent role (liaison / pdsa / dev / qa):', 'liaison');
     if (!role || !['liaison', 'pdsa', 'dev', 'qa'].includes(role)) return;
 
-    const sessionName = `agent-${role}-${Date.now().toString(36)}`;
-    this._agents.push({ role, sessionName, agentId: sessionName });
-    this._renderAgents();
+    try {
+      const res = await fetch('/api/agents/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Agent start failed'); return; }
+      this._agents.push({ role, sessionName: data.sessionName, agentId: data.agentId || data.sessionName });
+      this._renderAgents();
+    } catch (err) { alert('Agent start error: ' + err.message); }
   }
 
   _renderAgents() {

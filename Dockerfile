@@ -63,8 +63,11 @@ COPY --from=builder /app/src/twins ./src/twins
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/docs ./docs
 
-# Install tmux for persistent agent terminal sessions
-RUN apt-get update && apt-get install -y --no-install-recommends tmux && rm -rf /var/lib/apt/lists/*
+# Install tmux + curl for persistent agent terminal sessions and A2A connectivity
+RUN apt-get update && apt-get install -y --no-install-recommends tmux curl && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code globally (agents use Max Plan OAuth — no API key needed)
+RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code install deferred to startup (self-healing)"
 
 # Copy A2A agent scripts needed at runtime
 COPY --from=builder /app/src/a2a ./src/a2a
