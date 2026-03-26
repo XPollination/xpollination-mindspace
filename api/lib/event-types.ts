@@ -17,7 +17,17 @@ export const EVENT_TYPES = {
   WORKSPACE_UNDOCKED: 'workspace_undocked',
   HUMAN_INPUT: 'human_input',
   BRAIN_GATE: 'brain_gate',
+  VERSION_UPGRADED: 'version_upgraded',
 } as const;
+
+export function buildVersionUpgraded(version: string, station: string, previousVersion: string | null) {
+  return {
+    version,
+    previous_version: previousVersion,
+    station,
+    timestamp: new Date().toISOString(),
+  };
+}
 
 export function buildTaskAssigned(task: any, dna: any, transitions: any[]) {
   return {

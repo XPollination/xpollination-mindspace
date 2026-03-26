@@ -41,6 +41,7 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   WORKSPACE_DOCK: handleWorkspaceDock,
   WORKSPACE_UNDOCK: handleWorkspaceUndock,
   HUMAN_INPUT: handleHumanInput,
+  VERSION_TRANSITION: handleVersionTransition,
 };
 
 const JWT_SECRET_MSG = process.env.JWT_SECRET || 'changeme';
@@ -1107,4 +1108,48 @@ async function handleWorkspaceDock(_agent: any, body: any, res: Response): Promi
 async function handleWorkspaceUndock(_agent: any, body: any, res: Response): Promise<void> {
   // Stub — Phase 4 implementation
   res.status(200).json({ type: 'ACK', original_type: 'WORKSPACE_UNDOCK', status: 'stub', message: 'Workspace undock handler — Phase 4 implementation pending', timestamp: new Date().toISOString() });
+}
+
+// === VERSION MANAGEMENT VIA TWINS ===
+
+async function handleVersionTransition(agent: any, body: any, res: Response): Promise<void> {
+  const { version, station } = body;
+  if (!version) {
+    res.status(400).json({ type: 'ERROR', error: 'version is required' });
+    return;
+  }
+
+  const db = getDb();
+
+  // Check if version twin exists
+  const versionTwin = db.prepare('SELECT * FROM version_twins WHERE version = ?').get(version) as any;
+  if (!versionTwin) {
+    res.status(404).json({ type: 'ERROR', error: `Version twin not found: ${version}` });
+    return;
+  }
+
+  if (versionTwin.requires_rebuild) {
+    res.status(422).json({ type: 'ERROR', error: `Version ${version} requires Docker rebuild (requires_rebuild=true). Use deploy.js CLI instead.` });
+    return;
+  }
+
+  // Update status
+  const now = new Date().toISOString();
+  db.prepare('UPDATE version_twins SET status = ?, applied_at = ?, applied_by = ? WHERE version = ?')
+    .run('applied', now, agent.name || agent.id, version);
+
+  // Broadcast version_upgraded event
+  const { buildVersionUpgraded } = await import('../lib/event-types.js');
+  const event = buildVersionUpgraded(version, station || 'unknown', versionTwin.parent_version);
+  broadcast(EVENT_TYPES.VERSION_UPGRADED, event);
+
+  res.status(200).json({
+    type: 'ACK',
+    original_type: 'VERSION_TRANSITION',
+    version,
+    station: station || 'unknown',
+    applied_at: now,
+    note: 'Version twin status updated. Use deploy.js CLI for actual symlink swap + restart.',
+    timestamp: now,
+  });
 }

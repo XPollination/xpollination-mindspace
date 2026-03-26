@@ -1,0 +1,26 @@
+{
+  "beta": {
+    "db": "/mnt/HC_Volume_105173237/mindspace/data-test/mindspace/mindspace.db",
+    "vizRoot": "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-rc/viz",
+    "apiPort": 3101,
+    "vizPort": 4201,
+    "healthUrl": "http://127.0.0.1:4201/",
+    "restartCmd": "docker restart mindspace-test"
+  },
+  "prod": {
+    "db": "/mnt/HC_Volume_105173237/mindspace/data-prod/mindspace.db",
+    "vizRoot": "/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-prod/viz",
+    "apiPort": 3100,
+    "vizPort": 4200,
+    "healthUrl": "http://10.33.33.1:4200/",
+    "restartCmd": "docker restart mindspace-prod"
+  },
+  "local": {
+    "db": "data/xpollination.db",
+    "vizRoot": "viz",
+    "apiPort": 3100,
+    "vizPort": 4200,
+    "healthUrl": "http://localhost:4200/",
+    "restartCmd": "node scripts/service-lifecycle.js restart viz"
+  }
+}
