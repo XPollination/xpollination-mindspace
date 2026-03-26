@@ -1,9 +1,12 @@
 // Mission Twin — create, validate, diff
 
 export function createMission(input) {
+  const now = new Date().toISOString();
   return {
     _type: 'mission',
-    _created_at: new Date().toISOString(),
+    _schema_version: '1.0.0',
+    _created_at: now,
+    _updated_at: now,
     ...input,
   };
 }
@@ -48,8 +51,9 @@ export function validateMission(twin) {
     warnings.push('MissionInterface v1.0: content_md is empty — active/ready missions should have content');
   }
 
-  const completeness = twin.content_md
-    ? MISSION_SECTIONS.length - MISSION_SECTIONS.filter(s => !twin.content_md.match(new RegExp('##\\s+.*' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))).length
+  const md = typeof twin.content_md === 'string' ? twin.content_md : '';
+  const completeness = md
+    ? MISSION_SECTIONS.length - MISSION_SECTIONS.filter(s => !md.match(new RegExp('##\\s+.*' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))).length
     : 0;
 
   return {

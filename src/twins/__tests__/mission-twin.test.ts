@@ -27,6 +27,17 @@ describe('createMission', () => {
     expect(() => new Date(twin._created_at!)).not.toThrow();
   });
 
+  it('sets _schema_version to 1.0.0', () => {
+    const twin = createMission({ id: 'm1', title: 'M1', status: 'draft' });
+    expect(twin._schema_version).toBe('1.0.0');
+  });
+
+  it('sets _updated_at equal to _created_at on creation', () => {
+    const twin = createMission({ id: 'm1', title: 'M1', status: 'draft' });
+    expect(twin._updated_at).toBeDefined();
+    expect(twin._updated_at).toBe(twin._created_at);
+  });
+
   it('preserves optional fields when provided', () => {
     const twin = createMission({
       id: 'm1', title: 'M1', status: 'active',

@@ -3,6 +3,8 @@ import { Response } from 'express';
 interface SseConnection {
   res: Response;
   agentId: string;
+  role: string | null;
+  projectSlug: string | null;
   connectedAt: Date;
   heartbeatInterval: NodeJS.Timeout;
 }
@@ -14,7 +16,7 @@ const connections = new Map<string, SseConnection>();
  * Register an SSE connection for an agent.
  * Replaces any existing connection for the same agent_id (only one stream per agent).
  */
-export function addConnection(agentId: string, res: Response): void {
+export function addConnection(agentId: string, res: Response, role?: string, projectSlug?: string): void {
   // Close existing connection if any (agent reconnected)
   removeConnection(agentId);
 
@@ -41,6 +43,8 @@ export function addConnection(agentId: string, res: Response): void {
   connections.set(agentId, {
     res,
     agentId,
+    role: role || null,
+    projectSlug: projectSlug || null,
     connectedAt: new Date(),
     heartbeatInterval
   });
@@ -83,6 +87,21 @@ export function broadcast(event: string, data: unknown): number {
   let sent = 0;
   for (const [agentId] of connections) {
     if (sendToAgent(agentId, event, data)) sent++;
+  }
+  return sent;
+}
+
+/**
+ * Send a message to all connected agents with a specific role (and optionally project).
+ * Returns number of agents that received the message.
+ */
+export function sendToRole(role: string, event: string, data: unknown, projectSlug?: string): number {
+  let sent = 0;
+  for (const [agentId, conn] of connections) {
+    if (conn.role === role) {
+      if (projectSlug && conn.projectSlug && conn.projectSlug !== projectSlug) continue;
+      if (sendToAgent(agentId, event, data)) sent++;
+    }
   }
   return sent;
 }

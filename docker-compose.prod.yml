@@ -55,7 +55,8 @@ services:
     restart: unless-stopped
 
   mindspace:
-    build: .
+    build:
+      context: /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-prod
     container_name: mindspace-prod
     ports:
       - "10.33.33.1:3100:3100"
@@ -75,6 +76,10 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_CALLBACK_URL=https://mindspace.xpollination.earth/api/auth/oauth/google/callback
       - FRONTEND_URL=https://mindspace.xpollination.earth
+      - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
+      - LIVEKIT_URL=wss://meet.xpollination.earth
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
     depends_on:
       brain:
         condition: service_healthy

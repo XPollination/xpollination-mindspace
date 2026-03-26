@@ -1,9 +1,12 @@
 // Capability Twin — create, validate, diff
 
 export function createCapability(input) {
+  const now = new Date().toISOString();
   return {
     _type: 'capability',
-    _created_at: new Date().toISOString(),
+    _schema_version: '1.0.0',
+    _created_at: now,
+    _updated_at: now,
     ...input,
   };
 }
@@ -33,6 +36,13 @@ export function validateCapability(twin) {
 
   if (twin.sort_order !== undefined && twin.sort_order < 0) {
     errors.push('sort_order must be >= 0');
+  }
+
+  // Self-deploying capability warnings for active capabilities
+  if (twin.status === 'active') {
+    if (!twin.config) warnings.push('Active capability missing config');
+    if (!twin.activation) warnings.push('Active capability missing activation');
+    if (!twin.rollback_plan) warnings.push('Active capability missing rollback_plan');
   }
 
   // CapabilityInterface v1.0: check required sections

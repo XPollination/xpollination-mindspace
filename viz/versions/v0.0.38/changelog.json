@@ -1,0 +1,14 @@
+{
+  "version": "v0.0.38",
+  "date": "2026-03-25",
+  "title": "Agent OS: Browser-Based Agent Management",
+  "changes": [
+    "Add /agents page with agent panel web components and layout manager",
+    "Add liaison chat panel with approval cards and @mention support",
+    "Add API key management to settings (AES-256-GCM encrypted storage)",
+    "Add Agents link to navigation bar",
+    "Add object_create and object_update SSE listeners to kanban",
+    "Agent panels show real-time SSE event streams per agent",
+    "Layout presets: single, dual, triple, quad, focus"
+  ]
+}

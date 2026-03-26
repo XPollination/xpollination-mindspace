@@ -1,0 +1,23 @@
+{
+  "name": "@mindspace/theia-a2a",
+  "version": "0.1.0",
+  "description": "A2A integration for Mindspace IDE — agent panels, SSE streams, task management",
+  "keywords": ["theia-extension"],
+  "license": "MIT",
+  "main": "lib/browser/a2a-frontend-module",
+  "typings": "lib/browser/a2a-frontend-module",
+  "files": ["lib", "src"],
+  "dependencies": {
+    "@theia/core": "~1.69.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.4.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "theiaExtensions": [
+    { "frontend": "lib/browser/a2a-frontend-module" }
+  ]
+}

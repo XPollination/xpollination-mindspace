@@ -19,14 +19,14 @@ function authenticateIdentity(req: Request, apiKey?: string): string | null {
   if (apiKey) {
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
     const keyRow = db.prepare(
-      `SELECT ak.id AS key_id, ak.revoked_at, u.id
+      `SELECT ak.id AS key_id, ak.revoked_at, u.id AS user_id
        FROM api_keys ak
        JOIN users u ON ak.user_id = u.id
        WHERE ak.key_hash = ?`
     ).get(keyHash) as any;
 
     if (!keyRow || keyRow.revoked_at) return null;
-    return keyRow.id;
+    return keyRow.user_id;
   }
 
   // Path 2: JWT from Authorization header (browser — viz proxy sets this from ms_session cookie)
@@ -133,11 +133,30 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
     ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active');
   }
 
-  // 7. Return WELCOME message
+  // 7. Generate session token (JWT) for brain API auth
+  const SESSION_TTL = parseInt(process.env.SESSION_TOKEN_TTL || '86400', 10); // default 24h
+  const sessionToken = jwt.sign(
+    { sub: userId, agent_id: agentId, project_slug: projectSlug, role: currentRole },
+    JWT_SECRET,
+    { expiresIn: SESSION_TTL }
+  );
+  const tokenExpiresAt = new Date(Date.now() + SESSION_TTL * 1000).toISOString();
+
+  // 8. Return WELCOME message with session token and agent identity
   res.status(200).json({
     type: 'WELCOME',
     agent_id: agentId,
     session_id: agentSessionId,
+    session_token: sessionToken,
+    token_expires_at: tokenExpiresAt,
+    agent_identity: {
+      agent_id: agentId,
+      agent_name: agent_name,
+      role: currentRole || null,
+      user_id: userId,
+      project_slug: projectSlug,
+      permissions: ['read', 'write', 'transition'],
+    },
     reconnect: isReconnect,
     project: {
       slug: projectSlug,
