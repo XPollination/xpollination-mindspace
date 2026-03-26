@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — XPollination Mindspace</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+  <link rel="stylesheet" href="/mindspace.css">
+  <style>
+    label { margin-bottom: 0.3rem; }
+    .ms-input { margin-bottom: 1rem; }
+    .api-key-display { font-family: monospace; background: var(--ms-surface); padding: 0.5rem; border-radius: var(--ms-radius-sm); word-break: break-all; border: 1px solid var(--ms-border); }
+    .msg { padding: 0.5rem; border-radius: var(--ms-radius-sm); margin-bottom: 1rem; display: none; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <script type="module" src="/js/mindspace-nav.js"></script>
+
+  <div class="ms-container-narrow">
+    <h1 style="border-bottom:2px solid var(--ms-border);padding-bottom:0.5rem;margin-bottom:1.5rem;">Settings</h1>
+
+    <!-- My Projects -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">My Projects</h2>
+      <div id="projects-list"><div class="ms-loading" style="padding:16px 0;"><div class="ms-spinner"></div></div></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--ms-border);">
+        <label for="git-url">Add Project via Git URL</label>
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="git-url" placeholder="https://github.com/org/repo.git" class="ms-input" style="margin-bottom:0;">
+          <button class="ms-btn ms-btn-primary" onclick="addProject()">Add</button>
+        </div>
+        <div class="msg" id="project-msg"></div>
+        <p style="font-size:0.8rem;color:var(--ms-muted);margin-top:0.75rem;line-height:1.4;">Works with public and private repositories. Private projects use your local knowledge space. For token generation and provenance chain features, a commercial license is available at <a href="https://xpollination.earth" style="color:var(--ms-link);">xpollination.earth</a></p>
+      </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Change Password</h2>
+      <div class="msg" id="pw-msg"></div>
+      <form id="change-password-form">
+        <label for="current-password">Current Password</label>
+        <input type="password" id="current-password" name="current_password" required class="ms-input">
+        <label for="new-password">New Password</label>
+        <input type="password" id="new-password" name="new_password" required class="ms-input">
+        <label for="confirm-password">Confirm New Password</label>
+        <input type="password" id="confirm-password" required class="ms-input">
+        <button type="submit" class="ms-btn ms-btn-primary">Change Password</button>
+      </form>
+    </div>
+
+    <!-- API Key -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">API Key</h2>
+      <p style="font-size:0.85rem;color:var(--ms-muted);margin-bottom:0.5rem;">Use this key to authenticate CLI tools and agents.</p>
+      <div class="api-key-display" id="api-key-value">••••••••••••</div>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+        <button class="ms-btn ms-btn-ghost" onclick="revealApiKey()">Show API Key</button>
+        <button class="ms-btn ms-btn-danger" onclick="regenerateApiKey()">Regenerate</button>
+      </div>
+    </div>
+
+    <!-- Active Sessions -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Active Sessions</h2>
+      <div id="sessions-list"><div class="ms-loading" style="padding:8px 0;"><div class="ms-spinner"></div></div></div>
+    </div>
+
+    <!-- Account -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Account</h2>
+      <p>Signed in as <strong id="user-email">...</strong></p>
+      <a href="/logout" class="ms-btn ms-btn-danger" style="text-decoration:none;display:inline-block;margin-top:0.5rem;">Logout</a>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const current = document.getElementById('current-password').value;
+      const newPw = document.getElementById('new-password').value;
+      const confirm = document.getElementById('confirm-password').value;
+      const msg = document.getElementById('pw-msg');
+      if (newPw !== confirm) { msg.textContent = 'Passwords do not match'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; return; }
+      try {
+        const res = await fetch('/api/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({current_password: current, new_password: newPw}) });
+        const data = await res.json();
+        if (res.ok) { msg.textContent = 'Password changed'; msg.className = 'msg ms-msg-success'; } else { msg.textContent = data.error; msg.className = 'msg ms-msg-error'; }
+        msg.style.display = 'block';
+      } catch { msg.textContent = 'Network error'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
+    });
+
+    let lastGeneratedKey = null;
+    async function revealApiKey() {
+      const el = document.getElementById('api-key-value');
+      if (lastGeneratedKey) { el.textContent = lastGeneratedKey; return; }
+      try {
+        const res = await fetch('/api/keys');
+        const keys = await res.json();
+        if (Array.isArray(keys) && keys.length > 0) {
+          const k = keys[0];
+          el.innerHTML = '<strong>' + (k.name || 'API Key') + '</strong><br><span style="color:var(--ms-muted);font-size:0.85rem;">Key value is not retrievable after creation. Click Regenerate to create a new key.</span>';
+        } else {
+          el.textContent = 'No API key found. Click Regenerate to create one.';
+        }
+      } catch { el.textContent = 'Failed to load API key info'; }
+    }
+
+    async function regenerateApiKey() {
+      if (!confirm('Regenerate API key? Your current key will stop working immediately.')) return;
+      const el = document.getElementById('api-key-value');
+      el.textContent = 'Generating...';
+      try {
+        const res = await fetch('/api/keys', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: 'Agent Key'}) });
+        const data = await res.json();
+        if (data.key) {
+          lastGeneratedKey = data.key;
+          el.innerHTML = '<strong style="color:#2e7d32;">NEW KEY (copy now):</strong><br>' + data.key + '<br><span style="color:#c62828;font-size:0.85rem;">This key will not be shown again.</span>';
+        } else { el.textContent = data.error || 'Failed to generate key'; }
+      } catch { el.textContent = 'Network error'; }
+    }
+
+    async function loadSessions() {
+      try {
+        const res = await fetch('/api/auth/sessions');
+        const data = await res.json();
+        const el = document.getElementById('sessions-list');
+        if (data.sessions && data.sessions.length > 0) {
+          el.innerHTML = data.sessions.map(s =>
+            '<div style="padding:0.3rem 0;border-bottom:1px solid var(--ms-border);font-size:0.85rem;">' +
+            '<strong>' + (s.user_agent || 'unknown') + '</strong> — ' + s.ip_address + ' — ' + new Date(s.created_at).toLocaleDateString() + '</div>'
+          ).join('');
+        } else { el.textContent = 'No active sessions'; }
+      } catch { document.getElementById('sessions-list').textContent = 'Failed to load sessions'; }
+    }
+
+    async function loadAccount() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.email) document.getElementById('user-email').textContent = data.name + ' (' + data.email + ')';
+      } catch {}
+    }
+
+    async function loadMyProjects() {
+      const el = document.getElementById('projects-list');
+      try {
+        const res = await fetch('/api/projects');
+        const projects = await res.json();
+        const list = Array.isArray(projects) ? projects : (projects.projects || []);
+        if (list.length === 0) { el.innerHTML = '<p style="color:var(--ms-muted);font-size:0.85rem;">No projects yet. Add one via git URL below.</p>'; return; }
+        el.innerHTML = list.map(p => {
+          const vis = p.visibility === 'private' ? ' <span style="font-size:0.65rem;background:var(--ms-status-review);color:#fff;padding:1px 5px;border-radius:3px;vertical-align:middle;">PRIVATE</span>' : '';
+          return '<div style="padding:0.6rem 0;border-bottom:1px solid var(--ms-border);display:flex;align-items:center;gap:8px;">' +
+            '<div style="flex:1;min-width:0;">' +
+            '<strong style="font-size:0.9rem;">' + (p.name || p.slug) + '</strong>' + vis +
+            (p.git_url ? '<div style="font-size:0.75rem;color:var(--ms-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.git_url + '</div>' : '') +
+            '</div>' +
+            '<a href="#" onclick="removeProject(\'' + p.slug + '\',\'' + (p.name || p.slug).replace(/'/g, "\\'") + '\');return false;" style="font-size:0.75rem;color:var(--ms-muted);white-space:nowrap;" title="Removes your access, tasks stay">Leave</a>' +
+            '</div>';
+        }).join('');
+      } catch { el.textContent = 'Failed to load projects'; }
+    }
+
+    async function addProject() {
+      const gitUrl = document.getElementById('git-url').value.trim();
+      const msg = document.getElementById('project-msg');
+      msg.style.display = 'none';
+      if (!gitUrl) { msg.textContent = 'Please enter a git URL'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; return; }
+      try {
+        const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ git_url: gitUrl }) });
+        const data = await res.json();
+        if (res.ok) {
+          const action = data.action || 'created';
+          if (action === 'already_member') {
+            msg.textContent = 'You\'re already a member of "' + data.name + '"';
+            msg.className = 'msg'; msg.style.cssText = 'display:block;background:var(--ms-surface);color:var(--ms-link);padding:0.5rem;border-radius:4px;font-size:0.85rem;';
+          } else if (action === 'joined') {
+            msg.textContent = 'Joined project "' + data.name + '"!';
+            msg.className = 'msg ms-msg-success'; msg.style.display = 'block';
+          } else {
+            const visNote = data.visibility === 'private' ? ' (private repository detected)' : '';
+            msg.textContent = 'Project "' + data.name + '" created!' + visNote;
+            msg.className = 'msg ms-msg-success'; msg.style.display = 'block';
+          }
+          document.getElementById('git-url').value = ''; loadMyProjects();
+        } else { msg.textContent = data.error || 'Failed'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
+      } catch { msg.textContent = 'Network error'; msg.className = 'msg ms-msg-error'; msg.style.display = 'block'; }
+    }
+
+    async function removeProject(slug, name) {
+      if (!confirm('Leave project "' + name + '"? This removes your access. Tasks and data remain.')) return;
+      try {
+        const res = await fetch('/api/projects/' + slug, { method: 'DELETE' });
+        if (res.ok || res.status === 404) loadMyProjects();
+        else { const data = await res.json(); alert(data.error || 'Failed'); }
+      } catch { alert('Network error'); }
+    }
+
+    document.getElementById('git-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addProject(); } });
+
+    loadMyProjects();
+    loadSessions();
+    loadAccount();
+  </script>
+
+  <!-- API Key Management (Agent OS) -->
+  <div class="ms-container-narrow" style="margin-top:2rem;">
+    <settings-api-keys></settings-api-keys>
+  </div>
+  <script src="/js/settings-api-keys.js"></script>
+</body>
+</html>

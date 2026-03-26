@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kanban — Mindspace</title>
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+<link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+<link rel="manifest" href="/assets/favicons/manifest.webmanifest">
+<link rel="stylesheet" href="/mindspace.css">
+<link rel="stylesheet" href="/kanban.css">
+</head><body>
+<script type="module" src="/js/mindspace-nav.js"></script>
+<div class="kanban-toolbar">
+  <select id="project-filter" class="ms-input" style="width:auto;margin:0;padding:4px 8px;font-size:13px;">
+    <option value="all">All Projects</option>
+  </select>
+  <input type="text" id="search" class="ms-input" placeholder="Search tasks..." style="width:200px;margin:0;padding:4px 8px;font-size:13px;">
+  <div class="kanban-filters">
+    <button class="filter-btn active" data-filter="active">Active</button>
+    <button class="filter-btn" data-filter="all">All</button>
+  </div>
+  <select id="liaison-mode" class="ms-input" title="LIAISON Approval Mode" style="width:auto;margin:0;padding:4px 8px;font-size:13px;">
+    <option value="manual">Manual</option>
+    <option value="semi">Semi</option>
+    <option value="auto-approval">Auto-Approval</option>
+    <option value="autonomous">Autonomous</option>
+  </select>
+  <div class="kanban-stats" id="stats"></div>
+</div>
+<div class="kanban-board" id="board">
+  <div class="ms-loading"><div class="ms-spinner"></div><br>Connecting...</div>
+</div>
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-header">
+    <h2 id="detail-title">Task Detail</h2>
+    <button class="detail-close" onclick="closeDetail()">&times;</button>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+  <div class="detail-actions" id="detail-actions"></div>
+</div>
+<script type="module" src="/js/kanban.js"></script>
+</body></html>

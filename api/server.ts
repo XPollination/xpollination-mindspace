@@ -26,6 +26,10 @@ import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { mindspaceOAuthProvider } from './routes/mcp-oauth.js';
 import { nodeActionsRouter } from './routes/node-actions.js';
 import { dataRouter } from './routes/data.js';
+import { apiKeysRouter } from './routes/api-keys.js';
+import { oauthProviderRouter } from './routes/oauth-provider.js';
+import { startMonitor, stopMonitor } from './lib/heartbeat-monitor.js';
+import { workspacesRouter } from './routes/workspaces.js';
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
@@ -83,6 +87,9 @@ app.use('/api/settings', requireApiKeyOrJwt, settingsRouter);
 app.use('/api/livekit', requireApiKeyOrJwt, livekitRouter);
 app.use('/api/node', nodeActionsRouter);
 app.use('/api/data', dataRouter);
+app.use('/api/settings/api-keys', requireApiKeyOrJwt, apiKeysRouter);
+app.use('/api/settings/workspaces', requireApiKeyOrJwt, workspacesRouter);
+app.use(oauthProviderRouter);
 
 // Global suspect-links stats endpoint (kanban calls /api/suspect-links/stats?project=all)
 app.get('/api/suspect-links/stats', requireApiKeyOrJwt, (req, res) => {
@@ -107,11 +114,14 @@ app.use(errorHandler);
 const server = app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Mindspace API server listening');
   startAgentSweep();
+  startMonitor();
+  logger.info('Heartbeat monitor started (30s interval)');
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down...');
+  stopMonitor();
   server.close(() => {
     closeDb();
     process.exit(0);

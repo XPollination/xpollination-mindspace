@@ -7,6 +7,32 @@ export const featureFlagsRouter = Router({ mergeParams: true });
 
 const VALID_STATES = ['off', 'on'];
 
+// Capability twin compat: convert active capabilities to flag-shaped objects
+function capabilitiesAsFlags(db: any, projectSlug?: string): any[] {
+  let sql = "SELECT c.*, m.project_slug FROM capabilities c JOIN missions m ON c.mission_id = m.id WHERE 1=1";
+  const params: any[] = [];
+  if (projectSlug) { sql += ' AND m.project_slug = ?'; params.push(projectSlug); }
+  const caps = db.prepare(sql).all(...params) as any[];
+  return caps.map((cap: any) => {
+    let featureGate: any = {};
+    try { featureGate = JSON.parse(cap.feature_gate || '{}'); } catch { /* ignore */ }
+    return {
+      id: `cap-${cap.id}`,
+      project_slug: cap.project_slug,
+      task_id: null,
+      flag_name: cap.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || cap.id,
+      state: cap.status === 'active' ? 'on' : 'off',
+      toggled_by: null,
+      toggled_at: cap.updated_at,
+      created_at: cap.created_at,
+      expires_at: featureGate?.expires_at || null,
+      allowed_user_ids: featureGate?.user_ids ? JSON.stringify(featureGate.user_ids) : null,
+      _source: 'capability',
+      _capability_id: cap.id,
+    };
+  });
+}
+
 // POST / — create flag (contributor)
 featureFlagsRouter.post('/', requireProjectAccess('contributor'), (req: Request, res: Response) => {
   const { slug } = req.params;
@@ -50,17 +76,19 @@ featureFlagsRouter.get('/', requireProjectAccess('viewer'), (req: Request, res: 
   const { state } = req.query;
   const db = getDb();
 
-  let sql = 'SELECT * FROM feature_flags WHERE project_slug = ?';
-  const params: any[] = [slug];
+  const sql = 'SELECT * FROM feature_flags WHERE project_slug = ? ORDER BY created_at DESC';
+  const flags = db.prepare(sql).all(slug) as any[];
+
+  // Append capability-derived flags (compat layer)
+  const capFlags = capabilitiesAsFlags(db, slug);
+  const existingNames = new Set(flags.map((f: any) => f.flag_name));
+  let merged = [...flags, ...capFlags.filter(cf => !existingNames.has(cf.flag_name))];
 
   if (state) {
-    sql += ' AND state = ?';
-    params.push(state);
+    merged = merged.filter((f: any) => f.state === state);
   }
 
-  sql += ' ORDER BY created_at DESC';
-  const flags = db.prepare(sql).all(...params);
-  res.status(200).json(flags);
+  res.status(200).json(merged);
 });
 
 // GET /export — export all flags for project (YAML or JSON)

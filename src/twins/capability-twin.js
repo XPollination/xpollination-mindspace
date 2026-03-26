@@ -38,6 +38,13 @@ export function validateCapability(twin) {
     errors.push('sort_order must be >= 0');
   }
 
+  // Self-deploying capability warnings for active capabilities
+  if (twin.status === 'active') {
+    if (!twin.config) warnings.push('Active capability missing config');
+    if (!twin.activation) warnings.push('Active capability missing activation');
+    if (!twin.rollback_plan) warnings.push('Active capability missing rollback_plan');
+  }
+
   // CapabilityInterface v1.0: check required sections
   const md = twin.content_md || '';
   const missing = md ? CAPABILITY_SECTIONS.filter(s => !md.match(new RegExp('##\\s+.*' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) : CAPABILITY_SECTIONS;
