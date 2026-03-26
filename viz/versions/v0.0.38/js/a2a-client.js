@@ -32,13 +32,20 @@ export class A2AClient {
     if (saved) {
       try {
         const { agentId, sessionId } = JSON.parse(saved);
-        this._agentId = agentId;
-        this._sessionId = sessionId;
-        this._connected = true;
-        this._openStream();
-        this._emit('connected', { agent_id: agentId, session_id: sessionId });
-        return { agent_id: agentId, session_id: sessionId, reconnect: true };
-      } catch { /* corrupted storage, reconnect fresh */ }
+        // Validate session is still alive before reusing
+        const check = await fetch(`/a2a/stream/${agentId}`, { method: 'HEAD' }).catch(() => null);
+        if (check && check.ok) {
+          this._agentId = agentId;
+          this._sessionId = sessionId;
+          this._connected = true;
+          this._openStream();
+          this._emit('connected', { agent_id: agentId, session_id: sessionId });
+          return { agent_id: agentId, session_id: sessionId, reconnect: true };
+        } else {
+          // Stale session — agent no longer exists. Clear and reconnect fresh.
+          sessionStorage.removeItem(storageKey);
+        }
+      } catch { sessionStorage.removeItem(storageKey); }
     }
 
     const browserName = 'browser-' + (sessionStorage.getItem('a2a_browser_id') || (() => {
@@ -226,6 +233,7 @@ export class A2AClient {
 
     this._eventSource.addEventListener('connected', (e) => {
       this._connected = true;
+      this._reconnectAttempts = 0; // Reset on successful connection
       this._emit('stream_connected', JSON.parse(e.data));
     });
 
@@ -251,19 +259,28 @@ export class A2AClient {
 
     this._eventSource.onerror = () => {
       this._connected = false;
-      this._emit('error', { message: 'SSE connection lost' });
+      this._reconnectAttempts = (this._reconnectAttempts || 0) + 1;
+      // If too many reconnects, the session is probably dead — clear and stop
+      if (this._reconnectAttempts > 10) {
+        this._emit('error', { message: 'SSE connection failed after 10 attempts — clearing session' });
+        if (this._projectSlug) sessionStorage.removeItem(`a2a_session_${this._projectSlug}`);
+        this._eventSource.close();
+        return;
+      }
       this._scheduleReconnect();
     };
   }
 
   _scheduleReconnect() {
     if (this._reconnectTimer) return;
+    // Exponential backoff: 5s, 10s, 20s, 30s max
+    const delay = Math.min(this._reconnectDelay * Math.pow(1.5, (this._reconnectAttempts || 1) - 1), 30000);
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
       if (!this._connected && this._agentId) {
         this._openStream();
       }
-    }, this._reconnectDelay);
+    }, delay);
   }
 
   _cleanup() {
