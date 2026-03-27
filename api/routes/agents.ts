@@ -264,17 +264,8 @@ agentsRouter.get('/processes', (req: Request, res: Response) => {
   res.status(200).json({ count: agents.length, agents });
 });
 
-// GET /api/agents/:id — get agent by id (catch-all — MUST be last)
-agentsRouter.get('/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const db = getDb();
-  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
-  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
-  res.status(200).json(agent);
-});
-
-// GET /api/agents/me/liaison — check if user's LIAISON is running
-agentsRouter.get('/me/liaison', requireApiKeyOrJwt, (req: Request, res: Response) => {
+// GET /api/agents/me/liaison — check if user's LIAISON is running (MUST be before /:id)
+agentsRouter.get('/me/liaison', (req: Request, res: Response) => {
   const user = (req as any).user;
   const userId = user?.id || user?.sub;
   const sessionName = `agent-liaison-${userId}`;
@@ -285,6 +276,15 @@ agentsRouter.get('/me/liaison', requireApiKeyOrJwt, (req: Request, res: Response
   } catch {
     res.json({ running: false, sessionName, role: 'liaison', userId });
   }
+});
+
+// GET /api/agents/:id — get agent by id (catch-all — MUST be last)
+agentsRouter.get('/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const db = getDb();
+  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
+  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+  res.status(200).json(agent);
 });
 
 // POST /api/agents/start — create per-user tmux session + start Claude Code agent
