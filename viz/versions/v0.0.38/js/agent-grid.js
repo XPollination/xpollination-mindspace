@@ -115,7 +115,7 @@ class AgentGrid extends HTMLElement {
       if (Array.isArray(data) && data.length > 0) {
         this._agents = data.map(a => ({
           role: a.current_role || 'dev',
-          sessionName: `agent-${a.current_role || 'dev'}-${a.id.slice(0, 8)}`,
+          sessionName: `agent-${a.current_role || 'dev'}-${a.user_id || a.id}`,
           agentId: a.id,
         }));
         this._renderAgents();
