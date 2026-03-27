@@ -82,7 +82,7 @@ If sandbox MCP is unavailable, note 'L3 verification skipped' and use L1+L2 only
 MCP_FLAG=""
 if [ -n "$SANDBOX_URL" ] && [ "$SANDBOX_URL" != "disabled" ]; then
   cat > /tmp/mcp-sandbox-${USER_ID}.json <<MCPEOF
-{"mcpServers":{"sandbox":{"type":"url","url":"${SANDBOX_URL}/mcp"}}}
+{"mcpServers":{"sandbox":{"type":"http","url":"${SANDBOX_URL}/mcp"}}}
 MCPEOF
   MCP_FLAG="--mcp-config /tmp/mcp-sandbox-${USER_ID}.json"
   echo "▸ Sandbox MCP: ${SANDBOX_URL}"
