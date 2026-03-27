@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" font-family="system-ui, sans-serif">
+  <title>Twin Query Model — What Is Tested, What Is in Production</title>
+  <desc>
+    AGENT-READABLE: The A2A server maintains a graph of twin relationships. Query patterns:
+    (1) Forward: Mission → Capabilities → Tasks → Reports — "show me all test evidence for this mission"
+    (2) Reverse: Report → Task → Capability → Mission — "which mission does this test prove?"
+    (3) Release: Release twin → bundles capabilities at specific versions → each version linked to
+    passing report → "what is deployed and is it tested?"
+    (4) Gap: capabilities without passing reports = untested features in develop
+    The graph enables continuous traceability from intent to evidence.
+  </desc>
+
+  <rect width="900" height="420" fill="#0d1117" rx="8"/>
+  <text x="450" y="28" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Twin Query Model — "What's Tested? What's in Prod?"</text>
+
+  <!-- Forward query -->
+  <rect x="30" y="55" width="410" height="160" rx="8" fill="#161b22" stroke="#3fb950"/>
+  <text x="235" y="78" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Forward Query: Mission → Evidence</text>
+  <text x="50" y="100" fill="#8b949e" font-size="10">"Show me all test evidence for LIAISON Setup UX"</text>
+
+  <rect x="50" y="112" width="80" height="28" rx="4" fill="#0d2818" stroke="#3fb950"/>
+  <text x="90" y="130" fill="#3fb950" font-size="9" text-anchor="middle">Mission</text>
+  <line x1="130" y1="126" x2="148" y2="126" stroke="#3fb950" stroke-width="1.5"/>
+
+  <rect x="148" y="112" width="70" height="28" rx="4" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="183" y="130" fill="#58a6ff" font-size="9" text-anchor="middle">3 CAPs</text>
+  <line x1="218" y1="126" x2="236" y2="126" stroke="#58a6ff" stroke-width="1.5"/>
+
+  <rect x="236" y="112" width="70" height="28" rx="4" fill="#161b22" stroke="#30363d"/>
+  <text x="271" y="130" fill="#c9d1d9" font-size="9" text-anchor="middle">5 Tasks</text>
+  <line x1="306" y1="126" x2="324" y2="126" stroke="#d29922" stroke-width="1.5"/>
+
+  <rect x="324" y="112" width="96" height="28" rx="4" fill="#2d1b00" stroke="#d29922"/>
+  <text x="372" y="130" fill="#d29922" font-size="9" text-anchor="middle">8 Reports</text>
+
+  <text x="50" y="165" fill="#c9d1d9" font-size="9">Result: 8 reports across 3 iterations. 3 PASS, 3 FAIL, 2 PARTIAL.</text>
+  <text x="50" y="180" fill="#c9d1d9" font-size="9">Latest passing: iteration 3, 2026-03-27, 13 screenshots total.</text>
+  <text x="50" y="195" fill="#8b949e" font-size="9">The mission is proven: every capability has a passing report.</text>
+
+  <!-- Reverse query -->
+  <rect x="460" y="55" width="410" height="160" rx="8" fill="#161b22" stroke="#d29922"/>
+  <text x="665" y="78" fill="#d29922" font-size="12" font-weight="700" text-anchor="middle">Reverse Query: Report → Mission</text>
+  <text x="480" y="100" fill="#8b949e" font-size="10">"Which mission does report /r/a1b2c3d4 prove?"</text>
+
+  <rect x="480" y="112" width="80" height="28" rx="4" fill="#2d1b00" stroke="#d29922"/>
+  <text x="520" y="130" fill="#d29922" font-size="9" text-anchor="middle">Report</text>
+  <line x1="560" y1="126" x2="578" y2="126" stroke="#d29922" stroke-width="1.5"/>
+
+  <rect x="578" y="112" width="70" height="28" rx="4" fill="#161b22" stroke="#30363d"/>
+  <text x="613" y="130" fill="#c9d1d9" font-size="9" text-anchor="middle">Task</text>
+  <line x1="648" y1="126" x2="666" y2="126" stroke="#58a6ff" stroke-width="1.5"/>
+
+  <rect x="666" y="112" width="70" height="28" rx="4" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="701" y="130" fill="#58a6ff" font-size="9" text-anchor="middle">CAP-1</text>
+  <line x1="736" y1="126" x2="754" y2="126" stroke="#3fb950" stroke-width="1.5"/>
+
+  <rect x="754" y="112" width="96" height="28" rx="4" fill="#0d2818" stroke="#3fb950"/>
+  <text x="802" y="130" fill="#3fb950" font-size="9" text-anchor="middle">Mission</text>
+
+  <text x="480" y="165" fill="#c9d1d9" font-size="9">Result: Report proves Task "implement _ensureLiaison()"</text>
+  <text x="480" y="180" fill="#c9d1d9" font-size="9">→ part of CAP-1 "SessionStorage Guard"</text>
+  <text x="480" y="195" fill="#c9d1d9" font-size="9">→ part of Mission "LIAISON Setup UX"</text>
+
+  <!-- Release query -->
+  <rect x="30" y="235" width="410" height="160" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <text x="235" y="258" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Release Query: "What's in Prod?"</text>
+  <text x="50" y="280" fill="#8b949e" font-size="10">"What capabilities are in v0.3.0 and are they tested?"</text>
+
+  <rect x="50" y="295" width="370" height="85" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="60" y="313" fill="#c9d1d9" font-size="9" font-weight="600">Release v0.3.0 (prod, tagged 2026-03-28)</text>
+
+  <text x="60" y="332" fill="#3fb950" font-size="9">CAP-1 Guard v1.0.0</text>
+  <text x="250" y="332" fill="#3fb950" font-size="9">report /r/... PASS (iter 3)</text>
+  <text x="400" y="332" fill="#3fb950" font-size="9" text-anchor="end">5 screenshots</text>
+
+  <text x="60" y="348" fill="#3fb950" font-size="9">CAP-2 Setup v1.0.0</text>
+  <text x="250" y="348" fill="#3fb950" font-size="9">report /r/... PASS (iter 3)</text>
+  <text x="400" y="348" fill="#3fb950" font-size="9" text-anchor="end">3 screenshots</text>
+
+  <text x="60" y="364" fill="#3fb950" font-size="9">CAP-3 Detect v1.0.0</text>
+  <text x="250" y="364" fill="#3fb950" font-size="9">report /r/... PASS (iter 2)</text>
+  <text x="400" y="364" fill="#3fb950" font-size="9" text-anchor="end">2 screenshots</text>
+
+  <!-- Gap query -->
+  <rect x="460" y="235" width="410" height="160" rx="8" fill="#161b22" stroke="#f85149"/>
+  <text x="665" y="258" fill="#f85149" font-size="12" font-weight="700" text-anchor="middle">Gap Query: "What's Untested?"</text>
+  <text x="480" y="280" fill="#8b949e" font-size="10">"What's on develop without a passing report?"</text>
+
+  <rect x="480" y="295" width="370" height="85" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="490" y="313" fill="#c9d1d9" font-size="9" font-weight="600">develop branch (unreleased)</text>
+
+  <text x="490" y="332" fill="#f85149" font-size="9">CAP-4 Terminal Fix</text>
+  <text x="680" y="332" fill="#f85149" font-size="9">NO REPORT</text>
+  <text x="830" y="332" fill="#f85149" font-size="9" text-anchor="end">untested</text>
+
+  <text x="490" y="348" fill="#d29922" font-size="9">CAP-5 SSE Dedup</text>
+  <text x="680" y="348" fill="#d29922" font-size="9">report /r/... PARTIAL</text>
+  <text x="830" y="348" fill="#d29922" font-size="9" text-anchor="end">3/4 checks</text>
+
+  <text x="490" y="364" fill="#3fb950" font-size="9">CAP-6 Monitor Skill</text>
+  <text x="680" y="364" fill="#3fb950" font-size="9">report /r/... PASS</text>
+  <text x="830" y="364" fill="#3fb950" font-size="9" text-anchor="end">ready</text>
+
+  <text x="490" y="383" fill="#f85149" font-size="9" font-weight="600">2 untested/partial — cannot release until resolved</text>
+
+  <text x="450" y="415" fill="#484f58" font-size="8" text-anchor="middle">MISSION-TWIN-PROVENANCE v1 | 2026-03-27</text>
+</svg>
