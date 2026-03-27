@@ -11,8 +11,8 @@
 #   docker compose -f docker-compose.prod.yml -f docker-compose.sandbox.yml up -d
 #   npm run start:sandbox
 #
-# Alternative: set SANDBOX_URL in .env to use a hosted sandbox:
-#   SANDBOX_URL=https://sandbox.xp0.ai  (no local container needed)
+# Each station runs its own sandbox (xp0 decentralization principle).
+# SANDBOX_URL in .env points to the station's local sandbox worker.
 
 services:
   aio-sandbox:
