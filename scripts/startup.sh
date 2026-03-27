@@ -73,6 +73,33 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Step 0.5: Wait for AIO Sandbox (optional — graceful degradation)
+# ---------------------------------------------------------------------------
+# Browser + MCP for agent Level 3 (visual) verification.
+# Agents can navigate, screenshot, and click via MCP tools.
+# If unavailable, agents fall back to Level 1 + Level 2 checks only.
+
+SANDBOX_URL="${SANDBOX_URL:-}"
+if [ -n "$SANDBOX_URL" ] && [ "$SANDBOX_URL" != "disabled" ]; then
+  echo "▸ Step 0.5: Checking AIO Sandbox at $SANDBOX_URL..."
+  SANDBOX_READY=0
+  for i in $(seq 1 10); do
+    if curl -sf "${SANDBOX_URL}/v1/sandbox" > /dev/null 2>&1; then
+      echo "  ✓ AIO Sandbox ready — L3 browser verification available"
+      SANDBOX_READY=1
+      break
+    fi
+    echo "  Attempt $i/10 — waiting 3s..."
+    sleep 3
+  done
+  if [ "$SANDBOX_READY" -eq 0 ]; then
+    echo "  ⚠ AIO Sandbox not reachable — L3 verification unavailable"
+    echo "    Agents will use Level 1 + Level 2 verification only."
+  fi
+  echo ""
+fi
+
+# ---------------------------------------------------------------------------
 # Step 1: Database migrations
 # ---------------------------------------------------------------------------
 echo "▸ Step 1: Running database migrations..."

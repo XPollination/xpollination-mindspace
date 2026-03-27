@@ -10,6 +10,10 @@
 # Usage:
 #   docker compose -f docker-compose.test.yml up -d --build
 #   npm run start:test
+#
+# AIO Sandbox: browser + MCP for agent L3 visual verification.
+# Agents call sandbox MCP tools to navigate, screenshot, click.
+# Sandbox browser reaches mindspace-test via Docker DNS on beta-net.
 
 services:
   mindspace-test:
@@ -37,6 +41,7 @@ services:
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
       - BRAIN_AGENT_KEY=xpo-agent-dev-33c65662-ccc8-4fd4-9f65-7277ba639cdf
+      - SANDBOX_URL=http://aio-sandbox:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -47,6 +52,32 @@ services:
       start_period: 30s
     networks:
       - beta-net
+    restart: unless-stopped
+
+  aio-sandbox:
+    image: ghcr.io/agent-infra/sandbox:latest
+    container_name: mindspace-sandbox
+    security_opt:
+      - seccomp:unconfined
+    shm_size: "2gb"
+    mem_limit: "2g"
+    cpus: "1.0"
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - TZ=Europe/Vienna
+      - DISABLE_JUPYTER=true
+      - DISABLE_CODE_SERVER=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - beta-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/sandbox || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
 

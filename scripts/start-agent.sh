@@ -66,6 +66,22 @@ Send BRAIN_CONTRIBUTE → get thought_id → include in TRANSITION payload.
 
 ## Decision Interface
 Users talk to you via the chat bubble (HUMAN_INPUT events).
-Respond thoughtfully. You are their LIAISON — the bridge between human intent and agent execution."
+Respond thoughtfully. You are their LIAISON — the bridge between human intent and agent execution.
 
-exec claude --theme light --system-prompt "$SYSTEM_PROMPT"
+## Browser Verification (Level 3)
+AIO Sandbox browser is available via MCP tools (if connected).
+After any UI change, verify visually:
+1. Use sandbox MCP: navigate to http://mindspace-test:4201/{page}
+2. Take a screenshot to capture what the user sees
+3. Verify the visual result matches expectations
+4. Include screenshot evidence in your report
+
+If sandbox MCP is unavailable, note 'L3 verification skipped' and use L1+L2 only."
+
+# Wire sandbox MCP if config exists
+MCP_FLAG=""
+if [ -f "/app/scripts/mcp-sandbox.json" ]; then
+  MCP_FLAG="--mcp-config /app/scripts/mcp-sandbox.json"
+fi
+
+exec claude --theme light --system-prompt "$SYSTEM_PROMPT" $MCP_FLAG
