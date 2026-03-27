@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "sandbox": {
-      "type": "url",
+      "type": "http",
       "url": "http://aio-sandbox:8080/mcp"
     }
   }
