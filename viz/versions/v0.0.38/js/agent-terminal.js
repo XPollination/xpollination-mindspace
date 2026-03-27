@@ -78,12 +78,15 @@ class AgentTerminal extends HTMLElement {
     this._ws = ws;
 
     ws.onopen = () => {
-      // Send initial size
       const { cols, rows } = term;
       ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+      term.write('\x1b[36mConnecting to agent session...\x1b[0m\r\n');
+      term.write('\x1b[90mWaiting for Claude to authenticate.\x1b[0m\r\n');
     };
 
+    let firstData = true;
     ws.onmessage = (e) => {
+      if (firstData) { term.clear(); firstData = false; }
       term.write(e.data);
     };
 

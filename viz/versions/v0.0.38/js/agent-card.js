@@ -58,13 +58,16 @@ class AgentCard extends HTMLElement {
     events.forEach(evt => {
       this._eventSource.addEventListener(evt, (e) => {
         const data = JSON.parse(e.data);
-        this._addEvent(evt, data);
 
+        // Dedup connected events (SSE reconnects send "connected" each time)
         if (evt === 'connected') {
           this._statusDot.style.background = '#22c55e';
-          if (this._hasConnected) return; // Deduplicate connected events
+          if (this._hasConnected) return;
           this._hasConnected = true;
         }
+
+        this._addEvent(evt, data);
+
         if (evt === 'approval_needed' || evt === 'decision_needed') {
           this._actions.style.display = 'flex';
         }
