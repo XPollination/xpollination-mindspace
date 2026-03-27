@@ -40,7 +40,14 @@ You ARE this role now. All your work, contributions, and transitions use this id
 
 ## Step 2: Recover from Memory
 
-The shared memory holds everything you need: your role definition, workflow knowledge, current task state, decisions, and learnings from previous sessions.
+<!-- CMM4 ITERATION (2026-03-27): Replaced 3 generic recovery queries with 4 layered queries.
+     DATA: Original queries returned self-echoes (5x state_snapshot of own query text) due to
+     highway reinforcement. Human bypass rate was 100% — Thomas stopped using the skill.
+     FIX: Gardener's AGENT ONBOARDING MAP (thought c7cd8d02) prescribes targeted queries that
+     hit consolidated domain summaries instead of echo noise. Each layer query has a distinct
+     semantic signature that does not match its own stored text. -->
+
+Recovery follows 4 layers, each answering a specific question. Query them in order.
 
 **Health check first:**
 ```bash
@@ -53,26 +60,41 @@ If healthy, generate a session ID and query:
 ```bash
 SESSION_ID=$(cat /proc/sys/kernel/random/uuid)
 AUTH_HDR="Authorization: Bearer $BRAIN_API_KEY"
+ROLE_UPPER=$(echo $ARGUMENTS | tr a-z A-Z)
 
-# Query 1: Your role and recovery knowledge
+# LAYER 1 — WHO AM I (role identity, boundaries, documented violations)
 curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "$AUTH_HDR" \
-  -d "{\"prompt\": \"Recovery protocol and role definition for $ARGUMENTS agent. What are my responsibilities and what are the latest operational learnings?\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"read_only\": true}"
+  -d "{\"prompt\": \"DOMAIN SUMMARY $ARGUMENTS-role-identity\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$ROLE_UPPER\", \"session_id\": \"$SESSION_ID\", \"read_only\": true, \"full_content\": true}"
 
-# Query 2: Current task state and recent decisions
+# LAYER 2 — HOW DOES WORK FLOW (workflow, transitions, A2A, hard gates)
 curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "$AUTH_HDR" \
-  -d "{\"prompt\": \"Current task state, recent decisions, and in-flight work across all projects\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"read_only\": true}"
+  -d "{\"prompt\": \"CMM4 hard gates workflow A2A protocol task lifecycle\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$ROLE_UPPER\", \"session_id\": \"$SESSION_ID\", \"read_only\": true, \"full_content\": true}"
 
-# Query 3: In-flight task recovery (transition markers)
+# LAYER 3 — WHAT IS HAPPENING NOW (current tasks from PM system, not brain)
+# Brain cannot reliably store current task state — use the PM system directly.
+CLI=/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js
+for DB_REL in xpollination-mcp-server/data/xpollination.db HomePage/data/xpollination.db; do
+  DB_PATH="/home/developer/workspaces/github/PichlerThomas/$DB_REL"
+  if [ -f "$DB_PATH" ]; then
+    DATABASE_PATH="$DB_PATH" node $CLI list --role=$ARGUMENTS 2>/dev/null
+  fi
+done
+
+# LAYER 4 — HOW DO I OPERATE (git protocol, brain API, operational mechanics)
 curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
   -H "Content-Type: application/json" -H "$AUTH_HDR" \
-  -d "{\"prompt\": \"TASK START or TASK BLOCKED markers for $(echo $ARGUMENTS | tr a-z A-Z) agent — any interrupted or in-progress tasks\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$(echo $ARGUMENTS | tr a-z A-Z)\", \"session_id\": \"$SESSION_ID\", \"read_only\": true}"
+  -d "{\"prompt\": \"git protocol branching rules commit conventions\", \"agent_id\": \"agent-$ARGUMENTS\", \"agent_name\": \"$ROLE_UPPER\", \"session_id\": \"$SESSION_ID\", \"read_only\": true, \"full_content\": true}"
 ```
 
-**Read the results.** Memory returns `result.sources` (knowledge) and `result.highways_nearby` (most-trafficked paths). Use these to understand your situation.
+**Read the results.** Each layer gives you one piece of the picture:
+- **Layer 1** tells you who you are and what you must never do
+- **Layer 2** tells you how the 4-agent system works
+- **Layer 3** tells you what tasks are currently assigned to your role
+- **Layer 4** tells you how to use git and the brain API
 
-**If memory is down:** Fall back to `~/.claude/CLAUDE.md` and project CLAUDE.md. Scan PM system directly.
+**If memory is down:** Fall back to `~/.claude/CLAUDE.md` and project CLAUDE.md. Scan PM system directly using the CLI commands from Layer 3.
 
 ## Step 3: Start Background Monitor
 
