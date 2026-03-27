@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 500" font-family="system-ui, sans-serif">
+  <title>Test Report Lifecycle — Every Loop Ends with Documentation</title>
+  <desc>
+    AGENT-READABLE: CMM3 defined process. Every PDSA iteration loop ends with a test report.
+    Flow: Agent implements → deploys to beta → AIO Sandbox captures screenshots → agent creates
+    test report with structured fields (what was tested, screenshots, pass/fail per check,
+    verification level reached) → report stored in DB with short_id → accessible at /r/shortId →
+    linked to the task/capability that produced it. The report IS the evidence that the loop closed.
+  </desc>
+
+  <rect width="1100" height="500" fill="#0d1117" rx="8"/>
+  <text x="550" y="30" fill="#3fb950" font-size="16" font-weight="700" text-anchor="middle">Test Report Lifecycle — Every Loop Ends with Documentation</text>
+  <text x="550" y="50" fill="#8b949e" font-size="11" text-anchor="middle">CMM3: The process is defined. The output is standardized. The evidence is permanent.</text>
+
+  <!-- PDSA Loop -->
+  <rect x="30" y="70" width="240" height="400" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="150" y="95" fill="#c9d1d9" font-size="13" font-weight="700" text-anchor="middle">PDSA Loop</text>
+
+  <!-- Plan -->
+  <rect x="50" y="110" width="200" height="40" rx="6" fill="#0d2240" stroke="#58a6ff"/>
+  <text x="150" y="130" fill="#58a6ff" font-size="11" font-weight="600" text-anchor="middle">PLAN</text>
+  <text x="150" y="143" fill="#8b949e" font-size="9" text-anchor="middle">Mission + capabilities defined</text>
+
+  <line x1="150" y1="150" x2="150" y2="165" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="146,163 150,170 154,163" fill="#3fb950"/>
+
+  <!-- Do -->
+  <rect x="50" y="170" width="200" height="40" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="150" y="190" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">DO</text>
+  <text x="150" y="203" fill="#8b949e" font-size="9" text-anchor="middle">Agent implements + deploys to beta</text>
+
+  <line x1="150" y1="210" x2="150" y2="225" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="146,223 150,230 154,223" fill="#3fb950"/>
+
+  <!-- Study -->
+  <rect x="50" y="230" width="200" height="55" rx="6" fill="#1c2333" stroke="#d29922" stroke-width="2"/>
+  <text x="150" y="250" fill="#d29922" font-size="11" font-weight="700" text-anchor="middle">STUDY</text>
+  <text x="150" y="265" fill="#c9d1d9" font-size="9" text-anchor="middle">Sandbox browser → screenshots</text>
+  <text x="150" y="278" fill="#d29922" font-size="9" font-weight="600" text-anchor="middle">TEST REPORT CREATED HERE</text>
+
+  <line x1="150" y1="285" x2="150" y2="300" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="146,298 150,305 154,298" fill="#3fb950"/>
+
+  <!-- Act -->
+  <rect x="50" y="305" width="200" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="150" y="325" fill="#c9d1d9" font-size="11" font-weight="600" text-anchor="middle">ACT</text>
+  <text x="150" y="338" fill="#8b949e" font-size="9" text-anchor="middle">Fix issues or approve for prod</text>
+
+  <!-- Loop arrow -->
+  <line x1="50" y1="345" x2="30" y2="345" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="30" y1="345" x2="30" y2="130" stroke="#8b949e" stroke-width="1.5"/>
+  <line x1="30" y1="130" x2="50" y2="130" stroke="#8b949e" stroke-width="1.5"/>
+  <polygon points="48,125 55,130 48,135" fill="#8b949e"/>
+  <text x="35" y="240" fill="#484f58" font-size="8" transform="rotate(-90, 35, 240)">next iteration</text>
+
+  <!-- Arrow: Study → Report -->
+  <line x1="250" y1="257" x2="310" y2="257" stroke="#d29922" stroke-width="2"/>
+  <polygon points="308,252 315,257 308,262" fill="#d29922"/>
+
+  <!-- TEST REPORT structure -->
+  <rect x="315" y="80" width="400" height="390" rx="8" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+  <rect x="315" y="80" width="400" height="35" rx="8" fill="#2d1b00"/>
+  <rect x="315" y="107" width="400" height="8" fill="#2d1b00"/>
+  <text x="515" y="103" fill="#d29922" font-size="14" font-weight="700" text-anchor="middle">Test Report — /r/a1b2c3d4</text>
+
+  <!-- Report fields -->
+  <text x="335" y="140" fill="#c9d1d9" font-size="11" font-weight="600">Header</text>
+  <rect x="335" y="148" width="360" height="55" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="345" y="165" fill="#8b949e" font-size="10">title: "LIAISON Setup UX — Iteration 1"</text>
+  <text x="345" y="180" fill="#8b949e" font-size="10">task_ref: mission-liaison-setup | status: pass/fail</text>
+  <text x="345" y="195" fill="#8b949e" font-size="10">tested_by: LIAISON | date: 2026-03-27 | version: v0.0.38</text>
+
+  <text x="335" y="220" fill="#c9d1d9" font-size="11" font-weight="600">Verification Checks</text>
+  <rect x="335" y="228" width="360" height="85" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="345" y="245" fill="#3fb950" font-size="10">L1 grep: cb_liaison_authenticated (3 refs)</text>
+  <text x="680" y="245" fill="#3fb950" font-size="10" text-anchor="end">PASS</text>
+  <text x="345" y="261" fill="#3fb950" font-size="10">L2 curl: GET /me/liaison → { running: false }</text>
+  <text x="680" y="261" fill="#3fb950" font-size="10" text-anchor="end">PASS</text>
+  <text x="345" y="277" fill="#f85149" font-size="10">L3 browser: /agents terminal renders</text>
+  <text x="680" y="277" fill="#f85149" font-size="10" text-anchor="end">FAIL</text>
+  <text x="345" y="293" fill="#f85149" font-size="10">L3 browser: no SSE event flood</text>
+  <text x="680" y="293" fill="#f85149" font-size="10" text-anchor="end">FAIL</text>
+  <rect x="345" y="300" width="340" height="8" rx="2" fill="#30363d"/>
+  <rect x="345" y="300" width="170" height="8" rx="2" fill="#d29922"/>
+  <text x="515" y="298" fill="#d29922" font-size="8" text-anchor="middle">2/4 passed (50%)</text>
+
+  <text x="335" y="330" fill="#c9d1d9" font-size="11" font-weight="600">Screenshots</text>
+  <rect x="335" y="338" width="110" height="70" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="390" y="368" fill="#484f58" font-size="9" text-anchor="middle">step1.png</text>
+  <text x="390" y="380" fill="#3fb950" font-size="8" text-anchor="middle">chat bubble</text>
+
+  <rect x="455" y="338" width="110" height="70" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="510" y="368" fill="#484f58" font-size="9" text-anchor="middle">step2.png</text>
+  <text x="510" y="380" fill="#3fb950" font-size="8" text-anchor="middle">setup message</text>
+
+  <rect x="575" y="338" width="110" height="70" rx="4" fill="#0d1117" stroke="#f85149"/>
+  <text x="630" y="368" fill="#484f58" font-size="9" text-anchor="middle">step3.png</text>
+  <text x="630" y="380" fill="#f85149" font-size="8" text-anchor="middle">black terminal</text>
+
+  <text x="335" y="430" fill="#c9d1d9" font-size="11" font-weight="600">Findings</text>
+  <rect x="335" y="438" width="360" height="22" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="345" y="453" fill="#8b949e" font-size="9">Terminal black: no tmux data. SSE flood: connected event dedup before _addEvent</text>
+
+  <!-- Arrow: Report → Storage -->
+  <line x1="715" y1="270" x2="770" y2="270" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="768,265 775,270 768,275" fill="#3fb950"/>
+
+  <!-- Storage + URL -->
+  <rect x="775" y="120" width="290" height="180" rx="8" fill="#161b22" stroke="#3fb950"/>
+  <text x="920" y="148" fill="#3fb950" font-size="13" font-weight="700" text-anchor="middle">Permanent Record</text>
+
+  <rect x="795" y="160" width="250" height="30" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="920" y="180" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">/r/a1b2c3d4</text>
+
+  <text x="795" y="210" fill="#8b949e" font-size="10">DB: reports table</text>
+  <text x="795" y="226" fill="#8b949e" font-size="10">  short_id, title, content_md</text>
+  <text x="795" y="242" fill="#8b949e" font-size="10">  task_ref, mission_ref</text>
+  <text x="795" y="258" fill="#8b949e" font-size="10">  screenshots (JSON array of paths)</text>
+  <text x="795" y="274" fill="#8b949e" font-size="10">  checks (JSON: level, name, pass/fail)</text>
+  <text x="795" y="290" fill="#8b949e" font-size="10">  overall_status: pass | fail | partial</text>
+
+  <!-- Hierarchy link -->
+  <rect x="775" y="320" width="290" height="65" rx="6" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="920" y="345" fill="#58a6ff" font-size="11" font-weight="600" text-anchor="middle">Linked to Hierarchy</text>
+  <text x="795" y="365" fill="#8b949e" font-size="10">Mission /m/756ae11a → Report /r/a1b2c3d4</text>
+  <text x="795" y="380" fill="#8b949e" font-size="10">Task ms-liaison-setup → Report /r/a1b2c3d4</text>
+
+  <!-- Version -->
+  <text x="1060" y="490" fill="#484f58" font-size="8" text-anchor="end">MISSION-TEST-REPORTS v1 | 2026-03-27</text>
+</svg>
