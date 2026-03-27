@@ -91,4 +91,4 @@ elif [ -f "/app/scripts/mcp-sandbox.json" ]; then
   echo "▸ Sandbox MCP: from static config"
 fi
 
-exec claude --theme light --system-prompt "$SYSTEM_PROMPT" $MCP_FLAG
+exec claude --system-prompt "$SYSTEM_PROMPT" $MCP_FLAG
