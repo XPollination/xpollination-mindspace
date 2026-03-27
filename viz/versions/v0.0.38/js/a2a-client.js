@@ -22,13 +22,41 @@ export class A2AClient {
     this._connected = false;
   }
 
-  /** Connect to A2A server. JWT from ms_session cookie is sent automatically by the browser. */
+  /** Connect to A2A server. Reuses existing session if available. */
   async connect(projectSlug) {
     this._projectSlug = projectSlug;
 
+    // Reuse existing session from sessionStorage (prevents zombie agents on page reload)
+    const storageKey = `a2a_session_${projectSlug}`;
+    const saved = sessionStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const { agentId, sessionId } = JSON.parse(saved);
+        // Validate session is still alive before reusing
+        const check = await fetch(`/a2a/stream/${agentId}`, { method: 'HEAD' }).catch(() => null);
+        if (check && check.ok) {
+          this._agentId = agentId;
+          this._sessionId = sessionId;
+          this._connected = true;
+          this._openStream();
+          this._emit('connected', { agent_id: agentId, session_id: sessionId });
+          return { agent_id: agentId, session_id: sessionId, reconnect: true };
+        } else {
+          // Stale session — agent no longer exists. Clear and reconnect fresh.
+          sessionStorage.removeItem(storageKey);
+        }
+      } catch { sessionStorage.removeItem(storageKey); }
+    }
+
+    const browserName = 'browser-' + (sessionStorage.getItem('a2a_browser_id') || (() => {
+      const id = (crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : String(Date.now()));
+      sessionStorage.setItem('a2a_browser_id', id);
+      return id;
+    })());
+
     const twin = {
       identity: {
-        agent_name: 'browser-' + (crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now()),
+        agent_name: browserName,
         session_id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       },
       role: {
@@ -58,6 +86,9 @@ export class A2AClient {
     this._agentId = data.agent_id;
     this._sessionId = data.session_id;
     this._connected = true;
+
+    // Save session for reuse on page navigations
+    sessionStorage.setItem(storageKey, JSON.stringify({ agentId: data.agent_id, sessionId: data.session_id }));
 
     // Open SSE stream for push updates
     this._openStream();
@@ -121,6 +152,19 @@ export class A2AClient {
     return data;
   }
 
+  /** Send arbitrary A2A message */
+  async send(type, payload = {}) {
+    if (!this._agentId) throw new Error('Not connected. Call connect() first.');
+    const res = await fetch('/a2a/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: this._agentId, type, ...payload }),
+    });
+    const data = await res.json();
+    if (data.type === 'ERROR') throw new Error(`${type} failed: ${data.error}`);
+    return data;
+  }
+
   /** Send heartbeat */
   async heartbeat() {
     if (!this._agentId) return;
@@ -152,6 +196,10 @@ export class A2AClient {
       });
     } catch { /* silent */ }
 
+    // Clear saved session
+    if (this._projectSlug) {
+      sessionStorage.removeItem(`a2a_session_${this._projectSlug}`);
+    }
     this._cleanup();
   }
 
@@ -185,6 +233,7 @@ export class A2AClient {
 
     this._eventSource.addEventListener('connected', (e) => {
       this._connected = true;
+      this._reconnectAttempts = 0; // Reset on successful connection
       this._emit('stream_connected', JSON.parse(e.data));
     });
 
@@ -210,19 +259,28 @@ export class A2AClient {
 
     this._eventSource.onerror = () => {
       this._connected = false;
-      this._emit('error', { message: 'SSE connection lost' });
+      this._reconnectAttempts = (this._reconnectAttempts || 0) + 1;
+      // If too many reconnects, the session is probably dead — clear and stop
+      if (this._reconnectAttempts > 10) {
+        this._emit('error', { message: 'SSE connection failed after 10 attempts — clearing session' });
+        if (this._projectSlug) sessionStorage.removeItem(`a2a_session_${this._projectSlug}`);
+        this._eventSource.close();
+        return;
+      }
       this._scheduleReconnect();
     };
   }
 
   _scheduleReconnect() {
     if (this._reconnectTimer) return;
+    // Exponential backoff: 5s, 10s, 20s, 30s max
+    const delay = Math.min(this._reconnectDelay * Math.pow(1.5, (this._reconnectAttempts || 1) - 1), 30000);
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
       if (!this._connected && this._agentId) {
         this._openStream();
       }
-    }, this._reconnectDelay);
+    }, delay);
   }
 
   _cleanup() {

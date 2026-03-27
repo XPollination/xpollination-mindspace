@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 600" font-family="system-ui, sans-serif">
+  <title>LIAISON Setup — Full User Journey</title>
+  <desc>
+    AGENT-READABLE: End-to-end flow of the LIAISON setup UX. 5 steps:
+    1. User visits page → chat bubble appears → _ensureLiaison() finds no session
+    2. User clicks bubble → panel opens → POST /api/agents/start → setup message with "Complete setup →" link → sessionStorage cb_liaison_setup_shown=true
+    3. User clicks link → /agents page → terminal shows Claude OAuth URL → user clicks URL → new tab opens
+    4. User authorizes on claude.ai → Claude activates → /xpo.claude.monitor liaison → A2A connected event → sessionStorage cb_liaison_authenticated=true
+    5. User returns to any page → cb_liaison_authenticated check passes → no setup → chat works
+    The entire flow happens once per user. SessionStorage guards prevent repetition.
+  </desc>
+
+  <rect width="1100" height="600" fill="#0d1117" rx="8"/>
+  <text x="550" y="30" fill="#3fb950" font-size="16" font-weight="700" text-anchor="middle">LIAISON Setup — Complete User Journey</text>
+  <text x="550" y="50" fill="#8b949e" font-size="11" text-anchor="middle">One-time guided flow: 30 seconds from first click to working chat</text>
+
+  <!-- ═══════════════ STEP 1 ═══════════════ -->
+  <rect x="30" y="70" width="190" height="220" rx="8" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+  <rect x="30" y="70" width="190" height="30" rx="8" fill="#21262d"/>
+  <rect x="30" y="92" width="190" height="8" fill="#21262d"/>
+  <text x="125" y="90" fill="#58a6ff" font-size="11" font-weight="700" text-anchor="middle">Step 1</text>
+
+  <!-- Mini browser -->
+  <rect x="45" y="110" width="160" height="90" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <rect x="45" y="110" width="160" height="14" rx="4" fill="#21262d"/>
+  <text x="125" y="120" fill="#484f58" font-size="6" text-anchor="middle">/projects</text>
+  <rect x="55" y="130" width="60" height="50" rx="2" fill="#161b22" stroke="#30363d"/>
+  <rect x="120" y="130" width="75" height="50" rx="2" fill="#161b22" stroke="#30363d"/>
+  <!-- Chat bubble -->
+  <circle cx="186" cy="185" r="10" fill="#ea580c"/>
+  <text x="186" y="189" fill="#fff" font-size="8" text-anchor="middle">&#x1f4ac;</text>
+
+  <text x="125" y="218" fill="#c9d1d9" font-size="10" font-weight="600" text-anchor="middle">Visit any page</text>
+  <text x="125" y="233" fill="#8b949e" font-size="8" text-anchor="middle">Bubble appears</text>
+  <text x="125" y="246" fill="#8b949e" font-size="8" text-anchor="middle">LIAISON: not running</text>
+  <rect x="60" y="254" width="130" height="16" rx="4" fill="#f85149" opacity="0.15"/>
+  <text x="125" y="265" fill="#f85149" font-size="8" text-anchor="middle">running: false</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="220" y1="180" x2="246" y2="180" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="244,175 252,180 244,185" fill="#3fb950"/>
+  <text x="236" y="170" fill="#d29922" font-size="8" text-anchor="middle">click</text>
+
+  <!-- ═══════════════ STEP 2 ═══════════════ -->
+  <rect x="252" y="70" width="190" height="220" rx="8" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+  <rect x="252" y="70" width="190" height="30" rx="8" fill="#21262d"/>
+  <rect x="252" y="92" width="190" height="8" fill="#21262d"/>
+  <text x="347" y="90" fill="#58a6ff" font-size="11" font-weight="700" text-anchor="middle">Step 2</text>
+
+  <!-- Chat panel open -->
+  <rect x="267" y="110" width="160" height="130" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <rect x="267" y="110" width="160" height="16" rx="6" fill="#21262d"/>
+  <text x="280" y="120" fill="#c9d1d9" font-size="7" font-weight="600">Decision Interface</text>
+  <!-- Setup message -->
+  <rect x="274" y="132" width="146" height="45" rx="4" fill="#0d2818" stroke="#3fb950"/>
+  <text x="284" y="144" fill="#3fb950" font-size="7" font-weight="600">LIAISON starting.</text>
+  <text x="284" y="155" fill="#3fb950" font-size="7">Authenticating with Claude...</text>
+  <text x="284" y="170" fill="#58a6ff" font-size="8" font-weight="700" text-decoration="underline">Complete setup &#x2192;</text>
+  <!-- Input -->
+  <rect x="267" y="225" width="160" height="14" rx="0" fill="#21262d"/>
+  <text x="275" y="234" fill="#484f58" font-size="6">Type a message...</text>
+
+  <text x="347" y="258" fill="#c9d1d9" font-size="10" font-weight="600" text-anchor="middle">Setup message</text>
+  <text x="347" y="271" fill="#8b949e" font-size="8" text-anchor="middle">Shows ONCE per session</text>
+  <rect x="275" y="276" width="144" height="10" rx="3" fill="#d29922" opacity="0.15"/>
+  <text x="347" y="284" fill="#d29922" font-size="7" text-anchor="middle">cb_liaison_setup_shown = true</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="442" y1="180" x2="468" y2="180" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="466,175 474,180 466,185" fill="#3fb950"/>
+  <text x="458" y="170" fill="#d29922" font-size="8" text-anchor="middle">click</text>
+  <text x="458" y="194" fill="#8b949e" font-size="7" text-anchor="middle">link</text>
+
+  <!-- ═══════════════ STEP 3 ═══════════════ -->
+  <rect x="474" y="70" width="190" height="220" rx="8" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+  <rect x="474" y="70" width="190" height="30" rx="8" fill="#21262d"/>
+  <rect x="474" y="92" width="190" height="8" fill="#21262d"/>
+  <text x="569" y="90" fill="#58a6ff" font-size="11" font-weight="700" text-anchor="middle">Step 3</text>
+
+  <!-- Agents page with terminal -->
+  <rect x="489" y="110" width="160" height="130" rx="4" fill="#0d1117" stroke="#f5c2e7"/>
+  <rect x="489" y="110" width="160" height="16" rx="4" fill="#21262d"/>
+  <circle cx="500" cy="118" r="3" fill="#d29922"/>
+  <text x="510" y="121" fill="#f5c2e7" font-size="7" font-weight="600">LIAISON</text>
+  <text x="636" y="121" fill="#484f58" font-size="6" text-anchor="end">Starting</text>
+  <!-- Terminal -->
+  <rect x="495" y="130" width="148" height="100" rx="3" fill="#0d1117" stroke="#30363d"/>
+  <text x="502" y="142" fill="#d29922" font-size="6" font-family="monospace">To authenticate, visit:</text>
+  <rect x="499" y="148" width="140" height="12" rx="2" fill="#1c2333"/>
+  <text x="502" y="157" fill="#58a6ff" font-size="6" font-family="monospace" text-decoration="underline">https://claude.ai/oauth/...</text>
+  <text x="502" y="175" fill="#8b949e" font-size="6" font-family="monospace">Waiting for auth...</text>
+
+  <text x="569" y="258" fill="#c9d1d9" font-size="10" font-weight="600" text-anchor="middle">/agents terminal</text>
+  <text x="569" y="271" fill="#8b949e" font-size="8" text-anchor="middle">OAuth URL visible</text>
+  <text x="569" y="284" fill="#58a6ff" font-size="8" text-anchor="middle">User clicks URL</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="664" y1="180" x2="690" y2="180" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="688,175 696,180 688,185" fill="#3fb950"/>
+  <text x="680" y="170" fill="#d29922" font-size="8" text-anchor="middle">auth</text>
+
+  <!-- ═══════════════ STEP 4 ═══════════════ -->
+  <rect x="696" y="70" width="190" height="220" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <rect x="696" y="70" width="190" height="30" rx="8" fill="#0d2818"/>
+  <rect x="696" y="92" width="190" height="8" fill="#0d2818"/>
+  <text x="791" y="90" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">Step 4</text>
+
+  <!-- Terminal: success -->
+  <rect x="711" y="110" width="160" height="130" rx="4" fill="#0d1117" stroke="#3fb950"/>
+  <rect x="711" y="110" width="160" height="16" rx="4" fill="#0d2818"/>
+  <circle cx="722" cy="118" r="3" fill="#3fb950"/>
+  <text x="732" y="121" fill="#f5c2e7" font-size="7" font-weight="600">LIAISON</text>
+  <text x="860" y="121" fill="#3fb950" font-size="6" text-anchor="end">Connected</text>
+  <!-- Terminal content -->
+  <rect x="717" y="130" width="148" height="100" rx="3" fill="#0d1117" stroke="#30363d"/>
+  <text x="724" y="142" fill="#3fb950" font-size="6" font-family="monospace">&#x2713; Auth successful</text>
+  <text x="724" y="155" fill="#c9d1d9" font-size="6" font-family="monospace">Claude Code ready.</text>
+  <text x="724" y="170" fill="#58a6ff" font-size="6" font-family="monospace">&#x276f; /xpo.claude.monitor</text>
+  <text x="724" y="183" fill="#c9d1d9" font-size="6" font-family="monospace">Recovering LIAISON...</text>
+  <text x="724" y="198" fill="#3fb950" font-size="6" font-family="monospace">LIAISON active. A2A &#x2713;</text>
+
+  <text x="791" y="258" fill="#c9d1d9" font-size="10" font-weight="600" text-anchor="middle">Claude activates</text>
+  <text x="791" y="271" fill="#8b949e" font-size="8" text-anchor="middle">A2A connected event</text>
+  <rect x="715" y="276" width="152" height="10" rx="3" fill="#3fb950" opacity="0.15"/>
+  <text x="791" y="284" fill="#3fb950" font-size="7" text-anchor="middle">cb_liaison_authenticated = true</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="886" y1="180" x2="912" y2="180" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="910,175 918,180 910,185" fill="#3fb950"/>
+  <text x="900" y="170" fill="#d29922" font-size="8" text-anchor="middle">nav</text>
+
+  <!-- ═══════════════ STEP 5 ═══════════════ -->
+  <rect x="918" y="70" width="160" height="220" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <rect x="918" y="70" width="160" height="30" rx="8" fill="#0d2818"/>
+  <rect x="918" y="92" width="160" height="8" fill="#0d2818"/>
+  <text x="998" y="90" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">Step 5</text>
+
+  <!-- Working chat -->
+  <rect x="933" y="110" width="130" height="130" rx="6" fill="#0d1117" stroke="#3fb950"/>
+  <rect x="933" y="110" width="130" height="16" rx="6" fill="#0d2818"/>
+  <text x="943" y="120" fill="#c9d1d9" font-size="6" font-weight="600">Decision Interface</text>
+  <circle cx="1050" cy="118" r="3" fill="#3fb950"/>
+  <!-- Conversation -->
+  <rect x="965" y="132" width="90" height="18" rx="4" fill="#1c2333"/>
+  <text x="972" y="143" fill="#58a6ff" font-size="6">Pending tasks?</text>
+  <rect x="940" y="155" width="110" height="24" rx="4" fill="#161b22" stroke="#30363d"/>
+  <text x="947" y="165" fill="#f5c2e7" font-size="6">3 tasks in review</text>
+  <text x="947" y="175" fill="#8b949e" font-size="6">ms-chat, ms-terminal...</text>
+  <rect x="970" y="185" width="85" height="18" rx="4" fill="#1c2333"/>
+  <text x="977" y="196" fill="#58a6ff" font-size="6">Approve all</text>
+  <rect x="940" y="208" width="100" height="14" rx="4" fill="#0d2818"/>
+  <text x="947" y="218" fill="#3fb950" font-size="6">&#x2713; Done!</text>
+
+  <text x="998" y="258" fill="#3fb950" font-size="10" font-weight="700" text-anchor="middle">Chat works!</text>
+  <text x="998" y="271" fill="#8b949e" font-size="8" text-anchor="middle">No setup message</text>
+  <text x="998" y="284" fill="#8b949e" font-size="8" text-anchor="middle">ever again</text>
+
+  <!-- ═══════════════ BOTTOM: SESSION STORAGE STATE ═══════════════ -->
+  <rect x="30" y="310" width="1048" height="80" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="554" y="332" fill="#c9d1d9" font-size="12" font-weight="700" text-anchor="middle">sessionStorage State Across Steps</text>
+
+  <!-- Step 1 state -->
+  <text x="125" y="352" fill="#f85149" font-size="9" text-anchor="middle">Step 1</text>
+  <text x="125" y="366" fill="#484f58" font-size="8" text-anchor="middle">empty</text>
+
+  <text x="236" y="359" fill="#30363d" font-size="12" text-anchor="middle">&#x2192;</text>
+
+  <!-- Step 2 state -->
+  <text x="347" y="352" fill="#d29922" font-size="9" text-anchor="middle">Step 2</text>
+  <text x="347" y="366" fill="#d29922" font-size="7" text-anchor="middle">setup_shown=true</text>
+  <text x="347" y="378" fill="#8b949e" font-size="7" text-anchor="middle">session + agent_id</text>
+
+  <text x="458" y="359" fill="#30363d" font-size="12" text-anchor="middle">&#x2192;</text>
+
+  <!-- Step 3 state -->
+  <text x="569" y="352" fill="#d29922" font-size="9" text-anchor="middle">Step 3</text>
+  <text x="569" y="366" fill="#d29922" font-size="7" text-anchor="middle">setup_shown=true</text>
+  <text x="569" y="378" fill="#8b949e" font-size="7" text-anchor="middle">(unchanged)</text>
+
+  <text x="680" y="359" fill="#30363d" font-size="12" text-anchor="middle">&#x2192;</text>
+
+  <!-- Step 4 state -->
+  <text x="791" y="352" fill="#3fb950" font-size="9" text-anchor="middle">Step 4</text>
+  <text x="791" y="366" fill="#3fb950" font-size="7" text-anchor="middle">authenticated=true</text>
+  <text x="791" y="378" fill="#8b949e" font-size="7" text-anchor="middle">setup complete</text>
+
+  <text x="900" y="359" fill="#30363d" font-size="12" text-anchor="middle">&#x2192;</text>
+
+  <!-- Step 5 state -->
+  <text x="998" y="352" fill="#3fb950" font-size="9" text-anchor="middle">Step 5+</text>
+  <text x="998" y="366" fill="#3fb950" font-size="7" text-anchor="middle">authenticated=true</text>
+  <text x="998" y="378" fill="#3fb950" font-size="7" text-anchor="middle">all future visits</text>
+
+  <!-- ═══════════════ BOTTOM: KEY PRINCIPLES ═══════════════ -->
+  <rect x="30" y="405" width="340" height="82" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="200" y="425" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">UX Principles</text>
+  <text x="50" y="442" fill="#c9d1d9" font-size="9">&#x2022; Setup message appears exactly ONCE</text>
+  <text x="50" y="456" fill="#c9d1d9" font-size="9">&#x2022; ONE actionable link, not instructions</text>
+  <text x="50" y="470" fill="#c9d1d9" font-size="9">&#x2022; OAuth happens where the terminal IS</text>
+  <text x="50" y="484" fill="#c9d1d9" font-size="9">&#x2022; 30 seconds total from first click to working</text>
+
+  <rect x="390" y="405" width="340" height="82" rx="6" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="560" y="425" fill="#58a6ff" font-size="11" font-weight="700" text-anchor="middle">Technical Scope</text>
+  <text x="410" y="442" fill="#c9d1d9" font-size="9">&#x2022; Frontend-only: chat-bubble.js</text>
+  <text x="410" y="456" fill="#c9d1d9" font-size="9">&#x2022; No backend changes required</text>
+  <text x="410" y="470" fill="#c9d1d9" font-size="9">&#x2022; sessionStorage guards (2 keys)</text>
+  <text x="410" y="484" fill="#c9d1d9" font-size="9">&#x2022; One new method: _addSetupMessage()</text>
+
+  <rect x="750" y="405" width="328" height="82" rx="6" fill="#161b22" stroke="#d29922"/>
+  <text x="914" y="425" fill="#d29922" font-size="11" font-weight="700" text-anchor="middle">Edge Cases</text>
+  <text x="770" y="442" fill="#c9d1d9" font-size="9">&#x2022; New browser session + running agent = instant</text>
+  <text x="770" y="456" fill="#c9d1d9" font-size="9">&#x2022; Server restart + new session = setup again</text>
+  <text x="770" y="470" fill="#c9d1d9" font-size="9">&#x2022; Multiple tabs: first tab shows setup</text>
+  <text x="770" y="484" fill="#c9d1d9" font-size="9">&#x2022; Second tab skips (sessionStorage shared)</text>
+
+  <!-- Version -->
+  <text x="1060" y="590" fill="#484f58" font-size="8" text-anchor="end">MISSION-LIAISON-SETUP v1 | 2026-03-27</text>
+</svg>

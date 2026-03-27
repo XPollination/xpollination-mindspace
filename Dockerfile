@@ -63,6 +63,20 @@ COPY --from=builder /app/src/twins ./src/twins
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/docs ./docs
 
+# Install tmux + curl for persistent agent terminal sessions and A2A connectivity
+RUN apt-get update && apt-get install -y --no-install-recommends tmux curl && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code globally (agents use Max Plan OAuth — no API key needed)
+RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code install deferred to startup (self-healing)"
+
+# Pre-configure Claude Code defaults (template — per-user dirs created at runtime)
+RUN mkdir -p /home/node/.claude && \
+    echo '{"theme":"light","telemetry":false,"hasCompletedOnboarding":true}' > /home/node/.claude/settings.json && \
+    chown -R node:node /home/node/.claude
+
+# Copy A2A agent scripts needed at runtime
+COPY --from=builder /app/src/a2a ./src/a2a
+
 # Create data directory and set ownership to node user (UID 1000).
 # This prevents SQLite "readonly database" errors when /app/data is bind-mounted.
 # Without this, migrations create files as root and the node process can't write.

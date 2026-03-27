@@ -11,7 +11,7 @@
     "@theia/workspace": "~1.69.0",
     "@theia/navigator": "~1.69.0",
     "@theia/search-in-workspace": "~1.69.0",
-    "@theia/git": "~1.69.0",
+
     "@theia/preferences": "~1.69.0",
     "@theia/markers": "~1.69.0",
     "@theia/outline-view": "~1.69.0",

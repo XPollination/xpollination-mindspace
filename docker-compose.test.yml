@@ -45,4 +45,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - beta-net
     restart: unless-stopped
+
+
+networks:
+  beta-net:
+    driver: bridge

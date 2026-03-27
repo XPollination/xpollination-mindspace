@@ -409,6 +409,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // /ide → redirect to /agents (Theia replaced by custom terminal)
+  if (pathname.startsWith('/ide')) {
+    res.writeHead(302, { 'Location': '/agents' });
+    res.end();
+    return;
+  }
+
   // /agents route: Agent OS management page
   if (pathname === '/agents') {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
@@ -474,6 +481,29 @@ const server = http.createServer(async (req, res) => {
 });
 
 const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
+
+// WebSocket upgrade proxy for terminal connections → API server
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+  if (url.pathname.startsWith('/ws/terminal/')) {
+    const proxyReq = http.request({
+      hostname: 'localhost', port: API_PORT, path: url.pathname,
+      method: 'GET', headers: { ...req.headers, host: `localhost:${API_PORT}` }
+    });
+    proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+      socket.write('HTTP/1.1 101 Switching Protocols\r\n' +
+        Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n') +
+        '\r\n\r\n');
+      proxySocket.pipe(socket);
+      socket.pipe(proxySocket);
+    });
+    proxyReq.on('error', () => socket.destroy());
+    proxyReq.end();
+  } else {
+    socket.destroy();
+  }
+});
+
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Viz server running at http://${BIND_HOST}:${PORT} (Model B — browser as A2A client)`);
   console.log(`Static root: ${__dirname}`);
