@@ -60,6 +60,11 @@ class AgentTerminal extends HTMLElement {
     term.loadAddon(fitAddon);
     term.open(container);
 
+    // Placeholder immediately — terminal is rendered, connection hasn't started
+    term.write('\x1b[36m  Connecting to agent session...\x1b[0m\r\n\r\n');
+    term.write('\x1b[90m  Waiting for Claude to authenticate.\x1b[0m\r\n');
+    term.write('\x1b[90m  If this is a new session, complete OAuth in the terminal.\x1b[0m\r\n');
+
     // Fit after a tick (container needs to be rendered)
     requestAnimationFrame(() => {
       fitAddon.fit();
@@ -78,10 +83,9 @@ class AgentTerminal extends HTMLElement {
     this._ws = ws;
 
     ws.onopen = () => {
+      this._hasConnected = true;
       const { cols, rows } = term;
       ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-      term.write('\x1b[36mConnecting to agent session...\x1b[0m\r\n');
-      term.write('\x1b[90mWaiting for Claude to authenticate.\x1b[0m\r\n');
     };
 
     let firstData = true;
@@ -91,7 +95,14 @@ class AgentTerminal extends HTMLElement {
     };
 
     ws.onclose = () => {
-      term.write('\r\n\x1b[33m[disconnected — reconnecting...]\x1b[0m\r\n');
+      if (!this._hasConnected) {
+        term.clear();
+        term.write('\x1b[36m  Agent session not ready.\x1b[0m\r\n\r\n');
+        term.write('\x1b[90m  The agent will appear here after authentication.\x1b[0m\r\n');
+        term.write('\x1b[90m  Retrying...\x1b[0m\r\n');
+      } else {
+        term.write('\r\n\x1b[33m  [disconnected — reconnecting...]\x1b[0m\r\n');
+      }
       setTimeout(() => this._connectWS(term, sessionName, fitAddon), 3000);
     };
 
