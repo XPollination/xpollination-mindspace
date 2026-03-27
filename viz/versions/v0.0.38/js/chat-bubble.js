@@ -57,14 +57,6 @@ class ChatBubble extends HTMLElement {
     this._decisionsEl = this.querySelector('.cb-decisions');
     this._messagesEl = this.querySelector('.cb-messages');
     // Restore persisted messages from previous page
-    this._messages.forEach(msg => {
-      const div = document.createElement("div");
-      div.style.cssText = "padding:4px 0;font-size:12px;border-bottom:1px solid var(--ms-border,#f1f5f9);";
-      div.innerHTML = `<span style="color:${msg.color || "#94a3b8"};font-weight:bold;font-size:10px;">${msg.from}</span> <span>${msg.text}</span>`;
-      this._messagesEl.appendChild(div);
-    });
-
-    // Restore persisted messages from previous page
     this._restoreMessages();
 
     // Toggle panel
@@ -125,6 +117,12 @@ class ChatBubble extends HTMLElement {
       this._client.on('transition', (data) => {
         this._addMessage('System', `${data.task_slug} → ${data.to_status}`, '#94a3b8');
       });
+
+      this._client.on('stream_connected', (data) => {
+        if (data.role === 'liaison') {
+          sessionStorage.setItem('cb_liaison_authenticated', 'true');
+        }
+      });
     } catch (err) {
       console.warn('[chat-bubble] A2A connect failed:', err.message);
       // Fallback: use raw SSE with special liaison-chat ID
@@ -178,28 +176,63 @@ class ChatBubble extends HTMLElement {
   }
 
   async _ensureLiaison() {
+    // Guard: already authenticated this session — just fetch routing info
+    if (sessionStorage.getItem('cb_liaison_authenticated') === 'true') {
+      try {
+        const res = await fetch('/api/agents/me/liaison');
+        const data = await res.json();
+        if (data.running) {
+          sessionStorage.setItem('cb_liaison_session', data.sessionName);
+          sessionStorage.setItem('cb_liaison_agent_id', data.agentId || data.sessionName);
+        }
+      } catch { /* best-effort */ }
+      return;
+    }
+
     try {
       const res = await fetch('/api/agents/me/liaison');
       const data = await res.json();
+
       if (data.running) {
+        // Already running — mark authenticated, no setup needed
         sessionStorage.setItem('cb_liaison_session', data.sessionName);
         sessionStorage.setItem('cb_liaison_agent_id', data.agentId || data.sessionName);
+        sessionStorage.setItem('cb_liaison_authenticated', 'true');
         return;
       }
-      // Not running — auto-start
-      this._addMessage('System', 'Starting LIAISON...', '#94a3b8');
+
+      // Not running — auto-start, show ONE setup message
+      if (sessionStorage.getItem('cb_liaison_setup_shown')) return;
+
       const start = await fetch('/api/agents/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'liaison' }),
       });
       const agent = await start.json();
+
       if (start.ok) {
         sessionStorage.setItem('cb_liaison_session', agent.sessionName);
         sessionStorage.setItem('cb_liaison_agent_id', agent.agentId || agent.sessionName);
-        this._addMessage('System', `LIAISON ${agent.status}. Open Agents page to complete setup.`, '#22c55e');
+        sessionStorage.setItem('cb_liaison_setup_shown', 'true');
+        this._addSetupMessage(agent.status);
       }
-    } catch { /* ignore — LIAISON check is best-effort */ }
+    } catch { /* best-effort */ }
+  }
+
+  _addSetupMessage(status) {
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px;font-size:12px;background:var(--ms-surface,#f0fdf4);border:1px solid var(--ms-border,#86efac);border-radius:8px;margin:4px 0;';
+    div.innerHTML = `
+      <div style="color:var(--ms-text,#166534);font-weight:600;margin-bottom:4px;">
+        LIAISON ${status === 'starting' ? 'starting' : 'ready'}. Authenticating with Claude...
+      </div>
+      <a href="/agents" style="color:var(--ms-accent,#2563eb);font-weight:600;text-decoration:none;">
+        Complete setup &rarr;
+      </a>
+    `;
+    this._messagesEl.appendChild(div);
+    this._messagesEl.scrollTop = this._messagesEl.scrollHeight;
   }
 
   _addMessage(from, text, color) {
