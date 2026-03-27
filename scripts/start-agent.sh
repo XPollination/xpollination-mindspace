@@ -78,10 +78,17 @@ After any UI change, verify visually:
 
 If sandbox MCP is unavailable, note 'L3 verification skipped' and use L1+L2 only."
 
-# Wire sandbox MCP if config exists
+# Wire sandbox MCP if SANDBOX_URL is configured (station capability)
 MCP_FLAG=""
-if [ -f "/app/scripts/mcp-sandbox.json" ]; then
+if [ -n "$SANDBOX_URL" ] && [ "$SANDBOX_URL" != "disabled" ]; then
+  cat > /tmp/mcp-sandbox-${USER_ID}.json <<MCPEOF
+{"mcpServers":{"sandbox":{"type":"url","url":"${SANDBOX_URL}/mcp"}}}
+MCPEOF
+  MCP_FLAG="--mcp-config /tmp/mcp-sandbox-${USER_ID}.json"
+  echo "▸ Sandbox MCP: ${SANDBOX_URL}"
+elif [ -f "/app/scripts/mcp-sandbox.json" ]; then
   MCP_FLAG="--mcp-config /app/scripts/mcp-sandbox.json"
+  echo "▸ Sandbox MCP: from static config"
 fi
 
 exec claude --theme light --system-prompt "$SYSTEM_PROMPT" $MCP_FLAG
