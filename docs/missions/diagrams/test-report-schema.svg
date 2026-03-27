@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" font-family="system-ui, sans-serif">
+  <title>Test Report Schema — Database + URL + Hierarchy</title>
+  <desc>
+    AGENT-READABLE: reports table schema: id TEXT PK, short_id TEXT UNIQUE (8-char hex),
+    project_slug TEXT, title TEXT, content_md TEXT (markdown with embedded screenshots),
+    status TEXT (pass/fail/partial), task_ref TEXT (slug of tested task), mission_ref TEXT
+    (mission id), capability_ref TEXT, checks TEXT (JSON array of verification checks),
+    screenshots TEXT (JSON array of {path, caption, level}), tested_by TEXT (agent role),
+    iteration INTEGER (PDSA loop count), created_at TEXT. URL: /r/shortId renders via
+    knowledge.html same as /m/ and /c/. The report is a first-class object in the hierarchy
+    alongside missions, capabilities, requirements, and tasks.
+  </desc>
+
+  <rect width="900" height="400" fill="#0d1117" rx="8"/>
+  <text x="450" y="28" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Test Report — Schema and Hierarchy Position</text>
+
+  <!-- reports table -->
+  <rect x="30" y="50" width="380" height="330" rx="8" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+  <rect x="30" y="50" width="380" height="30" rx="8" fill="#2d1b00"/>
+  <rect x="30" y="72" width="380" height="8" fill="#2d1b00"/>
+  <text x="220" y="70" fill="#d29922" font-size="12" font-weight="700" text-anchor="middle">reports</text>
+
+  <!-- Columns -->
+  <text x="50" y="100" fill="#58a6ff" font-size="10" font-weight="600">id</text>
+  <text x="200" y="100" fill="#8b949e" font-size="10">TEXT PK</text>
+  <text x="320" y="100" fill="#484f58" font-size="9">UUID</text>
+
+  <text x="50" y="118" fill="#d29922" font-size="10" font-weight="600">short_id</text>
+  <text x="200" y="118" fill="#8b949e" font-size="10">TEXT UNIQUE</text>
+  <text x="320" y="118" fill="#484f58" font-size="9">8-char hex</text>
+
+  <text x="50" y="136" fill="#c9d1d9" font-size="10">project_slug</text>
+  <text x="200" y="136" fill="#8b949e" font-size="10">TEXT NOT NULL</text>
+
+  <text x="50" y="154" fill="#c9d1d9" font-size="10">title</text>
+  <text x="200" y="154" fill="#8b949e" font-size="10">TEXT NOT NULL</text>
+
+  <text x="50" y="172" fill="#c9d1d9" font-size="10">content_md</text>
+  <text x="200" y="172" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="172" fill="#484f58" font-size="9">markdown</text>
+
+  <text x="50" y="190" fill="#3fb950" font-size="10" font-weight="600">status</text>
+  <text x="200" y="190" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="190" fill="#484f58" font-size="9">pass | fail | partial</text>
+
+  <text x="50" y="208" fill="#c9d1d9" font-size="10">task_ref</text>
+  <text x="200" y="208" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="208" fill="#484f58" font-size="9">FK → tasks.slug</text>
+
+  <text x="50" y="226" fill="#c9d1d9" font-size="10">mission_ref</text>
+  <text x="200" y="226" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="226" fill="#484f58" font-size="9">FK → missions.id</text>
+
+  <text x="50" y="244" fill="#c9d1d9" font-size="10">capability_ref</text>
+  <text x="200" y="244" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="244" fill="#484f58" font-size="9">FK → capabilities.id</text>
+
+  <text x="50" y="262" fill="#d29922" font-size="10" font-weight="600">checks</text>
+  <text x="200" y="262" fill="#8b949e" font-size="10">TEXT (JSON)</text>
+  <text x="320" y="262" fill="#484f58" font-size="9">[{level,name,pass}]</text>
+
+  <text x="50" y="280" fill="#d29922" font-size="10" font-weight="600">screenshots</text>
+  <text x="200" y="280" fill="#8b949e" font-size="10">TEXT (JSON)</text>
+  <text x="320" y="280" fill="#484f58" font-size="9">[{path,caption}]</text>
+
+  <text x="50" y="298" fill="#c9d1d9" font-size="10">tested_by</text>
+  <text x="200" y="298" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="298" fill="#484f58" font-size="9">agent role</text>
+
+  <text x="50" y="316" fill="#c9d1d9" font-size="10">iteration</text>
+  <text x="200" y="316" fill="#8b949e" font-size="10">INTEGER</text>
+  <text x="320" y="316" fill="#484f58" font-size="9">PDSA loop #</text>
+
+  <text x="50" y="334" fill="#c9d1d9" font-size="10">created_at</text>
+  <text x="200" y="334" fill="#8b949e" font-size="10">TEXT</text>
+  <text x="320" y="334" fill="#484f58" font-size="9">ISO 8601</text>
+
+  <line x1="50" y1="348" x2="390" y2="348" stroke="#30363d"/>
+  <text x="50" y="366" fill="#d29922" font-size="10" font-weight="600">URL: /r/{short_id}</text>
+  <text x="200" y="366" fill="#8b949e" font-size="10">renders via knowledge.html</text>
+
+  <!-- Hierarchy position -->
+  <rect x="460" y="50" width="410" height="330" rx="8" fill="#161b22" stroke="#3fb950"/>
+  <text x="665" y="75" fill="#3fb950" font-size="13" font-weight="700" text-anchor="middle">Hierarchy Position</text>
+
+  <!-- Mission -->
+  <rect x="520" y="95" width="180" height="35" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="610" y="112" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">Mission /m/</text>
+  <text x="610" y="124" fill="#8b949e" font-size="9" text-anchor="middle">LIAISON Setup UX</text>
+
+  <line x1="610" y1="130" x2="610" y2="148" stroke="#3fb950" stroke-width="1.5"/>
+
+  <!-- Capability -->
+  <rect x="520" y="148" width="180" height="35" rx="6" fill="#161b22" stroke="#58a6ff"/>
+  <text x="610" y="165" fill="#58a6ff" font-size="11" font-weight="600" text-anchor="middle">Capability /c/</text>
+  <text x="610" y="177" fill="#8b949e" font-size="9" text-anchor="middle">SessionStorage Guard</text>
+
+  <line x1="610" y1="183" x2="610" y2="198" stroke="#3fb950" stroke-width="1.5"/>
+
+  <!-- Requirement -->
+  <rect x="520" y="198" width="180" height="35" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="610" y="215" fill="#bc8cff" font-size="11" font-weight="600" text-anchor="middle">Requirement</text>
+  <text x="610" y="227" fill="#8b949e" font-size="9" text-anchor="middle">Setup shows once per session</text>
+
+  <line x1="610" y1="233" x2="610" y2="248" stroke="#3fb950" stroke-width="1.5"/>
+
+  <!-- Task -->
+  <rect x="520" y="248" width="180" height="35" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="610" y="265" fill="#c9d1d9" font-size="11" font-weight="600" text-anchor="middle">Task</text>
+  <text x="610" y="277" fill="#8b949e" font-size="9" text-anchor="middle">Implement _ensureLiaison()</text>
+
+  <!-- Report (new!) -->
+  <line x1="700" y1="265" x2="740" y2="265" stroke="#d29922" stroke-width="2"/>
+  <line x1="740" y1="265" x2="740" y2="310" stroke="#d29922" stroke-width="2"/>
+  <line x1="740" y1="310" x2="720" y2="310" stroke="#d29922" stroke-width="2"/>
+  <polygon points="722,305 715,310 722,315" fill="#d29922"/>
+
+  <rect x="480" y="295" width="240" height="40" rx="8" fill="#2d1b00" stroke="#d29922" stroke-width="2"/>
+  <text x="600" y="315" fill="#d29922" font-size="12" font-weight="700" text-anchor="middle">Test Report /r/  NEW</text>
+  <text x="600" y="328" fill="#8b949e" font-size="9" text-anchor="middle">Iteration 1: 2/4 checks, 3 screenshots</text>
+
+  <!-- Multiple reports per task -->
+  <rect x="480" y="345" width="240" height="25" rx="4" fill="#161b22" stroke="#d29922" stroke-dasharray="4,3"/>
+  <text x="600" y="362" fill="#484f58" font-size="9" text-anchor="middle">Iteration 2: 4/4 checks, 5 screenshots</text>
+
+  <!-- CMM3 principle -->
+  <rect x="750" y="130" width="100" height="100" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="800" y="155" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">CMM3</text>
+  <text x="800" y="175" fill="#8b949e" font-size="9" text-anchor="middle">Defined</text>
+  <text x="800" y="190" fill="#8b949e" font-size="9" text-anchor="middle">Process</text>
+  <text x="800" y="210" fill="#c9d1d9" font-size="8" text-anchor="middle">Every loop</text>
+  <text x="800" y="222" fill="#c9d1d9" font-size="8" text-anchor="middle">produces a</text>
+  <text x="800" y="234" fill="#d29922" font-size="9" font-weight="600" text-anchor="middle">report</text>
+</svg>
