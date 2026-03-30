@@ -91,4 +91,21 @@ elif [ -f "/app/scripts/mcp-sandbox.json" ]; then
   echo "▸ Sandbox MCP: from static config"
 fi
 
+# Background monitor: detect OAuth URL in terminal, relay to chat bubble via A2A
+# The body helps the soul communicate during bootstrap
+SESSION_NAME="agent-${ROLE}-${USER_ID}"
+(
+  for i in $(seq 1 60); do
+    sleep 2
+    OUTPUT=$(tmux capture-pane -t "$SESSION_NAME" -p 2>/dev/null | tr -d '\n')
+    OAUTH_URL=$(echo "$OUTPUT" | grep -oP 'https://claude\.com/\S+')
+    if [ -n "$OAUTH_URL" ]; then
+      curl -s -X POST "${API_URL}/a2a/message" \
+        -H "Content-Type: application/json" \
+        -d "{\"agent_id\":\"${AGENT_ID}\",\"type\":\"HUMAN_INPUT\",\"text\":\"Authorize Claude to complete setup: ${OAUTH_URL}\"}" > /dev/null 2>&1
+      break
+    fi
+  done
+) &
+
 exec claude --system-prompt "$SYSTEM_PROMPT" $MCP_FLAG
