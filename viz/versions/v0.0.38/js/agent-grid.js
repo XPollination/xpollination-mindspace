@@ -56,7 +56,7 @@ class AgentGrid extends HTMLElement {
       termBtn.style.color = '#fff';
       dashBtn.style.background = 'none';
       dashBtn.style.color = 'var(--ms-text,#1e293b)';
-      this._grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(500px,1fr))';
+      this._grid.style.gridTemplateColumns = '1fr';
     }
 
     this._renderAgents();
@@ -101,7 +101,7 @@ class AgentGrid extends HTMLElement {
         const term = document.createElement('agent-terminal');
         term.setAttribute('session-name', agent.sessionName);
         term.setAttribute('role', agent.role);
-        term.style.height = '400px';
+        term.style.height = 'calc(100vh - 120px)';
         this._grid.appendChild(term);
       }
     }

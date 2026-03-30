@@ -17,6 +17,9 @@ if (!window.Terminal) {
   await import('https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/+esm').then(m => {
     window.FitAddon = m.FitAddon;
   });
+  await import('https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0/+esm').then(m => {
+    window.WebLinksAddon = m.WebLinksAddon;
+  });
 }
 
 class AgentTerminal extends HTMLElement {
@@ -58,6 +61,8 @@ class AgentTerminal extends HTMLElement {
 
     const fitAddon = new window.FitAddon();
     term.loadAddon(fitAddon);
+    const webLinksAddon = new window.WebLinksAddon();
+    term.loadAddon(webLinksAddon);
     term.open(container);
 
     // Placeholder immediately — terminal is rendered, connection hasn't started
