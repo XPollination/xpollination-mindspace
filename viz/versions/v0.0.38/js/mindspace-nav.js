@@ -118,11 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     document.body.prepend(createNav());
     document.body.classList.add('ms-has-nav');
-    // Decision Interface — chat bubble on every authenticated page
-    import('./chat-bubble.js').then(() => {
-      const bubble = document.createElement('chat-bubble');
-      document.body.appendChild(bubble);
-    }).catch(() => {});
+    // Chat bubble removed — will be re-added when peer model is ready
   }
 });
 

@@ -10,6 +10,9 @@
 # Usage:
 #   docker compose -f docker-compose.test.yml up -d --build
 #   npm run start:test
+#
+# Optional: Add AIO Sandbox for L3 browser verification:
+#   docker compose -f docker-compose.test.yml -f docker-compose.sandbox.yml up -d
 
 services:
   mindspace-test:
@@ -37,6 +40,7 @@ services:
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
       - BRAIN_AGENT_KEY=xpo-agent-dev-33c65662-ccc8-4fd4-9f65-7277ba639cdf
+      - SANDBOX_URL=${SANDBOX_URL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:

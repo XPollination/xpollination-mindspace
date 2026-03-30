@@ -176,7 +176,7 @@ class ChatBubble extends HTMLElement {
   }
 
   async _ensureLiaison() {
-    // Guard: already authenticated this session — just fetch routing info
+    // Guard: already running this session
     if (sessionStorage.getItem('cb_liaison_authenticated') === 'true') {
       try {
         const res = await fetch('/api/agents/me/liaison');
@@ -201,34 +201,22 @@ class ChatBubble extends HTMLElement {
         return;
       }
 
-      // Not running — auto-start, show ONE setup message
+      // Not running — guide user to start agent (no auto-start)
       if (sessionStorage.getItem('cb_liaison_setup_shown')) return;
-
-      const start = await fetch('/api/agents/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'liaison' }),
-      });
-      const agent = await start.json();
-
-      if (start.ok) {
-        sessionStorage.setItem('cb_liaison_session', agent.sessionName);
-        sessionStorage.setItem('cb_liaison_agent_id', agent.agentId || agent.sessionName);
-        sessionStorage.setItem('cb_liaison_setup_shown', 'true');
-        this._addSetupMessage(agent.status);
-      }
+      sessionStorage.setItem('cb_liaison_setup_shown', 'true');
+      this._addSetupMessage();
     } catch { /* best-effort */ }
   }
 
-  _addSetupMessage(status) {
+  _addSetupMessage() {
     const div = document.createElement('div');
     div.style.cssText = 'padding:8px;font-size:12px;background:var(--ms-surface,#f0fdf4);border:1px solid var(--ms-border,#86efac);border-radius:8px;margin:4px 0;';
     div.innerHTML = `
       <div style="color:var(--ms-text,#166534);font-weight:600;margin-bottom:4px;">
-        LIAISON ${status === 'starting' ? 'starting' : 'ready'}. Authenticating with Claude...
+        No agent running. Start one to begin.
       </div>
       <a href="/agents" style="color:var(--ms-accent,#2563eb);font-weight:600;text-decoration:none;">
-        Complete setup &rarr;
+        Go to Agents &rarr;
       </a>
     `;
     this._messagesEl.appendChild(div);

@@ -1,0 +1,47 @@
+# AIO Sandbox — Optional L3 browser verification (station capability)
+#
+# Adds Chrome browser + MCP server for agent visual testing.
+# Agents call sandbox MCP tools to navigate, screenshot, click.
+#
+# This is a STATION CAPABILITY — not required for normal operation.
+# Agents degrade gracefully without it (L1+L2 verification only).
+#
+# Usage (layer on top of test or prod):
+#   docker compose -f docker-compose.test.yml -f docker-compose.sandbox.yml up -d
+#   docker compose -f docker-compose.prod.yml -f docker-compose.sandbox.yml up -d
+#   npm run start:sandbox
+#
+# Each station runs its own sandbox (xp0 decentralization principle).
+# SANDBOX_URL in .env points to the station's local sandbox worker.
+
+services:
+  aio-sandbox:
+    image: ghcr.io/agent-infra/sandbox:latest
+    container_name: mindspace-sandbox
+    security_opt:
+      - seccomp:unconfined
+    shm_size: "2gb"
+    mem_limit: "2g"
+    cpus: "1.0"
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - TZ=Europe/Vienna
+      - DISABLE_JUPYTER=true
+      - DISABLE_CODE_SERVER=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - beta-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/sandbox || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  beta-net:
+    external: true
+    name: xpollination-mindspace-rc_beta-net

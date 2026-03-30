@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" font-family="system-ui, sans-serif">
+  <title>AIO Sandbox — Integration Architecture</title>
+  <desc>
+    AGENT-READABLE: AIO Sandbox runs as a Docker container alongside the Mindspace stack.
+    It provides: Chrome browser (CDP protocol), VNC for visual access, MCP servers for
+    browser/file/shell operations. The agent connects to the sandbox MCP server and can:
+    navigate to beta URLs, take screenshots, click elements, fill forms, verify visual state.
+    The sandbox sees the same network as the Mindspace containers via Docker networking.
+  </desc>
+
+  <rect width="900" height="450" fill="#0d1117" rx="8"/>
+  <text x="450" y="30" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">AIO Sandbox — Integration Architecture</text>
+
+  <!-- Hetzner CX22 box -->
+  <rect x="30" y="50" width="840" height="380" rx="8" fill="#161b22" stroke="#30363d" stroke-dasharray="6,3"/>
+  <text x="450" y="72" fill="#484f58" font-size="10" text-anchor="middle">Hetzner CX22 (10.33.33.1) — Docker Network</text>
+
+  <!-- Agent (Claude Code) -->
+  <rect x="50" y="90" width="180" height="120" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="2"/>
+  <text x="140" y="115" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Claude Code Agent</text>
+  <text x="140" y="135" fill="#8b949e" font-size="9" text-anchor="middle">(LIAISON / DEV / QA)</text>
+  <text x="140" y="158" fill="#c9d1d9" font-size="9" text-anchor="middle">Runs in tmux session</text>
+  <text x="140" y="175" fill="#c9d1d9" font-size="9" text-anchor="middle">on host (not Docker)</text>
+  <text x="140" y="195" fill="#58a6ff" font-size="9" text-anchor="middle">MCP client connection</text>
+
+  <!-- Arrow: Agent → Sandbox MCP -->
+  <line x1="230" y1="150" x2="290" y2="150" stroke="#58a6ff" stroke-width="2"/>
+  <polygon points="288,145 295,150 288,155" fill="#58a6ff"/>
+  <text x="260" y="142" fill="#58a6ff" font-size="8" text-anchor="middle">MCP</text>
+
+  <!-- AIO Sandbox container -->
+  <rect x="295" y="85" width="280" height="200" rx="8" fill="#1c2333" stroke="#58a6ff" stroke-width="2"/>
+  <text x="435" y="108" fill="#58a6ff" font-size="13" font-weight="700" text-anchor="middle">AIO Sandbox</text>
+  <text x="435" y="122" fill="#484f58" font-size="9" text-anchor="middle">ghcr.io/agent-infra/sandbox:latest</text>
+
+  <!-- Sandbox components -->
+  <rect x="310" y="135" width="115" height="35" rx="4" fill="#0d2240" stroke="#58a6ff"/>
+  <text x="367" y="152" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">Chrome</text>
+  <text x="367" y="164" fill="#8b949e" font-size="8" text-anchor="middle">CDP :9222</text>
+
+  <rect x="445" y="135" width="115" height="35" rx="4" fill="#0d2240" stroke="#58a6ff"/>
+  <text x="502" y="152" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">VNC</text>
+  <text x="502" y="164" fill="#8b949e" font-size="8" text-anchor="middle">noVNC :8080</text>
+
+  <rect x="310" y="180" width="115" height="35" rx="4" fill="#0d2240" stroke="#58a6ff"/>
+  <text x="367" y="197" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">MCP Server</text>
+  <text x="367" y="209" fill="#8b949e" font-size="8" text-anchor="middle">browser + file + shell</text>
+
+  <rect x="445" y="180" width="115" height="35" rx="4" fill="#0d2240" stroke="#58a6ff"/>
+  <text x="502" y="197" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">Screenshots</text>
+  <text x="502" y="209" fill="#8b949e" font-size="8" text-anchor="middle">PNG capture</text>
+
+  <!-- Arrow: Sandbox → Beta -->
+  <line x1="435" y1="285" x2="435" y2="320" stroke="#d29922" stroke-width="2"/>
+  <polygon points="431,318 435,325 439,318" fill="#d29922"/>
+  <text x="460" y="308" fill="#d29922" font-size="8">HTTP/WS</text>
+
+  <!-- Arrow: Sandbox → Prod -->
+  <line x1="435" y1="285" x2="690" y2="340" stroke="#d29922" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="580" y="308" fill="#484f58" font-size="8">optional</text>
+
+  <!-- Mindspace Beta container -->
+  <rect x="310" y="325" width="250" height="80" rx="8" fill="#161b22" stroke="#d29922"/>
+  <text x="435" y="350" fill="#d29922" font-size="12" font-weight="600" text-anchor="middle">mindspace-test (Beta)</text>
+  <text x="435" y="368" fill="#8b949e" font-size="9" text-anchor="middle">127.0.0.1:4201 — Viz + API</text>
+  <text x="435" y="385" fill="#8b949e" font-size="9" text-anchor="middle">127.0.0.1:3101 — API only</text>
+  <text x="435" y="400" fill="#484f58" font-size="8" text-anchor="middle">rc branch, rebuilt on merge</text>
+
+  <!-- Mindspace Prod container -->
+  <rect x="610" y="325" width="240" height="80" rx="8" fill="#161b22" stroke="#3fb950"/>
+  <text x="730" y="350" fill="#3fb950" font-size="12" font-weight="600" text-anchor="middle">mindspace-prod (Prod)</text>
+  <text x="730" y="368" fill="#8b949e" font-size="9" text-anchor="middle">10.33.33.1:4200 — Viz + API</text>
+  <text x="730" y="385" fill="#8b949e" font-size="9" text-anchor="middle">10.33.33.1:3100 — API only</text>
+  <text x="730" y="400" fill="#484f58" font-size="8" text-anchor="middle">tagged main, rebuilt on release</text>
+
+  <!-- Brain (shared) -->
+  <rect x="620" y="90" width="230" height="80" rx="8" fill="#161b22" stroke="#bc8cff"/>
+  <text x="735" y="115" fill="#bc8cff" font-size="12" font-weight="600" text-anchor="middle">Brain + Qdrant (Shared)</text>
+  <text x="735" y="135" fill="#8b949e" font-size="9" text-anchor="middle">0.0.0.0:3200 — Brain API</text>
+  <text x="735" y="152" fill="#8b949e" font-size="9" text-anchor="middle">10.33.33.1:6333 — Qdrant</text>
+
+  <!-- Arrow: Beta → Brain -->
+  <line x1="560" y1="365" x2="620" y2="165" stroke="#bc8cff" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- Verification flow label -->
+  <rect x="50" y="240" width="220" height="90" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="160" y="260" fill="#3fb950" font-size="10" font-weight="700" text-anchor="middle">Agent Verification Flow</text>
+  <text x="70" y="278" fill="#c9d1d9" font-size="9">1. Deploy to beta (rc rebuild)</text>
+  <text x="70" y="293" fill="#c9d1d9" font-size="9">2. Sandbox: navigate to beta URL</text>
+  <text x="70" y="308" fill="#c9d1d9" font-size="9">3. Sandbox: screenshot + verify</text>
+  <text x="70" y="323" fill="#c9d1d9" font-size="9">4. Report with screenshots</text>
+</svg>

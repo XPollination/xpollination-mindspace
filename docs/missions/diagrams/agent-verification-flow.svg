@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 550" font-family="system-ui, sans-serif">
+  <title>Agent Verification Flow — Before and After AIO Sandbox</title>
+  <desc>
+    AGENT-READABLE: Two flows compared. BEFORE: Agent writes code → greps source → curls endpoint →
+    reports "verified" → Thomas tests in browser → finds visual bugs → reports back → agent fixes.
+    Human is the browser. AFTER: Agent writes code → greps source → curls endpoint → launches sandbox
+    browser → navigates like user → takes screenshot → sees bug → fixes → reports "verified with
+    screenshots". Agent IS the browser. The feedback loop is closed within the agent.
+  </desc>
+
+  <rect width="1100" height="550" fill="#0d1117" rx="8"/>
+
+  <!-- BEFORE -->
+  <text x="275" y="30" fill="#f85149" font-size="15" font-weight="700" text-anchor="middle">BEFORE: Human is the Browser</text>
+
+  <rect x="30" y="50" width="490" height="480" rx="8" fill="#161b22" stroke="#f85149" stroke-dasharray="6,3"/>
+
+  <!-- Before flow steps -->
+  <rect x="50" y="70" width="180" height="45" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="140" y="90" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">1. Agent writes code</text>
+  <text x="140" y="103" fill="#8b949e" font-size="9" text-anchor="middle">Edit files, commit, push</text>
+
+  <line x1="140" y1="115" x2="140" y2="130" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="136,128 140,135 144,128" fill="#3fb950"/>
+
+  <rect x="50" y="135" width="180" height="45" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="140" y="155" fill="#c9d1d9" font-size="11" font-weight="600" text-anchor="middle">2. grep + curl</text>
+  <text x="140" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Level 1 + Level 2 checks</text>
+
+  <line x1="140" y1="180" x2="140" y2="195" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="136,193 140,200 144,193" fill="#3fb950"/>
+
+  <rect x="50" y="200" width="180" height="45" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="140" y="220" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">3. "All verified!"</text>
+  <text x="140" y="233" fill="#8b949e" font-size="9" text-anchor="middle">Reports to Thomas</text>
+
+  <line x1="230" y1="222" x2="310" y2="222" stroke="#f85149" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="308,217 315,222 308,227" fill="#f85149"/>
+
+  <!-- Thomas box -->
+  <rect x="315" y="200" width="180" height="45" rx="6" fill="#1c1117" stroke="#f85149"/>
+  <text x="405" y="220" fill="#f85149" font-size="11" font-weight="600" text-anchor="middle">4. Thomas opens browser</text>
+  <text x="405" y="233" fill="#8b949e" font-size="9" text-anchor="middle">Tests the actual UX</text>
+
+  <line x1="405" y1="245" x2="405" y2="265" stroke="#f85149" stroke-width="1.5"/>
+  <polygon points="401,263 405,270 409,263" fill="#f85149"/>
+
+  <rect x="315" y="270" width="180" height="55" rx="6" fill="#1c1117" stroke="#f85149"/>
+  <text x="405" y="290" fill="#f85149" font-size="11" font-weight="700" text-anchor="middle">5. Finds bugs!</text>
+  <text x="405" y="303" fill="#f85149" font-size="9" text-anchor="middle">Black terminal, event flood</text>
+  <text x="405" y="315" fill="#8b949e" font-size="8" text-anchor="middle">Level 3 failures invisible to agent</text>
+
+  <line x1="315" y1="297" x2="230" y2="297" stroke="#f85149" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="232,292 225,297 232,302" fill="#f85149"/>
+
+  <rect x="50" y="275" width="180" height="45" rx="6" fill="#1c1117" stroke="#f85149"/>
+  <text x="140" y="295" fill="#f85149" font-size="11" font-weight="600" text-anchor="middle">6. Agent fixes</text>
+  <text x="140" y="308" fill="#8b949e" font-size="9" text-anchor="middle">Another round trip</text>
+
+  <!-- Waste indicator -->
+  <rect x="80" y="340" width="400" height="35" rx="6" fill="#f85149" opacity="0.1"/>
+  <text x="280" y="362" fill="#f85149" font-size="11" font-weight="600" text-anchor="middle">Wasted cycle: agent reports done → human finds bugs → agent fixes → repeat</text>
+
+  <!-- Time waste -->
+  <text x="280" y="395" fill="#484f58" font-size="10" text-anchor="middle">Steps 3-6 are waste. The agent could have caught these bugs itself.</text>
+  <text x="280" y="415" fill="#484f58" font-size="10" text-anchor="middle">Thomas becomes the test infrastructure instead of making decisions.</text>
+
+  <!-- AFTER -->
+  <text x="825" y="30" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">AFTER: Agent IS the Browser</text>
+
+  <rect x="580" y="50" width="490" height="480" rx="8" fill="#161b22" stroke="#3fb950"/>
+
+  <!-- After flow steps -->
+  <rect x="640" y="70" width="200" height="45" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="740" y="90" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">1. Agent writes code</text>
+  <text x="740" y="103" fill="#8b949e" font-size="9" text-anchor="middle">Edit files, commit, push</text>
+
+  <line x1="740" y1="115" x2="740" y2="130" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="736,128 740,135 744,128" fill="#3fb950"/>
+
+  <rect x="640" y="135" width="200" height="45" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="740" y="155" fill="#c9d1d9" font-size="11" font-weight="600" text-anchor="middle">2. grep + curl</text>
+  <text x="740" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Level 1 + Level 2 checks</text>
+
+  <line x1="740" y1="180" x2="740" y2="195" stroke="#58a6ff" stroke-width="1.5"/>
+  <polygon points="736,193 740,200 744,193" fill="#58a6ff"/>
+
+  <rect x="610" y="200" width="260" height="65" rx="8" fill="#0d2240" stroke="#58a6ff" stroke-width="2"/>
+  <text x="740" y="220" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">3. AIO Sandbox Browser</text>
+  <text x="740" y="237" fill="#c9d1d9" font-size="10" text-anchor="middle">Navigate → click → screenshot → verify</text>
+  <text x="740" y="252" fill="#8b949e" font-size="9" text-anchor="middle">CDP + VNC + MCP in Docker container</text>
+
+  <line x1="740" y1="265" x2="740" y2="280" stroke="#58a6ff" stroke-width="1.5"/>
+  <polygon points="736,278 740,285 744,278" fill="#58a6ff"/>
+
+  <!-- Decision diamond -->
+  <polygon points="740,290 790,315 740,340 690,315" fill="#161b22" stroke="#58a6ff"/>
+  <text x="740" y="318" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">Bug?</text>
+
+  <!-- No bug path -->
+  <line x1="790" y1="315" x2="830" y2="315" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="810" y="308" fill="#3fb950" font-size="9" text-anchor="middle">No</text>
+
+  <rect x="835" y="295" width="200" height="45" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="935" y="315" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">4. "Verified + screenshots"</text>
+  <text x="935" y="328" fill="#8b949e" font-size="9" text-anchor="middle">Reports to Thomas with proof</text>
+
+  <!-- Bug path -->
+  <line x1="690" y1="315" x2="650" y2="315" stroke="#f85149" stroke-width="1.5"/>
+  <text x="670" y="308" fill="#f85149" font-size="9" text-anchor="middle">Yes</text>
+
+  <rect x="600" y="350" width="140" height="40" rx="6" fill="#1c1117" stroke="#f85149"/>
+  <text x="670" y="374" fill="#f85149" font-size="11" font-weight="600" text-anchor="middle">Fix + re-test</text>
+  <line x1="650" y1="340" x2="650" y2="350" stroke="#f85149" stroke-width="1.5"/>
+  <!-- Loop back arrow -->
+  <line x1="600" y1="370" x2="580" y2="370" stroke="#f85149" stroke-width="1.5"/>
+  <line x1="580" y1="370" x2="580" y2="232" stroke="#f85149" stroke-width="1.5"/>
+  <line x1="580" y1="232" x2="610" y2="232" stroke="#f85149" stroke-width="1.5"/>
+  <polygon points="608,227 615,232 608,237" fill="#f85149"/>
+
+  <!-- Benefit indicator -->
+  <rect x="640" y="420" width="400" height="35" rx="6" fill="#3fb950" opacity="0.1"/>
+  <text x="840" y="442" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">Closed loop: agent catches its own bugs before reporting to Thomas</text>
+
+  <text x="840" y="470" fill="#c9d1d9" font-size="10" text-anchor="middle">Thomas reviews verified features, not broken prototypes.</text>
+  <text x="840" y="490" fill="#c9d1d9" font-size="10" text-anchor="middle">Human time shifts from testing to decision-making.</text>
+
+  <!-- Version -->
+  <text x="1060" y="540" fill="#484f58" font-size="8" text-anchor="end">MISSION-AGENT-VERIFICATION v1 | 2026-03-27</text>
+</svg>

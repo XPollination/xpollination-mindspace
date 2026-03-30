@@ -17,6 +17,9 @@ if (!window.Terminal) {
   await import('https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/+esm').then(m => {
     window.FitAddon = m.FitAddon;
   });
+  await import('https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0/+esm').then(m => {
+    window.WebLinksAddon = m.WebLinksAddon;
+  });
 }
 
 class AgentTerminal extends HTMLElement {
@@ -58,7 +61,14 @@ class AgentTerminal extends HTMLElement {
 
     const fitAddon = new window.FitAddon();
     term.loadAddon(fitAddon);
+    const webLinksAddon = new window.WebLinksAddon();
+    term.loadAddon(webLinksAddon);
     term.open(container);
+
+    // Placeholder immediately — terminal is rendered, connection hasn't started
+    term.write('\x1b[36m  Connecting to agent session...\x1b[0m\r\n\r\n');
+    term.write('\x1b[90m  Waiting for Claude to authenticate.\x1b[0m\r\n');
+    term.write('\x1b[90m  If this is a new session, complete OAuth in the terminal.\x1b[0m\r\n');
 
     // Fit after a tick (container needs to be rendered)
     requestAnimationFrame(() => {
@@ -78,17 +88,26 @@ class AgentTerminal extends HTMLElement {
     this._ws = ws;
 
     ws.onopen = () => {
-      // Send initial size
+      this._hasConnected = true;
       const { cols, rows } = term;
       ws.send(JSON.stringify({ type: 'resize', cols, rows }));
     };
 
+    let firstData = true;
     ws.onmessage = (e) => {
+      if (firstData) { term.clear(); firstData = false; }
       term.write(e.data);
     };
 
     ws.onclose = () => {
-      term.write('\r\n\x1b[33m[disconnected — reconnecting...]\x1b[0m\r\n');
+      if (!this._hasConnected) {
+        term.clear();
+        term.write('\x1b[36m  Agent session not ready.\x1b[0m\r\n\r\n');
+        term.write('\x1b[90m  The agent will appear here after authentication.\x1b[0m\r\n');
+        term.write('\x1b[90m  Retrying...\x1b[0m\r\n');
+      } else {
+        term.write('\r\n\x1b[33m  [disconnected — reconnecting...]\x1b[0m\r\n');
+      }
       setTimeout(() => this._connectWS(term, sessionName, fitAddon), 3000);
     };
 
