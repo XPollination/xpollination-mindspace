@@ -264,6 +264,24 @@ agentsRouter.get('/processes', (req: Request, res: Response) => {
   res.status(200).json({ count: agents.length, agents });
 });
 
+// GET /api/agents/running — list actual running tmux agent sessions for this user
+agentsRouter.get('/running', (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const userId = user?.id || user?.sub;
+  const roles = ['liaison', 'pdsa', 'dev', 'qa'];
+  const running: any[] = [];
+
+  for (const role of roles) {
+    const sessionName = `agent-${role}-${userId}`;
+    try {
+      execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
+      running.push({ role, sessionName, status: 'running' });
+    } catch { /* session doesn't exist */ }
+  }
+
+  res.json(running);
+});
+
 // GET /api/agents/me/liaison — check if user's LIAISON is running (MUST be before /:id)
 agentsRouter.get('/me/liaison', (req: Request, res: Response) => {
   const user = (req as any).user;
@@ -302,6 +320,11 @@ agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) =>
   // Deterministic session name per user+role (no duplicates)
   const sessionName = `agent-${role}-${userId}`;
 
+  // Mark previous agents for this user+role as disconnected (prevent phantom cards)
+  const db = getDb();
+  db.prepare("UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now') WHERE user_id = ? AND current_role = ? AND status != 'disconnected'")
+    .run(userId, role);
+
   try {
     // Check if session already exists — reuse
     try {
@@ -310,10 +333,18 @@ agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) =>
       return;
     } catch { /* session doesn't exist — create it */ }
 
+    // JWT delegation: pass user's JWT so agent can register with A2A
+    const authHeader = req.headers.authorization;
+    const agentJwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+    // Create tmux session with bash, then send-keys to run start-agent.sh
+    // (exec claude needs a proper interactive PTY — inline command doesn't provide one)
     execFileSync('tmux', [
-      'new-session', '-d', '-s', sessionName,
-      '-x', '120', '-y', '40',
-      'bash', '/app/scripts/start-agent.sh', role, userId
+      'new-session', '-d', '-s', sessionName, '-x', '120', '-y', '40'
+    ], { env: { ...process.env, AGENT_JWT: agentJwt }, stdio: 'pipe' });
+    execFileSync('tmux', [
+      'send-keys', '-t', sessionName,
+      `bash /app/scripts/start-agent.sh ${role} ${userId}`, 'Enter'
     ], { stdio: 'pipe' });
 
     res.status(201).json({
@@ -327,4 +358,33 @@ agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) =>
   } catch (err: any) {
     res.status(500).json({ error: `Failed to start agent: ${err.message}` });
   }
+});
+
+// POST /api/agents/stop — kill agent tmux session + mark disconnected
+agentsRouter.post('/stop', (req: Request, res: Response) => {
+  const { sessionName } = req.body;
+  const user = (req as any).user;
+  const userId = user?.id || user?.sub;
+
+  if (!sessionName) {
+    res.status(400).json({ error: 'sessionName is required' });
+    return;
+  }
+
+  // Security: verify session belongs to this user
+  if (!sessionName.includes(userId)) {
+    res.status(403).json({ error: 'Cannot stop another user\'s agent' });
+    return;
+  }
+
+  try {
+    execFileSync('tmux', ['kill-session', '-t', sessionName], { stdio: 'pipe' });
+  } catch { /* session may not exist */ }
+
+  // Mark agent as disconnected in DB
+  const db = getDb();
+  db.prepare("UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now') WHERE user_id = ? AND status != 'disconnected'")
+    .run(userId);
+
+  res.status(200).json({ stopped: sessionName });
 });

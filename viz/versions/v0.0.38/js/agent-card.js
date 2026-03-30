@@ -22,6 +22,7 @@ class AgentCard extends HTMLElement {
           <span style="font-size:11px;color:var(--ms-muted,#94a3b8);">${name}</span>
           <span class="ac-timer" style="margin-left:auto;font-size:10px;color:var(--ms-muted,#94a3b8);font-family:monospace;"></span>
           <button class="ac-toggle-term" style="padding:2px 8px;border:1px solid var(--ms-border,#e2e8f0);border-radius:4px;background:none;color:var(--ms-muted,#94a3b8);cursor:pointer;font-size:10px;">Terminal</button>
+          <button class="ac-stop" style="padding:2px 8px;border:1px solid #ef4444;border-radius:4px;background:none;color:#ef4444;cursor:pointer;font-size:10px;">Stop</button>
         </div>
         <div class="ac-events" style="flex:1;overflow-y:auto;padding:8px;font-size:12px;min-height:80px;"></div>
         <div class="ac-actions" style="padding:6px 12px;border-top:1px solid var(--ms-border,#e2e8f0);display:none;gap:6px;">
@@ -44,6 +45,11 @@ class AgentCard extends HTMLElement {
       const visible = this._termContainer.style.display !== 'none';
       this._termContainer.style.display = visible ? 'none' : 'block';
       this.querySelector('.ac-toggle-term').textContent = visible ? 'Terminal' : 'Hide Terminal';
+    });
+
+    // Stop button
+    this.querySelector('.ac-stop').addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('stop-agent', { bubbles: true }));
     });
 
     // Connect SSE for agent events
