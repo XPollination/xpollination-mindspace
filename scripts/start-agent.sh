@@ -4,7 +4,8 @@
 
 ROLE="${1:-liaison}"
 USER_ID="${2:-default}"
-API_URL="${3:-http://localhost:3100}"
+API_URL="${3:-http://localhost:${API_PORT:-3100}}"
+AGENT_JWT="${AGENT_JWT:-}"
 
 echo "═══ Starting ${ROLE^^} Agent (user: ${USER_ID}) ═══"
 
@@ -30,6 +31,7 @@ echo "▸ Claude Code: $(claude --version 2>/dev/null || echo 'available')"
 echo "▸ Connecting to A2A at ${API_URL}..."
 WELCOME=$(curl -s -X POST "${API_URL}/a2a/connect" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${AGENT_JWT}" \
   -d "{
     \"identity\": {\"agent_name\": \"${ROLE}-agent-${USER_ID}\"},
     \"role\": {\"current\": \"${ROLE}\", \"capabilities\": [\"${ROLE}\"]},
@@ -54,29 +56,25 @@ SYSTEM_PROMPT="You are the ${ROLE^^} agent in XPollination Mindspace.
 - User: ${USER_ID}
 - A2A Server: ${API_URL}
 
-## Available Actions
-${ACTIONS}
+## Communication — A2A ONLY
+All project management operations go through A2A protocol. NO direct database access. NO sqlite3. NO interface-cli.js.
 
-## How to Act
-curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{\"agent_id\":\"${AGENT_ID}\",\"type\":\"<ACTION>\", ...}'
+Available A2A message types: ${ACTIONS}
+
+Send messages:
+curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{\"agent_id\":\"${AGENT_ID}\",\"type\":\"<TYPE>\", ...}'
+
+Examples:
+- Query tasks: {\"type\":\"OBJECT_QUERY\",\"object_type\":\"task\",\"filters\":{\"role\":\"${ROLE}\"}}
+- Transition: {\"type\":\"TRANSITION\",\"task_slug\":\"...\",\"to_status\":\"review\"}
+- Brain query: {\"type\":\"BRAIN_QUERY\",\"prompt\":\"...\"}
+- Brain contribute: {\"type\":\"BRAIN_CONTRIBUTE\",\"prompt\":\"...\"}
 
 ## Brain Gate
 Every transition from active work requires a brain contribution first.
-Send BRAIN_CONTRIBUTE → get thought_id → include in TRANSITION payload.
 
-## Decision Interface
-Users talk to you via the chat bubble (HUMAN_INPUT events).
-Respond thoughtfully. You are their LIAISON — the bridge between human intent and agent execution.
-
-## Browser Verification (Level 3)
-AIO Sandbox browser is available via MCP tools (if connected).
-After any UI change, verify visually:
-1. Use sandbox MCP: navigate to http://mindspace-test:4201/{page}
-2. Take a screenshot to capture what the user sees
-3. Verify the visual result matches expectations
-4. Include screenshot evidence in your report
-
-If sandbox MCP is unavailable, note 'L3 verification skipped' and use L1+L2 only."
+## Workspace
+You can read and write files in the project workspace. Use git to commit and push changes. Follow the git protocol: specific file staging, atomic commands, one-liner commits."
 
 # Wire sandbox MCP if SANDBOX_URL is configured (station capability)
 MCP_FLAG=""
@@ -90,22 +88,5 @@ elif [ -f "/app/scripts/mcp-sandbox.json" ]; then
   MCP_FLAG="--mcp-config /app/scripts/mcp-sandbox.json"
   echo "▸ Sandbox MCP: from static config"
 fi
-
-# Background monitor: detect OAuth URL in terminal, relay to chat bubble via A2A
-# The body helps the soul communicate during bootstrap
-SESSION_NAME="agent-${ROLE}-${USER_ID}"
-(
-  for i in $(seq 1 60); do
-    sleep 2
-    OUTPUT=$(tmux capture-pane -t "$SESSION_NAME" -p 2>/dev/null | tr -d '\n')
-    OAUTH_URL=$(echo "$OUTPUT" | grep -oP 'https://claude\.com/\S+')
-    if [ -n "$OAUTH_URL" ]; then
-      curl -s -X POST "${API_URL}/a2a/message" \
-        -H "Content-Type: application/json" \
-        -d "{\"agent_id\":\"${AGENT_ID}\",\"type\":\"HUMAN_INPUT\",\"text\":\"Authorize Claude to complete setup: ${OAUTH_URL}\"}" > /dev/null 2>&1
-      break
-    fi
-  done
-) &
 
 exec claude --system-prompt "$SYSTEM_PROMPT" $MCP_FLAG

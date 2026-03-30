@@ -26,9 +26,11 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url || '/', `http://localhost`);
   const sessionName = url.pathname.split('/').pop() || 'default';
 
-  // Ensure tmux session exists
+  // Only attach to existing sessions — never auto-create
+  // Sessions are born through /api/agents/start → start-agent.sh → exec claude
   if (!sessionExists(sessionName)) {
-    createSession(sessionName);
+    ws.close();
+    return;
   }
 
   // Spawn tmux attach via node-pty for full PTY support
