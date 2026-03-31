@@ -140,7 +140,19 @@ export class MindspaceNode {
 
   async getTasksForRole(role: string): Promise<Twin[]> {
     const all = await this.storage.query({ schema: 'xp0/task' });
-    return all.filter((t) => (t.content as any).role === role);
+    const byRole = all.filter((t) => (t.content as any).role === role);
+
+    // Return only latest version of each logical task (avoid duplicates from evolution)
+    const latestByLogicalId = new Map<string, Twin>();
+    for (const t of byRole) {
+      const lid = (t.content as any).logicalId as string | undefined;
+      if (!lid) { latestByLogicalId.set(t.cid, t); continue; }
+      const existing = latestByLogicalId.get(lid);
+      if (!existing || t.version > existing.version) {
+        latestByLogicalId.set(lid, t);
+      }
+    }
+    return Array.from(latestByLogicalId.values());
   }
 
   async getTaskByLogicalId(id: string): Promise<Twin | null> {
@@ -286,35 +298,50 @@ export class IntegrationRunner {
       liaison: 'review',
     };
 
+    const myDID = this.runner.getRunnerTwin()?.owner || '';
+
     this.autoClaimTimer = setInterval(async () => {
       if (this.runner.getStatus() === 'draining') return;
       try {
         const tasks = await this.node.getTasksForRole(this.role);
         for (const task of tasks) {
           const content = task.content as Record<string, unknown>;
+
+          // State machine: each iteration handles ONE step
           if (content.status === 'ready' && !content.claimed_by) {
+            // Step 1: Claim
             const claimed = await this.runner.claimTask(task);
-            // Announce claim to network
             await this.node.transport.publish('xp0/tasks', {
               type: 'twin.evolved',
               cid: claimed.cid,
               kind: 'task',
             });
-            const executed = await this.runner.executeTask(claimed);
-            // Role-aware transition
-            const nextStatus = ROLE_NEXT_STATUS[this.role] || 'review';
-            const logicalId = (executed.content as any)?.logicalId;
-            if (logicalId) {
-              await this.node.transitionTask(logicalId, nextStatus, this.role);
-            } else {
-              await this.runner.completeTask(executed);
-            }
-            // Publish result announcement
+            break;
+          }
+
+          if (content.status === 'active' && content.claimed_by === myDID && !content.result) {
+            // Step 2: Execute
+            const executed = await this.runner.executeTask(task);
             await this.node.transport.publish('xp0/tasks', {
               type: 'twin.evolved',
               cid: executed.cid,
               kind: 'task',
             });
+            break;
+          }
+
+          if (content.status === 'active' && content.claimed_by === myDID && content.result) {
+            // Step 3: Transition to next status
+            const nextStatus = ROLE_NEXT_STATUS[this.role] || 'review';
+            const logicalId = content.logicalId as string | undefined;
+            if (logicalId) {
+              const transitioned = await this.node.transitionTask(logicalId, nextStatus, this.role);
+              await this.node.transport.publish('xp0/tasks', {
+                type: 'twin.evolved',
+                cid: transitioned.cid,
+                kind: 'task',
+              });
+            }
             break;
           }
         }
