@@ -56,6 +56,13 @@ export class MindspaceNode {
       this.handleTaskAnnouncement(msg).catch(() => {});
     });
 
+    // Subscribe to GDPR forget announcements
+    await this.transport.subscribe('xp0/system/forget', (msg) => {
+      if (msg.type === 'twin.forget' && msg.cid) {
+        this.storage.forget(msg.cid).catch(() => {});
+      }
+    });
+
     this.running = true;
   }
 
@@ -97,6 +104,15 @@ export class MindspaceNode {
     const signed = await sign(twin, this.privateKey);
     await this.storage.dock(signed);
     return signed;
+  }
+
+  async forgetTwin(cid: string): Promise<void> {
+    await this.storage.forget(cid);
+    await this.transport.publish('xp0/system/forget', {
+      type: 'twin.forget',
+      cid,
+      kind: 'system',
+    });
   }
 
   async evolveTwin(twin: Twin, changes: Record<string, unknown>): Promise<Twin> {
