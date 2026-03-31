@@ -2,6 +2,7 @@ import { FileStorageAdapter } from '../storage/file-storage-adapter.js';
 import { LibP2PTransport } from '../transport/libp2p-transport.js';
 import { create, sign, evolve } from '../twin/kernel.js';
 import { validate as validateTransaction, verifyCID, resolveConflict } from '../validation/transaction-validator.js';
+import { RelationPermissionResolver, checkRateLimit, type RateLimitPolicy } from '../auth/permission-resolver.js';
 import type { Twin } from '../twin/types.js';
 import type { StorageAdapter } from '../storage/types.js';
 import type { TransportAdapter, TransportMessage } from '../transport/types.js';
@@ -34,6 +35,8 @@ export class MindspaceNode {
   private running = false;
   private runners: ManagedRunner[] = [];
   private taskIndex = new Map<string, Twin>(); // logicalId → latest twin
+  private permissionResolver: RelationPermissionResolver | null = null;
+  private rateLimitPolicy: RateLimitPolicy | null = null;
 
   constructor(opts: MindspaceNodeOpts) {
     this.opts = opts;
@@ -63,7 +66,39 @@ export class MindspaceNode {
       }
     });
 
+    this.permissionResolver = new RelationPermissionResolver(this.storage);
     this.running = true;
+  }
+
+  // --- Permission-scoped access ---
+
+  async getTaskDNAForRunner(runnerId: string, logicalId: string): Promise<Twin | null> {
+    if (!this.permissionResolver) throw new Error('Node not started');
+    const task = await this.getTaskByLogicalId(logicalId);
+    if (!task) return null;
+    const check = await this.permissionResolver.check(runnerId, task.cid, 'read');
+    if (!check.allowed) throw new Error(`Access denied: ${check.reason}`);
+    return task;
+  }
+
+  async setRateLimitPolicy(policy: RateLimitPolicy): Promise<void> {
+    this.rateLimitPolicy = policy;
+    // Store as policy twin
+    await this.createTwin('object', 'xp0/rate-limit-policy', {
+      maxClaimsPerWindow: policy.maxClaimsPerWindow,
+      windowSeconds: policy.windowSeconds,
+    });
+  }
+
+  async queryBrainAsRunner(runnerId: string, prompt: string): Promise<string | null> {
+    // Check delegation VC scope for brain access
+    if (!this.permissionResolver) throw new Error('Node not started');
+    const relations = await this.permissionResolver.getRelations(runnerId, undefined, 'brain-access');
+    if (relations.length === 0) {
+      throw new Error('Access denied: runner has no brain-access delegation');
+    }
+    // Delegate to brain API (would use BrainClient in production)
+    return `Brain response for: ${prompt}`;
   }
 
   async stop(): Promise<void> {
