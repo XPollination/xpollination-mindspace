@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" font-family="system-ui, sans-serif">
+  <title>Peer Discovery — Robin Connects to Hub</title>
+  <desc>
+    AGENT-READABLE: First-start flow for Robin. npm start → Mindspace boots → brain gate: no brain
+    configured → discovery UX. Three discovery methods: (1) Invite link from Thomas (simplest),
+    (2) Manual URL entry, (3) .well-known/mindspace.json (future auto-discovery). After connection:
+    brain available, A2A routing active, agent placement configured. Robin's soul can start.
+  </desc>
+
+  <rect width="900" height="450" fill="#0d1117" rx="8"/>
+  <text x="450" y="28" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Peer Discovery — How Robin Connects</text>
+
+  <!-- npm start -->
+  <rect x="30" y="55" width="180" height="40" rx="6" fill="#1c2333" stroke="#89b4fa" stroke-width="2"/>
+  <text x="120" y="78" fill="#89b4fa" font-size="12" font-weight="700" text-anchor="middle">Robin: npm start</text>
+
+  <line x1="210" y1="75" x2="245" y2="75" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="243,70 250,75 243,80" fill="#3fb950"/>
+
+  <!-- Brain gate -->
+  <rect x="250" y="55" width="200" height="55" rx="6" fill="#1c1117" stroke="#f85149" stroke-width="2"/>
+  <text x="350" y="78" fill="#f85149" font-size="11" font-weight="700" text-anchor="middle">Brain Gate</text>
+  <text x="350" y="95" fill="#f85149" font-size="9" text-anchor="middle">No brain configured → STOP</text>
+
+  <line x1="350" y1="110" x2="350" y2="135" stroke="#f85149" stroke-width="1.5"/>
+  <polygon points="346,133 350,140 354,133" fill="#f85149"/>
+
+  <!-- Discovery UX -->
+  <rect x="200" y="140" width="300" height="40" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="350" y="164" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Connect to a Brain to begin</text>
+
+  <!-- Three discovery methods -->
+  <line x1="270" y1="180" x2="150" y2="215" stroke="#3fb950" stroke-width="1.5"/>
+  <line x1="350" y1="180" x2="350" y2="215" stroke="#58a6ff" stroke-width="1.5"/>
+  <line x1="430" y1="180" x2="550" y2="215" stroke="#d29922" stroke-width="1.5"/>
+
+  <!-- Method 1: Invite link -->
+  <rect x="30" y="215" width="240" height="110" rx="8" fill="#161b22" stroke="#3fb950"/>
+  <text x="150" y="238" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">Method 1: Invite Link</text>
+  <text x="150" y="255" fill="#8b949e" font-size="9" text-anchor="middle">(recommended — simplest UX)</text>
+
+  <text x="45" y="278" fill="#c9d1d9" font-size="9">Thomas sends Robin:</text>
+  <text x="45" y="294" fill="#58a6ff" font-size="8" font-family="monospace">mindspace.xpo.../invite/abc123</text>
+  <text x="45" y="312" fill="#8b949e" font-size="8">Robin clicks → registers on hub</text>
+  <text x="45" y="324" fill="#8b949e" font-size="8">→ local Mindspace auto-configures</text>
+
+  <!-- Method 2: Manual URL -->
+  <rect x="290" y="215" width="220" height="110" rx="8" fill="#161b22" stroke="#58a6ff"/>
+  <text x="400" y="238" fill="#58a6ff" font-size="11" font-weight="700" text-anchor="middle">Method 2: Manual URL</text>
+
+  <text x="305" y="262" fill="#c9d1d9" font-size="9">First-start prompt:</text>
+  <text x="305" y="280" fill="#8b949e" font-size="9">"Enter hub URL:"</text>
+  <rect x="305" y="288" width="185" height="20" rx="3" fill="#0d1117" stroke="#30363d"/>
+  <text x="312" y="302" fill="#58a6ff" font-size="8" font-family="monospace">mindspace.xpo...</text>
+  <text x="305" y="322" fill="#8b949e" font-size="8">→ connects, verifies brain</text>
+
+  <!-- Method 3: Auto-discovery -->
+  <rect x="530" y="215" width="240" height="110" rx="8" fill="#161b22" stroke="#d29922"/>
+  <text x="650" y="238" fill="#d29922" font-size="11" font-weight="700" text-anchor="middle">Method 3: Auto-Discovery</text>
+  <text x="650" y="255" fill="#8b949e" font-size="9" text-anchor="middle">(future — xp0 target)</text>
+
+  <text x="545" y="278" fill="#c9d1d9" font-size="9" font-family="monospace">GET /.well-known/mindspace.json</text>
+  <text x="545" y="296" fill="#8b949e" font-size="8">Returns: brain_url, a2a_url,</text>
+  <text x="545" y="308" fill="#8b949e" font-size="8">peer_endpoint, capabilities</text>
+  <text x="545" y="322" fill="#8b949e" font-size="8">→ zero-config connection</text>
+
+  <!-- After connection -->
+  <line x1="150" y1="325" x2="350" y2="365" stroke="#3fb950" stroke-width="1"/>
+  <line x1="350" y1="325" x2="350" y2="365" stroke="#3fb950" stroke-width="1"/>
+  <line x1="550" y1="325" x2="350" y2="365" stroke="#3fb950" stroke-width="1"/>
+
+  <rect x="150" y="365" width="400" height="70" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="2"/>
+  <text x="350" y="390" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Connected to Hub</text>
+  <text x="170" y="408" fill="#c9d1d9" font-size="9">Brain: available (queries + contributions)</text>
+  <text x="170" y="422" fill="#c9d1d9" font-size="9">A2A: active (routing events to Robin's agents)</text>
+  <text x="170" y="436" fill="#c9d1d9" font-size="9">Agent placement: configured (hub or local)</text>
+
+  <!-- Saved config -->
+  <rect x="600" y="375" width="260" height="55" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="730" y="398" fill="#8b949e" font-size="10" text-anchor="middle">Saved to .env:</text>
+  <text x="615" y="416" fill="#c9d1d9" font-size="8" font-family="monospace">BRAIN_API_URL=https://hive.xpo.../api/v1</text>
+  <text x="615" y="428" fill="#c9d1d9" font-size="8" font-family="monospace">HUB_URL=wss://mindspace.xpo...</text>
+
+  <line x1="550" y1="400" x2="600" y2="400" stroke="#30363d" stroke-width="1"/>
+</svg>

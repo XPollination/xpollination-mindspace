@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 550" font-family="system-ui, sans-serif">
+  <title>Context 2 Agent Flow — Agents Work Through A2A, On Projects, On Mindspace</title>
+  <desc>
+    AGENT-READABLE: Three modes of agent work. (1) Agents work THROUGH Mindspace: all PM operations
+    via A2A protocol. Task queries, transitions, DNA updates — no direct database access. A2A server
+    is LLM-less protocol, validates and routes. (2) Agents work ON projects: Robin assigns a project,
+    DEV writes code in workspace (rw mount), commits, pushes. QA runs tests. All reporting via A2A.
+    (3) Agents work ON Mindspace: developing the body they live in. Write Mindspace source code,
+    commit, deploy via pipeline. New container twin has the changes. Self-developing system.
+  </desc>
+
+  <rect width="1100" height="550" fill="#0d1117" rx="8"/>
+  <text x="550" y="30" fill="#3fb950" font-size="16" font-weight="700" text-anchor="middle">Context 2: How Agents Work</text>
+  <text x="550" y="50" fill="#8b949e" font-size="11" text-anchor="middle">Three modes — through Mindspace, on projects, on Mindspace itself</text>
+
+  <!-- MODE 1: Through Mindspace -->
+  <rect x="30" y="70" width="330" height="450" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <rect x="30" y="70" width="330" height="32" rx="8" fill="#0d2818"/>
+  <rect x="30" y="94" width="330" height="8" fill="#0d2818"/>
+  <text x="195" y="92" fill="#3fb950" font-size="13" font-weight="700" text-anchor="middle">THROUGH Mindspace</text>
+  <text x="195" y="118" fill="#8b949e" font-size="10" text-anchor="middle">All PM operations via A2A protocol</text>
+
+  <!-- Agent -->
+  <rect x="55" y="135" width="130" height="40" rx="6" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="120" y="155" fill="#58a6ff" font-size="11" font-weight="600" text-anchor="middle">Agent (LLM)</text>
+  <text x="120" y="168" fill="#8b949e" font-size="8" text-anchor="middle">thinks, decides</text>
+
+  <line x1="120" y1="175" x2="120" y2="195" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="116,193 120,200 124,193" fill="#3fb950"/>
+
+  <!-- A2A Protocol -->
+  <rect x="55" y="200" width="280" height="100" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="195" y="220" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">A2A Server (no LLM)</text>
+  <text x="195" y="238" fill="#8b949e" font-size="9" text-anchor="middle">validates, routes, enforces gates</text>
+
+  <text x="70" y="258" fill="#c9d1d9" font-size="9">OBJECT_QUERY → list tasks</text>
+  <text x="70" y="272" fill="#c9d1d9" font-size="9">TRANSITION → change task status</text>
+  <text x="70" y="286" fill="#c9d1d9" font-size="9">OBJECT_CREATE → new mission/report</text>
+  <text x="70" y="300" fill="#c9d1d9" font-size="9">OBJECT_UPDATE → update DNA</text>
+
+  <line x1="195" y1="300" x2="195" y2="320" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="191,318 195,325 199,318" fill="#3fb950"/>
+
+  <!-- Database -->
+  <rect x="105" y="325" width="180" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="195" y="345" fill="#8b949e" font-size="10" text-anchor="middle">SQLite (storage adapter)</text>
+  <text x="195" y="358" fill="#484f58" font-size="8" text-anchor="middle">agents never touch this directly</text>
+
+  <!-- Brain -->
+  <rect x="55" y="385" width="130" height="40" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="120" y="405" fill="#bc8cff" font-size="10" font-weight="600" text-anchor="middle">Brain (Qdrant)</text>
+  <text x="120" y="418" fill="#8b949e" font-size="8" text-anchor="middle">BRAIN_QUERY / CONTRIBUTE</text>
+
+  <!-- SSE -->
+  <rect x="205" y="385" width="130" height="40" rx="6" fill="#161b22" stroke="#d29922"/>
+  <text x="270" y="405" fill="#d29922" font-size="10" font-weight="600" text-anchor="middle">SSE Push</text>
+  <text x="270" y="418" fill="#8b949e" font-size="8" text-anchor="middle">events → agents</text>
+
+  <!-- No direct DB -->
+  <rect x="55" y="445" width="280" height="30" rx="4" fill="#1c1117" stroke="#f85149"/>
+  <text x="195" y="464" fill="#f85149" font-size="9" font-weight="600" text-anchor="middle">NO direct DB access. NO interface-cli.js. A2A only.</text>
+
+  <!-- Blocked arrow -->
+  <line x1="120" y1="175" x2="195" y2="325" stroke="#f85149" stroke-width="1" stroke-dasharray="4,4" opacity="0.3"/>
+  <text x="140" y="250" fill="#f85149" font-size="20" text-anchor="middle" opacity="0.3">✗</text>
+
+  <!-- MODE 2: On Projects -->
+  <rect x="385" y="70" width="330" height="450" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+  <rect x="385" y="70" width="330" height="32" rx="8" fill="#0d2240"/>
+  <rect x="385" y="94" width="330" height="8" fill="#0d2240"/>
+  <text x="550" y="92" fill="#58a6ff" font-size="13" font-weight="700" text-anchor="middle">ON Projects</text>
+  <text x="550" y="118" fill="#8b949e" font-size="10" text-anchor="middle">Robin assigns work, agents develop</text>
+
+  <!-- Robin -->
+  <rect x="430" y="135" width="100" height="35" rx="6" fill="#161b22" stroke="#f5c2e7"/>
+  <text x="480" y="152" fill="#f5c2e7" font-size="10" font-weight="600" text-anchor="middle">Robin</text>
+  <text x="480" y="164" fill="#8b949e" font-size="8" text-anchor="middle">creates project</text>
+
+  <line x1="530" y1="152" x2="570" y2="152" stroke="#d29922" stroke-width="1.5"/>
+
+  <!-- Task via A2A -->
+  <rect x="570" y="135" width="120" height="35" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="630" y="152" fill="#3fb950" font-size="10" text-anchor="middle">Task via A2A</text>
+  <text x="630" y="164" fill="#8b949e" font-size="8" text-anchor="middle">assigned to DEV</text>
+
+  <line x1="550" y1="170" x2="550" y2="195" stroke="#58a6ff" stroke-width="1.5"/>
+  <polygon points="546,193 550,200 554,193" fill="#58a6ff"/>
+
+  <!-- Agent team -->
+  <rect x="410" y="200" width="70" height="30" rx="4" fill="#1c2333" stroke="#f5c2e7"/>
+  <text x="445" y="219" fill="#f5c2e7" font-size="9" text-anchor="middle">LIAISON</text>
+
+  <rect x="490" y="200" width="55" height="30" rx="4" fill="#1c2333" stroke="#f9e2af"/>
+  <text x="517" y="219" fill="#f9e2af" font-size="9" text-anchor="middle">PDSA</text>
+
+  <rect x="555" y="200" width="55" height="30" rx="4" fill="#1c2333" stroke="#89b4fa"/>
+  <text x="582" y="219" fill="#89b4fa" font-size="9" text-anchor="middle">DEV</text>
+
+  <rect x="620" y="200" width="55" height="30" rx="4" fill="#1c2333" stroke="#a6e3a1"/>
+  <text x="647" y="219" fill="#a6e3a1" font-size="9" text-anchor="middle">QA</text>
+
+  <line x1="550" y1="230" x2="550" y2="255" stroke="#58a6ff" stroke-width="1.5"/>
+  <polygon points="546,253 550,260 554,253" fill="#58a6ff"/>
+
+  <!-- Workspace -->
+  <rect x="410" y="260" width="280" height="110" rx="6" fill="#161b22" stroke="#58a6ff"/>
+  <text x="550" y="282" fill="#58a6ff" font-size="11" font-weight="600" text-anchor="middle">Project Workspace (RW)</text>
+
+  <text x="425" y="302" fill="#c9d1d9" font-size="9">DEV: write code, run build</text>
+  <text x="425" y="316" fill="#c9d1d9" font-size="9">QA: run tests, write test files</text>
+  <text x="425" y="330" fill="#c9d1d9" font-size="9">PDSA: write design docs</text>
+  <text x="425" y="348" fill="#c9d1d9" font-size="9">git commit + push (delegated credentials)</text>
+  <text x="425" y="362" fill="#8b949e" font-size="8">Scoped: agent only writes to assigned project</text>
+
+  <line x1="550" y1="370" x2="550" y2="395" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="546,393 550,400 554,393" fill="#3fb950"/>
+
+  <!-- Report back -->
+  <rect x="430" y="400" width="240" height="35" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="550" y="420" fill="#3fb950" font-size="10" text-anchor="middle">Report back via A2A TRANSITION</text>
+
+  <!-- Deployment -->
+  <rect x="410" y="455" width="280" height="35" rx="6" fill="#161b22" stroke="#d29922"/>
+  <text x="550" y="476" fill="#d29922" font-size="10" text-anchor="middle">Deploy: commit → PR → rc → rebuild</text>
+
+  <!-- MODE 3: On Mindspace -->
+  <rect x="740" y="70" width="330" height="450" rx="8" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+  <rect x="740" y="70" width="330" height="32" rx="8" fill="#2d1b00"/>
+  <rect x="740" y="94" width="330" height="8" fill="#2d1b00"/>
+  <text x="905" y="92" fill="#d29922" font-size="13" font-weight="700" text-anchor="middle">ON Mindspace Itself</text>
+  <text x="905" y="118" fill="#8b949e" font-size="10" text-anchor="middle">The system develops itself</text>
+
+  <!-- Self-development cycle -->
+  <rect x="770" y="140" width="270" height="80" rx="6" fill="#1c2333" stroke="#d29922"/>
+  <text x="905" y="163" fill="#d29922" font-size="11" font-weight="600" text-anchor="middle">DEV agent modifies Mindspace code</text>
+  <text x="785" y="183" fill="#c9d1d9" font-size="9">e.g. add new A2A handler</text>
+  <text x="785" y="197" fill="#c9d1d9" font-size="9">e.g. fix terminal-ws.ts</text>
+  <text x="785" y="211" fill="#c9d1d9" font-size="9">e.g. new migration, new viz component</text>
+
+  <line x1="905" y1="220" x2="905" y2="245" stroke="#d29922" stroke-width="1.5"/>
+  <polygon points="901,243 905,250 909,243" fill="#d29922"/>
+
+  <rect x="770" y="250" width="270" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="905" y="270" fill="#c9d1d9" font-size="10" text-anchor="middle">git commit → PR → develop → rc</text>
+  <text x="905" y="284" fill="#8b949e" font-size="8" text-anchor="middle">same pipeline as any project</text>
+
+  <line x1="905" y1="290" x2="905" y2="315" stroke="#d29922" stroke-width="1.5"/>
+  <polygon points="901,313 905,320 909,313" fill="#d29922"/>
+
+  <rect x="770" y="320" width="270" height="50" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="905" y="343" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">Rebuild container = new twin</text>
+  <text x="905" y="360" fill="#8b949e" font-size="9" text-anchor="middle">new A2A handler is live in the new body</text>
+
+  <line x1="905" y1="370" x2="905" y2="395" stroke="#d29922" stroke-width="1.5"/>
+  <polygon points="901,393 905,400 909,393" fill="#d29922"/>
+
+  <!-- Loop back -->
+  <rect x="770" y="400" width="270" height="50" rx="6" fill="#1c2333" stroke="#d29922"/>
+  <text x="905" y="420" fill="#d29922" font-size="10" font-weight="600" text-anchor="middle">Agents wake up in the NEW body</text>
+  <text x="905" y="436" fill="#8b949e" font-size="9" text-anchor="middle">with the feature they just built</text>
+
+  <!-- Loop arrow -->
+  <line x1="1040" y1="425" x2="1060" y2="425" stroke="#d29922" stroke-width="1.5"/>
+  <line x1="1060" y1="425" x2="1060" y2="160" stroke="#d29922" stroke-width="1.5"/>
+  <line x1="1060" y1="160" x2="1040" y2="160" stroke="#d29922" stroke-width="1.5"/>
+  <polygon points="1042,155 1035,160 1042,165" fill="#d29922"/>
+  <text x="1068" y="290" fill="#d29922" font-size="8" transform="rotate(90,1068,290)">self-development loop</text>
+
+  <!-- Context 1 deprecated -->
+  <rect x="770" y="470" width="270" height="35" rx="4" fill="#1c1117" stroke="#f85149"/>
+  <text x="905" y="491" fill="#f85149" font-size="9" font-weight="600" text-anchor="middle">Context 1 (host tmux) becomes unnecessary</text>
+
+  <!-- Version -->
+  <text x="550" y="540" fill="#484f58" font-size="8" text-anchor="middle">MISSION-CONTEXT2-TRANSITION v1 | 2026-03-30</text>
+</svg>
