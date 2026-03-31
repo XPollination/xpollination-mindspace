@@ -1,16 +1,21 @@
 /**
- * Terminal WebSocket — bridges browser xterm.js to server-side tmux sessions.
+ * Terminal WebSocket — bridges browser xterm.js to agent tmux sessions.
  * Route: /ws/terminal/:sessionName
- * Protocol: raw binary PTY data over WebSocket (same as xterm.js attach addon)
+ *
+ * Proxies WebSocket to the host agent runtime (agents run on host, not in Docker).
+ * Falls back to local tmux attach if runtime is unavailable.
  */
 
 import jwt from 'jsonwebtoken';
 import { IncomingMessage } from 'node:http';
 import { Duplex } from 'node:stream';
 import { WebSocketServer, WebSocket } from 'ws';
-import { sessionExists, createSession, resizeSession } from '../lib/terminal-manager.js';
+import { sessionExists, resizeSession } from '../lib/terminal-manager.js';
 
-// Use dynamic import for node-pty (native module)
+const RUNTIME_URL = process.env.AGENT_RUNTIME_URL || 'http://host.docker.internal:3101';
+const RUNTIME_WS = RUNTIME_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+
+// Use dynamic import for node-pty (native module, fallback only)
 let ptySpawn: any;
 async function getPty() {
   if (!ptySpawn) {
@@ -26,14 +31,47 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url || '/', `http://localhost`);
   const sessionName = url.pathname.split('/').pop() || 'default';
 
-  // Only attach to existing sessions — never auto-create
-  // Sessions are born through /api/agents/start → start-agent.sh → exec claude
+  // Try to proxy to host agent runtime
+  try {
+    const upstream = new WebSocket(`${RUNTIME_WS}/ws/terminal/${sessionName}`);
+
+    upstream.on('open', () => {
+      // Proxy: client → upstream
+      ws.on('message', (data) => {
+        if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
+      });
+    });
+
+    // Proxy: upstream → client
+    upstream.on('message', (data) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+    });
+
+    upstream.on('close', () => {
+      if (ws.readyState === WebSocket.OPEN) ws.close();
+    });
+
+    upstream.on('error', () => {
+      // Runtime proxy failed — fall back to local tmux
+      upstream.close();
+      fallbackToLocalTmux(ws, sessionName);
+    });
+
+    ws.on('close', () => upstream.close());
+    ws.on('error', () => upstream.close());
+
+  } catch {
+    // Runtime not available — fall back to local tmux
+    fallbackToLocalTmux(ws, sessionName);
+  }
+});
+
+async function fallbackToLocalTmux(ws: WebSocket, sessionName: string) {
   if (!sessionExists(sessionName)) {
     ws.close();
     return;
   }
 
-  // Spawn tmux attach via node-pty for full PTY support
   const spawn = await getPty();
   const pty = spawn('tmux', ['attach-session', '-t', sessionName], {
     name: 'xterm-256color',
@@ -43,45 +81,26 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     env: { ...process.env, TERM: 'xterm-256color' },
   });
 
-  // PTY → WebSocket
   pty.onData((data: string) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-    }
+    if (ws.readyState === WebSocket.OPEN) ws.send(data);
   });
 
-  // WebSocket → PTY
   ws.on('message', (data: Buffer | string) => {
     const msg = data.toString();
-    // Check for resize messages (JSON format)
     if (msg.startsWith('{"type":"resize"')) {
       try {
         const { cols, rows } = JSON.parse(msg);
-        if (cols && rows) {
-          pty.resize(cols, rows);
-          resizeSession(sessionName, cols, rows);
-        }
-      } catch { /* ignore parse errors */ }
+        if (cols && rows) { pty.resize(cols, rows); resizeSession(sessionName, cols, rows); }
+      } catch { /* */ }
       return;
     }
     pty.write(msg);
   });
 
-  // Cleanup on WebSocket close — detach but DON'T kill tmux session
-  ws.on('close', () => {
-    pty.kill();  // Kills the tmux attach process, NOT the session
-  });
-
-  ws.on('error', () => {
-    pty.kill();
-  });
-
-  pty.onExit(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
-  });
-});
+  ws.on('close', () => pty.kill());
+  ws.on('error', () => pty.kill());
+  pty.onExit(() => { if (ws.readyState === WebSocket.OPEN) ws.close(); });
+}
 
 export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
   const url = new URL(req.url || '/', `http://localhost`);
@@ -91,8 +110,6 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
     return;
   }
 
-  // Security: verify session ownership
-  // Session names are agent-<role>-<userId> — extract userId and match against JWT
   const sessionName = url.pathname.split('/').pop() || '';
   const sessionUserId = sessionName.replace(/^agent-[a-z]+-/, '');
   const cookies = (req.headers.cookie || '').split(';').reduce((acc: Record<string,string>, c) => {
@@ -101,7 +118,6 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
     return acc;
   }, {} as Record<string, string>);
 
-  // Best-effort auth check — if JWT available, verify user owns the session
   const token = cookies['ms_session'] || url.searchParams.get('token');
   if (token && sessionUserId && sessionUserId !== 'default') {
     try {
@@ -111,7 +127,7 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
         socket.destroy();
         return;
       }
-    } catch { /* JWT verify failed — allow connection (graceful degradation) */ }
+    } catch { /* allow */ }
   }
 
   wss.handleUpgrade(req, socket, head, (ws) => {

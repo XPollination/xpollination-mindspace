@@ -264,22 +264,28 @@ agentsRouter.get('/processes', (req: Request, res: Response) => {
   res.status(200).json({ count: agents.length, agents });
 });
 
-// GET /api/agents/running — list actual running tmux agent sessions for this user
-agentsRouter.get('/running', (req: Request, res: Response) => {
-  const user = (req as any).user;
-  const userId = user?.id || user?.sub;
-  const roles = ['liaison', 'pdsa', 'dev', 'qa'];
-  const running: any[] = [];
-
-  for (const role of roles) {
-    const sessionName = `agent-${role}-${userId}`;
-    try {
-      execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
-      running.push({ role, sessionName, status: 'running' });
-    } catch { /* session doesn't exist */ }
+// GET /api/agents/running — delegate to host agent runtime
+agentsRouter.get('/running', async (req: Request, res: Response) => {
+  const runtimeUrl = process.env.AGENT_RUNTIME_URL || 'http://host.docker.internal:3101';
+  try {
+    const resp = await fetch(`${runtimeUrl}/running`);
+    const data = await resp.json();
+    res.json(data);
+  } catch {
+    // Runtime not available — fall back to local tmux check
+    const user = (req as any).user;
+    const userId = user?.id || user?.sub;
+    const roles = ['liaison', 'pdsa', 'dev', 'qa'];
+    const running: any[] = [];
+    for (const role of roles) {
+      const sessionName = `agent-${role}-${userId}`;
+      try {
+        execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
+        running.push({ role, sessionName, status: 'running' });
+      } catch { /* */ }
+    }
+    res.json(running);
   }
-
-  res.json(running);
 });
 
 // GET /api/agents/me/liaison — check if user's LIAISON is running (MUST be before /:id)
@@ -306,7 +312,7 @@ agentsRouter.get('/:id', (req: Request, res: Response) => {
 });
 
 // POST /api/agents/start — create per-user tmux session + start Claude Code agent
-agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) => {
+agentsRouter.post('/start', requireApiKeyOrJwt, async (req: Request, res: Response) => {
   const { role } = req.body;
   const user = (req as any).user;
   const userId = user?.id || user?.sub;
@@ -325,43 +331,39 @@ agentsRouter.post('/start', requireApiKeyOrJwt, (req: Request, res: Response) =>
   db.prepare("UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now') WHERE user_id = ? AND current_role = ? AND status != 'disconnected'")
     .run(userId, role);
 
+  // Delegate to host agent runtime
+  const runtimeUrl = process.env.AGENT_RUNTIME_URL || 'http://host.docker.internal:3101';
+  const authHeader = req.headers.authorization;
+  const agentJwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
   try {
-    // Check if session already exists — reuse
-    try {
-      execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
-      res.status(200).json({ sessionName, agentId: sessionName, role, userId, status: 'running', message: 'Agent already running.' });
-      return;
-    } catch { /* session doesn't exist — create it */ }
-
-    // JWT delegation: pass user's JWT so agent can register with A2A
-    const authHeader = req.headers.authorization;
-    const agentJwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
-
-    // Create tmux session with bash, then send-keys to run start-agent.sh
-    // (exec claude needs a proper interactive PTY — inline command doesn't provide one)
-    execFileSync('tmux', [
-      'new-session', '-d', '-s', sessionName, '-x', '120', '-y', '40'
-    ], { env: { ...process.env, AGENT_JWT: agentJwt }, stdio: 'pipe' });
-    execFileSync('tmux', [
-      'send-keys', '-t', sessionName,
-      `bash /app/scripts/start-agent.sh ${role} ${userId}`, 'Enter'
-    ], { stdio: 'pipe' });
-
-    res.status(201).json({
+    const resp = await fetch(`${runtimeUrl}/spawn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionName, role, userId, agentJwt }),
+    });
+    const data = await resp.json() as any;
+    res.status(resp.status === 201 ? 201 : 200).json({
       sessionName,
       agentId: sessionName,
       role,
       userId,
-      status: 'starting',
-      message: `Agent ${role} starting for user ${userId}.`,
+      status: data.status || 'starting',
+      message: data.message || `Agent ${role} starting for user ${userId}.`,
     });
   } catch (err: any) {
-    res.status(500).json({ error: `Failed to start agent: ${err.message}` });
+    // Fall back to local tmux if runtime unavailable
+    try {
+      execFileSync('tmux', ['has-session', '-t', sessionName], { stdio: 'pipe' });
+      res.status(200).json({ sessionName, agentId: sessionName, role, userId, status: 'running', message: 'Agent already running (local).' });
+    } catch {
+      res.status(503).json({ error: `Agent runtime unavailable: ${err.message}` });
+    }
   }
 });
 
-// POST /api/agents/stop — kill agent tmux session + mark disconnected
-agentsRouter.post('/stop', (req: Request, res: Response) => {
+// POST /api/agents/stop — delegate to host runtime + mark disconnected
+agentsRouter.post('/stop', async (req: Request, res: Response) => {
   const { sessionName } = req.body;
   const user = (req as any).user;
   const userId = user?.id || user?.sub;
@@ -371,15 +373,22 @@ agentsRouter.post('/stop', (req: Request, res: Response) => {
     return;
   }
 
-  // Security: verify session belongs to this user
   if (!sessionName.includes(userId)) {
     res.status(403).json({ error: 'Cannot stop another user\'s agent' });
     return;
   }
 
+  const runtimeUrl = process.env.AGENT_RUNTIME_URL || 'http://host.docker.internal:3101';
   try {
-    execFileSync('tmux', ['kill-session', '-t', sessionName], { stdio: 'pipe' });
-  } catch { /* session may not exist */ }
+    await fetch(`${runtimeUrl}/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionName }),
+    });
+  } catch {
+    // Fall back to local tmux
+    try { execFileSync('tmux', ['kill-session', '-t', sessionName], { stdio: 'pipe' }); } catch { /* */ }
+  }
 
   // Mark agent as disconnected in DB
   const db = getDb();
