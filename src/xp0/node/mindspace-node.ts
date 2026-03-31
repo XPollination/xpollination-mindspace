@@ -154,9 +154,13 @@ export class MindspaceNode {
     const winnerTwin = await this.storage.resolve(winnerCid);
     if (!winnerTwin) return;
 
-    // Create merge twin: evolve the winner with mergedFrom info
-    // This creates a new head that supersedes all losers
+    // Undock ALL heads (including winner) — then dock only the merge twin
     const losers = heads.filter((h) => h !== winnerCid);
+    for (const loserCid of losers) {
+      await this.storage.undock(loserCid);
+    }
+
+    // Create merge twin from winner with mergedFrom metadata
     const merged = await evolve(winnerTwin, {
       mergedFrom: losers,
       conflict_resolved: true,
@@ -164,7 +168,7 @@ export class MindspaceNode {
     await this.storage.dock(merged);
     this.taskIndex.set(logicalId, merged);
 
-    // Propagate the merge so other nodes also converge
+    // Propagate so other nodes converge
     await this.transport.publish('xp0/tasks', {
       type: 'twin.evolved',
       cid: merged.cid,
