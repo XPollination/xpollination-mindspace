@@ -672,6 +672,373 @@ describe('T1.4: Runner drain — finish current task, reject new ones', () => {
 // This is the ultimate test — it exercises EVERYTHING.
 // ═══════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════
+// SECURITY — Integration-level tests (structural, not added later)
+// These verify security works ACROSS THE NETWORK, not just in one
+// process. Module-level security tests pass but don't prove that
+// peers actually reject invalid twins received via transport.
+// ═══════════════════════════════════════════════════════════════════
+
+describe('T-SEC INTEGRATION: Security across network peers', () => {
+  let honest: MindspaceNode;
+  let rogue: MindspaceNode;
+
+  beforeAll(async () => {
+    honest = await createNode();
+    await honest.start();
+
+    const addrs = honest.getListenAddresses();
+    rogue = await createNode({ bootstrapPeers: addrs });
+    await rogue.start();
+    await sleep(3000);
+  });
+
+  afterAll(async () => {
+    await rogue.stop();
+    await honest.stop();
+  });
+
+  it('T-SEC-1 NETWORK: rogue runner twin rejected by honest peer — never docked', async () => {
+    // Rogue creates a runner twin WITHOUT a valid delegation VC
+    const rogueTwin = await rogue.createTwin('object', 'xp0/runner/v0.0.1', {
+      name: 'rogue-runner',
+      roles: ['dev'],
+      status: 'ready',
+      // No delegationVC — this is the rogue part
+    });
+
+    // Rogue publishes it
+    await rogue.transport.publish('xp0/project/test', {
+      type: 'twin.created',
+      cid: rogueTwin.cid,
+    });
+
+    await sleep(2000);
+
+    // Honest node should NOT have docked this twin
+    const found = await honest.storage.resolve(rogueTwin.cid);
+    expect(found).toBeNull();
+  });
+
+  it('T-SEC-2 NETWORK: impersonated twin rejected by receiving peer', async () => {
+    // Rogue signs a twin claiming to be owned by honest node's DID
+    const { generateKeyPair: genKeys } = await import('../auth/identity.js');
+    const fakeKeys = await genKeys();
+
+    const impersonated = await create('object', 'xp0/task', honest.ownerDID, {
+      title: 'Impersonated task',
+      status: 'active',
+      logicalId: 'impersonated',
+    });
+    // Sign with WRONG key (rogue's key, but claiming honest's DID)
+    const { sign: signTwin } = await import('../twin/kernel.js');
+    const badSigned = await signTwin(impersonated, fakeKeys.privateKey);
+
+    // Rogue sends to honest
+    await rogue.transport.publish('xp0/project/test', {
+      type: 'twin.created',
+      cid: badSigned.cid,
+    });
+
+    await sleep(2000);
+
+    // Honest node should reject — signature doesn't match owner DID
+    const found = await honest.storage.resolve(badSigned.cid);
+    expect(found).toBeNull();
+  });
+
+  it('T-SEC-5 NETWORK: replayed twin evolution ignored by receiving peer', async () => {
+    // Create a valid twin on honest node
+    const twin = await honest.createTwin('object', 'xp0/task', {
+      title: 'Replay test',
+      logicalId: 'replay-test',
+    });
+
+    // Send it once — honest docks it
+    await honest.transport.publish('xp0/project/test', {
+      type: 'twin.created',
+      cid: twin.cid,
+    });
+
+    await sleep(1000);
+    const countBefore = (await honest.storage.query({})).length;
+
+    // Replay the SAME twin — should be idempotent
+    await rogue.transport.publish('xp0/project/test', {
+      type: 'twin.created',
+      cid: twin.cid,
+    });
+
+    await sleep(1000);
+    const countAfter = (await honest.storage.query({})).length;
+
+    // No duplicate docked
+    expect(countAfter).toBe(countBefore);
+  });
+
+  it('T-SEC-7 NETWORK: tombstoned delegation VC propagates — all peers reject runner', async () => {
+    const nodeA = await createNode();
+    const nodeB = await createNode();
+    await nodeA.start();
+    await nodeB.start();
+    await nodeB.connectTo(nodeA.getListenAddresses());
+    await sleep(2000);
+
+    // Create runner with delegation on A
+    const runner = await nodeA.addRunner({ role: 'dev' });
+    const runnerTwin = runner.getRunnerTwin();
+
+    // Verify B can see the runner (via transport)
+    await nodeA.transport.publish('xp0/project/test', {
+      type: 'runner.registered',
+      cid: runnerTwin.cid,
+    });
+    await sleep(1000);
+
+    // Owner tombstones the delegation VC
+    await nodeA.revokeDelegation(runner.getId());
+
+    // Tombstone propagates to B
+    await sleep(2000);
+
+    // Now runner tries to claim a task — should be rejected by BOTH peers
+    const task = await nodeA.createTask({
+      title: 'Post-revoke task',
+      role: 'dev',
+      project: 'test',
+      logicalId: 'post-revoke',
+    });
+
+    await sleep(3000);
+
+    // Task should still be ready (not claimed) — revoked runner can't claim
+    const latest = await nodeA.getLatestTwin('post-revoke');
+    expect((latest!.content as any).status).toBe('ready');
+
+    await nodeB.stop();
+    await nodeA.stop();
+  });
+
+  it('T-SEC-9 NETWORK: forget() propagates — all peers purge content', async () => {
+    const nodeA = await createNode();
+    const nodeB = await createNode();
+    await nodeA.start();
+    await nodeB.start();
+    await nodeB.connectTo(nodeA.getListenAddresses());
+    await sleep(2000);
+
+    // Create twin on A, sync to B
+    const twin = await nodeA.createTwin('object', 'xp0/task', {
+      personal_data: 'sensitive GDPR content',
+      logicalId: 'gdpr-test',
+    });
+
+    // B fetches and docks it
+    const fetched = await nodeB.transport.requestTwin(twin.cid);
+    expect(fetched).not.toBeNull();
+    await nodeB.storage.dock(fetched!);
+
+    // A forgets — should propagate via GossipSub
+    await nodeA.storage.forget(twin.cid);
+    await nodeA.transport.publish('xp0/system/forget', {
+      type: 'twin.forgotten',
+      cid: twin.cid,
+    });
+
+    await sleep(2000);
+
+    // B should also have forgotten
+    const onB = await nodeB.storage.resolve(twin.cid);
+    expect(onB).not.toBeNull();
+    expect((onB as any).state).toBe('forgotten');
+    expect((onB as any).content?.personal_data).toBeUndefined();
+
+    await nodeB.stop();
+    await nodeA.stop();
+  });
+
+  it('T-SEC-10 NETWORK: partition conflict resolved identically on both sides', async () => {
+    const nodeA = await createNode();
+    const nodeB = await createNode();
+    await nodeA.start();
+    await nodeB.start();
+    // Connected initially
+    await nodeB.connectTo(nodeA.getListenAddresses());
+    await sleep(2000);
+
+    // Create task
+    const task = await nodeA.createTask({
+      title: 'Partition test',
+      role: 'dev',
+      project: 'test',
+      logicalId: 'partition-test',
+    });
+
+    // Sync task to B
+    await sleep(1000);
+
+    // DISCONNECT — simulate network partition
+    await nodeB.transport.stop();
+
+    // Both sides claim independently (divergent evolution)
+    const runnerA = await nodeA.addRunner({ role: 'dev', autoClaimDelay: 0 });
+    const runnerB = await nodeB.addRunner({ role: 'dev', autoClaimDelay: 0 });
+
+    // A claims locally
+    await sleep(2000);
+    // B claims locally (isolated)
+    await sleep(2000);
+
+    // RECONNECT — partition heals
+    await nodeB.transport.start();
+    await nodeB.connectTo(nodeA.getListenAddresses());
+    await sleep(5000);
+
+    // Both sides should resolve to same winner
+    const headsA = await nodeA.storage.heads('partition-test');
+    const headsB = await nodeB.storage.heads('partition-test');
+
+    expect(headsA.length).toBe(1);
+    expect(headsB.length).toBe(1);
+    expect(headsA[0]).toBe(headsB[0]); // Same winner, deterministic
+
+    await nodeB.stop();
+    await nodeA.stop();
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// GAP 3: GDPR forget propagation
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Gap 3: GDPR forget propagation across peers', () => {
+  it('node subscribes to xp0/system/forget topic and auto-forgets received CIDs', async () => {
+    const nodeA = await createNode();
+    const nodeB = await createNode();
+    await nodeA.start();
+    await nodeB.start();
+    await nodeB.connectTo(nodeA.getListenAddresses());
+    await sleep(2000);
+
+    // Both have the twin
+    const twin = await nodeA.createTwin('object', 'xp0/test', { data: 'to be forgotten' });
+    const fetched = await nodeB.transport.requestTwin(twin.cid);
+    await nodeB.storage.dock(fetched!);
+
+    // A forgets via MindspaceNode.forget() — should auto-propagate
+    await nodeA.forgetTwin(twin.cid);
+
+    await sleep(3000);
+
+    // B auto-forgot (subscribed to system/forget topic)
+    const onB = await nodeB.storage.resolve(twin.cid);
+    expect((onB as any).state).toBe('forgotten');
+
+    await nodeB.stop();
+    await nodeA.stop();
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// GAP 4: Permission Model — scoped access
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Gap 4: Permission-scoped access', () => {
+  it('T-SEC-3: runner can only read DNA of tasks it is executing', async () => {
+    const node = await createNode();
+    await node.start();
+
+    const runner = await node.addRunner({ role: 'dev' });
+
+    // Create two tasks
+    const taskA = await node.createTask({
+      title: 'Task A — assigned to runner',
+      role: 'dev', project: 'test', logicalId: 'perm-task-a',
+    });
+    const taskB = await node.createTask({
+      title: 'Task B — NOT assigned to runner',
+      role: 'qa', project: 'test', logicalId: 'perm-task-b',
+    });
+
+    // Runner claims task A
+    await sleep(3000);
+
+    // Runner CAN read task A DNA (executing relation exists)
+    const dnaA = await node.getTaskDNAForRunner(runner.getId(), 'perm-task-a');
+    expect(dnaA).not.toBeNull();
+
+    // Runner CANNOT read task B DNA (no executing relation)
+    await expect(node.getTaskDNAForRunner(runner.getId(), 'perm-task-b'))
+      .rejects.toThrow(/permission|denied|no.*relation/i);
+
+    await node.stop();
+  });
+
+  it('T-SEC-6: rate limiting — runner claiming too fast is rejected', async () => {
+    const node = await createNode();
+    await node.start();
+
+    // Set rate limit policy: max 2 claims per 10s
+    await node.setRateLimitPolicy({ maxClaimsPerWindow: 2, windowSeconds: 10 });
+
+    const runner = await node.addRunner({ role: 'dev', autoClaimDelay: 0 });
+
+    // Create 5 tasks rapidly
+    for (let i = 0; i < 5; i++) {
+      await node.createTask({
+        title: `Rate limit task ${i}`,
+        role: 'dev', project: 'test', logicalId: `rate-${i}`,
+      });
+    }
+
+    await sleep(5000);
+
+    // Only 2 should be claimed (rate limited)
+    let claimed = 0;
+    for (let i = 0; i < 5; i++) {
+      const t = await node.getLatestTwin(`rate-${i}`);
+      if ((t!.content as any).status === 'active') claimed++;
+    }
+    expect(claimed).toBe(2);
+
+    await node.stop();
+  });
+
+  it('T-SEC-8: brain access scoped by delegation VC', async () => {
+    const node = await createNode();
+    await node.start();
+
+    // Runner with brain access in VC scope
+    const withBrain = await node.addRunner({
+      role: 'dev',
+      delegationScope: { operations: ['claim-tasks', 'read-brain'], roles: ['dev'] },
+    });
+
+    // Runner WITHOUT brain access in VC scope
+    const noBrain = await node.addRunner({
+      role: 'qa',
+      delegationScope: { operations: ['claim-tasks'], roles: ['qa'] },  // no read-brain
+    });
+
+    // withBrain can query brain
+    const result = await node.queryBrainAsRunner(withBrain.getId(), 'test query');
+    expect(result).toBeDefined();
+
+    // noBrain cannot query brain
+    await expect(node.queryBrainAsRunner(noBrain.getId(), 'test query'))
+      .rejects.toThrow(/permission|denied|scope/i);
+
+    await node.stop();
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Full team workflow across network
+// ═══════════════════════════════════════════════════════════════════
+
 describe('T7.1 FULL: Complete PDSA workflow across two machines', () => {
   let thomas: MindspaceNode;
   let robin: MindspaceNode;
