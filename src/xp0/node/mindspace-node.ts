@@ -261,6 +261,23 @@ export class IntegrationRunner {
     return undefined; // Runner accesses transport through the node
   }
 
+  getId(): string {
+    return this.runner.getId();
+  }
+
+  getStatus(): string {
+    return this.runner.getStatus();
+  }
+
+  async drain(): Promise<void> {
+    // Stop auto-claim, let current task finish
+    if (this.autoClaimTimer) {
+      clearInterval(this.autoClaimTimer);
+      this.autoClaimTimer = null;
+    }
+    await this.runner.drain();
+  }
+
   startAutoClaim(intervalMs: number): void {
     this.autoClaimTimer = setInterval(async () => {
       try {
