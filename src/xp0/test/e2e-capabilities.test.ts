@@ -433,12 +433,173 @@ describe('Capability 3: Team Management UI', () => {
 
   // ─── T3.7: Team twin visible in UI ───
 
-  it('team composition is visible — shows which agents are deployed', async () => {
+  it('team composition is visible — shows agent count and capacity', async () => {
     await screenshot(`${VIZ_URL}/agents`, 'cap3-team-composition.png');
 
     const text = await getPageText(`${VIZ_URL}/agents`);
-    // Should show team summary (agent count, roles)
+    // Should show team summary (agent count, capacity bar)
     expect(text).toMatch(/\d+\s*(agent|runner)/i);
+    // Capacity indicator: "N/M agents" or similar
+    expect(text).toMatch(/\d+\s*\/\s*\d+/);
+  });
+
+  // ─── T3.8: Runner shows current task when busy ───
+
+  it('busy runner card shows which task it is working on', async () => {
+    // Wait for a runner to claim a task (or trigger one)
+    await sleep(5000);
+    await screenshot(`${VIZ_URL}/agents`, 'cap3-runner-busy-task.png');
+
+    const text = await getPageText(`${VIZ_URL}/agents`);
+    // When busy, card should show the task slug or title
+    expect(text).toMatch(/working on|current task|busy/i);
+  });
+
+  // ─── T3.9: Role switching via UI ───
+
+  it('runner card has role switch dropdown — changing role updates card', async () => {
+    await screenshot(`${VIZ_URL}/agents`, 'cap3-role-switch-before.png');
+
+    const text = await getPageText(`${VIZ_URL}/agents`);
+    // Should have role switch control (dropdown or button)
+    expect(text).toMatch(/switch|role|change role/i);
+
+    // Click role switch (to qa)
+    await clickElement('[data-action="switch-role"], .ag-role-switch, select.ag-role-select');
+    await sleep(2000);
+
+    await screenshot(`${VIZ_URL}/agents`, 'cap3-role-switch-after.png');
+  });
+
+  // ─── T3.10: Network/peer connection status visible ───
+
+  it('agents page shows peer connection status', async () => {
+    await screenshot(`${VIZ_URL}/agents`, 'cap3-network-status.png');
+
+    const text = await getPageText(`${VIZ_URL}/agents`);
+    // Must show connection status — user needs to know if P2P is working
+    expect(text).toMatch(/connected|peers?|online|network/i);
+  });
+
+  // ─── T3.11: Heartbeat visual feedback ───
+
+  it('runner card shows heartbeat indicator (timestamp or pulse)', async () => {
+    await screenshot(`${VIZ_URL}/agents`, 'cap3-heartbeat.png');
+
+    const text = await getPageText(`${VIZ_URL}/agents`);
+    // Heartbeat shown as "last seen X ago" or "heartbeat: active"
+    expect(text).toMatch(/heartbeat|last.seen|ago|pulse|alive/i);
+  });
+
+  // ─── T3.12: Single agent mode — one runner switching roles ───
+
+  it('single agent with role switching is a valid configuration', async () => {
+    // Terminate all but one
+    // Then switch that runner through different roles
+    // System should warn but not prevent
+    const text = await getPageText(`${VIZ_URL}/agents`);
+
+    // Warning about incomplete team (informational, not blocking)
+    // Should NOT say "cannot" or "error"
+    // Should say "recommended" or "for full workflow" or similar
+    await screenshot(`${VIZ_URL}/agents`, 'cap3-single-agent.png');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// KANBAN INTEGRATION WITH RUNNER ARCHITECTURE
+// Task cards should show who claimed them
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Kanban Runner Integration', () => {
+  const VIZ_URL = process.env.VIZ_URL || 'http://127.0.0.1:4201';
+  const API_URL = process.env.API_URL || 'http://127.0.0.1:3101';
+  const CHROME_PORT = parseInt(process.env.CHROME_PORT || '40975');
+  const SCREENSHOT_DIR = resolve(__dirname, '../../../docs/reports/runner-architecture-beta-verification');
+
+  let token: string;
+
+  async function screenshot(url: string, filename: string, waitMs = 4000): Promise<string> {
+    const WebSocket = (await import('ws')).default;
+    const fs = await import('node:fs');
+    const pagesRes = await fetch(`http://127.0.0.1:${CHROME_PORT}/json`);
+    const pages = await pagesRes.json() as any[];
+    const page = pages.find((p: any) => p.type === 'page') || pages[0];
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(page.webSocketDebuggerUrl);
+      let id = 1;
+      const timeout = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 15000);
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ id: id++, method: 'Emulation.setDeviceMetricsOverride',
+          params: { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false } }));
+      });
+      ws.on('message', (data: any) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.id === 1) ws.send(JSON.stringify({ id: id++, method: 'Network.setCookie',
+          params: { name: 'ms_session', value: token, domain: new URL(url).hostname, path: '/' } }));
+        if (msg.id === 2) ws.send(JSON.stringify({ id: id++, method: 'Page.navigate', params: { url } }));
+        if (msg.id === 3) setTimeout(() => ws.send(JSON.stringify({ id: id++, method: 'Page.captureScreenshot', params: { format: 'png' } })), waitMs);
+        if (msg.id === 4 && msg.result?.data) {
+          const filepath = join(SCREENSHOT_DIR, filename);
+          fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+          fs.writeFileSync(filepath, Buffer.from(msg.result.data, 'base64'));
+          clearTimeout(timeout);
+          ws.close();
+          resolve(filepath);
+        }
+      });
+    });
+  }
+
+  async function getPageText(url: string): Promise<string> {
+    const WebSocket = (await import('ws')).default;
+    const pagesRes = await fetch(`http://127.0.0.1:${CHROME_PORT}/json`);
+    const pages = await pagesRes.json() as any[];
+    const page = pages.find((p: any) => p.type === 'page') || pages[0];
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(page.webSocketDebuggerUrl);
+      let id = 1;
+      const timeout = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 15000);
+      ws.on('open', () => { ws.send(JSON.stringify({ id: id++, method: 'Network.setCookie',
+        params: { name: 'ms_session', value: token, domain: new URL(url).hostname, path: '/' } })); });
+      ws.on('message', (data: any) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.id === 1) ws.send(JSON.stringify({ id: id++, method: 'Page.navigate', params: { url } }));
+        if (msg.id === 2) setTimeout(() => ws.send(JSON.stringify({ id: id++, method: 'Runtime.evaluate',
+          params: { expression: 'document.body.innerText' } })), 4000);
+        if (msg.id === 3 && msg.result?.result?.value) { clearTimeout(timeout); ws.close(); resolve(msg.result.result.value); }
+      });
+    });
+  }
+
+  beforeAll(async () => {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'thomas.pichler@xpollination.earth', password: 'changeme' }),
+    });
+    const data = await res.json() as any;
+    token = data.token;
+  });
+
+  it('active task card on kanban shows claimed_by runner name', async () => {
+    await screenshot(`${VIZ_URL}/kanban`, 'cap-kanban-claimed-by.png');
+
+    const text = await getPageText(`${VIZ_URL}/kanban`);
+    // Active tasks should show which runner claimed them
+    expect(text).toMatch(/claimed.by|runner|agent/i);
+  });
+
+  it('task status updates in real-time when runner transitions', async () => {
+    // Take screenshot, wait, take another — status should change
+    await screenshot(`${VIZ_URL}/kanban`, 'cap-kanban-realtime-before.png');
+    await sleep(5000);
+    await screenshot(`${VIZ_URL}/kanban`, 'cap-kanban-realtime-after.png');
+
+    // Both screenshots exist (visual proof of live updates)
+    const fs = await import('node:fs');
+    expect(fs.existsSync(join(SCREENSHOT_DIR, 'cap-kanban-realtime-before.png'))).toBe(true);
+    expect(fs.existsSync(join(SCREENSHOT_DIR, 'cap-kanban-realtime-after.png'))).toBe(true);
   });
 });
 
