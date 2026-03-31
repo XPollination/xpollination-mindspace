@@ -302,9 +302,9 @@ function cmdGet(idOrSlug) {
   const db = getDb();
 
   // Try by ID first, then by slug
-  let node = db.prepare('SELECT * FROM mindspace_nodes WHERE id = ?').get(idOrSlug);
+  let node = db.prepare('SELECT * FROM tasks WHERE id = ?').get(idOrSlug);
   if (!node) {
-    node = db.prepare('SELECT * FROM mindspace_nodes WHERE slug = ?').get(idOrSlug);
+    node = db.prepare('SELECT * FROM tasks WHERE slug = ?').get(idOrSlug);
   }
 
   if (!node) {
@@ -312,8 +312,12 @@ function cmdGet(idOrSlug) {
   }
 
   // Parse JSON fields
-  node.dna = JSON.parse(node.dna_json);
-  node.parent_ids = node.parent_ids ? JSON.parse(node.parent_ids) : [];
+  node.dna = node.dna_json ? JSON.parse(node.dna_json) : {};
+  node.type = 'task'; // tasks table has no type column
+  node.role = node.current_role || node.dna.role || null;
+  // Load dependencies from task_dependencies table
+  const deps = db.prepare('SELECT t.slug FROM task_dependencies td JOIN tasks t ON t.id = td.blocked_by_task_id WHERE td.task_id = ?').all(node.id);
+  node.depends_on = deps.map(d => d.slug);
   delete node.dna_json;
 
   output(node);
@@ -323,36 +327,41 @@ function cmdGet(idOrSlug) {
 function cmdList(filters) {
   const db = getDb();
 
-  let query = 'SELECT * FROM mindspace_nodes WHERE 1=1';
-  const params = [];
+  const projectSlug = filters.project || 'xpollination-mindspace';
+  let query = 'SELECT * FROM tasks WHERE project_slug = ?';
+  const params = [projectSlug];
 
   if (filters.status) {
     query += ' AND status = ?';
     params.push(filters.status);
   }
-  if (filters.type) {
-    query += ' AND type = ?';
-    params.push(filters.type);
-  }
   if (filters.role) {
-    query += ` AND json_extract(dna_json, '$.role') = ?`;
+    query += ' AND current_role = ?';
     params.push(filters.role);
   }
 
   query += ' ORDER BY updated_at DESC';
 
+  if (filters.limit) {
+    query += ' LIMIT ?';
+    params.push(parseInt(filters.limit));
+  }
+
   const nodes = db.prepare(query).all(...params);
 
   // Parse JSON fields
-  const result = nodes.map(node => ({
-    id: node.id,
-    type: node.type,
-    status: node.status,
-    slug: node.slug,
-    title: JSON.parse(node.dna_json).title || node.slug,
-    role: JSON.parse(node.dna_json).role || null,
-    updated_at: node.updated_at
-  }));
+  const result = nodes.map(node => {
+    const dna = node.dna_json ? JSON.parse(node.dna_json) : {};
+    return {
+      id: node.id,
+      type: 'task',
+      status: node.status,
+      slug: node.slug,
+      title: node.title || dna.title || node.slug,
+      role: node.current_role || dna.role || null,
+      updated_at: node.updated_at
+    };
+  });
 
   output({ count: result.length, nodes: result });
   db.close();
@@ -474,15 +483,15 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
   const db = getDb();
 
   // Get current node
-  const node = db.prepare('SELECT * FROM mindspace_nodes WHERE id = ? OR slug = ?').get(id, id);
+  const node = db.prepare('SELECT * FROM tasks WHERE id = ? OR slug = ?').get(id, id);
   if (!node) {
     error(`Node not found: ${id}`);
   }
 
   const fromStatus = node.status;
-  const nodeType = node.type;
+  const nodeType = node.type || 'task';
   const dna = JSON.parse(node.dna_json || '{}');
-  const currentRole = dna.role || null;
+  const currentRole = node.current_role || dna.role || null;
 
   // Narrow immutability bypass: complete→rework needs rework_target_role in DNA
   // Accept it as a transition parameter since update-dna blocks complete tasks
@@ -519,10 +528,10 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
     dna.blocked_at = new Date().toISOString();
 
     db.prepare(`
-      UPDATE mindspace_nodes
-      SET status = 'blocked', dna_json = ?, updated_at = datetime('now')
+      UPDATE tasks
+      SET status = 'blocked', current_role = ?, dna_json = ?, updated_at = datetime('now')
       WHERE id = ?
-    `).run(JSON.stringify(dna), node.id);
+    `).run(dna.role || node.current_role, JSON.stringify(dna), node.id);
 
     const result = {
       success: true,
@@ -561,10 +570,10 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
     delete restoredDna.blocked_at;
 
     db.prepare(`
-      UPDATE mindspace_nodes
-      SET status = ?, dna_json = ?, updated_at = datetime('now')
+      UPDATE tasks
+      SET status = ?, current_role = ?, dna_json = ?, updated_at = datetime('now')
       WHERE id = ?
-    `).run(effectiveNewStatus, JSON.stringify(restoredDna), node.id);
+    `).run(effectiveNewStatus, restoredDna.role || node.current_role, JSON.stringify(restoredDna), node.id);
 
     const result = {
       success: true,
@@ -615,13 +624,16 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
 
   // Dependency gates: only for pending→ready transitions
   if (fromStatus === 'pending' && newStatus === 'ready') {
-    const dependsOn = Array.isArray(dna.depends_on) ? dna.depends_on : [];
+    // Check both dna.depends_on AND task_dependencies table
+    const dnaDeps = Array.isArray(dna.depends_on) ? dna.depends_on : [];
+    const tableDeps = db.prepare('SELECT t.slug FROM task_dependencies td JOIN tasks t ON t.id = td.blocked_by_task_id WHERE td.task_id = ?').all(node.id).map(d => d.slug);
+    const dependsOn = [...new Set([...dnaDeps, ...tableDeps])];
 
     // Gate A: Dependency-aware scheduling — all depends_on tasks must be complete
     if (dependsOn.length > 0) {
       const incomplete = [];
       for (const depSlug of dependsOn) {
-        const depNode = db.prepare('SELECT status FROM mindspace_nodes WHERE slug = ?').get(depSlug);
+        const depNode = db.prepare('SELECT status FROM tasks WHERE slug = ?').get(depSlug);
         if (!depNode) {
           db.close();
           error(`Dependency not found: ${depSlug}. All depends_on slugs must exist.`);
@@ -787,18 +799,19 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
 
   const performTransition = db.transaction(() => {
     let updateResult;
+    const effectiveRole = updatedDna.role || node.current_role;
     if (dnaChanged) {
       updateResult = db.prepare(`
-        UPDATE mindspace_nodes
-        SET status = ?, dna_json = ?, updated_at = datetime('now')
+        UPDATE tasks
+        SET status = ?, current_role = ?, dna_json = ?, updated_at = datetime('now')
         WHERE id = ?
-      `).run(newStatus, JSON.stringify(updatedDna), node.id);
+      `).run(newStatus, effectiveRole, JSON.stringify(updatedDna), node.id);
     } else {
       updateResult = db.prepare(`
-        UPDATE mindspace_nodes
-        SET status = ?, updated_at = datetime('now')
+        UPDATE tasks
+        SET status = ?, current_role = ?, updated_at = datetime('now')
         WHERE id = ?
-      `).run(newStatus, node.id);
+      `).run(newStatus, effectiveRole, node.id);
     }
 
     // Check .changes — if 0 rows affected, the UPDATE silently failed
@@ -807,7 +820,7 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
     }
 
     // Verification read-back: confirm role persisted correctly after UPDATE
-    const verifyNode = db.prepare('SELECT status, dna_json FROM mindspace_nodes WHERE id = ?').get(node.id);
+    const verifyNode = db.prepare('SELECT status, dna_json, current_role FROM tasks WHERE id = ?').get(node.id);
     if (!verifyNode) {
       throw new Error(`Verification read-back failed: node ${node.id} not found after UPDATE`);
     }
@@ -830,6 +843,17 @@ async function cmdTransition(id, newStatus, actor, extraArgs = []) {
   } catch (err) {
     db.close();
     error(`Transition failed: ${err.message}`);
+  }
+
+  // Audit trail: record transition in task_transitions table
+  try {
+    db.prepare(`
+      INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, actor_role, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(randomUUID(), node.id, fromStatus, newStatus, actor, updatedDna.role || currentRole);
+  } catch (auditErr) {
+    // Non-fatal: log but don't fail the transition
+    console.error(`Warning: audit trail insert failed: ${auditErr.message}`);
   }
 
   const result = {
@@ -907,7 +931,7 @@ function cmdUpdateDna(id, dnaJson, actor) {
   const db = getDb();
 
   // Get current node
-  const node = db.prepare('SELECT * FROM mindspace_nodes WHERE id = ? OR slug = ?').get(id, id);
+  const node = db.prepare('SELECT * FROM tasks WHERE id = ? OR slug = ?').get(id, id);
   if (!node) {
     error(`Node not found: ${id}`);
   }
@@ -922,12 +946,19 @@ function cmdUpdateDna(id, dnaJson, actor) {
   const existingDna = JSON.parse(node.dna_json);
   const mergedDna = { ...existingDna, ...dna };
 
-  // Update
-  db.prepare(`
-    UPDATE mindspace_nodes
-    SET dna_json = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(JSON.stringify(mergedDna), node.id);
+  // Update — sync current_role and title columns with DNA
+  const updateFields = ['dna_json = ?', "updated_at = datetime('now')"];
+  const updateParams = [JSON.stringify(mergedDna)];
+  if (mergedDna.role && mergedDna.role !== node.current_role) {
+    updateFields.push('current_role = ?');
+    updateParams.push(mergedDna.role);
+  }
+  if (mergedDna.title && mergedDna.title !== node.title) {
+    updateFields.push('title = ?');
+    updateParams.push(mergedDna.title);
+  }
+  updateParams.push(node.id);
+  db.prepare(`UPDATE tasks SET ${updateFields.join(', ')} WHERE id = ?`).run(...updateParams);
 
   output({
     success: true,
@@ -998,7 +1029,7 @@ function cmdCreate(type, slug, dnaJson, actor) {
   const db = getDb();
 
   // Check slug uniqueness
-  const existing = db.prepare('SELECT id FROM mindspace_nodes WHERE slug = ?').get(slug);
+  const existing = db.prepare('SELECT id FROM tasks WHERE slug = ?').get(slug);
   if (existing) {
     error(`Slug already exists: ${slug}`);
   }
@@ -1013,14 +1044,29 @@ function cmdCreate(type, slug, dnaJson, actor) {
     if (mapped) dna.versioned_component = mapped;
   }
 
-  // Extract parent_ids from DNA into its own column (avoid duplication)
-  const parentIds = dna.parent_ids ? JSON.stringify(dna.parent_ids) : null;
-  if (dna.parent_ids) delete dna.parent_ids;
+  // Extract fields for tasks table columns
+  const projectSlug = dna.project || 'xpollination-mindspace';
+  const title = dna.title || slug;
+  const description = dna.description || null;
+  const currentRole = dna.role || 'liaison';
+  const dependsOn = dna.depends_on || [];
 
   db.prepare(`
-    INSERT INTO mindspace_nodes (id, type, status, slug, parent_ids, dna_json, created_at, updated_at)
-    VALUES (?, ?, 'pending', ?, ?, ?, datetime('now'), datetime('now'))
-  `).run(id, type, slug, parentIds, JSON.stringify(dna));
+    INSERT INTO tasks (id, project_slug, title, description, status, current_role, slug, dna_json, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(id, projectSlug, title, description, currentRole, slug, JSON.stringify(dna), actor);
+
+  // Insert dependencies into task_dependencies table
+  if (dependsOn.length > 0) {
+    const insertDep = db.prepare('INSERT OR IGNORE INTO task_dependencies (id, task_id, blocked_by_task_id, created_by) VALUES (?, ?, ?, ?)');
+    const findTask = db.prepare('SELECT id FROM tasks WHERE slug = ?');
+    for (const depSlug of dependsOn) {
+      const depTask = findTask.get(depSlug);
+      if (depTask) {
+        insertDep.run(randomUUID(), id, depTask.id, actor);
+      }
+    }
+  }
 
   output({
     success: true,
@@ -1059,7 +1105,7 @@ function cmdCapabilityStatus() {
     let completeCount = 0;
     for (const slug of taskSlugs) {
       const node = db.prepare(
-        'SELECT status FROM mindspace_nodes WHERE slug = ?'
+        'SELECT status FROM tasks WHERE slug = ?'
       ).get(slug);
       if (node && node.status === 'complete') {
         completeCount++;
