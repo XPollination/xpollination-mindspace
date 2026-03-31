@@ -1,7 +1,7 @@
 import { FileStorageAdapter } from '../storage/file-storage-adapter.js';
 import { LibP2PTransport } from '../transport/libp2p-transport.js';
 import { create, sign, evolve } from '../twin/kernel.js';
-import { validate as validateTransaction, verifyCID } from '../validation/transaction-validator.js';
+import { validate as validateTransaction, verifyCID, resolveConflict } from '../validation/transaction-validator.js';
 import type { Twin } from '../twin/types.js';
 import type { StorageAdapter } from '../storage/types.js';
 import type { TransportAdapter, TransportMessage } from '../transport/types.js';
@@ -104,6 +104,14 @@ export class MindspaceNode {
     const signed = await sign(twin, this.privateKey);
     await this.storage.dock(signed);
     return signed;
+  }
+
+  async resolveConflicts(logicalId: string): Promise<{ winner: string; losers: string[] } | null> {
+    const heads = await this.storage.heads(logicalId);
+    if (heads.length <= 1) return null;
+    const winner = resolveConflict(heads);
+    const losers = heads.filter((h) => h !== winner);
+    return { winner, losers };
   }
 
   async forgetTwin(cid: string): Promise<void> {
@@ -259,7 +267,17 @@ export class MindspaceNode {
         if (!cidCheck.valid) return; // silently reject tampered twins
         await this.storage.dock(twin);
         const logicalId = (twin.content as any)?.logicalId;
-        if (logicalId) this.taskIndex.set(logicalId, twin);
+        if (logicalId) {
+          this.taskIndex.set(logicalId, twin);
+          // Check for conflicts (heads > 1) and resolve
+          const heads = await this.storage.heads(logicalId);
+          if (heads.length > 1) {
+            const winner = resolveConflict(heads);
+            // Mark non-winner heads as superseded by evolving them
+            // Winner becomes the canonical head
+            this.taskIndex.set(logicalId, (await this.storage.resolve(winner))!);
+          }
+        }
       }
     }
   }
