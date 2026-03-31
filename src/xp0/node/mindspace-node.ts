@@ -1,7 +1,7 @@
 import { FileStorageAdapter } from '../storage/file-storage-adapter.js';
 import { LibP2PTransport } from '../transport/libp2p-transport.js';
 import { create, sign, evolve } from '../twin/kernel.js';
-import { validate as validateTransaction } from '../validation/transaction-validator.js';
+import { validate as validateTransaction, verifyCID } from '../validation/transaction-validator.js';
 import type { Twin } from '../twin/types.js';
 import type { StorageAdapter } from '../storage/types.js';
 import type { TransportAdapter, TransportMessage } from '../transport/types.js';
@@ -238,6 +238,9 @@ export class MindspaceNode {
       // Try to fetch the twin from the network
       const twin = await this.transport.requestTwin(msg.cid);
       if (twin) {
+        // Validate CID integrity before docking — reject tampered twins
+        const cidCheck = await verifyCID(twin);
+        if (!cidCheck.valid) return; // silently reject tampered twins
         await this.storage.dock(twin);
         const logicalId = (twin.content as any)?.logicalId;
         if (logicalId) this.taskIndex.set(logicalId, twin);
