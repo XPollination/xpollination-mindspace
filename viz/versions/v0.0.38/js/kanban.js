@@ -149,14 +149,18 @@ function renderCard(task) {
   const isSelected = task.slug === selectedTaskId || task.id === selectedTaskId;
 
   const isTerminal = ['complete', 'cancelled'].includes(task.status);
+  const isCancelled = task.status === 'cancelled';
+  const isBlocked = task.status === 'blocked';
+  const blockedReason = isBlocked && dna.blocked_reason ? dna.blocked_reason : '';
 
-  return `<div class="task-card${isSelected ? ' selected' : ''}${isTerminal ? ' completed' : ''}" data-id="${esc(task.slug || task.id)}">
+  return `<div class="task-card${isSelected ? ' selected' : ''}${isTerminal ? ' completed' : ''}${isCancelled ? ' cancelled' : ''}" data-id="${esc(task.slug || task.id)}">
     <div class="task-title">${title}</div>
     <div class="task-meta">
       <span class="task-badge" style="background:${STATUS_COLORS[task.status] || 'var(--ms-muted)'}">${task.status}</span>
       ${role ? `<span class="task-badge" style="background:${ROLE_COLORS[role] || 'var(--ms-muted)'}">${role}</span>` : ''}
       ${project ? `<span class="task-project">${esc(project)}</span>` : ''}
     </div>
+    ${blockedReason ? `<div class="task-blocked-reason">${esc(blockedReason)}</div>` : ''}
   </div>`;
 }
 
