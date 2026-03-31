@@ -87,6 +87,7 @@ export class TeamManager {
       if (entry) await entry.runner.stop().catch(() => {});
     }
     this.runners.clear();
+    if (this.teamTwin) await this.updateTeamTwin();
   }
 
   async switchRole(runnerId: string, newRole: string): Promise<void> {
