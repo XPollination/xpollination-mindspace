@@ -125,5 +125,14 @@ export async function validate(
   const step4 = await verifyChain(twin, opts.storage);
   if (!step4.valid) return { valid: false, step: 4, reason: step4.reason };
 
+  // Step 5: Workflow (if twin has previousVersion, compare states)
+  if (twin.previousVersion) {
+    const prevTwin = await opts.storage.resolve(twin.previousVersion);
+    if (prevTwin) {
+      const step5 = verifyWorkflow(prevTwin, twin);
+      if (!step5.valid) return { valid: false, step: 5, reason: step5.reason };
+    }
+  }
+
   return { valid: true };
 }
