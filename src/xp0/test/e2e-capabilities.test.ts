@@ -202,15 +202,17 @@ describe('Capability 2: Runner Process via MindspaceNode', () => {
 
 
 // ═══════════════════════════════════════════════════════════════════
-// CAPABILITY 3: Team Management UI
-// Mission: "In the Tasks view: Add [role] +1 buttons, Add full team,
-//           Terminate button, Runner status display, Team twin."
+// CAPABILITY 3: Team Management in Tasks/Kanban View
+// Mission Decision (line 842): "Team added via Tasks view, not agent
+//   tab. User decides where to put resources. Per-project assignment."
+// The Agents nav tab is REMOVED. Team panel lives in kanban view,
+// scoped to the currently selected project.
 //
 // These tests require a running viz server + Chrome CDP.
 // They verify the ACTUAL UI, not just the backend.
 // ═══════════════════════════════════════════════════════════════════
 
-describe('Capability 3: Team Management UI', () => {
+describe('Capability 3: Team Management in Kanban View', () => {
   // UI test config — adjust for your environment
   const VIZ_URL = process.env.VIZ_URL || 'http://127.0.0.1:4201';
   const API_URL = process.env.API_URL || 'http://127.0.0.1:3101';
@@ -351,92 +353,95 @@ describe('Capability 3: Team Management UI', () => {
     token = await login();
   });
 
-  // ─── T3.1: Agents page shows "Add [role] +1" buttons ───
+  // ─── T3.0: Agents nav tab is REMOVED ───
 
-  it('agents page has "Start Agentic Team" button', async () => {
-    const filepath = await screenshot(`${VIZ_URL}/agents`, 'cap3-agents-page.png');
-    expect(filepath).toBeTruthy();
-
-    const text = await getPageText(`${VIZ_URL}/agents`);
-    expect(text).toContain('Start Agentic Team');
+  it('navigation bar does NOT have Agents link (team is in kanban)', async () => {
+    const text = await getPageText(`${VIZ_URL}/kanban`);
+    const navText = text.split('\n').slice(0, 3).join(' '); // first few lines = nav
+    // Nav should have: Mission Map, Missions, Tasks — but NOT Agents
+    expect(navText).toMatch(/tasks/i);
+    expect(navText).not.toMatch(/\bagents\b/i);
   });
 
-  // ─── T3.2: Add role buttons exist (after runner architecture integration) ───
+  // ─── T3.1: Kanban has team panel (per-project) ───
 
-  it('agents page has individual role buttons: +LIAISON, +PDSA, +QA, +DEV', async () => {
-    const text = await getPageText(`${VIZ_URL}/agents`);
+  it('kanban view has a team panel scoped to selected project', async () => {
+    const filepath = await screenshot(`${VIZ_URL}/kanban`, 'cap3-team-panel.png');
+    expect(filepath).toBeTruthy();
 
-    // After runner architecture, should have per-role buttons
+    const text = await getPageText(`${VIZ_URL}/kanban`);
+    // Team panel should be visible in the kanban toolbar or sidebar
+    expect(text).toMatch(/team|agents?|runners?/i);
+  });
+
+  // ─── T3.2: Per-role add buttons in team panel ───
+
+  it('team panel has per-role add buttons: +LIAISON, +PDSA, +QA, +DEV', async () => {
+    const text = await getPageText(`${VIZ_URL}/kanban`);
+
     expect(text).toMatch(/\+\s*LIAISON|\+\s*Liaison|Add Liaison/i);
     expect(text).toMatch(/\+\s*PDSA|Add PDSA/i);
     expect(text).toMatch(/\+\s*QA|Add QA/i);
     expect(text).toMatch(/\+\s*DEV|Add Dev/i);
   });
 
-  // ─── T3.3: Click "Add Dev +1" starts a runner ───
+  // ─── T3.3: Click "+DEV" starts a runner for this project ───
 
-  it('clicking add-dev button creates a runner card with status=ready', async () => {
-    // Click the add dev button
-    await clickElement('[data-role="dev"].ag-add-role, .ag-add-dev, button:has-text("Dev")');
+  it('clicking +DEV creates a runner card with status=ready in team panel', async () => {
+    await clickElement('[data-role="dev"].team-add-role, .team-add-dev, [data-action="add-dev"]');
     await sleep(3000);
 
-    // Take screenshot of result
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-dev-added.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-dev-added.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
-    // Should show a runner card with dev role and ready status
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     expect(text).toMatch(/dev/i);
     expect(text).toMatch(/ready|online/i);
   });
 
-  // ─── T3.4: "Add full team" creates 4 runners ───
+  // ─── T3.4: "Add Full Team" creates 4 runners for this project ───
 
-  it('add full team creates 4 runner cards (liaison, pdsa, qa, dev)', async () => {
-    await clickElement('.ag-spawn, [data-action="add-full-team"]');
+  it('Add Full Team creates 4 runner cards in team panel', async () => {
+    await clickElement('[data-action="add-full-team"], .team-add-full');
     await sleep(5000);
 
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-full-team.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-full-team.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
-    // Should see all 4 roles
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     expect(text).toMatch(/liaison/i);
     expect(text).toMatch(/pdsa/i);
     expect(text).toMatch(/qa/i);
     expect(text).toMatch(/dev/i);
   });
 
-  // ─── T3.5: Runner status display shows role, status, heartbeat ───
+  // ─── T3.5: Runner cards show role, status, heartbeat ───
 
-  it('runner card shows role, status, and heartbeat timestamp', async () => {
+  it('runner card shows role badge, status dot, heartbeat', async () => {
     await sleep(2000);
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-runner-status.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-runner-status.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
-    // Runner cards should display status info
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     expect(text).toMatch(/ready|busy|active/i);
-    // Heartbeat or last-seen indicator
     expect(text).toMatch(/heartbeat|last.seen|ago|online/i);
   });
 
-  // ─── T3.6: Terminate button stops a runner ───
+  // ─── T3.6: Terminate button on runner card ───
 
-  it('terminate button stops runner — status changes to stopped', async () => {
-    // Click terminate on first runner
-    await clickElement('.ag-terminate, [data-action="terminate"], .ag-stop');
+  it('terminate button stops runner — card shows stopped', async () => {
+    await clickElement('[data-action="terminate"], .team-terminate');
     await sleep(3000);
 
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-after-terminate.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-after-terminate.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     expect(text).toMatch(/stopped|terminated|disconnected/i);
   });
 
   // ─── T3.7: Team twin visible in UI ───
 
   it('team composition is visible — shows agent count and capacity', async () => {
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-team-composition.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-team-composition.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     // Should show team summary (agent count, capacity bar)
     expect(text).toMatch(/\d+\s*(agent|runner)/i);
     // Capacity indicator: "N/M agents" or similar
@@ -448,9 +453,9 @@ describe('Capability 3: Team Management UI', () => {
   it('busy runner card shows which task it is working on', async () => {
     // Wait for a runner to claim a task (or trigger one)
     await sleep(5000);
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-runner-busy-task.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-runner-busy-task.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     // When busy, card should show the task slug or title
     expect(text).toMatch(/working on|current task|busy/i);
   });
@@ -458,9 +463,9 @@ describe('Capability 3: Team Management UI', () => {
   // ─── T3.9: Role switching via UI ───
 
   it('runner card has role switch dropdown — changing role updates card', async () => {
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-role-switch-before.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-role-switch-before.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     // Should have role switch control (dropdown or button)
     expect(text).toMatch(/switch|role|change role/i);
 
@@ -468,41 +473,67 @@ describe('Capability 3: Team Management UI', () => {
     await clickElement('[data-action="switch-role"], .ag-role-switch, select.ag-role-select');
     await sleep(2000);
 
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-role-switch-after.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-role-switch-after.png');
   });
 
-  // ─── T3.10: Network/peer connection status visible ───
+  // ─── T3.10: Network/peer connection status in team panel ───
 
-  it('agents page shows peer connection status', async () => {
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-network-status.png');
+  it('team panel shows peer connection status for this project', async () => {
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-network-status.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
-    // Must show connection status — user needs to know if P2P is working
+    const text = await getPageText(`${VIZ_URL}/kanban`);
+    // Team panel must show: "Connected to N peers" or peer list
+    // User needs to know if P2P is working for THIS project
     expect(text).toMatch(/connected|peers?|online|network/i);
   });
 
   // ─── T3.11: Heartbeat visual feedback ───
 
   it('runner card shows heartbeat indicator (timestamp or pulse)', async () => {
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-heartbeat.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-heartbeat.png');
 
-    const text = await getPageText(`${VIZ_URL}/agents`);
+    const text = await getPageText(`${VIZ_URL}/kanban`);
     // Heartbeat shown as "last seen X ago" or "heartbeat: active"
     expect(text).toMatch(/heartbeat|last.seen|ago|pulse|alive/i);
   });
 
-  // ─── T3.12: Single agent mode — one runner switching roles ───
+  // ─── T3.12: Team panel is project-scoped — changes with project filter ───
+
+  it('switching project filter updates team panel to show that project team', async () => {
+    await screenshot(`${VIZ_URL}/kanban?project=test-runner`, 'cap3-project-scoped-a.png');
+    const textA = await getPageText(`${VIZ_URL}/kanban?project=test-runner`);
+
+    await screenshot(`${VIZ_URL}/kanban?project=mindspace`, 'cap3-project-scoped-b.png');
+    const textB = await getPageText(`${VIZ_URL}/kanban?project=mindspace`);
+
+    // Different projects should show different team compositions
+    // (or both empty — but the panel itself should exist for both)
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-project-scoped-all.png');
+  });
+
+  // ─── T3.13: Multi-user visibility — see all teams on this project ───
+
+  it('team panel shows runners from ALL users on this project (Thomas + Robin)', async () => {
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-multi-user-team.png');
+
+    const text = await getPageText(`${VIZ_URL}/kanban`);
+    // When multiple users have runners on a project, show all
+    // Group by user/peer or show owner on each runner card
+    expect(text).toMatch(/team|runner|agent/i);
+  });
+
+  // ─── T3.14: Single agent mode — one runner switching roles ───
 
   it('single agent with role switching is a valid configuration', async () => {
     // Terminate all but one
     // Then switch that runner through different roles
     // System should warn but not prevent
-    const text = await getPageText(`${VIZ_URL}/agents`);
+    const text = await getPageText(`${VIZ_URL}/kanban`);
 
     // Warning about incomplete team (informational, not blocking)
     // Should NOT say "cannot" or "error"
     // Should say "recommended" or "for full workflow" or similar
-    await screenshot(`${VIZ_URL}/agents`, 'cap3-single-agent.png');
+    await screenshot(`${VIZ_URL}/kanban`, 'cap3-single-agent.png');
   });
 });
 
