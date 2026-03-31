@@ -222,7 +222,7 @@ export class MindspaceNode {
   // --- Internal ---
 
   private async handleTaskAnnouncement(msg: TransportMessage): Promise<void> {
-    if (msg.type === 'twin.created' && msg.cid) {
+    if ((msg.type === 'twin.created' || msg.type === 'twin.evolved') && msg.cid) {
       // Try to fetch the twin from the network
       const twin = await this.transport.requestTwin(msg.cid);
       if (twin) {
@@ -294,6 +294,12 @@ export class IntegrationRunner {
           const content = task.content as Record<string, unknown>;
           if (content.status === 'ready' && !content.claimed_by) {
             const claimed = await this.runner.claimTask(task);
+            // Announce claim to network
+            await this.node.transport.publish('xp0/tasks', {
+              type: 'twin.evolved',
+              cid: claimed.cid,
+              kind: 'task',
+            });
             const executed = await this.runner.executeTask(claimed);
             // Role-aware transition
             const nextStatus = ROLE_NEXT_STATUS[this.role] || 'review';
