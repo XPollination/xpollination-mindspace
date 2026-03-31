@@ -80,6 +80,9 @@ services:
       - LIVEKIT_URL=wss://meet.xpollination.earth
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - AGENT_RUNTIME_URL=http://host.docker.internal:3101
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       brain:
         condition: service_healthy
