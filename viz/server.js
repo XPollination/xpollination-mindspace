@@ -303,13 +303,14 @@ const server = http.createServer(async (req, res) => {
   // All settings, node actions, and other /api/* routes: catch-all proxy below.
 
   // SSE streaming proxy: pipe /a2a/stream/* without buffering (EventSource needs streaming)
+  // HEAD requests return immediately (session validation), GET opens SSE stream
   if (pathname.startsWith('/a2a/stream/')) {
     const cookies = parseCookies(req);
     const proxyHeaders = { ...req.headers, host: `localhost:${API_PORT}` };
     if (cookies.ms_session) proxyHeaders['authorization'] = `Bearer ${cookies.ms_session}`;
     const apiReq = http.request({
       hostname: 'localhost', port: API_PORT, path: pathname + url.search,
-      method: 'GET', headers: proxyHeaders
+      method: req.method, headers: proxyHeaders
     }, (apiRes) => {
       res.writeHead(apiRes.statusCode, apiRes.headers);
       apiRes.pipe(res);
