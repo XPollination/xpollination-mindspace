@@ -300,7 +300,41 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // All settings, node actions, and other /api/* routes: catch-all proxy below.
+  // --- Team Management API (local process management, not proxied) ---
+  if (pathname.match(/^\/api\/team\/[^/]+$/) && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ agents: [], capacity: { max: 4, current: 0 }, message: 'Runner team API — MindspaceNode integration pending' }));
+    return;
+  }
+  if (pathname.match(/^\/api\/team\/[^/]+\/agent$/) && req.method === 'POST') {
+    const body = await readBody(req);
+    const { role } = JSON.parse(body);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: 'pending', role, status: 'ready', message: 'Runner spawn API — MindspaceNode integration pending' }));
+    return;
+  }
+  if (pathname.match(/^\/api\/team\/[^/]+\/full$/) && req.method === 'POST') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ agents: ['liaison','pdsa','qa','dev'].map(r => ({ id: 'pending', role: r, status: 'ready' })), message: 'Full team API — MindspaceNode integration pending' }));
+    return;
+  }
+  if (pathname.match(/^\/api\/team\/[^/]+\/agent\/[^/]+$/) && req.method === 'DELETE') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'stopped', message: 'Terminate API — MindspaceNode integration pending' }));
+    return;
+  }
+  if (pathname.match(/^\/api\/team\/[^/]+\/agent\/[^/]+\/role$/) && req.method === 'PUT') {
+    const body = await readBody(req);
+    const { role } = JSON.parse(body);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ new_role: role, message: 'Role switch API — MindspaceNode integration pending' }));
+    return;
+  }
+  if (pathname.match(/^\/api\/team\/[^/]+\/agent\/[^/]+\/status$/) && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ready', message: 'Status API — MindspaceNode integration pending' }));
+    return;
+  }
 
   // SSE streaming proxy: pipe /a2a/stream/* without buffering (EventSource needs streaming)
   // HEAD requests return immediately (session validation), GET opens SSE stream
