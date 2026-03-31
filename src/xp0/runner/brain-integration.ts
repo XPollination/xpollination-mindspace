@@ -1,5 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { readFile, writeFile, readFile as readFileAsync } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 interface BrainClientOpts {
   apiUrl: string;
@@ -24,8 +25,20 @@ export class BrainClient {
   constructor(opts: BrainClientOpts) {
     this.opts = {
       ...opts,
-      apiKey: process.env.BRAIN_API_KEY || opts.apiKey,
+      apiKey: process.env.BRAIN_API_KEY || BrainClient.loadApiKeyFromEnvFile() || opts.apiKey,
     };
+  }
+
+  private static loadApiKeyFromEnvFile(): string | undefined {
+    try {
+      const envPath = resolve(process.cwd(), '.env');
+      if (!existsSync(envPath)) return undefined;
+      const content = readFileSync(envPath, 'utf-8');
+      const match = content.match(/^BRAIN_API_KEY=(.+)$/m);
+      return match ? match[1].trim() : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async queryRecovery(prompt: string): Promise<string | null> {
