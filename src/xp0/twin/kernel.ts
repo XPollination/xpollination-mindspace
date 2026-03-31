@@ -1,6 +1,7 @@
 import * as dagJson from '@ipld/dag-json';
 import { CID } from 'multiformats/cid';
 import { sha256 } from 'multiformats/hashes/sha2';
+import { base58btc } from 'multiformats/bases/base58';
 import type { Twin, UnsignedTwin, SignedTwin, TwinKind } from './types.js';
 
 // CID is computed from content-identity fields only: kind, schema, owner, content.
@@ -83,8 +84,21 @@ export async function verify(twin: Twin): Promise<boolean> {
     const ed = await import('@noble/ed25519');
     const prefix = 'did:key:z';
     if (!twin.owner.startsWith(prefix)) return false;
-    const pubHex = twin.owner.slice(prefix.length);
-    const publicKey = new Uint8Array(pubHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
+    const encoded = twin.owner.slice('did:key:'.length);
+    let publicKey: Uint8Array;
+    // Try base58btc did:key format (z + base58btc(0xed01 + pubkey))
+    try {
+      const decoded = base58btc.decode(encoded);
+      if (decoded[0] === 0xed && decoded[1] === 0x01) {
+        publicKey = decoded.slice(2);
+      } else {
+        throw new Error('not ed25519 multicodec');
+      }
+    } catch {
+      // Fall back to hex-encoded pubkey (legacy: did:key:z{hex})
+      const pubHex = encoded.slice(1); // skip 'z'
+      publicKey = new Uint8Array(pubHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
+    }
     const sigBytes = new Uint8Array(twin.signature.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
     const cidBytes = new TextEncoder().encode(twin.cid);
     return await ed.verifyAsync(sigBytes, cidBytes, publicKey);
