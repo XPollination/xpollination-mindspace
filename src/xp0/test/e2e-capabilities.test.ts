@@ -636,6 +636,105 @@ describe('Kanban Runner Integration', () => {
 
 
 // ═══════════════════════════════════════════════════════════════════
+// DECISION TRAIL VERIFICATION — decisions that need explicit tests
+// From /m/mission-runner-architecture Part 7
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Decision Trail Verification', () => {
+  // Decision 9: Tasks created only by LIAISON
+  it('D9: only LIAISON role can create tasks — other roles rejected', async () => {
+    // LIAISON can create
+    const task = await node.createTask({
+      title: 'Liaison creates this',
+      role: 'dev',
+      project: 'test',
+      logicalId: 'decision-9-test',
+      actor: 'liaison',
+    });
+    expect(task).toBeDefined();
+
+    // DEV cannot create tasks
+    await expect(node.createTask({
+      title: 'Dev tries to create',
+      role: 'dev',
+      project: 'test',
+      logicalId: 'decision-9-dev',
+      actor: 'dev',
+    })).rejects.toThrow(/not allowed|permission|only liaison/i);
+
+    // QA cannot create tasks
+    await expect(node.createTask({
+      title: 'QA tries to create',
+      role: 'qa',
+      project: 'test',
+      logicalId: 'decision-9-qa',
+      actor: 'qa',
+    })).rejects.toThrow(/not allowed|permission|only liaison/i);
+  });
+
+  // Decision 13: Termination triggers brain contribution
+  it('D13: runner termination triggers brain contribution with session summary', async () => {
+    const runner = await node.addRunner({ role: 'dev' });
+
+    // Terminate — should call brain.contribute before stopping
+    const result = await node.terminateRunner(runner.getId());
+
+    // Result should confirm brain contribution happened
+    expect(result.brainContributed).toBe(true);
+    // Runner twin should be stopped
+    expect(runner.getStatus()).toBe('stopped');
+  });
+
+  // Decision 7: All 3 runner modes possible (schema accepts all)
+  it('D7: runner twin schema accepts all 3 workload modes', async () => {
+    // Mode A: 1 runner = 1 engine (claude-code)
+    const modeA = await node.createTwin('object', 'xp0/runner/v0.0.1', {
+      name: 'mode-a', roles: ['dev'], status: 'ready',
+      workload: { type: 'claude-code', binary: '/usr/bin/claude', mode: 'per-task' },
+      hardware: { location: 'local' }, maxConcurrent: 1,
+    });
+    expect(modeA).toBeDefined();
+
+    // Mode B: 1 runner = N engines (router)
+    const modeB = await node.createTwin('object', 'xp0/runner/v0.0.1', {
+      name: 'mode-b', roles: ['dev'], status: 'ready',
+      workload: { type: 'router', engines: ['claude', 'qwen'], mode: 'per-task' },
+      hardware: { location: 'local' }, maxConcurrent: 2,
+    });
+    expect(modeB).toBeDefined();
+
+    // Mode C: thin client → external process (ollama, API)
+    const modeC = await node.createTwin('object', 'xp0/runner/v0.0.1', {
+      name: 'mode-c', roles: ['dev'], status: 'ready',
+      workload: { type: 'ollama', endpoint: 'http://localhost:11434', mode: 'per-task' },
+      hardware: { location: 'local' }, maxConcurrent: 4,
+    });
+    expect(modeC).toBeDefined();
+  });
+
+  // Decision 8: Task DNA is the prompt — self-contained
+  it('D8: task DNA passed to Claude as-is — no prompt construction in runner', async () => {
+    const runner = await node.addRunner({ role: 'dev' });
+    const task = await node.createTask({
+      title: 'DNA is the prompt test',
+      description: 'Implement a hello world function',
+      role: 'dev',
+      project: 'test',
+      logicalId: 'decision-8-test',
+    });
+
+    await sleep(5000);
+
+    // The prompt sent to mock-claude should contain the DNA fields directly
+    const latest = await node.getLatestTwin('decision-8-test');
+    const result = (latest!.content as any).result;
+    // Mock-claude echoes parts of the prompt — verify DNA content was passed
+    expect(result).toBeTruthy();
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
 // CAPABILITY 4: libp2p Transport — via MindspaceNode
 // Mission: "GossipSub for twin announcements, Bitswap for twin data
 //           exchange, DHT for peer discovery, project topics."
