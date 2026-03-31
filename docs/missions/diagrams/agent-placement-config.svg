@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, sans-serif">
+  <title>Agent Placement — Per-User Configuration</title>
+  <desc>
+    AGENT-READABLE: When a user clicks "+ Start Agentic Team", the hub checks the user's agent
+    placement setting. Three options: (1) Hub server — soul runs on Hetzner in host tmux. Default.
+    (2) My machine — soul runs on user's local Mindspace. Hub sends start event via peer connection.
+    (3) Custom — soul runs on user's registered remote server. Each option stores a different
+    agent_runtime_url in user settings. The Viz always runs on the hub — terminal WebSocket
+    bridges to wherever the soul lives.
+  </desc>
+
+  <rect width="900" height="500" fill="#0d1117" rx="8"/>
+  <text x="450" y="28" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Agent Placement — Per-User Configuration</text>
+
+  <!-- User clicks Start -->
+  <rect x="300" y="50" width="300" height="40" rx="6" fill="#1c2333" stroke="#f5c2e7" stroke-width="2"/>
+  <text x="450" y="74" fill="#f5c2e7" font-size="12" font-weight="700" text-anchor="middle">User clicks "+ Start Agentic Team"</text>
+
+  <line x1="450" y1="90" x2="450" y2="115" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="446,113 450,120 454,113" fill="#3fb950"/>
+
+  <!-- Settings check -->
+  <rect x="300" y="120" width="300" height="45" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="450" y="142" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">Hub checks user.agent_runtime</text>
+  <text x="450" y="157" fill="#8b949e" font-size="9" text-anchor="middle">stored in user_project_settings table</text>
+
+  <!-- Three branches -->
+  <line x1="350" y1="165" x2="150" y2="210" stroke="#3fb950" stroke-width="1.5"/>
+  <line x1="450" y1="165" x2="450" y2="210" stroke="#58a6ff" stroke-width="1.5"/>
+  <line x1="550" y1="165" x2="750" y2="210" stroke="#d29922" stroke-width="1.5"/>
+
+  <!-- Option 1: Hub server -->
+  <rect x="30" y="210" width="250" height="270" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <rect x="30" y="210" width="250" height="30" rx="8" fill="#0d2818"/>
+  <rect x="30" y="232" width="250" height="8" fill="#0d2818"/>
+  <text x="155" y="230" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Hub Server (default)</text>
+
+  <text x="50" y="260" fill="#c9d1d9" font-size="10" font-weight="600">Setting:</text>
+  <text x="50" y="276" fill="#8b949e" font-size="9" font-family="monospace">agent_runtime: "local"</text>
+
+  <text x="50" y="300" fill="#c9d1d9" font-size="10" font-weight="600">What happens:</text>
+  <text x="50" y="316" fill="#8b949e" font-size="9">Hub creates tmux on HOST</text>
+  <text x="50" y="330" fill="#8b949e" font-size="9">start-agent.sh runs locally</text>
+  <text x="50" y="344" fill="#8b949e" font-size="9">Claude Code on Hetzner</text>
+
+  <text x="50" y="368" fill="#c9d1d9" font-size="10" font-weight="600">Terminal bridge:</text>
+  <text x="50" y="384" fill="#8b949e" font-size="9">WebSocket → localhost tmux</text>
+  <text x="50" y="398" fill="#8b949e" font-size="9">zero latency</text>
+
+  <text x="50" y="422" fill="#c9d1d9" font-size="10" font-weight="600">Best for:</text>
+  <text x="50" y="438" fill="#8b949e" font-size="9">Thomas (same server)</text>
+  <text x="50" y="452" fill="#8b949e" font-size="9">Robin if no local setup</text>
+  <text x="50" y="466" fill="#8b949e" font-size="9">Always-on agents</text>
+
+  <!-- Option 2: My machine -->
+  <rect x="320" y="210" width="260" height="270" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+  <rect x="320" y="210" width="260" height="30" rx="8" fill="#0d2240"/>
+  <rect x="320" y="232" width="260" height="8" fill="#0d2240"/>
+  <text x="450" y="230" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">My Machine (peer)</text>
+
+  <text x="340" y="260" fill="#c9d1d9" font-size="10" font-weight="600">Setting:</text>
+  <text x="340" y="276" fill="#8b949e" font-size="9" font-family="monospace">agent_runtime: "peer"</text>
+  <text x="340" y="290" fill="#8b949e" font-size="9" font-family="monospace">peer_url: "ws://robin:8090"</text>
+
+  <text x="340" y="314" fill="#c9d1d9" font-size="10" font-weight="600">What happens:</text>
+  <text x="340" y="330" fill="#8b949e" font-size="9">Hub sends START event via peer conn</text>
+  <text x="340" y="344" fill="#8b949e" font-size="9">Robin's Mindspace creates tmux</text>
+  <text x="340" y="358" fill="#8b949e" font-size="9">Claude Code on Robin's MacBook</text>
+
+  <text x="340" y="382" fill="#c9d1d9" font-size="10" font-weight="600">Terminal bridge:</text>
+  <text x="340" y="398" fill="#8b949e" font-size="9">WebSocket → peer tunnel → Robin tmux</text>
+  <text x="340" y="412" fill="#8b949e" font-size="9">latency: network dependent</text>
+
+  <text x="340" y="436" fill="#c9d1d9" font-size="10" font-weight="600">Best for:</text>
+  <text x="340" y="452" fill="#8b949e" font-size="9">Robin with local setup</text>
+  <text x="340" y="466" fill="#8b949e" font-size="9">Sensitive projects (data stays local)</text>
+
+  <!-- Option 3: Custom -->
+  <rect x="620" y="210" width="250" height="270" rx="8" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+  <rect x="620" y="210" width="250" height="30" rx="8" fill="#2d1b00"/>
+  <rect x="620" y="232" width="250" height="8" fill="#2d1b00"/>
+  <text x="745" y="230" fill="#d29922" font-size="12" font-weight="700" text-anchor="middle">Custom Server</text>
+
+  <text x="640" y="260" fill="#c9d1d9" font-size="10" font-weight="600">Setting:</text>
+  <text x="640" y="276" fill="#8b949e" font-size="9" font-family="monospace">agent_runtime: "custom"</text>
+  <text x="640" y="290" fill="#8b949e" font-size="9" font-family="monospace">custom_url: "wss://gpu.robin.dev"</text>
+
+  <text x="640" y="314" fill="#c9d1d9" font-size="10" font-weight="600">What happens:</text>
+  <text x="640" y="330" fill="#8b949e" font-size="9">Hub sends START to custom endpoint</text>
+  <text x="640" y="344" fill="#8b949e" font-size="9">Remote Mindspace creates agents</text>
+  <text x="640" y="358" fill="#8b949e" font-size="9">Claude Code on dedicated server</text>
+
+  <text x="640" y="382" fill="#c9d1d9" font-size="10" font-weight="600">Terminal bridge:</text>
+  <text x="640" y="398" fill="#8b949e" font-size="9">WebSocket → custom endpoint → tmux</text>
+
+  <text x="640" y="436" fill="#c9d1d9" font-size="10" font-weight="600">Best for:</text>
+  <text x="640" y="452" fill="#8b949e" font-size="9">GPU workloads</text>
+  <text x="640" y="466" fill="#8b949e" font-size="9">Dedicated agent infrastructure</text>
+
+  <text x="450" y="495" fill="#484f58" font-size="8" text-anchor="middle">All options configurable in Settings → Agent Configuration. Default: Hub Server.</text>
+</svg>

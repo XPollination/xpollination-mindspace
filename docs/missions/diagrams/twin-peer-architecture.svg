@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 600" font-family="system-ui, sans-serif">
+  <title>Twin Peer Architecture — Git for Data, Hub for Real-Time</title>
+  <desc>
+    AGENT-READABLE: Two layers of peer-to-peer. DATA LAYER: twins are YAML files in git. Sync via
+    git push/pull. Works offline. Every peer has a complete copy. Content-addressed (git hashes).
+    CRM already proves this: twin.yaml files with _schema, _type, sub-entity folders.
+    REAL-TIME LAYER: hub provides brain (shared knowledge), A2A routing (agent coordination),
+    Viz (web UI), SSE (push events). Robin connects to hub for these. Git can't do real-time.
+    The hub is NOT the source of truth — the twin files are. The hub provides projections.
+  </desc>
+
+  <rect width="1100" height="600" fill="#0d1117" rx="8"/>
+  <text x="550" y="30" fill="#3fb950" font-size="16" font-weight="700" text-anchor="middle">Twin Peer Architecture — Two Layers</text>
+
+  <!-- DATA LAYER -->
+  <rect x="30" y="55" width="520" height="520" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+  <rect x="30" y="55" width="520" height="32" rx="8" fill="#0d2240"/>
+  <rect x="30" y="79" width="520" height="8" fill="#0d2240"/>
+  <text x="290" y="76" fill="#58a6ff" font-size="14" font-weight="700" text-anchor="middle">Data Layer: Git (P2P Sync)</text>
+
+  <!-- Twin file structure -->
+  <rect x="55" y="100" width="220" height="200" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <text x="165" y="120" fill="#c9d1d9" font-size="11" font-weight="600" text-anchor="middle">Twin Files (YAML in Git)</text>
+
+  <text x="70" y="142" fill="#3fb950" font-size="9" font-family="monospace">crm/kunden/auftragswelt/</text>
+  <text x="85" y="156" fill="#8b949e" font-size="9" font-family="monospace">twin.yaml</text>
+  <text x="85" y="170" fill="#8b949e" font-size="9" font-family="monospace">kontakte/</text>
+  <text x="85" y="184" fill="#8b949e" font-size="9" font-family="monospace">deals/</text>
+  <text x="85" y="198" fill="#8b949e" font-size="9" font-family="monospace">rechnungen/</text>
+
+  <text x="70" y="220" fill="#d29922" font-size="9" font-family="monospace">pm/tasks/fix-terminal/</text>
+  <text x="85" y="234" fill="#8b949e" font-size="9" font-family="monospace">twin.yaml</text>
+  <text x="85" y="248" fill="#8b949e" font-size="9" font-family="monospace">dna.yaml</text>
+
+  <text x="70" y="270" fill="#bc8cff" font-size="9" font-family="monospace">missions/liaison-setup/</text>
+  <text x="85" y="284" fill="#8b949e" font-size="9" font-family="monospace">twin.yaml</text>
+  <text x="85" y="298" fill="#8b949e" font-size="9" font-family="monospace">diagrams/</text>
+
+  <!-- twin.yaml detail -->
+  <rect x="290" y="100" width="240" height="130" rx="6" fill="#0d1117" stroke="#3fb950"/>
+  <text x="410" y="120" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">twin.yaml structure</text>
+  <text x="305" y="138" fill="#c9d1d9" font-size="9" font-family="monospace">_schema: "xpo/crm/kunde/v0.0.2"</text>
+  <text x="305" y="152" fill="#c9d1d9" font-size="9" font-family="monospace">_type: customer_twin</text>
+  <text x="305" y="166" fill="#c9d1d9" font-size="9" font-family="monospace">identity:</text>
+  <text x="305" y="180" fill="#c9d1d9" font-size="9" font-family="monospace">  slug: "auftragswelt"</text>
+  <text x="305" y="194" fill="#c9d1d9" font-size="9" font-family="monospace">  firma: "Auftragswelt GmbH"</text>
+  <text x="305" y="214" fill="#484f58" font-size="8">self-contained, schema-validated, git-tracked</text>
+
+  <!-- Git sync -->
+  <rect x="55" y="320" width="480" height="80" rx="6" fill="#0d2240" stroke="#58a6ff"/>
+  <text x="295" y="345" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">Git = P2P Sync Protocol</text>
+  <text x="70" y="365" fill="#c9d1d9" font-size="9">Robin: git pull → has ALL twin data locally</text>
+  <text x="70" y="380" fill="#c9d1d9" font-size="9">Robin: edits twin.yaml → git commit → git push → Thomas sees it</text>
+  <text x="70" y="395" fill="#8b949e" font-size="8">Works offline. Content-addressed (git hashes). Immutable history. Conflict detection via merge.</text>
+
+  <!-- Properties -->
+  <rect x="55" y="420" width="155" height="55" rx="4" fill="#161b22" stroke="#30363d"/>
+  <text x="132" y="438" fill="#3fb950" font-size="9" font-weight="600" text-anchor="middle">Offline-first</text>
+  <text x="132" y="452" fill="#8b949e" font-size="8" text-anchor="middle">Create twins locally</text>
+  <text x="132" y="464" fill="#8b949e" font-size="8" text-anchor="middle">sync when connected</text>
+
+  <rect x="220" y="420" width="155" height="55" rx="4" fill="#161b22" stroke="#30363d"/>
+  <text x="297" y="438" fill="#3fb950" font-size="9" font-weight="600" text-anchor="middle">Content-addressed</text>
+  <text x="297" y="452" fill="#8b949e" font-size="8" text-anchor="middle">Git hash = twin CID</text>
+  <text x="297" y="464" fill="#8b949e" font-size="8" text-anchor="middle">tamper-detectable</text>
+
+  <rect x="385" y="420" width="155" height="55" rx="4" fill="#161b22" stroke="#30363d"/>
+  <text x="462" y="438" fill="#3fb950" font-size="9" font-weight="600" text-anchor="middle">Complete copy</text>
+  <text x="462" y="452" fill="#8b949e" font-size="8" text-anchor="middle">Every peer has all data</text>
+  <text x="462" y="464" fill="#8b949e" font-size="8" text-anchor="middle">no central dependency</text>
+
+  <!-- Migration -->
+  <rect x="55" y="490" width="480" height="40" rx="6" fill="#1c1117" stroke="#d29922"/>
+  <text x="295" y="510" fill="#d29922" font-size="10" font-weight="600" text-anchor="middle">Migration: SQLite PM → twin YAML files in git</text>
+  <text x="295" y="524" fill="#8b949e" font-size="8" text-anchor="middle">Tasks, missions, capabilities become twin.yaml files. A2A server reads from files, not DB.</text>
+
+  <!-- REAL-TIME LAYER -->
+  <rect x="570" y="55" width="500" height="520" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <rect x="570" y="55" width="500" height="32" rx="8" fill="#0d2818"/>
+  <rect x="570" y="79" width="500" height="8" fill="#0d2818"/>
+  <text x="820" y="76" fill="#3fb950" font-size="14" font-weight="700" text-anchor="middle">Real-Time Layer: Hub (A2A + Brain)</text>
+
+  <!-- Hub services -->
+  <rect x="595" y="100" width="220" height="45" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="705" y="120" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">A2A Router</text>
+  <text x="705" y="136" fill="#8b949e" font-size="9" text-anchor="middle">transitions, events, agent coordination</text>
+
+  <rect x="830" y="100" width="220" height="45" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="940" y="120" fill="#bc8cff" font-size="11" font-weight="600" text-anchor="middle">Brain (Qdrant)</text>
+  <text x="940" y="136" fill="#8b949e" font-size="9" text-anchor="middle">shared knowledge, queries</text>
+
+  <rect x="595" y="155" width="220" height="45" rx="6" fill="#161b22" stroke="#d29922"/>
+  <text x="705" y="175" fill="#d29922" font-size="11" font-weight="600" text-anchor="middle">Viz (the mouth)</text>
+  <text x="705" y="191" fill="#8b949e" font-size="9" text-anchor="middle">web UI, terminal view, agents page</text>
+
+  <rect x="830" y="155" width="220" height="45" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="940" y="175" fill="#8b949e" font-size="11" text-anchor="middle">SSE Push Events</text>
+  <text x="940" y="191" fill="#484f58" font-size="9" text-anchor="middle">real-time notifications</text>
+
+  <text x="820" y="225" fill="#c9d1d9" font-size="10" font-weight="600" text-anchor="middle">What git CAN'T do (why the hub exists)</text>
+
+  <!-- Thomas -->
+  <rect x="595" y="250" width="450" height="100" rx="8" fill="#1c2333" stroke="#f5c2e7"/>
+  <text x="820" y="275" fill="#f5c2e7" font-size="12" font-weight="700" text-anchor="middle">Thomas (hub-local)</text>
+  <text x="610" y="295" fill="#c9d1d9" font-size="9">Soul: Claude Code on Hetzner host (tmux)</text>
+  <text x="610" y="310" fill="#c9d1d9" font-size="9">Data: git workspace on same server</text>
+  <text x="610" y="325" fill="#c9d1d9" font-size="9">Hub access: localhost (zero latency)</text>
+  <text x="610" y="340" fill="#3fb950" font-size="8">Agent placement: "this server" (default)</text>
+
+  <!-- Robin -->
+  <rect x="595" y="365" width="450" height="115" rx="8" fill="#1c2333" stroke="#89b4fa"/>
+  <text x="820" y="390" fill="#89b4fa" font-size="12" font-weight="700" text-anchor="middle">Robin (remote peer)</text>
+  <text x="610" y="410" fill="#c9d1d9" font-size="9">Soul: Claude Code on MacBook (local tmux)</text>
+  <text x="610" y="425" fill="#c9d1d9" font-size="9">Data: git clone of workspace (full copy)</text>
+  <text x="610" y="440" fill="#c9d1d9" font-size="9">Hub access: mindspace.xpollination.earth (peer connection)</text>
+  <text x="610" y="455" fill="#3fb950" font-size="8">Agent placement: "my machine" or "hub server" (configurable)</text>
+  <text x="610" y="470" fill="#8b949e" font-size="8">Brain: via hub (NEEDS connection). Data: local git (works offline)</text>
+
+  <!-- Hub NOT source of truth -->
+  <rect x="595" y="495" width="450" height="40" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="820" y="515" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">Hub is NOT the source of truth — twin files are</text>
+  <text x="820" y="530" fill="#8b949e" font-size="8" text-anchor="middle">Hub provides projections (search, events, routing). Files in git = truth.</text>
+
+  <text x="550" y="590" fill="#484f58" font-size="8" text-anchor="middle">MISSION-TWIN-PEER-CONSOLIDATION v1 | 2026-03-30</text>
+</svg>
