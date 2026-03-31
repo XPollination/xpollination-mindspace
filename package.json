@@ -50,6 +50,7 @@
     "@authzed/authzed-node": "^1.2.0",
     "@ipld/dag-json": "^10.2.6",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@noble/ed25519": "^3.0.1",
     "@qdrant/js-client-rest": "^1.17.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.0.0",
