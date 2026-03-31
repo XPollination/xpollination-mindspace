@@ -114,6 +114,29 @@ export class MindspaceNode {
     return { winner, losers };
   }
 
+  private async autoResolveConflict(logicalId: string, heads: string[]): Promise<void> {
+    const winnerCid = resolveConflict(heads);
+    const winnerTwin = await this.storage.resolve(winnerCid);
+    if (!winnerTwin) return;
+
+    // Create merge twin: evolve the winner with mergedFrom info
+    // This creates a new head that supersedes all losers
+    const losers = heads.filter((h) => h !== winnerCid);
+    const merged = await evolve(winnerTwin, {
+      mergedFrom: losers,
+      conflict_resolved: true,
+    });
+    await this.storage.dock(merged);
+    this.taskIndex.set(logicalId, merged);
+
+    // Propagate the merge so other nodes also converge
+    await this.transport.publish('xp0/tasks', {
+      type: 'twin.evolved',
+      cid: merged.cid,
+      kind: 'task',
+    });
+  }
+
   async forgetTwin(cid: string): Promise<void> {
     await this.storage.forget(cid);
     await this.transport.publish('xp0/system/forget', {
@@ -272,10 +295,7 @@ export class MindspaceNode {
           // Check for conflicts (heads > 1) and resolve
           const heads = await this.storage.heads(logicalId);
           if (heads.length > 1) {
-            const winner = resolveConflict(heads);
-            // Mark non-winner heads as superseded by evolving them
-            // Winner becomes the canonical head
-            this.taskIndex.set(logicalId, (await this.storage.resolve(winner))!);
+            await this.autoResolveConflict(logicalId, heads);
           }
         }
       }
