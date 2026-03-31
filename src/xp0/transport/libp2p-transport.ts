@@ -177,6 +177,11 @@ export class LibP2PTransport implements TransportAdapter {
     return this.node.getPeers().map((p) => p.toString());
   }
 
+  getListenAddresses(): string[] {
+    if (!this.node) return [];
+    return this.node.getMultiaddrs().map((a) => a.toString());
+  }
+
   enqueue(topic: string, msg: TransportMessage): void {
     this.queue.push({ topic, msg });
   }
