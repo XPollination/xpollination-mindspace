@@ -96,7 +96,7 @@ export class Runner {
   }
 
   async claimTask(taskTwin: Twin): Promise<Twin> {
-    const claimed = await evolve(taskTwin, { status: 'active' });
+    const claimed = await evolve(taskTwin, { status: 'active', claimed_by: this.opts.owner });
     await this.opts.storage.dock(claimed);
     return claimed;
   }

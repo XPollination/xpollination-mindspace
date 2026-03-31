@@ -279,7 +279,15 @@ export class IntegrationRunner {
   }
 
   startAutoClaim(intervalMs: number): void {
+    const ROLE_NEXT_STATUS: Record<string, string> = {
+      pdsa: 'approval',
+      dev: 'review',
+      qa: 'review',
+      liaison: 'review',
+    };
+
     this.autoClaimTimer = setInterval(async () => {
+      if (this.runner.getStatus() === 'draining') return;
       try {
         const tasks = await this.node.getTasksForRole(this.role);
         for (const task of tasks) {
@@ -287,7 +295,20 @@ export class IntegrationRunner {
           if (content.status === 'ready' && !content.claimed_by) {
             const claimed = await this.runner.claimTask(task);
             const executed = await this.runner.executeTask(claimed);
-            await this.runner.completeTask(executed);
+            // Role-aware transition
+            const nextStatus = ROLE_NEXT_STATUS[this.role] || 'review';
+            const logicalId = (executed.content as any)?.logicalId;
+            if (logicalId) {
+              await this.node.transitionTask(logicalId, nextStatus, this.role);
+            } else {
+              await this.runner.completeTask(executed);
+            }
+            // Publish result announcement
+            await this.node.transport.publish('xp0/tasks', {
+              type: 'twin.evolved',
+              cid: executed.cid,
+              kind: 'task',
+            });
             break;
           }
         }
