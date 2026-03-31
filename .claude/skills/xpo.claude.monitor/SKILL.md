@@ -78,13 +78,13 @@ curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
 
 ```bash
 pkill -f "agent-monitor.cjs $ARGUMENTS" 2>/dev/null || true
-source ~/.nvm/nvm.sh && nohup node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs $ARGUMENTS > /tmp/agent-monitor-$ARGUMENTS.log 2>&1 &
+source ~/.nvm/nvm.sh && nohup node /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/viz/agent-monitor.cjs $ARGUMENTS > /tmp/agent-monitor-$ARGUMENTS.log 2>&1 &
 ```
 
 ## Step 4: Wait for Work
 
 ```bash
-source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/agent-monitor.cjs $ARGUMENTS --wait
+source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/viz/agent-monitor.cjs $ARGUMENTS --wait
 ```
 
 - Blocks until actionable work appears, then outputs JSON and exits
@@ -96,7 +96,7 @@ source ~/.nvm/nvm.sh && node /home/developer/workspaces/github/PichlerThomas/xpo
 ## How to Work a Task
 
 ```bash
-CLI=/home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/src/db/interface-cli.js
+CLI=/home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/src/db/interface-cli.js
 
 # 1. Parse --wait output for slug and project DB path
 
@@ -165,10 +165,8 @@ curl -s -X POST ${BRAIN_API_URL}/api/v1/memory \
 
 **CRITICAL: Work = DNA + Transition.** Writing findings to DNA without executing the transition leaves the task stuck. If `--wait` returns a task where your output is already in DNA, the transition was missed — execute it immediately. Do not dismiss it as "already done."
 
-**Project databases** (all under `/home/developer/workspaces/github/PichlerThomas/`):
-- xpollination-mcp-server: `xpollination-mcp-server/data/xpollination.db`
-- HomePage: `HomePage/data/xpollination.db`
-- xpollination-best-practices: `xpollination-best-practices/data/xpollination.db`
+**Project database:**
+- xpollination-mindspace: `/mnt/HC_Volume_105173237/mindspace/data-prod/mindspace.db`
 
 ---
 
@@ -273,8 +271,8 @@ Writes tests from approved designs. Reviews dev implementations by running tests
 
 ## Reference
 
-- Workflow: `xpollination-mcp-server/tracks/process/context/WORKFLOW.md`
-- Monitor script: `xpollination-mcp-server/viz/agent-monitor.cjs`
+- Workflow: `xpollination-mindspace/tracks/process/context/WORKFLOW.md`
+- Monitor script: `xpollination-mindspace/viz/agent-monitor.cjs`
 - Memory API: `POST http://localhost:3200/api/v1/memory`
 - Memory health: `GET http://localhost:3200/api/v1/health`
 - Brain skill: `~/.claude/skills/brain/SKILL.md`

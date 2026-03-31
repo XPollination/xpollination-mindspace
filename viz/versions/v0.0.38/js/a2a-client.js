@@ -32,9 +32,15 @@ export class A2AClient {
     if (saved) {
       try {
         const { agentId, sessionId } = JSON.parse(saved);
-        // Validate session is still alive before reusing
-        const check = await fetch(`/a2a/stream/${agentId}`, { method: 'HEAD' }).catch(() => null);
-        if (check && check.ok) {
+        // Validate session is still alive via HEARTBEAT (fast, 3ms)
+        // Never use HEAD on SSE endpoint — it opens a persistent stream that hangs
+        const check = await fetch('/a2a/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: agentId, type: 'HEARTBEAT' }),
+        }).catch(() => null);
+        const checkData = check ? await check.json().catch(() => null) : null;
+        if (checkData && checkData.type === 'ACK') {
           this._agentId = agentId;
           this._sessionId = sessionId;
           this._connected = true;

@@ -23,7 +23,7 @@ const projectFilter = document.getElementById('project-filter');
 const searchInput = document.getElementById('search');
 
 let selectedTaskId = null;
-let currentFilter = 'active'; // 'active' = non-terminal, 'all' = everything
+let currentFilter = sessionStorage.getItem('kanban-completed-filter') || 'active';
 
 // --- Column Configuration ---
 // Twin status → column mapping. Change this to rearrange tasks.
@@ -32,8 +32,16 @@ const COLUMNS = [
   { id: 'active',   label: 'Active',   statuses: ['active', 'testing'],         color: 'var(--ms-status-active)' },
   { id: 'review',   label: 'Review',   statuses: ['review', 'approval'],        color: 'var(--ms-status-review)' },
   { id: 'approved', label: 'Approved', statuses: ['approved'],                  color: 'var(--ms-status-approved)' },
-  { id: 'done',     label: 'Done',     statuses: ['complete', 'rework', 'blocked', 'cancelled'], color: 'var(--ms-status-complete)' },
+  { id: 'rework',   label: 'Rework',   statuses: ['rework'],                    color: 'var(--ms-status-rework)' },
+  { id: 'blocked',  label: 'Blocked',  statuses: ['blocked', 'cancelled'],      color: 'var(--ms-status-blocked)' },
+  { id: 'done',     label: 'Done',     statuses: ['complete'],                  color: 'var(--ms-status-complete)' },
 ];
+
+function isWithinDays(updatedAt, days) {
+  const updated = new Date(updatedAt).getTime();
+  const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+  return updated >= cutoff;
+}
 
 const STATUS_COLORS = {
   pending: 'var(--ms-status-pending)', ready: 'var(--ms-status-ready)',
@@ -68,7 +76,14 @@ function filterTasks(tasks) {
 
   if (currentFilter === 'active') {
     filtered = filtered.filter(t => !['complete', 'cancelled'].includes(t.status));
+  } else if (currentFilter === '1d' || currentFilter === '7d' || currentFilter === '30d') {
+    const days = parseInt(currentFilter);
+    filtered = filtered.filter(t => {
+      if (!['complete', 'cancelled'].includes(t.status)) return true;
+      return isWithinDays(t.updated_at || t.created_at, days);
+    });
   }
+  // 'all' = no terminal filter
 
   if (search) {
     filtered = filtered.filter(t => {
@@ -133,13 +148,19 @@ function renderCard(task) {
   const project = task.project_slug;
   const isSelected = task.slug === selectedTaskId || task.id === selectedTaskId;
 
-  return `<div class="task-card${isSelected ? ' selected' : ''}" data-id="${esc(task.slug || task.id)}">
+  const isTerminal = ['complete', 'cancelled'].includes(task.status);
+  const isCancelled = task.status === 'cancelled';
+  const isBlocked = task.status === 'blocked';
+  const blockedReason = isBlocked && dna.blocked_reason ? dna.blocked_reason : '';
+
+  return `<div class="task-card${isSelected ? ' selected' : ''}${isTerminal ? ' completed' : ''}${isCancelled ? ' cancelled' : ''}" data-id="${esc(task.slug || task.id)}">
     <div class="task-title">${title}</div>
     <div class="task-meta">
       <span class="task-badge" style="background:${STATUS_COLORS[task.status] || 'var(--ms-muted)'}">${task.status}</span>
       ${role ? `<span class="task-badge" style="background:${ROLE_COLORS[role] || 'var(--ms-muted)'}">${role}</span>` : ''}
       ${project ? `<span class="task-project">${esc(project)}</span>` : ''}
     </div>
+    ${blockedReason ? `<div class="task-blocked-reason">${esc(blockedReason)}</div>` : ''}
   </div>`;
 }
 
@@ -299,9 +320,22 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
+    sessionStorage.setItem('kanban-completed-filter', currentFilter);
     renderBoard();
   });
 });
+
+// Completed filter dropdown
+const completedFilterEl = document.getElementById('completed-filter');
+if (completedFilterEl) {
+  completedFilterEl.value = currentFilter;
+  completedFilterEl.addEventListener('change', () => {
+    currentFilter = completedFilterEl.value;
+    sessionStorage.setItem('kanban-completed-filter', currentFilter);
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    renderBoard();
+  });
+}
 
 searchInput.addEventListener('input', () => renderBoard());
 projectFilter.addEventListener('change', () => renderBoard());
