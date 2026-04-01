@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 
 interface ClaudeBridgeOpts {
   binary: string;
@@ -35,6 +35,35 @@ export class ClaudeBridge {
           resolve(stdout.trim());
         },
       );
+    });
+  }
+
+  executeStreaming(prompt: string, onChunk: (chunk: string) => void): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const child = spawn('node', [this.binary, '--print', '-p', prompt], {
+        env: { ...process.env, ...this.env },
+      });
+      let output = '';
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error(`Claude bridge timed out after ${this.timeout}ms`));
+      }, this.timeout);
+
+      child.stdout.on('data', (data: Buffer) => {
+        const text = data.toString();
+        output += text;
+        onChunk(text);
+      });
+      child.stderr.on('data', () => {}); // drain stderr
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) reject(new Error(`Claude exited with code ${code}`));
+        else resolve(output.trim());
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
     });
   }
 }

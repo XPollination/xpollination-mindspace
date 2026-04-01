@@ -16,6 +16,8 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { getDb } from '../db/connection.js';
 import { getNode } from '../services/mindspace-node-service.js';
+import { syncClaimToSqlite, syncResultToSqlite } from '../lib/task-bridge.js';
+import { broadcast } from '../lib/sse-manager.js';
 
 const router = Router();
 const ROLES = ['liaison', 'pdsa', 'qa', 'dev'];
@@ -61,7 +63,20 @@ router.post('/:project/agent', async (req: Request, res: Response) => {
   const node = getNode();
   if (node) {
     try {
-      const runner = await node.addRunner({ role });
+      const runner = await node.addRunner({
+        role,
+        callbacks: {
+          onClaim: (logicalId, runnerId) => {
+            syncClaimToSqlite(getDb(), logicalId, runnerId);
+          },
+          onChunk: (logicalId, chunk) => {
+            broadcast('runner_output', { task_slug: logicalId, chunk, timestamp: new Date().toISOString() });
+          },
+          onComplete: (logicalId, result, nextStatus) => {
+            syncResultToSqlite(getDb(), logicalId, result, nextStatus);
+          },
+        },
+      });
       res.json({ id: runner.getId(), role, status: 'ready', name: `${role}-runner`, node_id: 'local' });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Failed to start runner' });
@@ -80,7 +95,14 @@ router.post('/:project/full', async (req: Request, res: Response) => {
     try {
       const agents = [];
       for (const role of ROLES) {
-        const runner = await node.addRunner({ role });
+        const runner = await node.addRunner({
+          role,
+          callbacks: {
+            onClaim: (logicalId, runnerId) => syncClaimToSqlite(getDb(), logicalId, runnerId),
+            onChunk: (logicalId, chunk) => broadcast('runner_output', { task_slug: logicalId, chunk, timestamp: new Date().toISOString() }),
+            onComplete: (logicalId, result, nextStatus) => syncResultToSqlite(getDb(), logicalId, result, nextStatus),
+          },
+        });
         agents.push({ id: runner.getId(), role, status: 'ready', name: `${role}-runner` });
       }
       res.json({ agents });

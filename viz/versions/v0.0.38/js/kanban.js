@@ -197,6 +197,23 @@ function showDetail(task) {
   ].filter(Boolean);
   if (workFields.length) html += renderSection('Work', workFields, false);
 
+  // Live Output (shown when task is active — runner streaming)
+  if (task.status === 'active') {
+    html += renderSection('Live Output', [
+      `<div id="live-output-${esc(task.slug)}" class="live-output-container">
+         <pre class="live-output-pre"></pre>
+         <div class="live-output-status">Waiting for runner...</div>
+       </div>`
+    ], true);
+  }
+
+  // Runner output (shown when complete — final result)
+  if (dna.runner_output) {
+    html += renderSection('Runner Output', [
+      `<pre style="white-space:pre-wrap;font-size:12px;">${esc(dna.runner_output)}</pre>`
+    ], false);
+  }
+
   // Reviews
   const reviewFields = [
     dna.qa_review ? field('QA Review', formatReview(dna.qa_review)) : '',
@@ -413,6 +430,31 @@ async function init() {
           }
         } catch { /* silent */ }
       }
+    });
+
+    // Runner live output streaming
+    client.on('runner_output', (data) => {
+      const pre = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-pre`);
+      if (pre) { pre.textContent += data.chunk; pre.scrollTop = pre.scrollHeight; }
+      const status = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-status`);
+      if (status) status.textContent = 'Runner active...';
+    });
+
+    client.on('runner_claim', (data) => {
+      try {
+        const updated = client.query('task', { slug: data.task_slug });
+        if (updated && updated.length) { cache.set('task', data.task_slug, updated[0]); }
+      } catch { /* silent */ }
+      renderBoard();
+    });
+
+    client.on('runner_complete', async (data) => {
+      const status = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-status`);
+      if (status) status.textContent = 'Completed';
+      try {
+        const updated = await client.query('task', { slug: data.task_slug });
+        if (updated.length) { cache.set('task', data.task_slug, updated[0]); renderBoard(); }
+      } catch { /* silent */ }
     });
 
     // Deep link: /kanban?task=slug

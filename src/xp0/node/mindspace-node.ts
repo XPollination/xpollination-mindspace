@@ -322,7 +322,17 @@ export class MindspaceNode {
 
   // --- Runner management ---
 
-  async addRunner(opts: { role: string; autoClaimDelay?: number; heartbeatInterval?: number; delegationScope?: { operations: string[]; roles: string[] } }): Promise<IntegrationRunner> {
+  async addRunner(opts: {
+    role: string;
+    autoClaimDelay?: number;
+    heartbeatInterval?: number;
+    delegationScope?: { operations: string[]; roles: string[] };
+    callbacks?: {
+      onClaim?: (logicalId: string, runnerId: string) => void;
+      onChunk?: (logicalId: string, chunk: string) => void;
+      onComplete?: (logicalId: string, result: string, nextStatus: string) => void;
+    };
+  }): Promise<IntegrationRunner> {
     const kp = await generateKeyPair();
     const did = deriveDID(kp.publicKey);
 
@@ -348,7 +358,7 @@ export class MindspaceNode {
     this.runners.push(managed);
 
     // Start auto-claim loop if configured
-    const ir = new IntegrationRunner(runner, opts.role, this);
+    const ir = new IntegrationRunner(runner, opts.role, this, opts.callbacks);
     if (opts.autoClaimDelay !== undefined) {
       ir.startAutoClaim(opts.autoClaimDelay);
     } else {
@@ -409,12 +419,19 @@ export class IntegrationRunner {
   private node: MindspaceNode;
   private listening = false;
   private autoClaimTimer: ReturnType<typeof setInterval> | null = null;
+  private callbacks?: {
+    onClaim?: (logicalId: string, runnerId: string) => void;
+    onChunk?: (logicalId: string, chunk: string) => void;
+    onComplete?: (logicalId: string, result: string, nextStatus: string) => void;
+  };
+  currentTaskLogicalId: string | null = null;
 
-  constructor(runner: Runner, role: string, node: MindspaceNode) {
+  constructor(runner: Runner, role: string, node: MindspaceNode, callbacks?: IntegrationRunner['callbacks']) {
     this.runner = runner;
     this.role = role;
     this.node = node;
     this.listening = true;
+    this.callbacks = callbacks;
   }
 
   isListening(): boolean {
@@ -531,6 +548,11 @@ export class IntegrationRunner {
               cid: claimed.cid,
               kind: 'task',
             });
+            // Callback: runner claimed a task
+            if (logId) {
+              this.currentTaskLogicalId = logId;
+              this.callbacks?.onClaim?.(logId, myDID);
+            }
             break;
           }
 
@@ -548,8 +570,11 @@ export class IntegrationRunner {
                 }
               }
             }
-            // Step 2: Execute
-            const executed = await this.runner.executeTask(task);
+            // Step 2: Execute (with streaming callback if available)
+            const chunkCb = logId && this.callbacks?.onChunk
+              ? (chunk: string) => this.callbacks!.onChunk!(logId, chunk)
+              : undefined;
+            const executed = await this.runner.executeTask(task, chunkCb);
             await this.node.transport.publish('xp0/tasks', {
               type: 'twin.evolved',
               cid: executed.cid,
@@ -569,6 +594,9 @@ export class IntegrationRunner {
                 cid: transitioned.cid,
                 kind: 'task',
               });
+              // Callback: runner completed task
+              this.currentTaskLogicalId = null;
+              this.callbacks?.onComplete?.(logicalId, content.result as string, nextStatus);
             }
             break;
           }
