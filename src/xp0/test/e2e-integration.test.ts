@@ -43,6 +43,7 @@ import { MindspaceNode, type MindspaceNodeOpts } from '../node/mindspace-node.js
 // Existing modules (these work)
 import { generateKeyPair, deriveDID } from '../auth/identity.js';
 import { create, sign, evolve, validate as validateTwin } from '../twin/kernel.js';
+import { clearPeerRegistry } from '../transport/libp2p-transport.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // Test fixtures
@@ -80,12 +81,16 @@ async function createNode(opts: Partial<MindspaceNodeOpts> = {}): Promise<Mindsp
 afterAll(async () => {
   // Stop all nodes
   for (const node of nodes) {
-    try { await node.stop(); } catch { /* ignore */ }
+    try { await node.stop();
+    clearPeerRegistry(); } catch { /* ignore */ }
   }
+  nodes = [];
+  clearPeerRegistry();
   // Clean up temp dirs
   for (const dir of tmpDirs) {
     try { await rm(dir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
+  tmpDirs = [];
 });
 
 
@@ -102,6 +107,7 @@ describe('T5.1: MindspaceNode starts and connects', () => {
     expect(node.getListenAddresses().length).toBeGreaterThan(0);
 
     await node.stop();
+    clearPeerRegistry();
   });
 
   it('storage, transport, and auth are all available after start', async () => {
@@ -113,6 +119,7 @@ describe('T5.1: MindspaceNode starts and connects', () => {
     expect(node.ownerDID).toBeDefined();
 
     await node.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -134,6 +141,7 @@ describe('T5.2: Runner connects via MindspaceNode', () => {
     expect(node.getRunners().length).toBe(1);
 
     await node.stop();
+    clearPeerRegistry();
   });
 
   it('runner does NOT have its own libp2p connection', async () => {
@@ -148,6 +156,7 @@ describe('T5.2: Runner connects via MindspaceNode', () => {
     expect(runner.getTransport()).toBeUndefined();
 
     await node.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -177,6 +186,7 @@ describe('T5.3: Two MindspaceNodes discover each other', () => {
   afterAll(async () => {
     await nodeB.stop();
     await nodeA.stop();
+    clearPeerRegistry();
   });
 
   it('both nodes see each other as connected peers', async () => {
@@ -257,6 +267,7 @@ describe('T5.4: Offline resilience', () => {
     expect((executed.content as any).result).toBeDefined();
 
     await nodeA.stop();
+    clearPeerRegistry();
   });
 
   it('locally created twins sync when reconnected', async () => {
@@ -291,6 +302,7 @@ describe('T5.4: Offline resilience', () => {
 
     await nodeB.stop();
     await nodeA.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -325,6 +337,7 @@ describe('T5.5: Connection drop recovery', () => {
 
     await nodeB.stop();
     await nodeA.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -491,6 +504,7 @@ describe('T4.2: Concurrent task claiming across nodes', () => {
 
     await nodeB.stop();
     await nodeA.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -579,6 +593,7 @@ describe('T7.3: Runner replacement — swap engine without disruption', () => {
     expect((task1!.content as any).claimed_by).not.toBe((task2!.content as any).claimed_by);
 
     await node.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -695,6 +710,7 @@ describe('T-SEC INTEGRATION: Security across network peers', () => {
   afterAll(async () => {
     await rogue.stop();
     await honest.stop();
+    clearPeerRegistry();
   });
 
   it('T-SEC-1 NETWORK: rogue runner twin rejected by honest peer — never docked', async () => {
@@ -818,7 +834,10 @@ describe('T-SEC INTEGRATION: Security across network peers', () => {
     // Task should still be ready (not claimed) — revoked runner can't claim
     const latest = await nodeA.getLatestTwin('post-revoke');
     expect((latest!.content as any).status).toBe('ready');
-    // cleanup handled by global afterAll
+
+    await nodeB.stop();
+    await nodeA.stop();
+    clearPeerRegistry();
   });
 
   it('T-SEC-9 NETWORK: forget() propagates — all peers purge content', async () => {
@@ -850,7 +869,10 @@ describe('T-SEC INTEGRATION: Security across network peers', () => {
     expect(onB).not.toBeNull();
     expect((onB as any).state).toBe('forgotten');
     expect((onB as any).content?.personal_data).toBeUndefined();
-    // cleanup handled by global afterAll
+
+    await nodeB.stop();
+    await nodeA.stop();
+    clearPeerRegistry();
   });
 
   it('T-SEC-10 NETWORK: partition conflict resolved identically on both sides', async () => {
@@ -908,7 +930,10 @@ describe('T-SEC INTEGRATION: Security across network peers', () => {
     expect(headsA.length).toBe(1);
     expect(headsB.length).toBe(1);
     expect(headsA[0]).toBe(headsB[0]); // Same winner, deterministic
-    // cleanup handled by global afterAll
+
+    await nodeB.stop();
+    await nodeA.stop();
+    clearPeerRegistry();
   }, 30000); // 30s timeout for partition test
 });
 
@@ -942,6 +967,7 @@ describe('Gap 3: GDPR forget propagation across peers', () => {
 
     await nodeB.stop();
     await nodeA.stop();
+    clearPeerRegistry();
   });
 });
 
@@ -979,6 +1005,7 @@ describe('Gap 4: Permission-scoped access', () => {
       .rejects.toThrow(/permission|denied|no.*relation/i);
 
     await node.stop();
+    clearPeerRegistry();
   });
 
   it('T-SEC-6: rate limiting — runner claiming too fast is rejected', async () => {
@@ -1009,6 +1036,7 @@ describe('Gap 4: Permission-scoped access', () => {
     expect(claimed).toBeLessThanOrEqual(2);
 
     await node.stop();
+    clearPeerRegistry();
   });
 
   it('T-SEC-8: brain access scoped by delegation VC', async () => {
@@ -1036,6 +1064,7 @@ describe('Gap 4: Permission-scoped access', () => {
       .rejects.toThrow(/permission|denied|scope/i);
 
     await node.stop();
+    clearPeerRegistry();
   });
 });
 

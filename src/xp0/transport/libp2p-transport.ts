@@ -16,6 +16,11 @@ const PUBSUB_PROTO = '/xp0/pubsub/1.0.0';
 // Static peer registry for bootstrap discovery
 const peerRegistry: string[] = [];
 
+// Clear registry — used by tests to prevent stale peer connections
+export function clearPeerRegistry(): void {
+  peerRegistry.length = 0;
+}
+
 interface LibP2PTransportOpts {
   storage: StorageAdapter;
 }
