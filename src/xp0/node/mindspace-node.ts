@@ -200,6 +200,23 @@ export class MindspaceNode {
     return signed;
   }
 
+  // --- Runner management (public) ---
+
+  getRunners(): Array<{ id: string; role: string; status: string }> {
+    return this.runners.map((r) => ({
+      id: r.id,
+      role: r.role,
+      status: r.runner.getStatus(),
+    }));
+  }
+
+  async terminateRunner(id: string): Promise<void> {
+    const idx = this.runners.findIndex((r) => r.id === id);
+    if (idx === -1) throw new Error('Runner not found');
+    await this.runners[idx].runner.stop();
+    this.runners.splice(idx, 1);
+  }
+
   // --- Task management ---
 
   async createTask(opts: {

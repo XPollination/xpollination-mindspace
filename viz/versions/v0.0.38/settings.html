@@ -61,6 +61,17 @@
       </div>
     </div>
 
+    <!-- Runner Target -->
+    <div class="ms-card">
+      <h2 style="margin-bottom:0.5rem;">Runner Target</h2>
+      <p style="font-size:0.85rem;color:var(--ms-muted);margin-bottom:0.75rem;">Choose where new runners start when you click "+1" in the Tasks view.</p>
+      <select id="runner-target" class="ms-input" style="margin-bottom:0.5rem;">
+        <option value="local">Local</option>
+      </select>
+      <span id="runner-target-scope" style="font-size:0.8rem;color:var(--ms-muted);"></span>
+      <div class="msg" id="runner-target-msg"></div>
+    </div>
+
     <!-- Active Sessions -->
     <div class="ms-card">
       <h2 style="margin-bottom:0.5rem;">Active Sessions</h2>
@@ -200,9 +211,42 @@
 
     document.getElementById('git-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addProject(); } });
 
+    // --- Runner Target ---
+    async function loadRunnerTarget() {
+      try {
+        const res = await fetch('/api/settings/runner-target');
+        const data = await res.json();
+        const sel = document.getElementById('runner-target');
+        sel.innerHTML = '';
+        for (const n of (data.nodes || [])) {
+          const opt = document.createElement('option');
+          opt.value = n.nodeId;
+          opt.textContent = n.label + (n.location === 'local' ? ' (local)' : '');
+          sel.appendChild(opt);
+        }
+        sel.value = data.target || 'local';
+        document.getElementById('runner-target-scope').textContent = data.scope === 'default' ? '' : `(${data.scope})`;
+      } catch { /* API not ready */ }
+    }
+
+    document.getElementById('runner-target').addEventListener('change', async (e) => {
+      const msg = document.getElementById('runner-target-msg');
+      try {
+        const res = await fetch('/api/settings/runner-target', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: e.target.value }),
+        });
+        if (res.ok) { msg.textContent = 'Saved'; msg.style.display = 'block'; msg.style.background = 'var(--ms-success, #16a34a)'; msg.style.color = '#fff'; }
+        else { const d = await res.json(); msg.textContent = d.error; msg.style.display = 'block'; msg.style.background = 'var(--ms-danger, #dc2626)'; msg.style.color = '#fff'; }
+        setTimeout(() => { msg.style.display = 'none'; }, 2000);
+      } catch { msg.textContent = 'Network error'; msg.style.display = 'block'; }
+    });
+
     loadMyProjects();
     loadSessions();
     loadAccount();
+    loadRunnerTarget();
   </script>
 
   <!-- API Key Management (Agent OS) -->

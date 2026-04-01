@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db/connection.js';
 import { requireApiKeyOrJwt } from '../middleware/require-auth.js';
+import { nodeRegistry } from '../lib/node-registry.js';
 
 export const settingsRouter = Router();
 
@@ -77,4 +78,59 @@ settingsRouter.put('/liaison-approval-mode', (req: Request, res: Response) => {
   } catch { /* system_settings may not exist in all envs */ }
 
   res.status(200).json({ mode, scope: project ? 'user+project' : 'user', project: project || null });
+});
+
+// --- Runner Target Setting ---
+
+// GET /runner-target — where do new runners start?
+settingsRouter.get('/runner-target', (req: Request, res: Response) => {
+  const db = getDb();
+  const user = (req as any).user;
+  const project = req.query.project as string | undefined;
+
+  let target = 'local';
+  let scope = 'default';
+
+  if (user?.id) {
+    const row = db.prepare(
+      `SELECT value, updated_at FROM user_project_settings
+       WHERE user_id = ? AND key = 'runner_target'
+       AND (project_slug = ? OR project_slug IS NULL)
+       ORDER BY CASE WHEN project_slug IS NOT NULL THEN 0 ELSE 1 END
+       LIMIT 1`
+    ).get(user.id, project || null) as any;
+    if (row) {
+      target = row.value;
+      scope = 'user';
+    }
+  }
+
+  const nodes = nodeRegistry.getNodes();
+  res.json({ target, nodes, scope });
+});
+
+// PUT /runner-target — set runner placement target
+settingsRouter.put('/runner-target', (req: Request, res: Response) => {
+  const { target, project } = req.body;
+  if (!target) {
+    res.status(400).json({ error: 'target is required' });
+    return;
+  }
+
+  const validIds = nodeRegistry.getNodes().map((n) => n.nodeId);
+  if (!validIds.includes(target) && target !== 'auto') {
+    res.status(400).json({ error: `Unknown target. Available: ${validIds.join(', ')}, auto` });
+    return;
+  }
+
+  const db = getDb();
+  const user = (req as any).user;
+  const userId = user?.id || 'system';
+
+  db.prepare(
+    `INSERT OR REPLACE INTO user_project_settings (user_id, project_slug, key, value, updated_at)
+     VALUES (?, ?, 'runner_target', ?, datetime('now'))`
+  ).run(userId, project || null, target);
+
+  res.json({ target, updated: true, scope: project ? 'user+project' : 'user' });
 });
