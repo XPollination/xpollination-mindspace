@@ -58,12 +58,16 @@ export class LibP2PTransport implements TransportAdapter {
     const storage = this.storage;
     const subs = this.subscriptions;
 
+    // Only use mDNS when no bootstrap peers provided (local dev).
+    // In tests, bootstrap peers are explicit — mDNS causes cross-test interference.
+    const discovery = this.knownPeers.length > 0 ? [] : [mdns()];
+
     this.node = await createLibp2p({
       addresses: { listen: ['/ip4/127.0.0.1/tcp/0'] },
       transports: [tcp()],
       connectionEncrypters: [noise()],
       streamMuxers: [yamux()],
-      peerDiscovery: [mdns()],
+      peerDiscovery: discovery,
       services: { identify: identify() },
     });
 
