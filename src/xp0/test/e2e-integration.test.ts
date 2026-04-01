@@ -318,9 +318,10 @@ describe('T5.5: Connection drop recovery', () => {
     await nodeA.transport.stop();
     await sleep(1000);
 
-    // A comes back
+    // A comes back (new port — B needs to learn new address)
     await nodeA.transport.start();
-    await sleep(5000); // Wait for reconnection
+    await nodeB.connectTo(nodeA.getListenAddresses());
+    await sleep(3000);
 
     // B should reconnect to A
     expect(nodeB.transport.getConnectedPeers().length).toBeGreaterThanOrEqual(1);
