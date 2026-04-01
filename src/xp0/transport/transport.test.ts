@@ -48,12 +48,14 @@ describe('LibP2PTransport interface', () => {
 describe('peer discovery', () => {
   it('two peers discover each other after start', async () => {
     transportA = new LibP2PTransport({ storage: storageA });
-    transportB = new LibP2PTransport({ storage: storageB });
-
     await transportA.start();
+
+    // B connects to A via bootstrap (per-instance peers — no shared registry)
+    const addrsA = transportA.getListenAddresses();
+    transportB = new LibP2PTransport({ storage: storageB, bootstrapPeers: addrsA });
     await transportB.start();
 
-    // Allow discovery time
+    // Allow connection time
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const peersA = await transportA.getConnectedPeers();
@@ -68,9 +70,9 @@ describe('peer discovery', () => {
 describe('GossipSub publish/subscribe', () => {
   it('published twin evolution arrives at subscriber', async () => {
     transportA = new LibP2PTransport({ storage: storageA });
-    transportB = new LibP2PTransport({ storage: storageB });
-
     await transportA.start();
+    const addrs = transportA.getListenAddresses();
+    transportB = new LibP2PTransport({ storage: storageB, bootstrapPeers: addrs });
     await transportB.start();
     await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -99,9 +101,11 @@ describe('GossipSub publish/subscribe', () => {
 describe('twin request by CID', () => {
   it('peer B can request twin from peer A by CID', async () => {
     transportA = new LibP2PTransport({ storage: storageA });
-    transportB = new LibP2PTransport({ storage: storageB });
-
     await transportA.start();
+    const addrs = transportA.getListenAddresses();
+    transportB = new LibP2PTransport({ storage: storageB, bootstrapPeers: addrs });
+
+
     await transportB.start();
     await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -116,7 +120,9 @@ describe('twin request by CID', () => {
 
   it('returns null for non-existent CID', async () => {
     transportA = new LibP2PTransport({ storage: storageA });
-    transportB = new LibP2PTransport({ storage: storageB });
+    await transportA.start();
+    const addrs = transportA.getListenAddresses();
+    transportB = new LibP2PTransport({ storage: storageB, bootstrapPeers: addrs });
 
     await transportA.start();
     await transportB.start();
@@ -132,7 +138,9 @@ describe('twin request by CID', () => {
 describe('project topic isolation', () => {
   it('subscriber to mindspace topic does not receive crm events', async () => {
     transportA = new LibP2PTransport({ storage: storageA });
-    transportB = new LibP2PTransport({ storage: storageB });
+    await transportA.start();
+    const addrs = transportA.getListenAddresses();
+    transportB = new LibP2PTransport({ storage: storageB, bootstrapPeers: addrs });
 
     await transportA.start();
     await transportB.start();
