@@ -450,7 +450,8 @@ export class IntegrationRunner {
     let processing = false;
     this.autoClaimTimer = setInterval(async () => {
       if (processing) return; // Prevent concurrent iterations
-      if (this.runner.getStatus() === 'draining') return;
+      const status = this.runner.getStatus();
+      if (status === 'draining' || status === 'stopped') return;
       processing = true;
       try {
         const tasks = await this.node.getTasksForRole(this.role);
