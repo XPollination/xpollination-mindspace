@@ -16,7 +16,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { getDb } from '../db/connection.js';
 import { getNode } from '../services/mindspace-node-service.js';
-import { syncClaimToSqlite, syncResultToSqlite } from '../lib/task-bridge.js';
+import { syncClaimToSqlite, syncResultToSqlite, createTwinFromTask } from '../lib/task-bridge.js';
 import { broadcast } from '../lib/sse-manager.js';
 
 const router = Router();
@@ -158,6 +158,19 @@ router.put('/:project/agent/:id/role', (req: Request, res: Response) => {
   const db = getDb();
   db.prepare(`UPDATE agents SET current_role = ? WHERE id = ?`).run(role, req.params.id);
   res.json({ id: req.params.id, role, status: 'active' });
+});
+
+// POST /api/team/:project/bridge/:slug — create twin from existing SQLite task
+router.post('/:project/bridge/:slug', async (req: Request, res: Response) => {
+  const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE slug = ?').get(req.params.slug) as any;
+  if (!task) { res.status(404).json({ error: 'Task not found' }); return; }
+  try {
+    await createTwinFromTask(db, { ...task, current_role: req.body.role || task.current_role });
+    res.json({ bridged: true, slug: req.params.slug });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export { router as teamRouter };
