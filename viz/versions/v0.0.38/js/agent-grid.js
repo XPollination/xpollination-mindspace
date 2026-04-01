@@ -13,7 +13,11 @@ class AgentGrid extends HTMLElement {
       <div class="ag" style="display:flex;flex-direction:column;height:100%;">
         <div class="ag-toolbar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ms-surface,#f8fafc);border-bottom:1px solid var(--ms-border,#e2e8f0);">
           <span style="font-weight:bold;">Agent OS</span>
-          <button class="ag-spawn" style="padding:4px 12px;border:none;border-radius:4px;background:var(--ms-accent,#ea580c);color:#fff;cursor:pointer;font-weight:bold;font-size:12px;">+ Start Agentic Team</button>
+          <button class="ag-spawn" style="padding:4px 12px;border:none;border-radius:4px;background:var(--ms-accent,#ea580c);color:#fff;cursor:pointer;font-weight:bold;font-size:12px;">+ Full Team</button>
+          <button class="ag-add-role" data-role="liaison" style="padding:4px 8px;border:none;border-radius:4px;background:var(--ms-role-liaison,#6366f1);color:#fff;cursor:pointer;font-size:11px;">+Liaison</button>
+          <button class="ag-add-role" data-role="pdsa" style="padding:4px 8px;border:none;border-radius:4px;background:var(--ms-role-pdsa,#8b5cf6);color:#fff;cursor:pointer;font-size:11px;">+PDSA</button>
+          <button class="ag-add-role" data-role="dev" style="padding:4px 8px;border:none;border-radius:4px;background:var(--ms-role-dev,#22c55e);color:#fff;cursor:pointer;font-size:11px;">+Dev</button>
+          <button class="ag-add-role" data-role="qa" style="padding:4px 8px;border:none;border-radius:4px;background:var(--ms-role-qa,#eab308);color:#fff;cursor:pointer;font-size:11px;">+QA</button>
           <button class="ag-stop-all" style="padding:4px 12px;border:none;border-radius:4px;background:#ef4444;color:#fff;cursor:pointer;font-weight:bold;font-size:12px;display:none;">Stop All</button>
           <div style="margin-left:auto;display:flex;gap:4px;">
             <button class="ag-view-dash" style="padding:3px 10px;border:1px solid var(--ms-border,#e2e8f0);border-radius:4px;background:var(--ms-accent,#ea580c);color:#fff;cursor:pointer;font-size:11px;">Dashboard</button>
@@ -35,8 +39,13 @@ class AgentGrid extends HTMLElement {
     this.querySelector('.ag-view-dash').addEventListener('click', () => this._setView('dashboard'));
     this.querySelector('.ag-view-term').addEventListener('click', () => this._setView('terminal'));
 
-    // Start team
-    this.querySelector('.ag-spawn').addEventListener('click', () => this._spawnAgent());
+    // Start full team
+    this.querySelector('.ag-spawn').addEventListener('click', () => this._spawnFullTeam());
+
+    // Per-role add buttons
+    this.querySelectorAll('.ag-add-role').forEach(btn => {
+      btn.addEventListener('click', () => this._addAgent(btn.dataset.role));
+    });
 
     // Stop all
     this._stopAllBtn.addEventListener('click', () => this._stopAll());
@@ -67,48 +76,61 @@ class AgentGrid extends HTMLElement {
     this._renderAgents();
   }
 
-  async _spawnAgent() {
-    const roles = ['liaison', 'pdsa', 'dev', 'qa'];
-
-    for (const role of roles) {
-      try {
-        const res = await fetch('/api/agents/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          // Avoid duplicates
-          if (!this._agents.find(a => a.role === role)) {
-            this._agents.push({ role, sessionName: data.sessionName, agentId: data.agentId || data.sessionName });
-          }
-        }
-      } catch { /* continue with next role */ }
-    }
+  async _addAgent(role) {
+    try {
+      const project = this._getProject();
+      const res = await fetch(`/api/team/${project}/agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        this._agents.push({ role, id: data.id, status: data.status || 'ready' });
+      }
+    } catch { /* ignore */ }
     this._renderAgents();
   }
 
-  async _stopAgent(sessionName, role) {
+  async _spawnFullTeam() {
     try {
-      await fetch('/api/agents/stop', {
+      const project = this._getProject();
+      const res = await fetch(`/api/team/${project}/full`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionName }),
       });
+      const data = await res.json();
+      if (res.ok && data.agents) {
+        for (const agent of data.agents) {
+          if (!this._agents.find(a => a.role === agent.role)) {
+            this._agents.push({ role: agent.role, id: agent.id, status: agent.status || 'ready' });
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    this._renderAgents();
+  }
+
+  _getProject() {
+    // Get current project from URL or default
+    const params = new URLSearchParams(window.location.search);
+    return params.get('project') || 'mindspace';
+  }
+
+  async _stopAgent(id, role) {
+    try {
+      const project = this._getProject();
+      await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE' });
     } catch { /* best effort */ }
-    this._agents = this._agents.filter(a => a.sessionName !== sessionName);
+    this._agents = this._agents.filter(a => a.id !== id);
     this._renderAgents();
   }
 
   async _stopAll() {
     for (const agent of [...this._agents]) {
       try {
-        await fetch('/api/agents/stop', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionName: agent.sessionName }),
-        });
+        const project = this._getProject();
+        await fetch(`/api/team/${project}/agent/${agent.id}`, { method: 'DELETE' });
       } catch { /* continue */ }
     }
     this._agents = [];

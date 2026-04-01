@@ -1,0 +1,61 @@
+import type { Twin } from '../twin/types.js';
+import type { StorageAdapter } from '../storage/types.js';
+
+export interface PermissionResolver {
+  check(who: string, twinCid: string, right: 'read' | 'write'): Promise<{ allowed: boolean; reason?: string }>;
+  getRelations(source?: string, target?: string, relationType?: string): Promise<Twin[]>;
+}
+
+export class RelationPermissionResolver implements PermissionResolver {
+  private storage: StorageAdapter;
+
+  constructor(storage: StorageAdapter) {
+    this.storage = storage;
+  }
+
+  async check(who: string, twinCid: string, right: 'read' | 'write'): Promise<{ allowed: boolean; reason?: string }> {
+    const relations = await this.getRelations(who, twinCid, 'executes');
+    if (relations.length > 0) return { allowed: true };
+    // Check ownership
+    const twin = await this.storage.resolve(twinCid);
+    if (twin && twin.owner === who) return { allowed: true };
+    return { allowed: false, reason: `No 'executes' relation from ${who} to ${twinCid}` };
+  }
+
+  async getRelations(source?: string, target?: string, relationType?: string): Promise<Twin[]> {
+    const all = await this.storage.query({ kind: 'relation' });
+    return all.filter((t) => {
+      const c = t.content as Record<string, unknown>;
+      if (source && c.source !== source) return false;
+      if (target && c.target !== target) return false;
+      if (relationType && c.relationType !== relationType) return false;
+      return true;
+    });
+  }
+}
+
+// Rate limit checking
+export interface RateLimitPolicy {
+  maxClaimsPerWindow: number;
+  windowSeconds: number;
+}
+
+export async function checkRateLimit(
+  runnerId: string,
+  policy: RateLimitPolicy,
+  storage: StorageAdapter,
+): Promise<{ allowed: boolean; reason?: string }> {
+  // Count unique logical tasks claimed by this runner (across all evolution versions)
+  const allTasks = await storage.query({ schema: 'xp0/task' });
+  const claimedLogicalIds = new Set<string>();
+  for (const t of allTasks) {
+    const c = t.content as Record<string, unknown>;
+    if (c.claimed_by === runnerId && c.logicalId) {
+      claimedLogicalIds.add(c.logicalId as string);
+    }
+  }
+  if (claimedLogicalIds.size >= policy.maxClaimsPerWindow) {
+    return { allowed: false, reason: `Rate limit: ${claimedLogicalIds.size}/${policy.maxClaimsPerWindow} tasks claimed` };
+  }
+  return { allowed: true };
+}

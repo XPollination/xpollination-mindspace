@@ -13,11 +13,15 @@ import type { TransportAdapter, TransportMessage } from './types.js';
 const TWIN_REQUEST_PROTO = '/xp0/twin-request/1.0.0';
 const PUBSUB_PROTO = '/xp0/pubsub/1.0.0';
 
-// Static peer registry for bootstrap discovery
-const peerRegistry: string[] = [];
+// Legacy static registry — DEPRECATED, use per-instance bootstrapPeers
+const _legacyRegistry: string[] = [];
+export function clearPeerRegistry(): void {
+  _legacyRegistry.length = 0;
+}
 
 interface LibP2PTransportOpts {
   storage: StorageAdapter;
+  bootstrapPeers?: string[]; // per-instance peer list (replaces static registry)
 }
 
 interface QueueEntry {
@@ -41,21 +45,29 @@ export class LibP2PTransport implements TransportAdapter {
   private node: Libp2p | null = null;
   private subscriptions = new Map<string, ((msg: TransportMessage) => void)[]>();
   private queue: QueueEntry[] = [];
+  private knownPeers: string[] = []; // per-instance — true P2P, no shared state
 
   constructor(opts: LibP2PTransportOpts) {
     this.storage = opts.storage;
+    if (opts.bootstrapPeers) {
+      this.knownPeers = [...opts.bootstrapPeers];
+    }
   }
 
   async start(): Promise<void> {
     const storage = this.storage;
     const subs = this.subscriptions;
 
+    // Only use mDNS when no bootstrap peers provided (local dev).
+    // In tests, bootstrap peers are explicit — mDNS causes cross-test interference.
+    const discovery = this.knownPeers.length > 0 ? [] : [mdns()];
+
     this.node = await createLibp2p({
       addresses: { listen: ['/ip4/127.0.0.1/tcp/0'] },
       transports: [tcp()],
       connectionEncrypters: [noise()],
       streamMuxers: [yamux()],
-      peerDiscovery: [mdns()],
+      peerDiscovery: discovery,
       services: { identify: identify() },
     });
 
@@ -94,15 +106,9 @@ export class LibP2PTransport implements TransportAdapter {
 
     await this.node.start();
 
-    // Register our addresses for peer discovery
-    const addrs = this.node.getMultiaddrs();
-    for (const addr of addrs) {
-      peerRegistry.push(addr.toString());
-    }
-
-    // Connect to known peers
+    // Connect to known peers (per-instance list — no shared static state)
     const myPeerId = this.node.peerId.toString();
-    for (const addrStr of peerRegistry) {
+    for (const addrStr of this.knownPeers) {
       if (!addrStr.includes(myPeerId)) {
         try {
           await this.node.dial(multiaddr(addrStr));
@@ -116,13 +122,14 @@ export class LibP2PTransport implements TransportAdapter {
 
   async stop(): Promise<void> {
     if (this.node) {
-      const addrs = this.node.getMultiaddrs().map((a) => a.toString());
-      for (const addr of addrs) {
-        const idx = peerRegistry.indexOf(addr);
-        if (idx !== -1) peerRegistry.splice(idx, 1);
-      }
       await this.node.stop();
       this.node = null;
+    }
+  }
+
+  addBootstrapPeer(addr: string): void {
+    if (!this.knownPeers.includes(addr)) {
+      this.knownPeers.push(addr);
     }
   }
 
@@ -175,6 +182,11 @@ export class LibP2PTransport implements TransportAdapter {
   getConnectedPeers(): string[] {
     if (!this.node) return [];
     return this.node.getPeers().map((p) => p.toString());
+  }
+
+  getListenAddresses(): string[] {
+    if (!this.node) return [];
+    return this.node.getMultiaddrs().map((a) => a.toString());
   }
 
   enqueue(topic: string, msg: TransportMessage): void {

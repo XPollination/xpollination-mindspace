@@ -77,8 +77,26 @@ export class Runner {
     return this.runnerTwin;
   }
 
+  getId(): string {
+    return this.opts.owner || this.runnerTwin?.cid || '';
+  }
+
+  getStatus(): string {
+    if (!this.runnerTwin) return 'stopped';
+    return (this.runnerTwin.content as Record<string, unknown>).status as string || 'unknown';
+  }
+
+  async drain(): Promise<void> {
+    // Stop accepting new tasks, finish current
+    if (this.runnerTwin && !this.stopped) {
+      const evolved = await evolve(this.runnerTwin, { status: 'draining' });
+      this.runnerTwin = await sign(evolved, this.opts.privateKey);
+      await this.opts.storage.dock(this.runnerTwin);
+    }
+  }
+
   async claimTask(taskTwin: Twin): Promise<Twin> {
-    const claimed = await evolve(taskTwin, { status: 'active' });
+    const claimed = await evolve(taskTwin, { status: 'active', claimed_by: this.opts.owner });
     await this.opts.storage.dock(claimed);
     return claimed;
   }
