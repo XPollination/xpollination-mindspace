@@ -23,6 +23,7 @@ interface ManagedRunner {
   runner: Runner;
   role: string;
   id: string;
+  delegationScope?: { operations: string[]; roles: string[] };
 }
 
 export class MindspaceNode {
@@ -36,7 +37,7 @@ export class MindspaceNode {
   private runners: ManagedRunner[] = [];
   private taskIndex = new Map<string, Twin>(); // logicalId → latest twin
   private permissionResolver: RelationPermissionResolver | null = null;
-  private rateLimitPolicy: RateLimitPolicy | null = null;
+  rateLimitPolicy: RateLimitPolicy | null = null;
 
   constructor(opts: MindspaceNodeOpts) {
     this.opts = opts;
@@ -74,11 +75,21 @@ export class MindspaceNode {
 
   async getTaskDNAForRunner(runnerId: string, logicalId: string): Promise<Twin | null> {
     if (!this.permissionResolver) throw new Error('Node not started');
-    const task = await this.getTaskByLogicalId(logicalId);
+    const task = await this.getLatestTwin(logicalId);
     if (!task) return null;
-    const check = await this.permissionResolver.check(runnerId, task.cid, 'read');
-    if (!check.allowed) throw new Error(`Access denied: ${check.reason}`);
-    return task;
+
+    // Check permission against task CID AND all ancestors in evolution chain
+    // (executes relation was created with the CID at claim time, which differs from latest)
+    const history = await this.storage.history(task.cid);
+    for (const twin of history) {
+      const check = await this.permissionResolver.check(runnerId, twin.cid, 'read');
+      if (check.allowed) return task;
+    }
+
+    // Also check by ownership
+    if (task.owner === runnerId) return task;
+
+    throw new Error(`Access denied: No 'executes' relation from ${runnerId} to ${logicalId}`);
   }
 
   async setRateLimitPolicy(policy: RateLimitPolicy): Promise<void> {
@@ -91,12 +102,15 @@ export class MindspaceNode {
   }
 
   async queryBrainAsRunner(runnerId: string, prompt: string): Promise<string | null> {
-    // Check delegation VC scope for brain access
-    if (!this.permissionResolver) throw new Error('Node not started');
-    const relations = await this.permissionResolver.getRelations(runnerId, undefined, 'brain-access');
-    if (relations.length === 0) {
+    // Find the managed runner and check its delegation scope
+    const managed = this.runners.find((r) => r.id === runnerId);
+    if (!managed) throw new Error('Runner not found');
+
+    // Check delegation scope for brain access
+    if (!managed.delegationScope || !managed.delegationScope.operations.includes('read-brain')) {
       throw new Error('Access denied: runner has no brain-access delegation');
     }
+
     // Delegate to brain API (would use BrainClient in production)
     return `Brain response for: ${prompt}`;
   }
@@ -273,7 +287,7 @@ export class MindspaceNode {
 
   // --- Runner management ---
 
-  async addRunner(opts: { role: string; autoClaimDelay?: number; heartbeatInterval?: number }): Promise<IntegrationRunner> {
+  async addRunner(opts: { role: string; autoClaimDelay?: number; heartbeatInterval?: number; delegationScope?: { operations: string[]; roles: string[] } }): Promise<IntegrationRunner> {
     const kp = await generateKeyPair();
     const did = deriveDID(kp.publicKey);
 
@@ -293,7 +307,8 @@ export class MindspaceNode {
     const managed: ManagedRunner = {
       runner,
       role: opts.role,
-      id: runner.getRunnerTwin().cid,
+      id: runner.getId(), // DID — consistent with runner.getId() and permission checks
+      delegationScope: opts.delegationScope,
     };
     this.runners.push(managed);
 
@@ -334,14 +349,10 @@ export class MindspaceNode {
         const logicalId = (twin.content as any)?.logicalId;
         if (logicalId) {
           this.taskIndex.set(logicalId, twin);
-          // Check for conflicts: multiple active claims for same logicalId
-          const all = await this.storage.query({});
-          const activeClaims = all.filter((t) => {
-            const c = t.content as Record<string, unknown>;
-            return c.logicalId === logicalId && c.status === 'active' && c.claimed_by;
-          });
-          if (activeClaims.length > 1) {
-            await this.autoResolveConflict(logicalId, activeClaims.map((t) => t.cid));
+          // Check for conflicts using heads() — proper DAG leaf detection
+          const currentHeads = await this.storage.heads(logicalId);
+          if (currentHeads.length > 1) {
+            await this.autoResolveConflict(logicalId, currentHeads);
           }
         }
       }
@@ -403,8 +414,11 @@ export class IntegrationRunner {
 
     const myDID = this.runner.getRunnerTwin()?.owner || '';
 
+    let processing = false;
     this.autoClaimTimer = setInterval(async () => {
+      if (processing) return; // Prevent concurrent iterations
       if (this.runner.getStatus() === 'draining') return;
+      processing = true;
       try {
         const tasks = await this.node.getTasksForRole(this.role);
         for (const task of tasks) {
@@ -412,6 +426,24 @@ export class IntegrationRunner {
 
           // State machine: each iteration handles ONE step
           if (content.status === 'ready' && !content.claimed_by) {
+            // Pre-claim check: is the task STILL ready at head level?
+            const logId = content.logicalId as string | undefined;
+            if (logId) {
+              const currentHeads = await this.node.storage.heads(logId);
+              if (currentHeads.length > 0) {
+                const headTwin = await this.node.storage.resolve(currentHeads[0]);
+                if (headTwin && (headTwin.content as any).status !== 'ready') {
+                  break; // Already claimed by someone else, skip
+                }
+              }
+            }
+
+            // Rate limit check
+            if (this.node.rateLimitPolicy) {
+              const rl = await checkRateLimit(myDID, this.node.rateLimitPolicy, this.node.storage);
+              if (!rl.allowed) break; // Rate limited, skip
+            }
+
             // Step 1: Claim + create executes relation for permission scoping
             const claimed = await this.runner.claimTask(task);
             await this.node.createTwin('relation', 'xp0/executes', {
@@ -428,15 +460,17 @@ export class IntegrationRunner {
           }
 
           if (content.status === 'active' && content.claimed_by === myDID && !content.result) {
-            // Check for conflict: am I the winner? If not, skip this task
+            // Conflict check using heads() — only leaf nodes of the DAG
             const logId = content.logicalId as string | undefined;
             if (logId) {
-              const allActive = (await this.node.storage.query({})).filter(
-                (t) => (t.content as any)?.logicalId === logId && (t.content as any)?.status === 'active',
-              );
-              if (allActive.length > 1) {
-                const winnerCid = resolveConflict(allActive.map((t) => t.cid));
-                if (task.cid !== winnerCid) break; // I'm the loser, skip
+              const currentHeads = await this.node.storage.heads(logId);
+              if (currentHeads.length > 1) {
+                const winnerCid = resolveConflict(currentHeads);
+                if (task.cid !== winnerCid) {
+                  // I lost — undock my claim to collapse heads
+                  await this.node.storage.undock(task.cid);
+                  break;
+                }
               }
             }
             // Step 2: Execute
@@ -465,7 +499,8 @@ export class IntegrationRunner {
           }
         }
       } catch { /* ignore */ }
-    }, intervalMs);
+      processing = false;
+    }, Math.max(intervalMs, 100)); // Min 100ms to prevent tight loops
   }
 
   async claimTask(twin: Twin): Promise<Twin> {

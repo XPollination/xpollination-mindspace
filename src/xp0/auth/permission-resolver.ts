@@ -45,14 +45,14 @@ export async function checkRateLimit(
   policy: RateLimitPolicy,
   storage: StorageAdapter,
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const cutoff = new Date(Date.now() - policy.windowSeconds * 1000).toISOString();
+  // Count active claims by this runner (regardless of time — simpler, correct for bootstrap)
   const allTasks = await storage.query({ schema: 'xp0/task' });
-  const recentClaims = allTasks.filter((t) => {
+  const activeClaims = allTasks.filter((t) => {
     const c = t.content as Record<string, unknown>;
-    return c.claimed_by === runnerId && c.status === 'active' && (t.createdAt || '') >= cutoff;
+    return c.claimed_by === runnerId && c.status === 'active';
   });
-  if (recentClaims.length >= policy.maxClaimsPerWindow) {
-    return { allowed: false, reason: `Rate limit: ${recentClaims.length}/${policy.maxClaimsPerWindow} claims in ${policy.windowSeconds}s window` };
+  if (activeClaims.length >= policy.maxClaimsPerWindow) {
+    return { allowed: false, reason: `Rate limit: ${activeClaims.length}/${policy.maxClaimsPerWindow} active claims` };
   }
   return { allowed: true };
 }
