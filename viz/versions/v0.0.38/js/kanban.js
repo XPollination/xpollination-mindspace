@@ -514,13 +514,45 @@ function renderTeamStatus() {
   const el = document.getElementById('team-status');
   if (!el) return;
   if (teamAgents.length === 0) {
-    el.textContent = 'No agents';
+    el.innerHTML = 'No agents';
     return;
   }
-  const dots = teamAgents.map(a =>
-    `<span class="team-runner-dot ${a.status || 'ready'}" title="${a.role}: ${a.status || 'ready'}"></span>`
-  ).join('');
-  el.innerHTML = `${dots} ${teamAgents.length} agent${teamAgents.length > 1 ? 's' : ''}`;
+  el.innerHTML = teamAgents.map(a => `
+    <div class="runner-card" data-id="${a.id}">
+      <span class="team-runner-dot ${a.status || 'ready'}"></span>
+      <span class="runner-role">${a.role}</span>
+      <span class="runner-status">${a.status || 'ready'}</span>
+      ${a.current_task ? `<span class="runner-task">working on: ${a.current_task}</span>` : ''}
+      <span class="runner-heartbeat">last seen: ${a.last_seen ? timeAgo(a.last_seen) : 'now'}</span>
+      <select class="runner-role-switch" data-action="switch-role" onchange="switchRole('${a.id}', this.value)">
+        ${['liaison','pdsa','qa','dev'].map(r =>
+          `<option value="${r}" ${r === a.role ? 'selected' : ''}>${r}</option>`
+        ).join('')}
+      </select>
+      <button class="team-terminate" data-action="terminate" onclick="terminateAgent('${a.id}')">×</button>
+    </div>
+  `).join('') + ` ${teamAgents.length} agent${teamAgents.length > 1 ? 's' : ''}`;
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'now';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  return `${min}m ago`;
+}
+
+async function switchRole(id, newRole) {
+  const project = getTeamProject();
+  try {
+    await fetch(`/api/team/${project}/agent/${id}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole }),
+    });
+    await loadTeam();
+  } catch (e) { console.warn('switchRole failed:', e); }
 }
 
 // Reload team when project filter changes
