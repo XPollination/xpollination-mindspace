@@ -603,6 +603,10 @@ describe('T4.3: Three peers resolve conflict identically', () => {
     await nodeC.start();
     await nodeC.connectTo(addrs);
 
+    // Full mesh: B↔C also connected (not just B→A and C→A)
+    await sleep(1000);
+    await nodeC.connectTo(nodeB.getListenAddresses());
+
     await sleep(3000);
 
     // All three have dev runners
