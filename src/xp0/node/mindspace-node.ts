@@ -247,9 +247,12 @@ export class MindspaceNode {
   }
 
   async getLatestTwin(logicalId: string): Promise<Twin | null> {
-    const heads = await this.storage.heads(logicalId);
-    if (heads.length === 0) return null;
-    return this.storage.resolve(heads[0]);
+    // Query all twins with this logicalId and return highest version
+    const all = await this.storage.query({});
+    const matching = all.filter((t) => (t.content as any)?.logicalId === logicalId);
+    if (matching.length === 0) return null;
+    matching.sort((a, b) => (b.version || 0) - (a.version || 0));
+    return matching[0];
   }
 
   async transitionTask(logicalId: string, status: string, actor: string): Promise<Twin> {
@@ -331,10 +334,14 @@ export class MindspaceNode {
         const logicalId = (twin.content as any)?.logicalId;
         if (logicalId) {
           this.taskIndex.set(logicalId, twin);
-          // Check for conflicts (heads > 1) and resolve
-          const heads = await this.storage.heads(logicalId);
-          if (heads.length > 1) {
-            await this.autoResolveConflict(logicalId, heads);
+          // Check for conflicts: multiple active claims for same logicalId
+          const all = await this.storage.query({});
+          const activeClaims = all.filter((t) => {
+            const c = t.content as Record<string, unknown>;
+            return c.logicalId === logicalId && c.status === 'active' && c.claimed_by;
+          });
+          if (activeClaims.length > 1) {
+            await this.autoResolveConflict(logicalId, activeClaims.map((t) => t.cid));
           }
         }
       }
@@ -405,8 +412,13 @@ export class IntegrationRunner {
 
           // State machine: each iteration handles ONE step
           if (content.status === 'ready' && !content.claimed_by) {
-            // Step 1: Claim
+            // Step 1: Claim + create executes relation for permission scoping
             const claimed = await this.runner.claimTask(task);
+            await this.node.createTwin('relation', 'xp0/executes', {
+              source: myDID,
+              target: claimed.cid,
+              relationType: 'executes',
+            });
             await this.node.transport.publish('xp0/tasks', {
               type: 'twin.evolved',
               cid: claimed.cid,
