@@ -13,6 +13,7 @@ import { createDecision, validateDecision } from '../../src/twins/decision-twin.
 import { cascadeForward } from '../lib/cascade-engine.js';
 import { grantLease, releaseLease, extendLease } from '../lib/lease-manager.js';
 import { EVENT_TYPES, buildTaskAssigned, buildApprovalNeeded, buildReviewNeeded, buildReworkNeeded, buildTaskBlocked, buildDecisionNeeded, buildDecisionResolved, buildBrainGate } from '../lib/event-types.js';
+import { createTwinFromTask } from '../lib/task-bridge.js';
 
 export const a2aMessageRouter = Router();
 
@@ -604,6 +605,8 @@ function handleTransition(agent: any, body: any, res: Response): void {
     const wfTransitions = workflowContext(createTask({ slug: task.slug, status: effectiveToStatus, dna: { ...dna, role: newRole } })).available_transitions;
     if (effectiveToStatus === 'ready') {
       sendToRole(newRole, EVENT_TYPES.TASK_ASSIGNED, buildTaskAssigned(task, dna, wfTransitions), task.project_slug);
+      // Bridge: create twin in MindspaceNode so runners can claim it
+      createTwinFromTask(db, { ...task, current_role: newRole, dna_json: JSON.stringify(dna) }).catch(() => {});
     } else if (effectiveToStatus === 'approval') {
       sendToRole('liaison', EVENT_TYPES.APPROVAL_NEEDED, buildApprovalNeeded(task, dna), task.project_slug);
     } else if (effectiveToStatus === 'review') {
