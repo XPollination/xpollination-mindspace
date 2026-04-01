@@ -481,9 +481,9 @@ describe('T4.2: Concurrent task claiming across nodes', () => {
     expect(headsB.length).toBe(1);
     expect(headsA[0]).toBe(headsB[0]);
 
-    // The losing runner should have backed off
+    // The winning runner progressed (active or beyond — may have already executed)
     const winner = await nodeA.storage.resolve(headsA[0]);
-    expect((winner!.content as any).status).toBe('active');
+    expect(['active', 'review', 'complete']).toContain((winner!.content as any).status);
 
     await nodeB.stop();
     await nodeA.stop();
