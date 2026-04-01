@@ -420,17 +420,19 @@ export class IntegrationRunner {
   }
 
   async drain(): Promise<void> {
-    // Stop auto-claim, let current task finish
+    // Stop auto-claim immediately
     if (this.autoClaimTimer) {
       clearInterval(this.autoClaimTimer);
       this.autoClaimTimer = null;
     }
     await this.runner.drain(); // sets status to 'draining'
-    // Wait for any in-flight execution, then stop
-    setTimeout(async () => {
+    // Schedule stop after current work finishes
+    this._drainTimeout = setTimeout(async () => {
       try { await this.runner.stop(); } catch { /* ignore */ }
-    }, 2000);
+    }, 3000);
   }
+
+  private _drainTimeout: ReturnType<typeof setTimeout> | null = null;
 
   startAutoClaim(intervalMs: number): void {
     const ROLE_NEXT_STATUS: Record<string, string> = {

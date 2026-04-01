@@ -45,14 +45,17 @@ export async function checkRateLimit(
   policy: RateLimitPolicy,
   storage: StorageAdapter,
 ): Promise<{ allowed: boolean; reason?: string }> {
-  // Count active claims by this runner (regardless of time — simpler, correct for bootstrap)
+  // Count unique logical tasks claimed by this runner (across all evolution versions)
   const allTasks = await storage.query({ schema: 'xp0/task' });
-  const activeClaims = allTasks.filter((t) => {
+  const claimedLogicalIds = new Set<string>();
+  for (const t of allTasks) {
     const c = t.content as Record<string, unknown>;
-    return c.claimed_by === runnerId && c.status === 'active';
-  });
-  if (activeClaims.length >= policy.maxClaimsPerWindow) {
-    return { allowed: false, reason: `Rate limit: ${activeClaims.length}/${policy.maxClaimsPerWindow} active claims` };
+    if (c.claimed_by === runnerId && c.logicalId) {
+      claimedLogicalIds.add(c.logicalId as string);
+    }
+  }
+  if (claimedLogicalIds.size >= policy.maxClaimsPerWindow) {
+    return { allowed: false, reason: `Rate limit: ${claimedLogicalIds.size}/${policy.maxClaimsPerWindow} tasks claimed` };
   }
   return { allowed: true };
 }
