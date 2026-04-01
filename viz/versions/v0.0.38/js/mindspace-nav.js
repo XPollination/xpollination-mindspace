@@ -20,6 +20,7 @@ function toggleTheme() {
 // --- Nav injection ---
 const AUTH_PATHS = ['/login', '/register'];
 const NAV_LINKS = [
+  { href: '/reflections', label: 'Reflections', match: (p) => p === '/reflections' },
   { href: '/', label: 'Mission Map', match: (p) => p === '/' },
   { href: '/missions', label: 'Missions', match: (p) => p === '/missions' },
   { href: '/kanban', label: 'Tasks', match: (p) => p === '/kanban' || p === '/tasks' },

@@ -382,6 +382,15 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // /reflections — Public knowledge layer (observations from mission work)
+  if (pathname === '/reflections') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'reflections.html'));
+    return;
+  }
+
   // Root route: serve client-rendered Mission Map (Model B — browser as A2A client)
   if (pathname === '/') {
     const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
