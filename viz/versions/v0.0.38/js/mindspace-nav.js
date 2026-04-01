@@ -23,7 +23,6 @@ const NAV_LINKS = [
   { href: '/', label: 'Mission Map', match: (p) => p === '/' },
   { href: '/missions', label: 'Missions', match: (p) => p === '/missions' },
   { href: '/kanban', label: 'Tasks', match: (p) => p === '/kanban' || p === '/tasks' },
-  { href: '/agents', label: 'Agents', match: (p) => p === '/agents' },
 ];
 
 function isAuthPage() {

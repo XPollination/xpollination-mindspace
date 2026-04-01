@@ -32,6 +32,15 @@
     <option value="autonomous">Autonomous</option>
   </select>
   <div class="kanban-stats" id="stats"></div>
+  <div class="team-panel" id="team-panel">
+    <span class="team-label">Team:</span>
+    <button class="team-btn team-full" onclick="addFullTeam()">+ Full Team</button>
+    <button class="team-btn" style="background:var(--ms-accent,#ea580c)" onclick="addAgent('liaison')">+Liaison</button>
+    <button class="team-btn" style="background:#dc2626" onclick="addAgent('pdsa')">+PDSA</button>
+    <button class="team-btn" style="background:#2563eb" onclick="addAgent('dev')">+Dev</button>
+    <button class="team-btn" style="background:#dc2626" onclick="addAgent('qa')">+QA</button>
+    <span class="team-status" id="team-status">No agents</span>
+  </div>
 </div>
 <div class="kanban-board" id="board">
   <div class="ms-loading"><div class="ms-spinner"></div><br>Connecting...</div>

@@ -159,6 +159,7 @@ function renderCard(task) {
       <span class="task-badge" style="background:${STATUS_COLORS[task.status] || 'var(--ms-muted)'}">${task.status}</span>
       ${role ? `<span class="task-badge" style="background:${ROLE_COLORS[role] || 'var(--ms-muted)'}">${role}</span>` : ''}
       ${project ? `<span class="task-project">${esc(project)}</span>` : ''}
+      ${dna.claimed_by ? `<span class="task-claimed" title="Claimed by ${esc(dna.claimed_by)}">${esc(dna.claimed_by).substring(0, 16)}…</span>` : ''}
     </div>
     ${blockedReason ? `<div class="task-blocked-reason">${esc(blockedReason)}</div>` : ''}
   </div>`;
@@ -456,3 +457,74 @@ if (liaisonModeEl) {
 }
 
 init().then(() => loadApprovalMode());
+
+// ═══════════════════════════════════════════════════════════════
+// Team Management — per-project runner control
+// Decision 842: Team added via Tasks view, not agent tab.
+// ═══════════════════════════════════════════════════════════════
+
+let teamAgents = [];
+
+function getTeamProject() {
+  return document.getElementById('project-filter')?.value || 'mindspace';
+}
+
+async function addAgent(role) {
+  const project = getTeamProject();
+  try {
+    const res = await fetch(`/api/team/${project}/agent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    });
+    const data = await res.json();
+    teamAgents.push(data);
+    renderTeamStatus();
+  } catch (e) { console.warn('addAgent failed:', e); }
+}
+
+async function addFullTeam() {
+  const project = getTeamProject();
+  try {
+    const res = await fetch(`/api/team/${project}/full`, { method: 'POST' });
+    const data = await res.json();
+    if (data.agents) teamAgents.push(...data.agents);
+    renderTeamStatus();
+  } catch (e) { console.warn('addFullTeam failed:', e); }
+}
+
+async function terminateAgent(id) {
+  const project = getTeamProject();
+  await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE' });
+  teamAgents = teamAgents.filter(a => a.id !== id);
+  renderTeamStatus();
+}
+
+async function loadTeam() {
+  const project = getTeamProject();
+  try {
+    const res = await fetch(`/api/team/${project}`);
+    const data = await res.json();
+    teamAgents = data.agents || [];
+    renderTeamStatus();
+  } catch { /* API may not be ready */ }
+}
+
+function renderTeamStatus() {
+  const el = document.getElementById('team-status');
+  if (!el) return;
+  if (teamAgents.length === 0) {
+    el.textContent = 'No agents';
+    return;
+  }
+  const dots = teamAgents.map(a =>
+    `<span class="team-runner-dot ${a.status || 'ready'}" title="${a.role}: ${a.status || 'ready'}"></span>`
+  ).join('');
+  el.innerHTML = `${dots} ${teamAgents.length} agent${teamAgents.length > 1 ? 's' : ''}`;
+}
+
+// Reload team when project filter changes
+document.getElementById('project-filter')?.addEventListener('change', loadTeam);
+
+// Initial team load
+setTimeout(loadTeam, 1500);
