@@ -25,8 +25,15 @@ export async function startNodeService(): Promise<void> {
   }
 
   try {
-    const { MindspaceNode } = await import('../../src/xp0/node/mindspace-node.js');
-    const { generateKeyPair, deriveDID } = await import('../../src/xp0/auth/identity.js');
+    // Try source (dev) then dist (container) paths
+    let MindspaceNode: any, generateKeyPair: any, deriveDID: any;
+    try {
+      ({ MindspaceNode } = await import('../../src/xp0/node/mindspace-node.js'));
+      ({ generateKeyPair, deriveDID } = await import('../../src/xp0/auth/identity.js'));
+    } catch {
+      ({ MindspaceNode } = await import('../../dist/src/xp0/node/mindspace-node.js'));
+      ({ generateKeyPair, deriveDID } = await import('../../dist/src/xp0/auth/identity.js'));
+    }
 
     const storeDir = resolve(process.cwd(), 'data/xp0-store');
     mkdirSync(storeDir, { recursive: true });
