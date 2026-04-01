@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reflections — Mindspace</title>
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon-180x180.png">
+<link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico">
+<link rel="manifest" href="/assets/favicons/manifest.webmanifest">
+<link rel="stylesheet" href="/mindspace.css">
+<style>
+.reflection-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+.reflection-card{display:block;padding:20px;background:var(--ms-surface);border:1px solid var(--ms-border);border-radius:var(--ms-radius);text-decoration:none;color:var(--ms-text);transition:border-color 0.2s;cursor:pointer;}
+.reflection-card:hover{border-color:var(--ms-link);text-decoration:none;}
+.card-date{font-size:12px;color:var(--ms-muted);margin-bottom:6px;}
+.card-title{font-size:16px;font-weight:600;margin-bottom:8px;}
+.card-excerpt{font-size:13px;color:var(--ms-muted);line-height:1.5;margin-bottom:12px;}
+.card-meta{display:flex;gap:12px;font-size:11px;color:var(--ms-muted);}
+.card-tag{background:var(--ms-border);padding:2px 8px;border-radius:12px;font-size:10px;}
+.intro{max-width:640px;color:var(--ms-muted);margin-bottom:24px;line-height:1.6;}
+@media(max-width:600px){.reflection-grid{grid-template-columns:1fr;}}
+</style>
+</head><body>
+<script type="module" src="/js/mindspace-nav.js"></script>
+<div class="ms-container">
+<h1 style="font-size:28px;margin-bottom:8px;">Reflections</h1>
+<p class="intro">Observations from building with agents — distilled from real mission work. Each reflection traces back to the investigations that produced it.</p>
+<div id="reflections-content">
+  <div class="reflection-grid">
+    <a class="reflection-card" href="/m/ab44df98">
+      <div class="card-date">2026-04-01</div>
+      <div class="card-title">Structure, Not Retrieval</div>
+      <div class="card-excerpt">Today our agent wrote a 95,000 character architecture document. Next session, same agent, same document — it couldn't navigate it. The document was there. The structure wasn't.</div>
+      <div class="card-meta">
+        <span class="card-tag">context</span>
+        <span class="card-tag">agents</span>
+        <span class="card-tag">navigation</span>
+        <span>Derived from: Defense AI Security</span>
+      </div>
+    </a>
+  </div>
+</div>
+<div style="margin-top:32px;padding-top:16px;border-top:1px solid var(--ms-border);font-size:13px;color:var(--ms-muted);">
+  Reflections are projections of mission work — the public-facing surface of a living knowledge system.
+  <a href="/m/a112e81e" style="color:var(--ms-link);">About this concept</a>
+</div>
+</div>
+</body></html>
