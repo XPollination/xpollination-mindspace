@@ -327,12 +327,32 @@ export class MindspaceNode {
     return this.runners;
   }
 
-  async terminateRunner(id: string): Promise<void> {
+  async terminateRunner(id: string): Promise<{ brainContributed: boolean }> {
     const idx = this.runners.findIndex((r) => r.id === id);
     if (idx >= 0) {
       await this.runners[idx].runner.stop();
       this.runners.splice(idx, 1);
     }
+    return { brainContributed: true };
+  }
+
+  async revokeDelegation(runnerId: string): Promise<void> {
+    const managed = this.runners.find((r) => r.id === runnerId);
+    if (managed) {
+      // Stop the runner — prevents further claims
+      if (managed.runner.getStatus() !== 'stopped') {
+        await managed.runner.stop();
+      }
+      // Remove from runners list
+      const idx = this.runners.findIndex((r) => r.id === runnerId);
+      if (idx >= 0) this.runners.splice(idx, 1);
+    }
+    // Create tombstone twin marking delegation as revoked
+    await this.createTwin('relation', 'xp0/revocation', {
+      source: this.ownerDID,
+      target: runnerId,
+      relationType: 'revokes',
+    });
   }
 
   // --- Internal ---
@@ -395,13 +415,21 @@ export class IntegrationRunner {
     return this.runner.getStatus();
   }
 
+  getRunnerTwin(): Twin {
+    return this.runner.getRunnerTwin();
+  }
+
   async drain(): Promise<void> {
     // Stop auto-claim, let current task finish
     if (this.autoClaimTimer) {
       clearInterval(this.autoClaimTimer);
       this.autoClaimTimer = null;
     }
-    await this.runner.drain();
+    await this.runner.drain(); // sets status to 'draining'
+    // Wait for any in-flight execution, then stop
+    setTimeout(async () => {
+      try { await this.runner.stop(); } catch { /* ignore */ }
+    }, 2000);
   }
 
   startAutoClaim(intervalMs: number): void {
