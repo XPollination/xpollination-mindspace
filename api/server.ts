@@ -32,6 +32,7 @@ import { oauthProviderRouter } from './routes/oauth-provider.js';
 import { startMonitor, stopMonitor } from './lib/heartbeat-monitor.js';
 import { workspacesRouter } from './routes/workspaces.js';
 import { teamRouter } from './routes/team.js';
+import { startNodeService, stopNodeService } from './services/mindspace-node-service.js';
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '3100', 10);
@@ -114,11 +115,18 @@ app.get('/api/suspect-links/stats', requireApiKeyOrJwt, (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   logger.info({ port: PORT }, 'Mindspace API server listening');
   startAgentSweep();
   startMonitor();
   logger.info('Heartbeat monitor started (30s interval)');
+
+  // Start MindspaceNode for runner placement (Phase A: local singleton)
+  try {
+    await startNodeService();
+  } catch (err) {
+    logger.warn({ err }, 'MindspaceNode service failed to start — runners use DB fallback');
+  }
 });
 
 // WebSocket upgrade for terminal connections
@@ -132,17 +140,19 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down...');
   stopMonitor();
+  await stopNodeService().catch(() => {});
   server.close(() => {
     closeDb();
     process.exit(0);
   });
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down...');
+  await stopNodeService().catch(() => {});
   server.close(() => {
     closeDb();
     process.exit(0);

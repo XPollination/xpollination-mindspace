@@ -210,11 +210,12 @@ export class MindspaceNode {
     }));
   }
 
-  async terminateRunner(id: string): Promise<void> {
+  async terminateRunner(id: string): Promise<{ brainContributed: boolean }> {
     const idx = this.runners.findIndex((r) => r.id === id);
     if (idx === -1) throw new Error('Runner not found');
     await this.runners[idx].runner.stop();
     this.runners.splice(idx, 1);
+    return { brainContributed: true };
   }
 
   // --- Task management ---
@@ -355,19 +356,6 @@ export class MindspaceNode {
     }
 
     return ir;
-  }
-
-  getRunners(): ManagedRunner[] {
-    return this.runners;
-  }
-
-  async terminateRunner(id: string): Promise<{ brainContributed: boolean }> {
-    const idx = this.runners.findIndex((r) => r.id === id);
-    if (idx >= 0) {
-      await this.runners[idx].runner.stop();
-      this.runners.splice(idx, 1);
-    }
-    return { brainContributed: true };
   }
 
   async revokeDelegation(runnerId: string): Promise<void> {
