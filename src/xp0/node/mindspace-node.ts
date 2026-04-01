@@ -44,7 +44,10 @@ export class MindspaceNode {
     this.ownerDID = opts.owner;
     this.privateKey = opts.privateKey;
     this.storage = new FileStorageAdapter(opts.storeDir);
-    this.transport = new LibP2PTransport({ storage: this.storage });
+    this.transport = new LibP2PTransport({
+      storage: this.storage,
+      bootstrapPeers: opts.bootstrapPeers,
+    });
   }
 
   async start(): Promise<void> {
