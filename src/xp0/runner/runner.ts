@@ -78,7 +78,7 @@ export class Runner {
   }
 
   getId(): string {
-    return this.runnerTwin?.cid || '';
+    return this.opts.owner || this.runnerTwin?.cid || '';
   }
 
   getStatus(): string {

@@ -428,6 +428,17 @@ export class IntegrationRunner {
           }
 
           if (content.status === 'active' && content.claimed_by === myDID && !content.result) {
+            // Check for conflict: am I the winner? If not, skip this task
+            const logId = content.logicalId as string | undefined;
+            if (logId) {
+              const allActive = (await this.node.storage.query({})).filter(
+                (t) => (t.content as any)?.logicalId === logId && (t.content as any)?.status === 'active',
+              );
+              if (allActive.length > 1) {
+                const winnerCid = resolveConflict(allActive.map((t) => t.cid));
+                if (task.cid !== winnerCid) break; // I'm the loser, skip
+              }
+            }
             // Step 2: Execute
             const executed = await this.runner.executeTask(task);
             await this.node.transport.publish('xp0/tasks', {
