@@ -489,17 +489,23 @@ server.on('upgrade', (req, socket, head) => {
   console.log(`[ws-upgrade] ${req.url} upgrade=${req.headers.upgrade} connection=${req.headers.connection}`);
   if (url.pathname.startsWith('/ws/terminal/')) {
     console.log(`[ws-upgrade] proxying to localhost:${API_PORT}${url.pathname}`);
+    const fwdHeaders = { ...req.headers, host: `localhost:${API_PORT}` };
+    console.log(`[ws-upgrade] headers: upgrade=${fwdHeaders.upgrade} connection=${fwdHeaders.connection}`);
     const proxyReq = http.request({
       hostname: 'localhost', port: API_PORT, path: url.pathname,
-      method: 'GET', headers: { ...req.headers, host: `localhost:${API_PORT}` }
+      method: 'GET', headers: fwdHeaders
     });
     proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
-      console.log(`[ws-upgrade] upstream connected, piping`);
+      console.log(`[ws-upgrade] upstream 101 received, piping`);
       socket.write('HTTP/1.1 101 Switching Protocols\r\n' +
         Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n') +
         '\r\n\r\n');
       proxySocket.pipe(socket);
       socket.pipe(proxySocket);
+    });
+    proxyReq.on('response', (proxyRes) => {
+      console.log(`[ws-upgrade] upstream HTTP response (NOT upgrade): ${proxyRes.statusCode}`);
+      socket.destroy();
     });
     proxyReq.on('error', (err) => { console.log(`[ws-upgrade] proxy error: ${err.message}`); socket.destroy(); });
     proxyReq.end();
