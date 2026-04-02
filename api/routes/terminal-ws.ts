@@ -31,18 +31,22 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url || '/', `http://localhost`);
   const sessionName = url.pathname.split('/').pop() || 'default';
 
-  // Try to proxy to host agent runtime
+  // If session exists locally, attach directly (no proxy roundtrip)
+  if (sessionExists(sessionName)) {
+    fallbackToLocalTmux(ws, sessionName);
+    return;
+  }
+
+  // Try to proxy to host agent runtime (for sessions on the host machine)
   try {
     const upstream = new WebSocket(`${RUNTIME_WS}/ws/terminal/${sessionName}`);
 
     upstream.on('open', () => {
-      // Proxy: client → upstream
       ws.on('message', (data) => {
         if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
       });
     });
 
-    // Proxy: upstream → client
     upstream.on('message', (data) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
     });
@@ -52,7 +56,6 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     });
 
     upstream.on('error', () => {
-      // Runtime proxy failed — fall back to local tmux
       upstream.close();
       fallbackToLocalTmux(ws, sessionName);
     });
@@ -61,7 +64,6 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     ws.on('error', () => upstream.close());
 
   } catch {
-    // Runtime not available — fall back to local tmux
     fallbackToLocalTmux(ws, sessionName);
   }
 });

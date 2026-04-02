@@ -563,22 +563,23 @@ function renderTeamStatus() {
     el.innerHTML = 'No agents';
     return;
   }
-  el.innerHTML = teamAgents.map(a => `
+  // Filter out stopped/dead agents from display
+  const liveAgents = teamAgents.filter(a => a.status !== 'stopped' && a.status !== 'disconnected');
+  if (liveAgents.length === 0) {
+    el.innerHTML = 'No agents';
+    return;
+  }
+  el.innerHTML = liveAgents.map(a => {
+    const hasTerminal = a.session && a.session.startsWith('runner-');
+    return `
     <div class="runner-card" data-id="${a.id}">
       <span class="team-runner-dot ${a.status || 'ready'}"></span>
       <span class="runner-role">${a.role}</span>
       <span class="runner-status">${a.status || 'ready'}</span>
-      ${a.current_task ? `<span class="runner-task">working on: ${a.current_task}</span>` : ''}
-      <span class="runner-heartbeat">last seen: ${a.last_seen ? timeAgo(a.last_seen) : 'now'}</span>
-      <select class="runner-role-switch" data-action="switch-role" onchange="switchRole('${a.id}', this.value)">
-        ${['liaison','pdsa','qa','dev'].map(r =>
-          `<option value="${r}" ${r === a.role ? 'selected' : ''}>${r}</option>`
-        ).join('')}
-      </select>
-      ${a.session ? `<button class="runner-open" onclick="openTerminal('${a.session}', '${a.role}')">Open</button>` : ''}
+      ${hasTerminal ? `<button class="runner-open" onclick="openTerminal('${a.session}', '${a.role}')">Open</button>` : ''}
       <button class="team-terminate" data-action="terminate" onclick="terminateAgent('${a.id}')">×</button>
-    </div>
-  `).join('') + ` ${teamAgents.length} agent${teamAgents.length > 1 ? 's' : ''}`;
+    </div>`;
+  }).join('') + ` ${liveAgents.length} agent${liveAgents.length > 1 ? 's' : ''}`;
 }
 
 function timeAgo(dateStr) {
