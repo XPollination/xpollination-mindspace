@@ -260,3 +260,220 @@ AC-5: Agent interchangeability
 | Agent discovery | Query who's subscribed, what roles are covered, capacity |
 | Event history | Audit trail: every event, every gate check, every subscriber reaction |
 | Broadcast events | Agent publishes to ALL agents (not role-filtered) for system announcements |
+
+---
+
+## Part 8: End-to-End Test Plan
+
+### Phase 1: Ping-Pong — Minimum Viable Event Loop
+
+**Goal:** Verify agents can subscribe to SSE events and react. No workflow, no tasks. Just: agent A publishes event → agent B sees it → agent B responds → agent A sees response.
+
+**Preconditions:**
+```
+1. Terminate ALL existing agents on beta
+   → GET /api/team/all → for each agent: DELETE /api/team/all/agent/{id}
+   → Verify: GET /api/team/all returns {"agents":[],"capacity":{"max":4,"current":0}}
+   → Kill all tmux: docker exec mindspace-test tmux kill-server
+
+2. Verify beta is healthy
+   → GET /health returns {"status":"ok"}
+   → No tmux sessions running: docker exec mindspace-test tmux ls → "no server running"
+```
+
+**Test Steps:**
+
+```
+STEP 1: Spawn DEV agent with A2A registration
+  ACTION: POST /api/team/all/agent {"role":"dev"}
+  VERIFY:
+    - Response has session field (tmux session name)
+    - docker exec mindspace-test tmux ls → shows runner-dev-{id}
+    - Agent registered in A2A: GET /api/agents/pool → contains dev agent
+    - monitor-v2.js sidecar running: docker exec mindspace-test tmux ls → shows unblock-runner-dev-{id}
+  EXPECTED: DEV agent alive in tmux + registered in A2A + SSE stream open
+
+STEP 2: Spawn PDSA agent with A2A registration
+  ACTION: POST /api/team/all/agent {"role":"pdsa"}
+  VERIFY:
+    - Same checks as Step 1 for pdsa
+    - Two agents visible in GET /api/agents/pool
+    - Two tmux sessions: runner-dev-{id}, runner-pdsa-{id}
+  EXPECTED: Both agents alive + registered + listening
+
+STEP 3: Verify SSE connectivity
+  ACTION: Check A2A server SSE connections
+  VERIFY:
+    - GET /health → sse_connections >= 2 (both agents connected)
+    - Each agent's monitor is connected to /a2a/stream/{agent_id}
+  EXPECTED: Both agents subscribed to event stream
+
+STEP 4: DEV sends HUMAN_INPUT event to PDSA
+  ACTION: From DEV terminal (via tmux send-keys or browser terminal):
+    curl -X POST http://localhost:3101/a2a/message \
+      -H "Authorization: Bearer {dev_session_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"type":"HUMAN_INPUT","agent_id":"{dev_agent_id}","text":"PING from DEV"}'
+  VERIFY:
+    - A2A server receives message (check logs)
+    - SSE event pushed to PDSA's stream
+    - PDSA's monitor-v2.js logs: "[PDSA] Received: PING from DEV"
+    - OR: PDSA's tmux pane shows injected message
+  EXPECTED: PDSA sees the event
+
+STEP 5: PDSA responds with HUMAN_INPUT event to DEV
+  ACTION: From PDSA terminal:
+    curl -X POST http://localhost:3101/a2a/message \
+      -H "Authorization: Bearer {pdsa_session_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"type":"HUMAN_INPUT","agent_id":"{pdsa_agent_id}","text":"PONG from PDSA"}'
+  VERIFY:
+    - DEV's monitor-v2.js receives event
+    - DEV's tmux pane shows "PONG from PDSA"
+  EXPECTED: Bidirectional event flow confirmed
+
+STEP 6: Screenshot verification
+  ACTION: Take Chrome CDP screenshots of:
+    - Kanban showing both agents in team panel
+    - DEV terminal showing PONG received
+    - PDSA terminal showing PING received
+    - A2A server logs showing event routing
+  EXPECTED: Visual proof of event-driven communication
+```
+
+**Success Criteria Phase 1:**
+- Two agents spawn with A2A registration ✓
+- SSE streams open for both agents ✓
+- HUMAN_INPUT event from DEV reaches PDSA via SSE ✓
+- HUMAN_INPUT event from PDSA reaches DEV via SSE ✓
+- No direct tmux-to-tmux communication — ALL through A2A ✓
+
+**What we learn:**
+- Does monitor-v2.js connect reliably from inside the container?
+- Does the SSE stream survive long enough for events?
+- Does event injection into Claude sessions work?
+- What latency from publish to receive?
+
+---
+
+### Phase 2: Full PDSA Workflow as Events
+
+**Goal:** A task flows from creation to completion entirely via events. Agents react to events, gates enforce process, kanban updates in real-time.
+
+**Preconditions:**
+```
+1. Phase 1 passed — agents can ping-pong via events
+2. Terminate all agents from Phase 1
+3. Beta has at least 1 task in ready+pdsa status
+   → 16 ready+pdsa tasks exist on beta (verified: theia-docker-compose, etc.)
+4. Spawn full team: PDSA + DEV agents (QA and LIAISON handled manually for now)
+```
+
+**Workflow under test (from WORKFLOW.md):**
+```
+ready+pdsa → active+pdsa → approval → approved → ready+dev → active+dev → review+qa → review+pdsa → review+liaison → complete
+```
+
+**Test Steps:**
+
+```
+STEP 1: Clean start
+  ACTION:
+    - Terminate all agents
+    - Verify beta has ready+pdsa tasks
+    - Spawn PDSA agent: POST /api/team/all/agent {"role":"pdsa"}
+    - Spawn DEV agent: POST /api/team/all/agent {"role":"dev"}
+  VERIFY:
+    - Both agents registered in A2A
+    - Both SSE streams open
+    - Both monitors running
+  EXPECTED: Team ready to receive events
+
+STEP 2: PDSA receives TASK_ASSIGNED event
+  ACTION: 
+    - A ready+pdsa task exists (e.g., theia-docker-compose)
+    - A2A server sends TASK_ASSIGNED to PDSA role via SSE
+    - (May need manual trigger: transition task to ready to re-fire event)
+  VERIFY:
+    - PDSA monitor logs: "[PDSA] Task assigned: theia-docker-compose"
+    - PDSA agent claims task (transitions ready → active)
+    - Gate validates: role=pdsa ✓, memory_query_session set ✓
+  EXPECTED: PDSA agent working on task
+
+STEP 3: PDSA submits design → APPROVAL_NEEDED event
+  ACTION:
+    - PDSA agent completes work (designs)
+    - PDSA transitions: active → approval
+    - Gate validates: pdsa_ref set ✓, brain_contribution_id set ✓
+  VERIFY:
+    - A2A publishes APPROVAL_NEEDED event
+    - LIAISON (Thomas via kanban) sees approval request
+    - Kanban card moves to APPROVAL column
+  EXPECTED: Design submitted, human gate activated
+
+STEP 4: LIAISON approves → TASK_ASSIGNED(dev) event
+  ACTION:
+    - Thomas approves in kanban (or LIAISON transitions approval → approved)
+    - Gate validates: human_answer set ✓
+    - Workflow routes to approved → ready+dev
+  VERIFY:
+    - A2A publishes TASK_ASSIGNED to dev role
+    - DEV agent receives event via SSE
+    - DEV monitor logs: "[DEV] Task assigned: theia-docker-compose"
+  EXPECTED: Task flows from PDSA to DEV via events
+
+STEP 5: DEV implements → REVIEW_NEEDED event
+  ACTION:
+    - DEV agent claims and implements
+    - DEV transitions: active → review
+    - Gate validates: implementation set ✓, tests pass ✓
+  VERIFY:
+    - A2A publishes REVIEW_NEEDED to qa role
+    - Kanban card moves to REVIEW column
+    - (QA agent would receive if spawned)
+  EXPECTED: Implementation submitted, review chain starts
+
+STEP 6: Review chain (manual for Phase 2)
+  ACTION:
+    - QA reviews → transitions review (sets role to pdsa)
+    - PDSA reviews → transitions review (sets role to liaison)
+    - LIAISON reviews → transitions to complete
+    - Each transition validated by gates
+  VERIFY:
+    - Each transition fires events
+    - Kanban updates at each step
+    - Brain gate enforced at each transition
+    - Cascade engine unblocks dependents on complete
+  EXPECTED: Task completed through full PDSA workflow
+
+STEP 7: Full verification
+  ACTION: Take Chrome CDP screenshots of:
+    - Kanban showing task in COMPLETE column
+    - Task detail showing all DNA fields filled
+    - Agent terminal showing event history
+    - A2A server logs showing full event chain
+  VERIFY:
+    - All workflow gates were enforced
+    - All transitions happened via events (not direct calls)
+    - Brain contributions at each transition
+    - Task DNA complete: findings, design, implementation, reviews
+  EXPECTED: Full PDSA cycle proven via event-driven architecture
+```
+
+**Success Criteria Phase 2:**
+- Task assigned to PDSA via TASK_ASSIGNED event ✓
+- PDSA submits design → APPROVAL_NEEDED event fires ✓
+- Human approves → TASK_ASSIGNED(dev) event fires ✓
+- DEV implements → REVIEW_NEEDED event fires ✓
+- Review chain completes → COMPLETE event fires ✓
+- Cascade engine unblocks dependent tasks ✓
+- ALL transitions validated by workflow gates ✓
+- Kanban UI updates in real-time via SSE ✓
+- Brain contributions at each transition ✓
+
+**What we learn:**
+- Does the full workflow work end-to-end via events?
+- Do gates catch invalid transitions from agents?
+- Does the cascade engine trigger correctly?
+- What's the total cycle time for one task?
+- Where are the bottlenecks?
