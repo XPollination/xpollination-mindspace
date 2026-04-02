@@ -113,7 +113,8 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
   }
 
   const sessionName = url.pathname.split('/').pop() || '';
-  const sessionUserId = sessionName.replace(/^agent-[a-z]+-/, '');
+  // Extract user ID from session name patterns: agent-{role}-{userId} or runner-{role}-{shortId}
+  const sessionUserId = sessionName.replace(/^(agent|runner)-[a-z]+-/, '');
   const cookies = (req.headers.cookie || '').split(';').reduce((acc: Record<string,string>, c) => {
     const [k, v] = c.trim().split('=');
     if (k && v) acc[k] = v;
@@ -124,7 +125,7 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
   if (token && sessionUserId && sessionUserId !== 'default') {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'changeme') as any;
-      if (decoded.sub && decoded.sub !== sessionUserId) {
+      if (decoded.sub && !decoded.sub.startsWith(sessionUserId) && sessionUserId !== decoded.sub) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
         return;
