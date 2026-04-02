@@ -30,6 +30,7 @@ import { dataRouter } from './routes/data.js';
 import { apiKeysRouter } from './routes/api-keys.js';
 import { oauthProviderRouter } from './routes/oauth-provider.js';
 import { startMonitor, stopMonitor } from './lib/heartbeat-monitor.js';
+import { startTaskAnnouncer, stopTaskAnnouncer } from './lib/task-announcer.js';
 import { workspacesRouter } from './routes/workspaces.js';
 import { teamRouter } from './routes/team.js';
 import { startNodeService, stopNodeService } from './services/mindspace-node-service.js';
@@ -120,6 +121,8 @@ const server = app.listen(PORT, async () => {
   startAgentSweep();
   startMonitor();
   logger.info('Heartbeat monitor started (30s interval)');
+  startTaskAnnouncer();
+  logger.info('Task announcer started (10s interval)');
 
   // Start MindspaceNode for runner placement (Phase A: local singleton)
   try {
@@ -143,6 +146,7 @@ server.on('upgrade', (req, socket, head) => {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down...');
   stopMonitor();
+  stopTaskAnnouncer();
   await stopNodeService().catch(() => {});
   server.close(() => {
     closeDb();
@@ -152,6 +156,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down...');
+  stopTaskAnnouncer();
   await stopNodeService().catch(() => {});
   server.close(() => {
     closeDb();

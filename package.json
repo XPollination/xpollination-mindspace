@@ -81,6 +81,7 @@
     "uint8arraylist": "^2.4.8",
     "uuid": "^10.0.0",
     "ws": "^8.20.0",
+    "yaml": "^2.8.3",
     "zod": "^3.22.0"
   },
   "devDependencies": {

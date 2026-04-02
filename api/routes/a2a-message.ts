@@ -14,6 +14,12 @@ import { cascadeForward } from '../lib/cascade-engine.js';
 import { grantLease, releaseLease, extendLease } from '../lib/lease-manager.js';
 import { EVENT_TYPES, buildTaskAssigned, buildApprovalNeeded, buildReviewNeeded, buildReworkNeeded, buildTaskBlocked, buildDecisionNeeded, buildDecisionResolved, buildBrainGate } from '../lib/event-types.js';
 import { createTwinFromTask } from '../lib/task-bridge.js';
+import { validateTransition, getTargetRole, getEvent, getFixedRole, getInstructions, buildInstructionText, loadConfig } from '../lib/workflow-engine.js';
+import { sendToAgent } from '../lib/sse-manager.js';
+import { execFileSync } from 'node:child_process';
+
+// Load workflow config on module init
+try { loadConfig(); } catch { /* config may not exist yet */ }
 
 export const a2aMessageRouter = Router();
 
@@ -25,8 +31,9 @@ const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
   HEARTBEAT: handleHeartbeat,
   ROLE_SWITCH: handleRoleSwitch,
   DISCONNECT: handleDisconnect,
-  CLAIM_TASK: handleStub,
+  CLAIM_TASK: handleClaimTask,
   TRANSITION: handleTransition,
+  DELIVER: handleDeliver,
   RELEASE_TASK: handleStub,
   ATTESTATION_SUBMITTED: handleAttestationSubmitted,
   OBJECT_QUERY: handleObjectQuery,
@@ -1020,6 +1027,183 @@ function handleCapabilityUpgrade(agent: any, body: any, res: Response): void {
 
   broadcast('capability_upgraded', { capability_id: cap.id, from_version: fromVersion, to_version, actor: agent.name || agent.id, timestamp: now });
   res.status(200).json({ type: 'ACK', original_type: 'CAPABILITY_UPGRADE', agent_id: agent.id, capability_id: cap.id, from_version: fromVersion, to_version, timestamp: now });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLAIM_TASK — Agent claims a task via A2A protocol (no DB access)
+// Server validates, grants lease, sends instructions
+// ═══════════════════════════════════════════════════════════════
+function handleClaimTask(agent: any, body: any, res: Response): void {
+  const { task_slug } = body;
+  if (!task_slug) { res.status(400).json({ type: 'ERROR', error: 'task_slug required' }); return; }
+
+  const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE slug = ? OR id = ?').get(task_slug, task_slug) as any;
+  if (!task) { res.status(404).json({ type: 'CLAIM_REJECTED', error: 'Task not found' }); return; }
+
+  // Check task is ready and role matches
+  if (task.status !== 'ready') {
+    res.status(409).json({ type: 'CLAIM_REJECTED', error: `Task status is ${task.status}, not ready` });
+    return;
+  }
+  if (task.current_role && task.current_role !== agent.current_role) {
+    res.status(403).json({ type: 'CLAIM_REJECTED', error: `Task role is ${task.current_role}, you are ${agent.current_role}` });
+    return;
+  }
+
+  // Check no active lease
+  try {
+    const lease = db.prepare("SELECT id FROM leases WHERE task_id = ? AND status = 'active'").get(task.id);
+    if (lease) { res.status(409).json({ type: 'CLAIM_REJECTED', error: 'Task already claimed' }); return; }
+  } catch { /* leases table may not exist */ }
+
+  // Parse DNA and merge claim payload
+  let dna: any = {};
+  try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* */ }
+  if (body.payload) Object.assign(dna, body.payload);
+
+  // Validate transition via config engine
+  const validation = validateTransition('ready', 'active', agent.current_role, dna, db);
+  if (!validation.valid) {
+    res.status(422).json({ type: 'CLAIM_REJECTED', error: validation.error, gate: validation.gate });
+    return;
+  }
+
+  // Execute: update DB, grant lease
+  const now = new Date().toISOString();
+  db.prepare('UPDATE tasks SET status = ?, current_role = ?, claimed_by = ?, claimed_at = ?, dna_json = ?, updated_at = ? WHERE id = ?')
+    .run('active', task.current_role, agent.id, now, JSON.stringify(dna), now, task.id);
+
+  try { grantLease(db, task.id, agent.user_id || agent.id); } catch { /* */ }
+  try {
+    db.prepare('INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), task.id, 'ready', 'active', agent.id, task.project_slug);
+  } catch { /* */ }
+
+  // Build instructions from workflow config
+  const role = agent.current_role;
+  const instructionConfig = getInstructions(role);
+  const instructionText = buildInstructionText(role, task, dna);
+
+  // Deliver instructions to Claude terminal via tmux
+  const sessionName = agent.session_id;
+  if (sessionName?.startsWith('runner-')) {
+    try {
+      execFileSync('tmux', ['send-keys', '-t', sessionName, instructionText, 'Enter'], { timeout: 5000 });
+    } catch { /* tmux session may not exist */ }
+  }
+
+  // Send CLAIM_CONFIRMED via SSE
+  sendToAgent(agent.id, 'claim_confirmed', {
+    task_slug: task.slug, task_id: task.id, title: task.title,
+    dna, instructions: instructionConfig, timestamp: now,
+  });
+
+  broadcast('transition', { task_slug: task.slug, from_status: 'ready', to_status: 'active', actor: agent.id, timestamp: now });
+
+  res.status(200).json({
+    type: 'CLAIM_CONFIRMED', task_slug: task.slug, task_id: task.id,
+    dna, instructions: instructionConfig, timestamp: now,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVER — Agent submits work results via A2A protocol
+// Server validates gates, writes DNA, transitions, routes next
+// ═══════════════════════════════════════════════════════════════
+function handleDeliver(agent: any, body: any, res: Response): void {
+  const { task_slug, transition_to } = body;
+  if (!task_slug) { res.status(400).json({ type: 'ERROR', error: 'task_slug required' }); return; }
+  if (!transition_to) { res.status(400).json({ type: 'ERROR', error: 'transition_to required' }); return; }
+
+  const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE slug = ? OR id = ?').get(task_slug, task_slug) as any;
+  if (!task) { res.status(404).json({ type: 'DELIVERY_REJECTED', error: 'Task not found' }); return; }
+
+  // Parse and merge DNA
+  let dna: any = {};
+  try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* */ }
+
+  // Merge all delivered fields into DNA
+  const deliveredFields = body.payload || body;
+  for (const [key, val] of Object.entries(deliveredFields)) {
+    if (['type', 'agent_id', 'task_slug', 'transition_to'].includes(key)) continue;
+    dna[key] = val;
+  }
+
+  // Validate transition via config engine
+  const fromStatus = task.status;
+  const validation = validateTransition(fromStatus, transition_to, agent.current_role, dna, db);
+  if (!validation.valid) {
+    res.status(422).json({
+      type: 'DELIVERY_REJECTED', task_slug: task.slug,
+      error: validation.error, gate: validation.gate,
+      hint: `Fix the failing gate and deliver again.`,
+    });
+    return;
+  }
+
+  // Resolve target role
+  const targetRole = getTargetRole(fromStatus, transition_to, dna, task.current_role)
+    || getFixedRole(transition_to)
+    || task.current_role;
+
+  // Handle blocked state save
+  if (transition_to === 'blocked') {
+    dna.blocked_from_state = fromStatus;
+    dna.blocked_from_role = task.current_role;
+    dna.blocked_at = new Date().toISOString();
+  }
+
+  // Handle restore from blocked
+  let effectiveStatus = transition_to;
+  let effectiveRole = targetRole;
+  if (fromStatus === 'blocked' && transition_to === 'restore') {
+    effectiveStatus = dna.blocked_from_state || 'ready';
+    effectiveRole = dna.blocked_from_role || task.current_role;
+    delete dna.blocked_from_state;
+    delete dna.blocked_from_role;
+    delete dna.blocked_at;
+    delete dna.blocked_reason;
+  }
+
+  // Execute: update DB
+  const now = new Date().toISOString();
+  db.prepare('UPDATE tasks SET dna_json = ?, status = ?, current_role = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(dna), effectiveStatus, effectiveRole, now, task.id);
+
+  // Release lease on exit from active
+  if (fromStatus === 'active') {
+    try { releaseLease(db, task.id, agent.user_id || agent.id); } catch { /* */ }
+  }
+
+  // Record transition
+  try {
+    db.prepare('INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), task.id, fromStatus, effectiveStatus, agent.id, task.project_slug);
+  } catch { /* */ }
+
+  // Broadcast transition event
+  broadcast('transition', { task_slug: task.slug, from_status: fromStatus, to_status: effectiveStatus, new_role: effectiveRole, actor: agent.id, timestamp: now });
+
+  // Route event to next role
+  const eventType = getEvent(fromStatus, transition_to);
+  if (eventType && effectiveRole) {
+    const eventData = { task_slug: task.slug, task_id: task.id, title: task.title, role: effectiveRole, dna, timestamp: now };
+    sendToRole(effectiveRole, eventType, eventData, task.project_slug);
+  }
+
+  // Cascade on complete
+  let cascadeResult = null;
+  if (effectiveStatus === 'complete') {
+    try { cascadeResult = cascadeForward(task.id, db); } catch { /* */ }
+  }
+
+  res.status(200).json({
+    type: 'DELIVERY_ACCEPTED', task_slug: task.slug,
+    from_status: fromStatus, to_status: effectiveStatus, new_role: effectiveRole,
+    cascade: cascadeResult, timestamp: now,
+  });
 }
 
 function handleStub(_agent: any, body: any, res: Response): void {
