@@ -1,0 +1,344 @@
+# Workflow Configuration — Source of Truth
+# All process logic in one file. Engine reads this and executes.
+# Change this file → change the workflow. No code changes needed.
+#
+# Version: 1.0.0 (extracted from WORKFLOW.md v17 + a2a-message.ts hardcoded config)
+
+# ═══════════════════════════════════════════════════════════════
+# TRANSITIONS: from_status → to_status with actors, gates, events
+# ═══════════════════════════════════════════════════════════════
+
+transitions:
+  pending:
+    ready:
+      actors: [system, liaison]
+      gates: [dependency_check]
+      event: task_available
+      target_role: from_dna
+
+  ready:
+    active:
+      actors: [matching_role]
+      gates: [brain_query]
+      event: claim_confirmed
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  active:
+    approval:
+      actors: [pdsa]
+      gates: [pdsa_ref_github, brain_contribute]
+      event: approval_needed
+      target_role: liaison
+    review:
+      actors: [dev, qa, liaison]
+      gates: [brain_contribute]
+      event: review_needed
+      target_role: from_review_chain
+    testing:
+      actors: [qa]
+      gates: []
+      event: null
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  approval:
+    approved:
+      actors: [liaison]
+      gates: [human_answer]
+      event: task_available
+      target_role: qa
+    rework:
+      actors: [liaison]
+      gates: [human_answer, rework_reason]
+      event: rework_needed
+      target_role: pdsa
+    complete:
+      actors: [liaison]
+      gates: [human_answer, abstract_ref_github]
+      event: null
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  approved:
+    active:
+      actors: [qa]
+      gates: [brain_query]
+      event: claim_confirmed
+    testing:
+      actors: [qa]
+      gates: []
+      event: null
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  testing:
+    ready:
+      actors: [qa]
+      gates: []
+      event: task_available
+      target_role: dev
+    rework:
+      actors: [qa]
+      gates: [rework_reason]
+      event: rework_needed
+      target_role: from_rework_target
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  review:
+    review:
+      actors: [qa, pdsa]
+      gates: []
+      event: review_needed
+      target_role: from_review_chain
+    complete:
+      actors: [liaison]
+      gates: [abstract_ref_github, human_answer]
+      event: null
+    rework:
+      actors: [liaison, qa, pdsa]
+      gates: [rework_target]
+      event: rework_needed
+      target_role: from_rework_target
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  rework:
+    active:
+      actors: [matching_role]
+      gates: [brain_query]
+      event: claim_confirmed
+    blocked:
+      actors: [any]
+      gates: [blocked_reason]
+      event: task_blocked
+      target_role: liaison
+
+  complete:
+    rework:
+      actors: [liaison]
+      gates: [rework_target]
+      event: rework_needed
+      target_role: from_rework_target
+
+  blocked:
+    restore:
+      actors: [liaison, system]
+      gates: []
+      event: task_available
+      target_role: from_blocked_state
+
+# ═══════════════════════════════════════════════════════════════
+# GATES: named validators with field + validation rule + error
+# ═══════════════════════════════════════════════════════════════
+
+gates:
+  dependency_check:
+    type: custom
+    validate: all_depends_on_complete
+    error: "Dependencies not met"
+
+  brain_query:
+    type: field
+    field: memory_query_session
+    validate: non_empty
+    error: "Must query brain before claiming (memory_query_session required)"
+
+  pdsa_ref_github:
+    type: field
+    field: pdsa_ref
+    validate: github_url
+    error: "pdsa_ref must be a GitHub URL (https://github.com/...)"
+
+  brain_contribute:
+    type: field
+    field: memory_contribution_id
+    validate: non_empty
+    error: "Must contribute learnings to brain before transitioning"
+
+  human_answer:
+    type: field
+    field: human_answer
+    validate: min_length_10
+    error: "Requires human decision text (min 10 characters)"
+
+  abstract_ref_github:
+    type: field
+    field: abstract_ref
+    validate: github_url
+    error: "abstract_ref must be a GitHub URL (https://github.com/...)"
+
+  blocked_reason:
+    type: field
+    field: blocked_reason
+    validate: non_empty
+    error: "Must explain why task is blocked"
+
+  rework_reason:
+    type: field
+    field: rework_reason
+    validate: non_empty
+    error: "Must explain what needs fixing"
+
+  rework_target:
+    type: field
+    field: rework_target_role
+    validate: one_of
+    allowed: [pdsa, dev, qa, liaison]
+    error: "Must specify who fixes (pdsa/dev/qa/liaison)"
+
+# ═══════════════════════════════════════════════════════════════
+# VALIDATORS: reusable validation functions
+# ═══════════════════════════════════════════════════════════════
+
+validators:
+  non_empty: "value != null && value !== ''"
+  github_url: "typeof value === 'string' && value.startsWith('https://github.com/')"
+  min_length_10: "typeof value === 'string' && value.length >= 10"
+  one_of: "allowed.includes(value)"
+
+# ═══════════════════════════════════════════════════════════════
+# ROLE ROUTING: fixed roles + review chain + rework routing
+# ═══════════════════════════════════════════════════════════════
+
+role_routing:
+  fixed_roles:
+    complete: liaison
+    approval: liaison
+    approved: qa
+    testing: qa
+    cancelled: liaison
+
+  review_chain:
+    - from: dev
+      next: qa
+    - from: qa
+      next: pdsa
+    - from: pdsa
+      next: liaison
+
+# ═══════════════════════════════════════════════════════════════
+# INSTRUCTIONS: per-role work orders sent with CLAIM_CONFIRMED
+# ═══════════════════════════════════════════════════════════════
+
+instructions:
+  pdsa:
+    context: "You are the PDSA agent. Research and design."
+    read: [title, description, acceptance_criteria, context, depends_on]
+    do: "Research the problem domain. Query brain for existing knowledge. Design a solution following PDSA methodology. Create a design document and push to git."
+    produce:
+      findings: "Your research findings and analysis"
+      proposed_design: "Your design proposal with rationale"
+      pdsa_ref: "GitHub URL of your design document (push to git first)"
+    brain: "Query brain for context before working. Contribute key learnings after."
+    transition_to: approval
+    gates_to_pass: [pdsa_ref_github, brain_contribute]
+
+  dev:
+    context: "You are the DEV agent. Implement the approved design."
+    read: [title, description, proposed_design, acceptance_criteria, qa_tests]
+    do: "Implement the design exactly as specified. Follow the proposed approach. Make all tests pass. Commit and push."
+    produce:
+      implementation: "Summary of what you built, files changed, commit hash"
+      test_pass_count: "Number of tests passing"
+      test_total_count: "Total number of tests"
+    brain: "Query brain for implementation patterns. Contribute learnings after."
+    transition_to: review
+    gates_to_pass: [brain_contribute]
+
+  qa_test:
+    context: "You are the QA agent. Write tests for the approved design."
+    read: [title, proposed_design, acceptance_criteria]
+    do: "Write tests that verify the acceptance criteria. Tests ARE the specification."
+    produce:
+      qa_tests: "Test descriptions, file locations, what each test verifies"
+    transition_to: ready
+    gates_to_pass: []
+
+  qa_review:
+    context: "You are the QA agent reviewing DEV implementation."
+    read: [title, proposed_design, implementation, qa_tests, acceptance_criteria]
+    do: "Review implementation against design. Run tests. Verify acceptance criteria met."
+    produce:
+      qa_review: "Review verdict (pass/fail) with reasoning"
+    transition_to: review
+    or_rework: "If tests fail or implementation doesn't match design → rework with rework_reason"
+    gates_to_pass: []
+
+  pdsa_review:
+    context: "You are the PDSA agent reviewing implementation against your design."
+    read: [title, proposed_design, implementation, qa_review]
+    do: "Verify implementation matches your original design intent. Check nothing was lost in translation."
+    produce:
+      pdsa_review: "Design verification verdict with reasoning"
+    transition_to: review
+    gates_to_pass: []
+
+  liaison_approval:
+    context: "You are the LIAISON agent. Present this design to Thomas for approval."
+    read: [title, findings, proposed_design, pdsa_ref]
+    do: "Summarize the PDSA design for Thomas. Present key decisions and rationale. Wait for Thomas's decision."
+    produce:
+      human_answer: "Thomas's decision text"
+      human_answer_at: "Timestamp of decision"
+      approval_mode: "manual/semi/auto-approval/autonomous"
+    transition_to: approved
+    or_rework: "If Thomas rejects → rework with rework_reason"
+    gates_to_pass: [human_answer]
+
+  liaison_review:
+    context: "You are the LIAISON agent. Present final work to Thomas for completion."
+    read: [title, findings, implementation, qa_review, pdsa_review]
+    do: "Summarize all work done. Present reviews. Recommend approval or rework. Create abstract document."
+    produce:
+      liaison_review: "Final summary for Thomas"
+      human_answer: "Thomas's decision"
+      abstract_ref: "GitHub URL of completion abstract"
+    transition_to: complete
+    or_rework: "If Thomas rejects → rework with rework_target_role"
+    gates_to_pass: [abstract_ref_github, human_answer]
+
+# ═══════════════════════════════════════════════════════════════
+# BLOCKED STATE: save/restore configuration
+# ═══════════════════════════════════════════════════════════════
+
+blocked:
+  save_fields: [blocked_from_state, blocked_from_role, blocked_at, blocked_reason]
+  restore_fields: [blocked_from_state, blocked_from_role]
+  clear_on_restore: [blocked_from_state, blocked_from_role, blocked_at, blocked_reason]
+
+# ═══════════════════════════════════════════════════════════════
+# LEASE: task claiming TTL
+# ═══════════════════════════════════════════════════════════════
+
+lease:
+  ttl_minutes: 30
+  extend_on_heartbeat: true
+  expire_action: requeue_to_ready
+
+# ═══════════════════════════════════════════════════════════════
+# CASCADE: what happens on completion
+# ═══════════════════════════════════════════════════════════════
+
+cascade:
+  on_complete: unblock_dependents
+  auto_transition: pending_to_ready
