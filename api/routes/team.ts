@@ -32,14 +32,8 @@ function spawnAgent(role: string, userId: string, project: string): { id: string
     // Session may already exist — reuse it
   }
 
-  // Start A2A event monitor sidecar (subscribes to SSE events for this role)
-  const monitorSession = `monitor-${sessionName}`;
-  const apiKey = process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '';
-  const apiPort = process.env.API_PORT || '3101';
-  const monitorCmd = `node /app/src/a2a/monitor-v2.js --role ${role} --api-key ${apiKey} --api-url http://localhost:${apiPort} --project ${projectSlug} --name ${sessionName}`;
-  try {
-    createSession(monitorSession, monitorCmd);
-  } catch { /* may exist */ }
+  // monitor-v2.js sidecar DEPRECATED — agents receive work via task announcer
+  // The A2A server announces tasks, agents claim via CLAIM_TASK message
 
   // Start per-agent unblock monitor (auto-confirms permission prompts)
   const unblockSession = `unblock-${sessionName}`;
@@ -110,7 +104,6 @@ router.delete('/:project/agent/:id', (req: Request, res: Response) => {
   const agent = db.prepare('SELECT session_id FROM agents WHERE id = ?').get(req.params.id) as any;
   if (agent?.session_id) {
     try { killSession(agent.session_id); } catch { /* already dead */ }
-    try { killSession(`monitor-${agent.session_id}`); } catch { /* */ }
     try { killSession(`unblock-${agent.session_id}`); } catch { /* */ }
   }
   db.prepare(`UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now') WHERE id = ?`)
