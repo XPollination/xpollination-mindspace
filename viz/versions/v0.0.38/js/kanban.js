@@ -655,18 +655,30 @@ function openTerminal(sessionName, role) {
   const ws = new WebSocket(`${proto}//${location.host}/ws/terminal/${sessionName}`);
   activeWebSocket = ws;
 
+  const wsUrl = `${proto}//${location.host}/ws/terminal/${sessionName}`;
+  term.write(`\x1b[33mConnecting: ${wsUrl}\x1b[0m\r\n`);
+  console.log('[terminal] connecting:', wsUrl);
+
   ws.onopen = () => {
-    term.write('\x1b[32mConnected to agent session.\x1b[0m\r\n');
-    // Send initial resize
+    term.write('\x1b[32mWebSocket connected. Waiting for terminal data...\x1b[0m\r\n');
+    console.log('[terminal] WebSocket OPEN');
     fitAddon.fit();
     ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
   };
   ws.onmessage = (e) => {
+    console.log('[terminal] data received:', typeof e.data, e.data?.length || e.data?.size || 0, 'bytes');
     if (typeof e.data === 'string') term.write(e.data);
     else if (e.data instanceof Blob) e.data.text().then(t => term.write(t));
+    else if (e.data instanceof ArrayBuffer) term.write(new Uint8Array(e.data));
   };
-  ws.onclose = () => { term.write('\r\n\x1b[31m[Session disconnected]\x1b[0m\r\n'); };
-  ws.onerror = () => { term.write('\r\n\x1b[31m[Connection error]\x1b[0m\r\n'); };
+  ws.onclose = (e) => {
+    term.write(`\r\n\x1b[31m[Session disconnected] code=${e.code} reason=${e.reason}\x1b[0m\r\n`);
+    console.log('[terminal] WebSocket CLOSED:', e.code, e.reason);
+  };
+  ws.onerror = (e) => {
+    term.write('\r\n\x1b[31m[Connection error]\x1b[0m\r\n');
+    console.log('[terminal] WebSocket ERROR');
+  };
 
   // Send terminal input to WebSocket (bidirectional)
   term.onData((data) => { if (ws.readyState === 1) ws.send(data); });

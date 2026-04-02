@@ -486,21 +486,25 @@ const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 // WebSocket upgrade proxy for terminal connections → API server
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  console.log(`[ws-upgrade] ${req.url} upgrade=${req.headers.upgrade} connection=${req.headers.connection}`);
   if (url.pathname.startsWith('/ws/terminal/')) {
+    console.log(`[ws-upgrade] proxying to localhost:${API_PORT}${url.pathname}`);
     const proxyReq = http.request({
       hostname: 'localhost', port: API_PORT, path: url.pathname,
       method: 'GET', headers: { ...req.headers, host: `localhost:${API_PORT}` }
     });
     proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+      console.log(`[ws-upgrade] upstream connected, piping`);
       socket.write('HTTP/1.1 101 Switching Protocols\r\n' +
         Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n') +
         '\r\n\r\n');
       proxySocket.pipe(socket);
       socket.pipe(proxySocket);
     });
-    proxyReq.on('error', () => socket.destroy());
+    proxyReq.on('error', (err) => { console.log(`[ws-upgrade] proxy error: ${err.message}`); socket.destroy(); });
     proxyReq.end();
   } else {
+    console.log(`[ws-upgrade] rejected: ${url.pathname}`);
     socket.destroy();
   }
 });
