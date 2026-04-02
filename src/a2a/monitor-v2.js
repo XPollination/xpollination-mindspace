@@ -13,8 +13,9 @@
  *   5. On task_assigned: claim → work → submit findings → transition
  */
 
-import { connect, startEventStream, sendMessage, heartbeat } from './a2a-agent.js';
+import { connect, startEventStream, sendMessage, heartbeat, AGENT_NAME } from './a2a-agent.js';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const role = process.argv[2] || 'dev';
 const ROLE_UPPER = role.toUpperCase();
@@ -80,11 +81,19 @@ async function onTaskAssigned(data) {
   // Step 2: Brain query for task context
   await queryBrain(`Context for task ${data.task_slug}: ${data.title}. What do I need to know?`);
 
-  // Step 3: Signal that work would be done here
-  // In full Agent OS: the turn engine (a2a-event-handler.js) processes work via Claude API
-  // In monitor-v2: we log that work is needed and await human/Claude intervention
-  console.log(`[${ROLE_UPPER}] Task ${data.task_slug} claimed and active. Awaiting work execution.`);
-  console.log(`[${ROLE_UPPER}] Use a2a-event-handler.js for autonomous Claude-powered work.`);
+  // Step 3: Inject task into Claude terminal session
+  const tmuxTarget = AGENT_NAME; // e.g., runner-dev-e41cbd6a
+  if (tmuxTarget) {
+    const taskPrompt = `[A2A EVENT] Task assigned: ${data.task_slug} — ${data.title}. Role: ${role}. Status: active. Work on this task now. When done, transition it by running: curl -X POST http://localhost:3101/a2a/message -H "Content-Type: application/json" -d '{"type":"TRANSITION","agent_id":"${data.agent_id || ''}","task_slug":"${data.task_slug}","to_status":"review"}'`;
+    try {
+      execFileSync('tmux', ['send-keys', '-t', tmuxTarget, taskPrompt, 'Enter'], { timeout: 5000 });
+      console.log(`[${ROLE_UPPER}] Injected task into ${tmuxTarget}`);
+    } catch (err) {
+      console.log(`[${ROLE_UPPER}] tmux inject failed: ${err.message}`);
+    }
+  } else {
+    console.log(`[${ROLE_UPPER}] No tmux target — task ${data.task_slug} claimed but not injected.`);
+  }
 }
 
 async function submitWork(taskSlug, findings, toStatus = 'review') {
@@ -107,21 +116,29 @@ async function submitWork(taskSlug, findings, toStatus = 'review') {
   );
 }
 
+async function injectIntoSession(message) {
+  const tmuxTarget = AGENT_NAME;
+  if (!tmuxTarget) return;
+  try {
+    execFileSync('tmux', ['send-keys', '-t', tmuxTarget, message, 'Enter'], { timeout: 5000 });
+  } catch { /* ignore */ }
+}
+
 async function onReviewNeeded(data) {
-  console.log(`[${ROLE_UPPER}] Review needed: ${data.task_slug} (from ${data.from_role})`);
-  // Claim for review
+  console.log(`[${ROLE_UPPER}] Review needed: ${data.task_slug} (from ${data.from_role || 'unknown'})`);
   try {
     await sendMessage('TRANSITION', { task_slug: data.task_slug, to_status: 'active' });
     console.log(`[${ROLE_UPPER}] Review claimed: ${data.task_slug}`);
+    await injectIntoSession(`[A2A EVENT] Review needed: ${data.task_slug}. Review the work and transition to complete or rework.`);
   } catch { /* may not be claimable */ }
 }
 
 async function onReworkNeeded(data) {
   console.log(`[${ROLE_UPPER}] Rework needed: ${data.task_slug} — ${data.rework_reason || 'no reason given'}`);
-  // Reclaim for rework
   try {
     await sendMessage('TRANSITION', { task_slug: data.task_slug, to_status: 'active' });
     console.log(`[${ROLE_UPPER}] Rework claimed: ${data.task_slug}`);
+    await injectIntoSession(`[A2A EVENT] Rework needed: ${data.task_slug}. Reason: ${data.rework_reason || 'see task DNA'}. Fix and resubmit.`);
   } catch { /* may not be claimable */ }
 }
 
