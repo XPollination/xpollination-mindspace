@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 550" font-family="system-ui, sans-serif">
+  <title>Task Lifecycle as Events — From Creation to Completion</title>
+  <desc>
+    AGENT-READABLE: A task flows through the PDSA workflow entirely via events.
+    Each step: agent publishes transition event → workflow gate validates → event bus routes
+    to subscribers of the next role. No agent-to-agent communication. The event bus is the
+    only connection point. Gates are enforced at every transition. Agents are interchangeable —
+    any DEV runner can claim any DEV task. If an agent crashes, the event stays in the bus
+    and another agent picks it up.
+  </desc>
+
+  <rect width="1000" height="550" fill="#0d1117" rx="8"/>
+  <text x="500" y="28" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Task Lifecycle as Events — PDSA Workflow</text>
+
+  <!-- Timeline arrow -->
+  <line x1="40" y1="80" x2="960" y2="80" stroke="#3fb950" stroke-width="2" marker-end="url(#at)"/>
+  <text x="980" y="84" fill="#3fb950" font-size="10">time</text>
+
+  <!-- Step 1: TASK_CREATED -->
+  <rect x="50" y="100" width="140" height="100" rx="6" fill="#161b22" stroke="#ea580c" stroke-width="2"/>
+  <circle cx="120" cy="75" r="8" fill="#ea580c"/>
+  <text x="120" y="79" fill="#0d1117" font-size="8" font-weight="700" text-anchor="middle">1</text>
+  <text x="120" y="118" fill="#ea580c" font-size="9" font-weight="700" text-anchor="middle">TASK_CREATED</text>
+  <text x="120" y="135" fill="#8b949e" font-size="8" text-anchor="middle">by: LIAISON</text>
+  <text x="120" y="150" fill="#8b949e" font-size="8" text-anchor="middle">status: ready</text>
+  <text x="120" y="165" fill="#8b949e" font-size="8" text-anchor="middle">role: pdsa</text>
+  <text x="120" y="185" fill="#3fb950" font-size="7" text-anchor="middle">Gate: depends_on complete?</text>
+
+  <!-- Step 2: PDSA claims -->
+  <rect x="210" y="100" width="140" height="100" rx="6" fill="#161b22" stroke="#bc8cff" stroke-width="2"/>
+  <circle cx="280" cy="75" r="8" fill="#bc8cff"/>
+  <text x="280" y="79" fill="#0d1117" font-size="8" font-weight="700" text-anchor="middle">2</text>
+  <text x="280" y="118" fill="#bc8cff" font-size="9" font-weight="700" text-anchor="middle">TASK_CLAIMED</text>
+  <text x="280" y="135" fill="#8b949e" font-size="8" text-anchor="middle">by: PDSA runner</text>
+  <text x="280" y="150" fill="#8b949e" font-size="8" text-anchor="middle">ready → active</text>
+  <text x="280" y="165" fill="#8b949e" font-size="8" text-anchor="middle">claimed_by: did:key:...</text>
+  <text x="280" y="185" fill="#3fb950" font-size="7" text-anchor="middle">Gate: role=pdsa? brain queried?</text>
+
+  <!-- Step 3: PDSA submits design -->
+  <rect x="370" y="100" width="140" height="100" rx="6" fill="#161b22" stroke="#bc8cff" stroke-width="2"/>
+  <circle cx="440" cy="75" r="8" fill="#bc8cff"/>
+  <text x="440" y="79" fill="#0d1117" font-size="8" font-weight="700" text-anchor="middle">3</text>
+  <text x="440" y="118" fill="#bc8cff" font-size="9" font-weight="700" text-anchor="middle">DESIGN_SUBMITTED</text>
+  <text x="440" y="135" fill="#8b949e" font-size="8" text-anchor="middle">by: PDSA runner</text>
+  <text x="440" y="150" fill="#8b949e" font-size="8" text-anchor="middle">active → approval</text>
+  <text x="440" y="165" fill="#8b949e" font-size="8" text-anchor="middle">dna: pdsa_ref, findings</text>
+  <text x="440" y="185" fill="#3fb950" font-size="7" text-anchor="middle">Gate: pdsa_ref set? brain contributed?</text>
+
+  <!-- Step 4: Human approves -->
+  <rect x="530" y="100" width="140" height="100" rx="6" fill="#161b22" stroke="#ea580c" stroke-width="2"/>
+  <circle cx="600" cy="75" r="8" fill="#ea580c"/>
+  <text x="600" y="79" fill="#0d1117" font-size="8" font-weight="700" text-anchor="middle">4</text>
+  <text x="600" y="118" fill="#ea580c" font-size="9" font-weight="700" text-anchor="middle">DESIGN_APPROVED</text>
+  <text x="600" y="135" fill="#8b949e" font-size="8" text-anchor="middle">by: LIAISON (human gate)</text>
+  <text x="600" y="150" fill="#8b949e" font-size="8" text-anchor="middle">approval → approved</text>
+  <text x="600" y="165" fill="#8b949e" font-size="8" text-anchor="middle">human_answer: "approved"</text>
+  <text x="600" y="185" fill="#3fb950" font-size="7" text-anchor="middle">Gate: human_confirmed?</text>
+
+  <!-- Step 5: DEV implements -->
+  <rect x="690" y="100" width="140" height="100" rx="6" fill="#161b22" stroke="#2563eb" stroke-width="2"/>
+  <circle cx="760" cy="75" r="8" fill="#2563eb"/>
+  <text x="760" y="79" fill="#0d1117" font-size="8" font-weight="700" text-anchor="middle">5</text>
+  <text x="760" y="118" fill="#2563eb" font-size="9" font-weight="700" text-anchor="middle">IMPLEMENTED</text>
+  <text x="760" y="135" fill="#8b949e" font-size="8" text-anchor="middle">by: DEV runner</text>
+  <text x="760" y="150" fill="#8b949e" font-size="8" text-anchor="middle">active → review</text>
+  <text x="760" y="165" fill="#8b949e" font-size="8" text-anchor="middle">dna: implementation, commit</text>
+  <text x="760" y="185" fill="#3fb950" font-size="7" text-anchor="middle">Gate: tests pass? brain contributed?</text>
+
+  <!-- Step 6: Complete -->
+  <rect x="850" y="100" width="120" height="100" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <circle cx="910" cy="75" r="8" fill="#3fb950"/>
+  <text x="910" y="79" fill="#0d1117" font-size="8" font-weight="700" text-anchor="middle">6</text>
+  <text x="910" y="118" fill="#3fb950" font-size="9" font-weight="700" text-anchor="middle">COMPLETED</text>
+  <text x="910" y="135" fill="#8b949e" font-size="8" text-anchor="middle">review chain done</text>
+  <text x="910" y="150" fill="#8b949e" font-size="8" text-anchor="middle">QA → PDSA → LIAISON</text>
+  <text x="910" y="165" fill="#8b949e" font-size="8" text-anchor="middle">human confirms</text>
+  <text x="910" y="185" fill="#3fb950" font-size="7" text-anchor="middle">Gate: all reviews pass</text>
+
+  <!-- Event Bus bar -->
+  <rect x="50" y="235" width="920" height="40" rx="4" fill="#0d2818" stroke="#3fb950" stroke-width="2"/>
+  <text x="500" y="260" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">A2A Event Bus — every event validated by workflow gates before routing</text>
+
+  <!-- Subscriber reactions -->
+  <text x="500" y="305" fill="#8b949e" font-size="12" font-weight="600" text-anchor="middle">Subscribers React Independently</text>
+
+  <!-- Kanban reacts -->
+  <rect x="60" y="325" width="170" height="80" rx="6" fill="#161b22" stroke="#8b949e"/>
+  <text x="145" y="348" fill="#8b949e" font-size="10" font-weight="600" text-anchor="middle">Kanban UI</text>
+  <text x="145" y="365" fill="#8b949e" font-size="8" text-anchor="middle">Subscribes to: ALL transitions</text>
+  <text x="145" y="380" fill="#8b949e" font-size="8" text-anchor="middle">Reacts: moves card, updates status</text>
+  <text x="145" y="395" fill="#8b949e" font-size="8" text-anchor="middle">Doesn't care WHO transitioned</text>
+
+  <!-- Brain reacts -->
+  <rect x="260" y="325" width="170" height="80" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="345" y="348" fill="#bc8cff" font-size="10" font-weight="600" text-anchor="middle">Brain (Cognitive)</text>
+  <text x="345" y="365" fill="#8b949e" font-size="8" text-anchor="middle">Subscribes to: ALL events</text>
+  <text x="345" y="380" fill="#8b949e" font-size="8" text-anchor="middle">Reacts: learns patterns,</text>
+  <text x="345" y="395" fill="#8b949e" font-size="8" text-anchor="middle">detects anomalies, reflects</text>
+
+  <!-- Next role agent reacts -->
+  <rect x="460" y="325" width="170" height="80" rx="6" fill="#161b22" stroke="#2563eb"/>
+  <text x="545" y="348" fill="#2563eb" font-size="10" font-weight="600" text-anchor="middle">Next Role Agent</text>
+  <text x="545" y="365" fill="#8b949e" font-size="8" text-anchor="middle">Subscribes to: own role events</text>
+  <text x="545" y="380" fill="#8b949e" font-size="8" text-anchor="middle">Reacts: claims task, starts work</text>
+  <text x="545" y="395" fill="#8b949e" font-size="8" text-anchor="middle">Any runner with matching role</text>
+
+  <!-- Cascade engine reacts -->
+  <rect x="660" y="325" width="170" height="80" rx="6" fill="#161b22" stroke="#3fb950"/>
+  <text x="745" y="348" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">Cascade Engine</text>
+  <text x="745" y="365" fill="#8b949e" font-size="8" text-anchor="middle">Subscribes to: COMPLETE events</text>
+  <text x="745" y="380" fill="#8b949e" font-size="8" text-anchor="middle">Reacts: unblocks dependents,</text>
+  <text x="745" y="395" fill="#8b949e" font-size="8" text-anchor="middle">triggers next tasks in pipeline</text>
+
+  <!-- SSE lines from bus to subscribers -->
+  <line x1="145" y1="275" x2="145" y2="325" stroke="#8b949e" stroke-width="1" stroke-dasharray="3"/>
+  <line x1="345" y1="275" x2="345" y2="325" stroke="#bc8cff" stroke-width="1" stroke-dasharray="3"/>
+  <line x1="545" y1="275" x2="545" y2="325" stroke="#2563eb" stroke-width="1" stroke-dasharray="3"/>
+  <line x1="745" y1="275" x2="745" y2="325" stroke="#3fb950" stroke-width="1" stroke-dasharray="3"/>
+
+  <!-- Key insight box -->
+  <rect x="100" y="430" width="800" height="90" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="1"/>
+  <text x="500" y="455" fill="#3fb950" font-size="12" font-weight="700" text-anchor="middle">Key Insight: The Package Scan Analogy</text>
+  <text x="500" y="475" fill="#8b949e" font-size="10" text-anchor="middle">DEV publishes "Implementation completed" → like scanning a package at the distribution center</text>
+  <text x="500" y="492" fill="#8b949e" font-size="10" text-anchor="middle">QA reacts (starts review) · Brain reacts (learns) · Kanban reacts (moves card) · Cascade reacts (unblocks next)</text>
+  <text x="500" y="509" fill="#3fb950" font-size="10" text-anchor="middle">All independently. No agent tells another what to do. The event IS the signal.</text>
+
+  <defs>
+    <marker id="at" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7" fill="#3fb950"/></marker>
+  </defs>
+</svg>
