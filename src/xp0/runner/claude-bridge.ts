@@ -10,18 +10,30 @@ export class ClaudeBridge {
   private binary: string;
   private env: Record<string, string>;
   private timeout: number;
+  private isNodeScript: boolean;
 
   constructor(opts: ClaudeBridgeOpts) {
     this.binary = opts.binary;
     this.env = opts.env || {};
     this.timeout = opts.timeout || 300000;
+    // Real Claude binary is standalone; mock-claude is a .js/.ts file needing node
+    this.isNodeScript = opts.binary.endsWith('.js') || opts.binary.endsWith('.ts');
+  }
+
+  private getCommand(): [string, string[]] {
+    if (this.isNodeScript) {
+      return ['node', [this.binary]];
+    }
+    return [this.binary, []];
   }
 
   execute(prompt: string): Promise<string> {
+    const [cmd, baseArgs] = this.getCommand();
+    const args = [...baseArgs, '--print', '-p', prompt];
     return new Promise((resolve, reject) => {
       execFile(
-        'node',
-        [this.binary, '--print', '-p', prompt],
+        cmd,
+        args,
         {
           encoding: 'utf-8',
           timeout: this.timeout,
@@ -39,8 +51,10 @@ export class ClaudeBridge {
   }
 
   executeStreaming(prompt: string, onChunk: (chunk: string) => void): Promise<string> {
+    const [cmd, baseArgs] = this.getCommand();
+    const args = [...baseArgs, '--print', '-p', prompt];
     return new Promise((resolve, reject) => {
-      const child = spawn('node', [this.binary, '--print', '-p', prompt], {
+      const child = spawn(cmd, args, {
         env: { ...process.env, ...this.env },
       });
       let output = '';

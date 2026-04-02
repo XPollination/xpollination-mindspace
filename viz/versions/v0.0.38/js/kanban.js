@@ -518,7 +518,9 @@ async function addAgent(role) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role }),
+      credentials: 'same-origin',
     });
+    if (!res.ok) { console.warn('addAgent:', res.status, await res.text()); return; }
     const data = await res.json();
     teamAgents.push(data);
     renderTeamStatus();
@@ -528,7 +530,8 @@ async function addAgent(role) {
 async function addFullTeam() {
   const project = getTeamProject();
   try {
-    const res = await fetch(`/api/team/${project}/full`, { method: 'POST' });
+    const res = await fetch(`/api/team/${project}/full`, { method: 'POST', credentials: 'same-origin' });
+    if (!res.ok) { console.warn('addFullTeam:', res.status); return; }
     const data = await res.json();
     if (data.agents) teamAgents.push(...data.agents);
     renderTeamStatus();
@@ -537,7 +540,7 @@ async function addFullTeam() {
 
 async function terminateAgent(id) {
   const project = getTeamProject();
-  await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE' });
+  await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE', credentials: 'same-origin' });
   teamAgents = teamAgents.filter(a => a.id !== id);
   renderTeamStatus();
 }
@@ -545,7 +548,8 @@ async function terminateAgent(id) {
 async function loadTeam() {
   const project = getTeamProject();
   try {
-    const res = await fetch(`/api/team/${project}`);
+    const res = await fetch(`/api/team/${project}`, { credentials: 'same-origin' });
+    if (!res.ok) return;
     const data = await res.json();
     teamAgents = data.agents || [];
     renderTeamStatus();
