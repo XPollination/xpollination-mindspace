@@ -11,7 +11,8 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { getDb } from '../db/connection.js';
-import { createSession, killSession, sessionExists } from '../lib/terminal-manager.js';
+import { createSession, killSession, sessionExists, sendKeys } from '../lib/terminal-manager.js';
+import { execFile } from 'node:child_process';
 
 const router = Router();
 const ROLES = ['liaison', 'pdsa', 'qa', 'dev'];
@@ -28,6 +29,15 @@ function spawnAgent(role: string, userId: string, project: string): { id: string
     createSession(sessionName, command);
   } catch {
     // Session may already exist — that's fine, reuse it
+  }
+
+  // Start per-agent unblock monitor (auto-confirms permission prompts)
+  const unblockSession = `unblock-${sessionName}`;
+  try {
+    const unblockCmd = `bash -c 'while true; do output=$(tmux capture-pane -t ${sessionName} -p -S -40 2>/dev/null); bottom=$(echo "$output" | tail -12 | tr "\\n" " "); if echo "$bottom" | grep -qE "Esc to cancel|Do you want to allow|Do you want to proceed"; then prompt=$(echo "$output" | tail -40 | tr "\\n" " "); if echo "$prompt" | grep -qiE "don.t ask again"; then opt=$(echo "$prompt" | grep -oiE "[1-9]\\.[^.]{0,80}don.t ask again" | head -1 | grep -oE "^[1-9]"); if [ -n "$opt" ]; then tmux send-keys -t ${sessionName} "$opt"; echo "[$(date +%H:%M:%S)] ${role}: opt $opt (dont ask again)"; sleep 3; continue; fi; fi; if echo "$prompt" | grep -qE "[0-9]+\\. Yes"; then if echo "$prompt" | grep -qE "2\\.[^0-9]*Yes.*don"; then tmux send-keys -t ${sessionName} 2; echo "[$(date +%H:%M:%S)] ${role}: opt 2"; elif echo "$prompt" | grep -qE "1\\. Yes"; then tmux send-keys -t ${sessionName} 1; echo "[$(date +%H:%M:%S)] ${role}: opt 1"; fi; sleep 3; continue; fi; fi; sleep 5; done'`;
+    createSession(unblockSession, unblockCmd);
+  } catch {
+    // Unblock session may already exist
   }
 
   // Track in DB (best-effort — FK constraints may fail in some environments)
@@ -95,6 +105,7 @@ router.delete('/:project/agent/:id', (req: Request, res: Response) => {
   const agent = db.prepare('SELECT session_id FROM agents WHERE id = ?').get(req.params.id) as any;
   if (agent?.session_id) {
     try { killSession(agent.session_id); } catch { /* already dead */ }
+    try { killSession(`unblock-${agent.session_id}`); } catch { /* */ }
   }
   db.prepare(`UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now') WHERE id = ?`)
     .run(req.params.id);
