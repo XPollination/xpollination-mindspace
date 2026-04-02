@@ -601,6 +601,12 @@ async function switchRole(id, newRole) {
   } catch (e) { console.warn('switchRole failed:', e); }
 }
 
+// Expose team functions globally (kanban.js is a module, onclick needs window scope)
+window.addAgent = addAgent;
+window.addFullTeam = addFullTeam;
+window.terminateAgent = terminateAgent;
+window.switchRole = switchRole;
+
 // Reload team when project filter changes
 document.getElementById('project-filter')?.addEventListener('change', loadTeam);
 
