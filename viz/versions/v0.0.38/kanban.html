@@ -7,6 +7,9 @@
 <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
 <link rel="stylesheet" href="/mindspace.css">
 <link rel="stylesheet" href="/kanban.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10/lib/addon-fit.min.js"></script>
 </head><body>
 <script type="module" src="/js/mindspace-nav.js"></script>
 <div class="kanban-toolbar">
@@ -53,6 +56,14 @@
   </div>
   <div class="detail-body" id="detail-body"></div>
   <div class="detail-actions" id="detail-actions"></div>
+</div>
+<div class="terminal-overlay" id="terminal-overlay" onclick="closeTerminal()"></div>
+<div class="terminal-panel" id="terminal-panel">
+  <div class="terminal-header">
+    <span id="terminal-title">Agent Terminal</span>
+    <button class="detail-close" onclick="closeTerminal()">&times;</button>
+  </div>
+  <div id="terminal-container"></div>
 </div>
 <script type="module" src="/js/kanban.js"></script>
 </body></html>

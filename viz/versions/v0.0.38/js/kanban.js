@@ -575,6 +575,7 @@ function renderTeamStatus() {
           `<option value="${r}" ${r === a.role ? 'selected' : ''}>${r}</option>`
         ).join('')}
       </select>
+      ${a.session ? `<button class="runner-open" onclick="openTerminal('${a.session}', '${a.role}')">Open</button>` : ''}
       <button class="team-terminate" data-action="terminate" onclick="terminateAgent('${a.id}')">×</button>
     </div>
   `).join('') + ` ${teamAgents.length} agent${teamAgents.length > 1 ? 's' : ''}`;
@@ -612,3 +613,85 @@ document.getElementById('project-filter')?.addEventListener('change', loadTeam);
 
 // Initial team load
 setTimeout(loadTeam, 1500);
+
+// ═══════════════════════════════════════════════════════════════
+// Agent Terminal — xterm.js WebSocket bridge to tmux session
+// ═══════════════════════════════════════════════════════════════
+
+let activeTerminal = null;
+let activeWebSocket = null;
+
+function openTerminal(sessionName, role) {
+  const overlay = document.getElementById('terminal-overlay');
+  const panel = document.getElementById('terminal-panel');
+  const container = document.getElementById('terminal-container');
+  const title = document.getElementById('terminal-title');
+
+  title.textContent = `${(role || '').toUpperCase()} Agent — ${sessionName}`;
+  overlay.classList.add('active');
+  panel.classList.add('active');
+
+  // Clean up previous terminal
+  container.innerHTML = '';
+  if (activeWebSocket) { activeWebSocket.close(); activeWebSocket = null; }
+  if (activeTerminal) { activeTerminal.dispose(); activeTerminal = null; }
+
+  // Create xterm.js instance
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    theme: { background: '#1a1a2e', foreground: '#e0e0e0', cursor: '#ea580c' },
+  });
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+  setTimeout(() => fitAddon.fit(), 100);
+  activeTerminal = term;
+
+  // Connect WebSocket to tmux session
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws/terminal/${sessionName}`);
+  activeWebSocket = ws;
+
+  ws.onopen = () => {
+    term.write('\x1b[32mConnected to agent session.\x1b[0m\r\n');
+    // Send initial resize
+    fitAddon.fit();
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+  };
+  ws.onmessage = (e) => {
+    if (typeof e.data === 'string') term.write(e.data);
+    else if (e.data instanceof Blob) e.data.text().then(t => term.write(t));
+  };
+  ws.onclose = () => { term.write('\r\n\x1b[31m[Session disconnected]\x1b[0m\r\n'); };
+  ws.onerror = () => { term.write('\r\n\x1b[31m[Connection error]\x1b[0m\r\n'); };
+
+  // Send terminal input to WebSocket (bidirectional)
+  term.onData((data) => { if (ws.readyState === 1) ws.send(data); });
+
+  // Handle window resize
+  const resizeHandler = () => {
+    fitAddon.fit();
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  };
+  window.addEventListener('resize', resizeHandler);
+  panel._resizeHandler = resizeHandler;
+}
+
+function closeTerminal() {
+  const panel = document.getElementById('terminal-panel');
+  document.getElementById('terminal-overlay')?.classList.remove('active');
+  panel?.classList.remove('active');
+  if (activeWebSocket) { activeWebSocket.close(); activeWebSocket = null; }
+  if (activeTerminal) { activeTerminal.dispose(); activeTerminal = null; }
+  if (panel?._resizeHandler) {
+    window.removeEventListener('resize', panel._resizeHandler);
+    panel._resizeHandler = null;
+  }
+}
+
+window.openTerminal = openTerminal;
+window.closeTerminal = closeTerminal;

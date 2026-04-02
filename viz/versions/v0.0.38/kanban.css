@@ -157,3 +157,10 @@
 .live-output-container { margin: 8px 0; }
 .live-output-pre { background: var(--ms-bg-darker, #1a1a2e); color: var(--ms-text-light, #e0e0e0); padding: 12px; border-radius: 6px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; min-height: 60px; }
 .live-output-status { font-size: 11px; color: var(--ms-text-muted, #64748b); margin-top: 4px; }
+.terminal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+.terminal-overlay.active { display: block; }
+.terminal-panel { position: fixed; top: 5vh; left: 5vw; right: 5vw; bottom: 5vh; background: #1a1a2e; border-radius: 8px; z-index: 1000; display: none; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.terminal-panel.active { display: flex; }
+.terminal-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid #333; color: #e0e0e0; font-weight: 600; font-size: 14px; flex-shrink: 0; }
+#terminal-container { flex: 1; padding: 4px; overflow: hidden; }
+.runner-open { background: #2563eb; border: none; border-radius: 3px; color: #fff; cursor: pointer; font-size: 10px; padding: 1px 6px; font-weight: 600; }
