@@ -1,7 +1,7 @@
-# A2A Agent Work Delivery — LLM-less Server Coordinates Claude Code Agents
+# A2A Agent Work Delivery — Announce, Self-Select, Validate
 
 **Ref:** MISSION-A2A-AGENT-DELIVERY
-**Version:** v1.0.0
+**Version:** v2.0.0
 **Date:** 2026-04-02
 **Authors:** Thomas Pichler + LIAISON Agent
 **Status:** Draft
@@ -12,42 +12,116 @@
 
 ## Management Abstract
 
-The A2A server (LLM-less) coordinates Claude Code agents running in interactive terminals. Agents spawn via "+1 Dev" in kanban, authenticate via Max plan OAuth, and receive structured instructions from the A2A server. The server knows the workflow, enforces gates, and sends tasks to the right agent. Agents work, write DNA, and report back via A2A messages. The process logic lives in the SERVER configuration (iterable without code deploys), not in the agents.
+Agents are contractors. They get work orders via A2A messages, execute the work, submit deliverables via A2A messages. They never enter the office (database). The A2A server is the only system with database access — it reads tasks, writes DNA, validates gates, and translates between the protocol and the database.
 
-**Constraint:** No Anthropic API key. Max plan subscription only. Claude Code CLI is the only inference path. The `a2a-event-handler.js` (API-based) cannot be used.
+The model is **Announce → Self-Select → Validate**: the server announces available tasks to the room, idle agents claim, the server validates and delivers structured instructions, agents work and submit results, the server validates delivery against workflow gates. No dispatcher bottleneck. Scales horizontally.
+
+**Constraint:** No Anthropic API key. Max plan only. Claude Code CLI in tmux is the only inference path.
 
 ---
 
-## Part 1: Architecture
+## Part 1: Architecture — The Contractor Model
+
+### Who Knows What
 
 ```
-A2A Server (LLM-less coordinator)
-  ├── Knows: connected agents, their roles, their status
-  ├── Knows: workflow transitions, quality gates, review chain
-  ├── Knows: task DNA, required fields per transition
-  │
-  ├── On task ready+pdsa:
-  │   → Find active PDSA agent
-  │   → Send TASK_ASSIGNED with full DNA via SSE
-  │   → Agent receives in Claude Code terminal
-  │   → Agent reads DNA, works, writes results
-  │   → Agent sends TRANSITION via curl to A2A
-  │   → Server validates gates → ACK or ERROR
-  │   → Server routes to next role
-  │
-  └── On task complete:
-      → Cascade engine unblocks dependents
-      → Brain contribution confirmed
-      → Kanban UI updates via SSE broadcast
+A2A SERVER (the office):
+  ✓ Database (tasks, DNA, agents, transitions)
+  ✓ Workflow rules (state machine, gates, role routing)
+  ✓ Connected agents (role, status, heartbeat)
+  ✓ Brain API access
+  ✗ Does NOT think (LLM-less)
+
+AGENT (the contractor):
+  ✓ Its role (pdsa/dev/qa/liaison)
+  ✓ A2A protocol (send/receive messages)
+  ✓ Claude Code (inference via Max plan OAuth)
+  ✗ NO database access
+  ✗ NO interface-cli
+  ✗ NO SQL
+  ✗ NO direct workflow engine access
 ```
 
-### Why LLM-less server
+### The Protocol Flow
 
-The A2A server is NOT an AI. It's a workflow engine with SSE event routing. Benefits:
-- **Iterable process:** Change the workflow config → all agents follow new rules. No agent redeployment.
-- **Deterministic gates:** Quality gates are code, not LLM judgment. They pass or fail.
-- **Auditable:** Every transition logged with actor, timestamp, gate results.
-- **Fast:** No inference latency on routing. Milliseconds, not minutes.
+```
+1. AGENT CONNECTS
+   Agent → A2A: "I'm a PDSA agent, ready for work"
+   Server → Agent: "Welcome. You're registered. Listen for announcements."
+
+2. SERVER ANNOUNCES (heartbeat/cron finds pending task)
+   Server → Room: "Task xyz available for role=pdsa"
+   (All connected PDSA agents see this)
+
+3. AGENT SELF-SELECTS
+   Agent → A2A: "I claim task xyz"
+   (Idle agent claims. Busy agents ignore.)
+
+4. SERVER VALIDATES CLAIM
+   Server checks: role matches? agent idle? gates pass?
+   Server → DATABASE: UPDATE tasks SET status='active', claimed_by=agent
+   Server → Agent: "Confirmed. Here is your work order:"
+   {
+     task_slug: "xyz",
+     title: "Design the widget system",
+     dna: { full DNA object },
+     instructions: {
+       read: ["description", "acceptance_criteria"],
+       produce: ["findings", "proposed_design"],
+       set: { "pdsa_ref": "GitHub URL of your design doc" },
+       contribute_to_brain: true,
+       transition_to: "approval"
+     },
+     gate_requirements: ["pdsa_ref must be GitHub URL", "brain contribution required"]
+   }
+
+5. AGENT WORKS
+   Claude Code reads the work order, thinks, produces output.
+   Agent has EVERYTHING it needs in the message — no DB queries needed.
+
+6. AGENT DELIVERS
+   Agent → A2A: "Task xyz complete. Results:"
+   {
+     task_slug: "xyz",
+     findings: "Research shows...",
+     proposed_design: "The approach is...",
+     pdsa_ref: "https://github.com/...",
+     brain_contribution: "Key learning from this task...",
+     transition_to: "approval"
+   }
+
+7. SERVER VALIDATES DELIVERY
+   Server checks gates: pdsa_ref is GitHub URL? ✓ Brain contributed? ✓
+   Server → DATABASE: UPDATE tasks SET dna_json=..., status='approval'
+   Server → Agent: "ACK. Task moved to approval."
+   Server → Room: "APPROVAL_NEEDED for task xyz" (liaison agents see this)
+
+8. SERVER CHECKS FOR MORE WORK
+   Any more tasks for this agent's role?
+   → Yes: announce to room again
+   → No: agent stays idle, waiting for next announcement
+```
+
+### Why This Scales
+
+| Aspect | Dispatcher (server-pushes) | Marketplace (agent-pulls) | **Hybrid (announce + self-select)** |
+|--------|---------------------------|--------------------------|--------------------------------------|
+| Coordination | Server manages each agent individually | None — agents fight over tasks | Server announces, agents self-select |
+| Bottleneck | Server is O(tasks × agents) | None | None — announcing is O(1) broadcast |
+| Fault tolerance | Server dies = all coordination stops | Agents have claimed tasks | Agents have claimed tasks + server validates |
+| 50 agents join | Server must manage 50 conversations | 50 agents start pulling | 50 agents hear announcements, self-organize |
+| 2 agents claim same task | N/A (server assigns) | Conflict resolution (lowest CID) | Server validates first claim, rejects second |
+| Process changes | Update server conversation scripts | Update agent skills | **Update server instruction templates only** |
+
+### The Key Separation
+
+```
+interface-cli  = for humans/LIAISON in tmux (direct DB access)
+A2A messages   = for spawned agents (NO DB access, protocol only)
+A2A server     = translates between protocol and database
+```
+
+The agent is a contractor: gets a work order (A2A message), does the work, submits the deliverable (A2A message). Never enters the office (database).
 
 ---
 
@@ -55,235 +129,260 @@ The A2A server is NOT an AI. It's a workflow engine with SSE event routing. Bene
 
 ### PDSA Design Path (Happy Path)
 
-| # | From State | To State | Actor | Event Sent | Target Role | Required DNA |
-|---|-----------|----------|-------|------------|-------------|-------------|
-| 1 | pending | ready | system/liaison | TASK_ASSIGNED | pdsa | depends_on_reviewed |
-| 2 | ready | active | pdsa | — | — | memory_query_session |
-| 3 | active | approval | pdsa | APPROVAL_NEEDED | liaison | pdsa_ref, memory_contribution_id |
-| 4 | approval | approved | human/liaison | TASK_ASSIGNED | qa | human_answer |
-| 5 | approved | active | qa | — | — | memory_query_session |
-| 6 | active | testing | qa | — | — | — |
-| 7 | testing | ready | qa | TASK_ASSIGNED | dev | — |
-| 8 | ready | active | dev | — | — | memory_query_session |
-| 9 | active | review | dev | REVIEW_NEEDED | qa | implementation, brain_contribution_id |
-| 10 | review+qa | review+pdsa | qa | REVIEW_NEEDED | pdsa | qa_review |
-| 11 | review+pdsa | review+liaison | pdsa | REVIEW_NEEDED | liaison | pdsa_review |
+| # | From | To | Actor | A2A Announcement | Target Role | Required DNA |
+|---|------|-----|-------|-----------------|-------------|-------------|
+| 1 | pending | ready | system/liaison | TASK_AVAILABLE | pdsa | depends_on_reviewed |
+| 2 | ready | active | pdsa agent claims | CLAIM_CONFIRMED + instructions | — | memory_query_session |
+| 3 | active | approval | pdsa delivers | APPROVAL_NEEDED | liaison | pdsa_ref, brain_contribution |
+| 4 | approval | approved | human/liaison | TASK_AVAILABLE | qa | human_answer |
+| 5 | approved | active | qa claims | CLAIM_CONFIRMED + instructions | — | memory_query_session |
+| 6 | active | testing | qa delivers | — | — | qa_tests |
+| 7 | testing | ready | qa | TASK_AVAILABLE | dev | — |
+| 8 | ready | active | dev claims | CLAIM_CONFIRMED + instructions | — | memory_query_session |
+| 9 | active | review | dev delivers | REVIEW_NEEDED | qa | implementation, brain_contribution |
+| 10 | review+qa | review+pdsa | qa delivers review | REVIEW_NEEDED | pdsa | qa_review |
+| 11 | review+pdsa | review+liaison | pdsa delivers review | REVIEW_NEEDED | liaison | pdsa_review |
 | 12 | review+liaison | complete | human/liaison | — | — | abstract_ref, human_answer |
 
 ### Rework Paths
 
-| # | From State | To State | Actor | Event Sent | Target Role | Required DNA |
-|---|-----------|----------|-------|------------|-------------|-------------|
-| R1 | approval | rework | human/liaison | REWORK_NEEDED | pdsa | rework_reason |
-| R2 | review+qa | rework | qa | REWORK_NEEDED | dev | rework_reason |
-| R3 | review+pdsa | rework | pdsa | REWORK_NEEDED | dev/pdsa | rework_target_role |
-| R4 | review+liaison | rework | human/liaison | REWORK_NEEDED | dev/pdsa/qa | rework_target_role |
-| R5 | complete | rework | human | REWORK_NEEDED | dev/pdsa/qa | rework_target_role |
-| R6 | rework | active | assigned role | — | — | memory_query_session |
+| # | From | To | Actor | A2A Announcement | Required DNA |
+|---|------|-----|-------|-----------------|-------------|
+| R1 | approval | rework | human/liaison | REWORK_NEEDED → pdsa | rework_reason |
+| R2 | review+qa | rework | qa | REWORK_NEEDED → dev | rework_reason |
+| R3 | review+pdsa | rework | pdsa | REWORK_NEEDED → target | rework_target_role |
+| R4 | review+liaison | rework | human/liaison | REWORK_NEEDED → target | rework_target_role |
+| R5 | complete | rework | human | REWORK_NEEDED → target | rework_target_role |
+| R6 | rework | active | target role claims | CLAIM_CONFIRMED | memory_query_session |
 
 ### Blocked/Unblocked
 
-| # | From State | To State | Actor | Event Sent | Required DNA |
-|---|-----------|----------|-------|------------|-------------|
-| B1 | any | blocked | any agent | TASK_BLOCKED → liaison | blocked_reason |
-| B2 | blocked | (restore) | liaison/system | TASK_ASSIGNED | — |
-
-### Liaison Content Path (simplified)
-
-| # | From State | To State | Actor | Event Sent |
-|---|-----------|----------|-------|------------|
-| L1 | pending | ready | liaison | — |
-| L2 | ready | active | liaison | — |
-| L3 | active | review | liaison | — |
-| L4 | review | complete | human/liaison | — |
+| # | From | To | Actor | A2A Announcement | Required DNA |
+|---|------|-----|-------|-----------------|-------------|
+| B1 | any | blocked | any agent | TASK_BLOCKED → liaison | blocked_reason, from_state, from_role |
+| B2 | blocked | restore | liaison/system | TASK_AVAILABLE (original role) | — |
 
 ---
 
 ## Part 3: Quality Gates (Hard Gates)
 
-These are enforced by the A2A server on EVERY transition. No agent can bypass them.
+Enforced by the A2A server on EVERY delivery. No agent can bypass.
 
-| Gate | Transition | Required DNA | Validation |
-|------|-----------|-------------|------------|
-| **Dependency** | pending→ready | depends_on_reviewed=true | All depends_on tasks complete |
-| **Brain query** | ready→active | memory_query_session | Agent queried brain before claiming |
-| **PDSA ref** | active→approval | pdsa_ref | Must be GitHub URL |
-| **Brain contribute** | active→review/approval | memory_contribution_id | Agent contributed learnings |
-| **Human decision** | approval→approved/rework | human_answer | Thomas's decision text |
-| **Abstract** | review→complete | abstract_ref | Must be GitHub URL |
-| **Role consistency** | →complete/approval/approved/testing | fixed role | Engine rejects wrong role |
-| **Rework target** | review→rework, complete→rework | rework_target_role | Must specify who fixes |
-| **Blocked reason** | any→blocked | blocked_reason | Must explain why |
+| Gate | When | What Server Checks | Rejects With |
+|------|------|-------------------|--------------|
+| **Dependency** | pending→ready | All depends_on tasks complete | "Dependencies not met" |
+| **Brain query** | claim | memory_query_session present | "Must query brain before claiming" |
+| **PDSA ref** | active→approval | pdsa_ref is GitHub URL | "Missing PDSA document" |
+| **Brain contribute** | any active→transition | memory_contribution_id present | "Must contribute learnings" |
+| **Human decision** | approval→approved | human_answer present | "Requires human approval" |
+| **Abstract** | review→complete | abstract_ref is GitHub URL | "Missing completion abstract" |
+| **Role consistency** | →complete/approval/approved/testing | Correct role assigned | "Wrong role for this state" |
+| **Rework target** | →rework | rework_target_role set | "Must specify who fixes" |
+| **Blocked reason** | →blocked | blocked_reason present | "Must explain why blocked" |
 
 ---
 
-## Part 4: Event-to-Instruction Mapping
+## Part 4: Instruction Templates (Server Configuration)
 
-The A2A server sends events. Each event must contain the INSTRUCTIONS for the receiving agent. This is the **iterable process configuration** — change the instruction template, all agents get new instructions.
+The A2A server sends instructions AFTER confirming a claim. These templates are **iterable** — change the template, all agents get new instructions. No agent changes needed.
 
-### TASK_ASSIGNED instruction
+### Per-Role Instruction Templates
 
-```
-When A2A server sends TASK_ASSIGNED to a PDSA agent:
-
+**PDSA claims a task:**
+```json
 {
-  event: "task_assigned",
-  task_slug: "theia-docker-compose",
-  title: "Add Theia to docker-compose",
-  role: "pdsa",
-  dna: { full task DNA object },
-  available_transitions: ["active", "blocked"],
-  instruction: {
-    steps: [
-      "1. Read the task DNA above",
-      "2. Query brain for context: task title + related knowledge",
-      "3. Produce a PDSA design document",
-      "4. Write findings to DNA field: findings",
-      "5. Write design to DNA field: proposed_design",
-      "6. Set pdsa_ref to the GitHub URL of your design doc",
-      "7. Contribute learnings to brain",
-      "8. Transition to: approval"
-    ],
-    required_output: {
+  "role": "pdsa",
+  "instructions": {
+    "read": ["title", "description", "acceptance_criteria", "context"],
+    "do": "Research the problem. Design a solution following PDSA methodology.",
+    "produce": {
       "findings": "Your research findings",
-      "proposed_design": "Your design proposal",
-      "pdsa_ref": "GitHub URL"
+      "proposed_design": "Your design proposal with rationale",
+      "pdsa_ref": "Push design doc to git, provide GitHub URL"
     },
-    transition_to: "approval",
-    gate_requirements: ["pdsa_ref must be GitHub URL", "memory_contribution_id must be set"]
+    "brain": "Query brain for context before working. Contribute learnings after.",
+    "transition_to": "approval",
+    "gates": ["pdsa_ref must be GitHub URL", "brain contribution required"]
   }
 }
 ```
 
-### Per-Role Instructions
+**DEV claims a task:**
+```json
+{
+  "role": "dev",
+  "instructions": {
+    "read": ["title", "description", "proposed_design", "acceptance_criteria", "qa_tests"],
+    "do": "Implement the design. Follow the proposed approach. Make tests pass.",
+    "produce": {
+      "implementation": "Summary of what you built + commit hash",
+      "test_pass_count": "Number of tests passing",
+      "test_total_count": "Total number of tests"
+    },
+    "brain": "Query brain for implementation patterns. Contribute learnings after.",
+    "transition_to": "review",
+    "gates": ["implementation must be set", "brain contribution required"]
+  }
+}
+```
 
-| Event | Role | Instruction Summary | Expected Output DNA | Transition To |
-|-------|------|--------------------|--------------------|---------------|
-| TASK_ASSIGNED | pdsa | Research + design | findings, proposed_design, pdsa_ref | approval |
-| TASK_ASSIGNED | dev | Implement design | implementation, commit | review |
-| TASK_ASSIGNED | qa | Write tests | qa_tests, test_pass_count | ready (for dev) |
-| REVIEW_NEEDED | qa | Review implementation | qa_review | review (→pdsa) |
-| REVIEW_NEEDED | pdsa | Verify design match | pdsa_review | review (→liaison) |
-| REVIEW_NEEDED | liaison | Present to Thomas | liaison_review, human_answer | complete |
-| APPROVAL_NEEDED | liaison | Present design to Thomas | human_answer | approved or rework |
-| REWORK_NEEDED | any | Fix the issue | rework_context | review or approval |
+**QA claims a review:**
+```json
+{
+  "role": "qa",
+  "instructions": {
+    "read": ["title", "proposed_design", "implementation", "qa_tests"],
+    "do": "Review implementation against design. Run tests. Verify acceptance criteria.",
+    "produce": {
+      "qa_review": "Your review verdict and reasoning"
+    },
+    "transition_to": "review (→pdsa)",
+    "or_rework": "If implementation doesn't match design → rework with rework_reason"
+  }
+}
+```
 
-### Why this is iterable
+### Why This Is Iterable
 
-The instruction templates are in the A2A server, NOT in the agents. When the process changes:
-- Add a new required DNA field → update the instruction template + add a quality gate
-- Change the review chain → update the event routing config
-- Add a new role → add instruction template + update EXPECTED_ROLES_BY_STATE
-
-No agent code changes. No agent restarts. The server sends different instructions.
+| Change | What to update | Agent impact |
+|--------|---------------|-------------|
+| Add DNA field | Instruction template + quality gate | None — agents follow new instructions |
+| Change review chain | Event routing config | None — server routes differently |
+| Add new role | Instruction template + role map | Add new agent type, no existing changes |
+| Tighten gate | Quality gate config | Agents get rejection + reason, adapt |
 
 ---
 
-## Part 5: What Already Works
+## Part 5: A2A Message Types
 
-| Component | Status | Where |
-|-----------|--------|-------|
-| A2A server with SSE routing | Working | api/routes/a2a-*.ts |
-| Workflow gates (7 types) | Working | QUALITY_GATES in a2a-message.ts |
-| Role consistency enforcement | Working | EXPECTED_ROLES_BY_STATE |
-| Event types (5: assigned, review, approval, rework, blocked) | Working | event-types.ts |
-| Claude Code in tmux via +1 Dev | Working | api/routes/team.ts |
-| xterm.js terminal in browser | Working | kanban.html + terminal-ws.ts |
-| Per-agent unblock | Working | unblock tmux session |
-| SSE push to role | Working | sendToRole() in sse-manager.ts |
-| Cascade engine (unblock dependents) | Working | cascade-engine.ts |
-| Brain contribution gate | Working | a2a-message.ts brain gate |
+### Agent → Server
 
-### What needs to be built
+| Message | When | Payload |
+|---------|------|---------|
+| `REGISTER` | Agent connects | role, capabilities |
+| `CLAIM` | Agent wants a task | task_slug |
+| `DELIVER` | Agent completed work | task_slug, DNA fields, transition_to |
+| `HEARTBEAT` | Every 25s | status (idle/busy) |
+| `BLOCK` | Agent can't proceed | task_slug, blocked_reason |
 
-| Component | What | Why |
-|-----------|------|-----|
-| **Instruction templates** | Per-role instruction JSON in server config | So A2A server sends structured work, not flat text |
-| **tmux instruction delivery** | A2A server types structured instructions into Claude terminal | Bridge between SSE event and Claude Code |
-| **Result capture** | Claude sends TRANSITION + DNA via curl back to A2A | Agent reports completion via A2A protocol |
-| **Instruction config file** | JSON/YAML file defining per-role instructions | Iterable without code changes |
+### Server → Agent
+
+| Message | When | Payload |
+|---------|------|---------|
+| `WELCOME` | After register | agent_id, room info |
+| `TASK_AVAILABLE` | Task needs a role | task_slug, title, role, DNA summary |
+| `CLAIM_CONFIRMED` | After validated claim | full DNA, structured instructions, gate requirements |
+| `CLAIM_REJECTED` | Gate failed or already claimed | reason |
+| `DELIVERY_ACCEPTED` | Gates passed | ACK, next event info |
+| `DELIVERY_REJECTED` | Gate failed | which gate, what's missing |
+| `REWORK_NEEDED` | Task returned for fixes | task_slug, rework_reason, instructions |
 
 ---
 
-## Part 6: Test Cases (from WORKFLOW.md)
+## Part 6: What Already Works
 
-Each transition from Part 2 is a test case. The test verifies: event sent → agent receives → agent works → agent transitions → gate validates → next event fires.
+| Component | Status |
+|-----------|--------|
+| A2A server with SSE routing | Working |
+| Workflow gates (9 types) | Working |
+| Role consistency enforcement | Working |
+| Event types + sendToRole | Working |
+| Claude Code in tmux (+1 Dev) | Working |
+| xterm.js terminal in browser | Working |
+| Per-agent unblock | Working |
+| Cascade engine | Working |
+| Brain contribution gate | Working |
 
-### TC-1: PDSA Happy Path (12 steps)
+### What Needs to Be Built
+
+| Component | What |
+|-----------|------|
+| **Instruction templates** | JSON config per role, loaded by A2A server |
+| **TASK_AVAILABLE announcement** | Server heartbeat/cron finds tasks, announces to room |
+| **CLAIM handling** | Agent sends CLAIM, server validates + sends instructions |
+| **DELIVER handling** | Agent sends results, server writes DNA + validates gates |
+| **Message delivery to Claude** | tmux send-keys with structured work order |
+| **Result capture from Claude** | Agent sends A2A message (how?) |
+
+### Open Question: How Does Claude Send A2A Messages?
+
+The agent (Claude Code in tmux) needs to send CLAIM, DELIVER, HEARTBEAT messages back to the A2A server. Options:
+
+1. **Bash curl** — Claude runs curl commands. Works but not protocol-native.
+2. **MCP tool** — MCP wraps A2A calls. But MCP makes agents dependent on discovery order.
+3. **A2A as chat** — The messages TO Claude are typed into the terminal. Claude's RESPONSES are captured and parsed by the server. The conversation IS the protocol.
+4. **Hybrid** — Claude has a simple helper script (`a2a send "CLAIM" "task-xyz"`) that wraps the curl. Protocol-aware but simple.
+
+---
+
+## Part 7: Test Cases
+
+### TC-1: PDSA Happy Path
 
 ```
-Precondition: No agents running. Task in pending+pdsa.
+Precondition: No agents. Task pending+pdsa.
 
-1. Spawn PDSA agent (+1 PDSA)
-2. LIAISON transitions task: pending → ready
-3. VERIFY: PDSA receives TASK_ASSIGNED with full DNA
-4. PDSA claims: ready → active (gate: memory_query_session)
-5. PDSA works: reads DNA, produces design
-6. PDSA transitions: active → approval (gate: pdsa_ref + brain_contribution)
-7. VERIFY: LIAISON receives APPROVAL_NEEDED
-8. LIAISON approves: approval → approved (gate: human_answer)
-9. Spawn QA agent (+1 QA)
-10. VERIFY: QA receives TASK_ASSIGNED
-11. QA writes tests, transitions: testing → ready+dev
-12. Spawn DEV agent (+1 DEV)
-13. VERIFY: DEV receives TASK_ASSIGNED
-14. DEV implements, transitions: active → review
-15. VERIFY: QA receives REVIEW_NEEDED
-16. QA reviews → review+pdsa
-17. PDSA reviews → review+liaison
-18. LIAISON completes → complete (gate: abstract_ref + human_answer)
-19. VERIFY: Cascade engine unblocks dependents
-20. VERIFY: All DNA fields filled, all gates passed
+1. Spawn PDSA (+1 PDSA)
+2. Server announces: TASK_AVAILABLE for pdsa
+3. PDSA agent claims via A2A message
+4. Server validates → CLAIM_CONFIRMED with DNA + instructions
+5. PDSA works (reads instructions, produces design)
+6. PDSA delivers via A2A message (findings, pdsa_ref)
+7. Server validates gates → DELIVERY_ACCEPTED
+8. Server announces: APPROVAL_NEEDED for liaison
+9. VERIFY: Task is now approval+liaison in DB
 ```
 
-### TC-2: Rework Path
+### TC-2: Rework
 
 ```
 Precondition: Task at review+liaison.
 
-1. LIAISON rejects: review → rework (rework_target_role: dev)
-2. VERIFY: DEV receives REWORK_NEEDED
-3. DEV claims rework: rework → active
-4. DEV fixes, transitions: active → review
-5. Review chain resumes: qa → pdsa → liaison → complete
+1. LIAISON rejects → REWORK_NEEDED (target: dev)
+2. DEV agent receives rework announcement
+3. DEV claims rework
+4. Server sends: CLAIM_CONFIRMED with rework instructions + reason
+5. DEV fixes → delivers
+6. Server validates → review chain resumes
 ```
 
-### TC-3: Blocked/Unblocked
+### TC-3: Claim Conflict
 
 ```
-Precondition: Task at active+dev, brain goes down.
+Precondition: Two PDSA agents connected. One task announced.
 
-1. DEV blocks: active → blocked (blocked_reason: "Brain unavailable")
-2. VERIFY: LIAISON receives TASK_BLOCKED
-3. Thomas fixes brain
-4. LIAISON restores: blocked → active+dev (from_state + from_role restored)
-5. DEV resumes work
+1. Server announces: TASK_AVAILABLE for pdsa
+2. Agent-A claims
+3. Agent-B claims (slightly later)
+4. Server validates A's claim first → CONFIRMED
+5. Server rejects B's claim → CLAIM_REJECTED "already claimed"
+6. Agent-B stays idle, waits for next announcement
 ```
 
-### TC-4: Multiple Agents Same Role
+### TC-4: Gate Rejection
 
 ```
-Precondition: Two DEV agents connected.
+Precondition: PDSA agent working on task.
 
-1. Task transitions to ready+dev
-2. VERIFY: Both DEV agents receive TASK_ASSIGNED
-3. One claims first (ready → active)
-4. VERIFY: Second agent does NOT also claim
-5. First DEV works and transitions
+1. PDSA delivers WITHOUT pdsa_ref
+2. Server validates → gate fails
+3. Server → DELIVERY_REJECTED "pdsa_ref must be GitHub URL"
+4. PDSA reads rejection, adds pdsa_ref, delivers again
+5. Server validates → DELIVERY_ACCEPTED
 ```
 
 ---
 
-## Part 7: Decision Trail
+## Part 8: Decision Trail
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D1 | No Anthropic API | Max plan only. Claude Code CLI is the only inference path. |
-| D2 | A2A server is LLM-less | Deterministic routing, fast, auditable. Process in server, work in agent. |
-| D3 | Instructions in server config | Iterable. Change the template → all agents get new instructions. No agent restart. |
-| D4 | Claude Code in tmux | Interactive terminal. User can see and interact. Max plan OAuth auth. |
-| D5 | tmux send-keys for delivery | Proven working. Types instructions into Claude's prompt. |
-| D6 | curl for result reporting | Agent sends TRANSITION + DNA back to A2A. Standard HTTP. |
-| D7 | Workflow rules as twin (future) | Change the twin → change the workflow. No code deploy. Planned but not yet. |
-| D8 | No monitor sidecar | Reintroduced polling. Claude should be the participant, not a black box. |
-| D9 | Events not chat | Agents publish what happened, subscribers react. Decoupled. |
+| D1 | Hybrid: announce + self-select + validate | Scales horizontally. No dispatcher bottleneck. Server validates, agents self-organize. |
+| D2 | Agent has NO database access | Contractor model. Work order in, deliverable out. All via A2A messages. |
+| D3 | Server writes DNA on behalf of agents | Single source of truth. Server validates before writing. |
+| D4 | Instruction templates in server config | Iterable. Change template → all agents follow new rules. No agent restart. |
+| D5 | No Anthropic API key | Max plan only. Claude Code CLI is the only inference path. |
+| D6 | No monitor sidecar | Reintroduced polling. Agents participate in A2A directly. |
+| D7 | Events not chat for coordination | Announce to room, subscribers self-organize. Like package scanning. |
+| D8 | interface-cli for humans, A2A for agents | Different access patterns. Humans query DB directly. Agents use protocol. |
+| D9 | Workflow rules as twin (future) | Change the twin → change the workflow. No code deploy. Not yet implemented. |
