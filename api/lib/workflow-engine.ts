@@ -245,6 +245,12 @@ export function buildInstructionText(
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
+  // Build the delivery command with all produce fields as flags
+  const deliverFlags = Object.keys(instr.produce)
+    .map((k) => `--${k.replace(/_/g, '-')} "YOUR_${k.toUpperCase()}"`)
+    .join(' ');
+  const deliverCmd = `node /app/scripts/a2a-deliver.js --slug ${task.slug} --transition ${instr.transition_to} --role ${role} ${deliverFlags}`;
+
   return [
     `[TASK] ${task.slug} — ${task.title}`,
     `Role: ${role} | Transition to: ${instr.transition_to}`,
@@ -254,8 +260,10 @@ export function buildInstructionText(
     readFields ? `Context:\n${readFields}` : '',
     ``,
     `Produce:\n${produceList}`,
+    ``,
+    `When done, deliver results by running:`,
+    deliverCmd,
     instr.or_rework ? `\nOr rework: ${instr.or_rework}` : '',
-    instr.gates_to_pass.length > 0 ? `\nGates: ${instr.gates_to_pass.join(', ')}` : '',
   ]
     .filter(Boolean)
     .join('\n');

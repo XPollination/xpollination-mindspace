@@ -7,6 +7,7 @@ import { getDb } from '../db/connection.js';
 import { sendToRole, getConnectedAgents } from './sse-manager.js';
 import { logger } from './logger.js';
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { buildInstructionText, getInstructions, validateTransition } from './workflow-engine.js';
 import { grantLease } from './lease-manager.js';
 
@@ -88,7 +89,12 @@ function announceReadyTasks(): void {
             .run('active', agent.id, now, JSON.stringify(claimDna), now, task.id);
           try { grantLease(db, task.id, agent.user_id || agent.id); } catch { /* */ }
 
-          // Build and deliver instructions to tmux
+          // Write active task file for Stop hook (Option 1)
+          try {
+            writeFileSync(`/tmp/a2a-active-task-${role}.json`, JSON.stringify({ slug: task.slug, title: task.title, role }));
+          } catch { /* */ }
+
+          // Build and deliver instructions to tmux (includes delivery command — Option 3)
           const instructions = buildInstructionText(role, task, dna);
           try {
             execFileSync('tmux', ['send-keys', '-t', agent.session_id, instructions, 'Enter'], { timeout: 5000 });
