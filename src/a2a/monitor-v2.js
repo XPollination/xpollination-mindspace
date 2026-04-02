@@ -82,18 +82,44 @@ async function onTaskAssigned(data) {
   await queryBrain(`Context for task ${data.task_slug}: ${data.title}. What do I need to know?`);
 
   // Step 3: Inject task into Claude terminal session
-  const tmuxTarget = AGENT_NAME; // e.g., runner-dev-e41cbd6a
+  const tmuxTarget = AGENT_NAME;
   if (tmuxTarget) {
-    const taskPrompt = `[A2A EVENT] Task assigned: ${data.task_slug} — ${data.title}. Role: ${role}. Status: active. Work on this task now. When done, transition it by running: curl -X POST http://localhost:3101/a2a/message -H "Content-Type: application/json" -d '{"type":"TRANSITION","agent_id":"${data.agent_id || ''}","task_slug":"${data.task_slug}","to_status":"review"}'`;
+    const taskPrompt = `Work on task: ${data.task_slug}. Title: ${data.title}. You are ${role}. Do the work described, then say DONE when finished.`;
     try {
       execFileSync('tmux', ['send-keys', '-t', tmuxTarget, taskPrompt, 'Enter'], { timeout: 5000 });
       console.log(`[${ROLE_UPPER}] Injected task into ${tmuxTarget}`);
     } catch (err) {
       console.log(`[${ROLE_UPPER}] tmux inject failed: ${err.message}`);
     }
+
+    // Step 4: Watch for completion — poll Claude session for idle state
+    watchForCompletion(tmuxTarget, data.task_slug);
   } else {
     console.log(`[${ROLE_UPPER}] No tmux target — task ${data.task_slug} claimed but not injected.`);
   }
+}
+
+function watchForCompletion(tmuxTarget, taskSlug) {
+  let checks = 0;
+  const maxChecks = 120; // 10 min max (5s intervals)
+  const interval = setInterval(() => {
+    checks++;
+    if (checks > maxChecks) {
+      console.log(`[${ROLE_UPPER}] Task ${taskSlug} watch timeout — giving up after ${maxChecks * 5}s`);
+      clearInterval(interval);
+      return;
+    }
+    try {
+      const output = execFileSync('tmux', ['capture-pane', '-t', tmuxTarget, '-p', '-S', '-5'], { timeout: 3000 }).toString();
+      const bottom = output.trim().split('\n').slice(-3).join(' ');
+      // Claude is idle when prompt shows "❯" without "thinking", "Beaming", etc.
+      if (bottom.includes('? for shortcuts') || (bottom.includes('❯') && !bottom.includes('thinking') && !bottom.includes('Beaming') && !bottom.includes('Jitterbugging') && !bottom.includes('Cogitat') && !bottom.includes('interrupt'))) {
+        console.log(`[${ROLE_UPPER}] Task ${taskSlug} — Claude idle, submitting work`);
+        clearInterval(interval);
+        submitWork(taskSlug, `Completed by ${ROLE_UPPER} agent via A2A event`, 'review').catch(() => {});
+      }
+    } catch { /* tmux capture failed — session may be gone */ }
+  }, 5000);
 }
 
 async function submitWork(taskSlug, findings, toStatus = 'review') {
