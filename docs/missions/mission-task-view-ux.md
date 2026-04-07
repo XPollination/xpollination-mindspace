@@ -537,10 +537,118 @@ ux-workflow-rework-column (pdsa) │                                   └──
 | 5 | `ux-cancelled-to-done` | dev | medium | T3 | D5 | pending |
 | 6 | `ux-sandbox-verification` | qa | high | T4, T5 | — | pending |
 
-**Parallel tracks:**
-- PDSA: T1 + T2 can run in parallel (no dependency)
-- DEV: T3 waits on T1, then T4 + T5 can run in parallel
-- QA: T6 waits for all DEV work
+**Dependencies:**
+- T1 + T2: no dependencies — can start immediately (both PDSA)
+- T3: blocked by T1 — needs the schema before refactoring
+- T4 + T5: blocked by T3 — need config-driven board before changing config
+- T6: blocked by T4 + T5 — verifies the end result
+
+**Start state:** T1 and T2 active. T3–T6 pending until dependencies resolve.
+
+---
+
+<!-- @section: verification | v:1 -->
+## LIAISON Verification Protocol
+
+After each task completes, LIAISON verifies via Chrome CDP sandbox before transitioning forward.
+
+### T1: `ux-board-config-schema` (PDSA → LIAISON reviews)
+
+**What to verify:**
+1. File `board-config.yaml` exists in `api/config/` or `viz/config/`
+2. Schema has all required sections: `columns`, `statuses`, `roles`, `filters`
+3. Each column has: `id`, `label`, `statuses[]`, `color`
+4. Each status has: `color`, `terminal` (boolean)
+5. `filters` array defines: `value`, `label`, `showTerminal` or `showTerminalDays`
+6. Mindspace task board config is the first instance — all 7 columns, 11 statuses, 4 roles, 5 filter options
+7. No overlap with `workflow.yaml` — board-config owns rendering, workflow.yaml owns transitions
+
+**How to test:**
+```
+Read board-config.yaml → validate YAML parses → check all fields present → 
+compare statuses against workflow.yaml → verify column-status mapping covers all 11 statuses
+```
+
+### T2: `ux-workflow-rework-column` (PDSA → LIAISON reviews)
+
+**What to verify:**
+1. WORKFLOW.md Visualization Categories has 7 entries (was 6)
+2. REWORK is its own category with `[rework]`
+3. COMPLETE/DONE category includes `[complete, cancelled]`
+4. BLOCKED category has only `[blocked]`
+5. No status is missing from any category (all 11 covered)
+
+**How to test:**
+```
+Read WORKFLOW.md → find "Visualization Categories" table → 
+verify 7 rows → verify rework is separate → verify cancelled is with complete
+```
+
+### T3: `ux-kanban-config-driven` (DEV → QA reviews → LIAISON verifies)
+
+**What to verify:**
+1. `kanban.js` imports/fetches board-config at init
+2. No hardcoded status names remain in JS — grep for `'complete'`, `'cancelled'`, `'blocked'`, `'active'`, `'pending'`, `'ready'` as string literals
+3. `COLUMNS` array reads from config
+4. `STATUS_COLORS` and `ROLE_COLORS` read from config
+5. `filterTasks()` uses `config.terminalStatuses` instead of `['complete','cancelled']`
+6. Board still renders correctly on beta (sandbox screenshot)
+
+**How to test:**
+```
+1. grep -c "'complete'" kanban.js → must be 0
+2. grep -c "'cancelled'" kanban.js → must be 0
+3. grep -c "'blocked'" kanban.js → must be 0
+4. Sandbox: navigate to beta kanban → screenshot → verify 7 columns render
+5. Sandbox: click filter options → verify cards appear/disappear correctly
+```
+
+### T4: `ux-remove-filter-buttons` (DEV → QA reviews → LIAISON verifies)
+
+**What to verify:**
+1. No `.filter-btn` elements in kanban HTML
+2. No `data-filter` attributes in HTML
+3. No `filter-btn` event handlers in JS
+4. Dropdown `#completed-filter` is the only filter control
+5. Dropdown options match config: Active tasks, + Completed (1 day), etc.
+6. Visual: no contradictory states possible
+
+**How to test (sandbox):**
+```
+1. Screenshot beta kanban → verify no Active/All buttons visible
+2. Open dropdown → screenshot → verify 5 options with correct labels
+3. Select each option → verify board updates correctly
+4. Refresh page → verify filter state persists (sessionStorage)
+```
+
+### T5: `ux-cancelled-to-done` (DEV → QA reviews → LIAISON verifies)
+
+**What to verify:**
+1. In board-config.yaml: `done` column statuses include `cancelled`
+2. In board-config.yaml: `blocked` column statuses do NOT include `cancelled`
+3. Visual: cancelled tasks appear in DONE column, not BLOCKED
+
+**How to test (sandbox):**
+```
+1. Read board-config.yaml → verify column mappings
+2. Sandbox: set filter to "All tasks" → screenshot
+3. Verify: BLOCKED column shows 0 or only truly blocked tasks
+4. Verify: DONE column shows both complete and cancelled tasks
+5. Verify: cancelled tasks have distinct visual badge (different color from complete)
+```
+
+### T6: `ux-sandbox-verification` (QA runs all TC-UX tests)
+
+**What LIAISON verifies:** QA's test report covers all 6 TC-UX cases with screenshots as evidence.
+
+| Test Case | What LIAISON checks in the report |
+|-----------|----------------------------------|
+| TC-UX-1 | Screenshot shows dropdown only, no buttons |
+| TC-UX-2 | Screenshot shows 7 columns with correct labels |
+| TC-UX-3 | board-config.yaml exists and matches what sandbox shows |
+| TC-UX-4 | Screenshot with "All" filter: cancelled in DONE, not BLOCKED |
+| TC-UX-5 | Screenshots of each filter option: selection always indicated |
+| TC-UX-6 | Screenshot shows REWORK column between APPROVED and BLOCKED |
 
 ---
 
