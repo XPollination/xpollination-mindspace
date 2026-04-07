@@ -263,6 +263,14 @@ export class A2AClient {
       this._emit('object_update', JSON.parse(e.data));
     });
 
+    this._eventSource.addEventListener('agent_spawned', (e) => {
+      this._emit('agent_spawned', JSON.parse(e.data));
+    });
+
+    this._eventSource.addEventListener('agent_terminated', (e) => {
+      this._emit('agent_terminated', JSON.parse(e.data));
+    });
+
     this._eventSource.onerror = () => {
       this._connected = false;
       this._reconnectAttempts = (this._reconnectAttempts || 0) + 1;
