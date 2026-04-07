@@ -249,3 +249,4 @@ AND: Only tasks at ready or later are delivered
 | D4 | `set -g mouse on` in tmux.conf | Mousewheel should scroll, not send key events | Proposed |
 | D5 | Verify task status before SSE delivery | Pending tasks must not reach agents. Hard gate. | Proposed |
 | D6 | Twin configuration for workspace mount | Same container image, different mount path per hub. Robin's hub = different volume source. | Proposed |
+| D7 | Disable +Team when project is "All Projects" | An agent must be bound to a specific project workspace. "All Projects" has no workspace to mount. Currently team.ts hardcodes `xpollination-mindspace` as fallback (line 24) — this masks the problem. | Proposed |
