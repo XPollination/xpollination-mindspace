@@ -1,10 +1,10 @@
 # Task View UX — Filtering, State Visibility, and Agent Awareness
 
 **Ref:** MISSION-TASK-VIEW-UX
-**Version:** v1.1.0
+**Version:** v1.2.0
 **Date:** 2026-04-07
 **Authors:** Thomas Pichler + LIAISON Agent
-**Status:** Draft — deep analysis complete
+**Status:** Ready — research complete, 6 tasks created, awaiting execution
 
 <!-- @section: progression | v:1 -->
 ## Mission Progression
@@ -510,6 +510,37 @@ The filter fix (D1) and the cancelled-in-blocked fix (D5) should be implemented 
 - D6 (keep REWORK column): already in config — just keep it
 
 The code change becomes: **make kanban.js read from config instead of hardcoding**. Then all future column/filter/status changes are config-only.
+
+---
+
+<!-- @section: tasks | v:1 -->
+## Task Breakdown
+
+### Execution order (dependency chain)
+
+```
+ux-board-config-schema (pdsa)  ──┐
+                                 ├──> ux-kanban-config-driven (dev) ──┬──> ux-remove-filter-buttons (dev) ──┐
+ux-workflow-rework-column (pdsa) │                                   └──> ux-cancelled-to-done (dev) ──────┤
+                                 │                                                                         │
+                                 └─────────────────────────────────────────> ux-sandbox-verification (qa) <─┘
+```
+
+### Tasks
+
+| # | Slug | Role | Priority | Depends on | Decision | Status |
+|---|------|------|----------|------------|----------|--------|
+| 1 | `ux-board-config-schema` | pdsa | high | — | D7 | pending |
+| 2 | `ux-workflow-rework-column` | pdsa | medium | — | D6 | pending |
+| 3 | `ux-kanban-config-driven` | dev | high | T1 | D7 | pending |
+| 4 | `ux-remove-filter-buttons` | dev | high | T3 | D1 | pending |
+| 5 | `ux-cancelled-to-done` | dev | medium | T3 | D5 | pending |
+| 6 | `ux-sandbox-verification` | qa | high | T4, T5 | — | pending |
+
+**Parallel tracks:**
+- PDSA: T1 + T2 can run in parallel (no dependency)
+- DEV: T3 waits on T1, then T4 + T5 can run in parallel
+- QA: T6 waits for all DEV work
 
 ---
 
