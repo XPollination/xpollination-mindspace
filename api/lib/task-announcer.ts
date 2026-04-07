@@ -129,9 +129,15 @@ function announceReadyTasks(): void {
     }
 
     if (sent > 0) {
+      // SSE delivered — claim the task so it's not re-announced
+      try {
+        const now = new Date().toISOString();
+        const claimDna = { ...dna, memory_query_session: 'auto-sse' };
+        db.prepare('UPDATE tasks SET status = ?, dna_json = ?, updated_at = ? WHERE id = ? AND status = ?')
+          .run('active', JSON.stringify(claimDna), now, task.id, task.status);
+      } catch { /* */ }
       announced.add(announcedKey);
+      // Don't expire from cache — task was claimed
     }
-    // Clear from announced after 60s (re-announce if still unclaimed)
-    setTimeout(() => announced.delete(announcedKey), 60_000);
   }
 }
