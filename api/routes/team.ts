@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import { getDb } from '../db/connection.js';
 import { createSession, killSession, sessionExists, sendKeys } from '../lib/terminal-manager.js';
 import { execFile } from 'node:child_process';
+import { broadcast } from '../lib/sse-manager.js';
 
 const router = Router();
 const ROLES = ['liaison', 'pdsa', 'qa', 'dev'];
@@ -32,8 +33,14 @@ function spawnAgent(role: string, userId: string, project: string): { id: string
     // Session may already exist — reuse it
   }
 
-  // monitor-v2.js sidecar DEPRECATED — agents receive work via task announcer
-  // The A2A server announces tasks, agents claim via CLAIM_TASK message
+  // SSE bridge: connects to A2A SSE stream, delivers events to Claude terminal
+  const bridgeSession = `bridge-${sessionName}`;
+  const apiKey = process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '';
+  const apiPort = process.env.API_PORT || '3101';
+  const bridgeCmd = `node /app/src/a2a/sse-bridge.js --role ${role} --session ${sessionName} --api-key ${apiKey} --api-url http://localhost:${apiPort} --project ${projectSlug}`;
+  try {
+    createSession(bridgeSession, bridgeCmd);
+  } catch { /* may exist */ }
 
   // Start per-agent unblock monitor (auto-confirms permission prompts)
   const unblockSession = `unblock-${sessionName}`;
@@ -85,6 +92,7 @@ router.post('/:project/agent', (req: Request, res: Response) => {
 
   const userId = (req as any).user?.id || 'system';
   const { id, session } = spawnAgent(role, userId, req.params.project);
+  broadcast('agent_spawned', { id, role, session, timestamp: new Date().toISOString() });
   res.json({ id, role, status: 'ready', name: `${role}-runner`, session });
 });
 
@@ -101,13 +109,15 @@ router.post('/:project/full', (req: Request, res: Response) => {
 // DELETE /api/team/:project/agent/:id — terminate agent (kill tmux)
 router.delete('/:project/agent/:id', (req: Request, res: Response) => {
   const db = getDb();
-  const agent = db.prepare('SELECT session_id FROM agents WHERE id = ?').get(req.params.id) as any;
+  const agent = db.prepare('SELECT session_id, current_role FROM agents WHERE id = ?').get(req.params.id) as any;
   if (agent?.session_id) {
     try { killSession(agent.session_id); } catch { /* already dead */ }
+    try { killSession(`bridge-${agent.session_id}`); } catch { /* */ }
     try { killSession(`unblock-${agent.session_id}`); } catch { /* */ }
   }
   db.prepare(`UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now') WHERE id = ?`)
     .run(req.params.id);
+  broadcast('agent_terminated', { id: req.params.id, role: agent?.current_role, timestamp: new Date().toISOString() });
   res.json({ id: req.params.id, status: 'stopped' });
 });
 

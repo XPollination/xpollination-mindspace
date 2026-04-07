@@ -38,19 +38,30 @@ export function stopTaskAnnouncer(): void {
 
 function announceReadyTasks(): void {
   const db = getDb();
-  const connected = getConnectedAgents();
-  if (connected.length === 0) return;
 
-  // Find ready tasks without active leases
-  const readyTasks = db.prepare(`
-    SELECT t.id, t.slug, t.title, t.current_role, t.project_slug, t.dna_json
+  // Sweep expired leases — dead agents' tasks become reclaimable
+  try {
+    const expired = db.prepare("SELECT task_id FROM leases WHERE status = 'active' AND expires_at < datetime('now')").all() as any[];
+    for (const lease of expired) {
+      db.prepare("UPDATE leases SET status = 'expired' WHERE task_id = ? AND status = 'active'").run(lease.task_id);
+      db.prepare("UPDATE tasks SET status = 'ready', claimed_by = NULL WHERE id = ? AND status = 'active'").run(lease.task_id);
+    }
+    if (expired.length > 0) logger.info({ count: expired.length }, 'Expired leases swept');
+  } catch { /* leases table may not exist */ }
+
+  // Find tasks that need agent action — all actionable states
+  const actionableTasks = db.prepare(`
+    SELECT t.id, t.slug, t.title, t.current_role, t.project_slug, t.dna_json, t.status
     FROM tasks t
-    WHERE t.status = 'ready'
+    WHERE t.status IN ('ready', 'approval', 'review', 'rework', 'approved')
     AND NOT EXISTS (
       SELECT 1 FROM leases l WHERE l.task_id = t.id AND l.status = 'active'
     )
     ORDER BY t.updated_at ASC
+    LIMIT 10
   `).all() as any[];
+
+  const readyTasks = actionableTasks;
 
   for (const task of readyTasks) {
     const announcedKey = `${task.slug}:${task.current_role}`;
@@ -62,11 +73,21 @@ function announceReadyTasks(): void {
     let dna: any = {};
     try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* */ }
 
-    // Try SSE first
-    const sent = sendToRole(role, 'task_available', {
+    // Map status to event type
+    const eventMap: Record<string, string> = {
+      ready: 'task_available',
+      approval: 'approval_needed',
+      review: 'review_needed',
+      rework: 'rework_needed',
+      approved: 'task_available',
+    };
+    const eventType = eventMap[task.status] || 'task_available';
+
+    // Send via SSE to agents with matching role
+    const sent = sendToRole(role, eventType, {
       task_slug: task.slug, task_id: task.id, title: task.title, role,
-      project_slug: task.project_slug,
-      dna_summary: { title: dna.title || task.title, description: dna.description?.substring(0, 200) },
+      project_slug: task.project_slug, status: task.status,
+      dna, rework_reason: dna.rework_reason,
       timestamp: new Date().toISOString(),
     }, task.project_slug);
 

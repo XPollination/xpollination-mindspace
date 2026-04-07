@@ -457,6 +457,10 @@ async function init() {
       } catch { /* silent */ }
     });
 
+    // Team change events — real-time update when agents spawn/terminate
+    client.on('agent_spawned', () => loadTeam());
+    client.on('agent_terminated', () => loadTeam());
+
     // Deep link: /kanban?task=slug
     const params = new URLSearchParams(window.location.search);
     const taskParam = params.get('task');
