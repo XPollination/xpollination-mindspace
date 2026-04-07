@@ -183,13 +183,79 @@ BASELINE: FAIL (agent just dies silently with 401)
 
 ---
 
-<!-- @section: decisions | v:1 | deps:[implementation,tests] -->
+### TC-LEASE: Dead agent lease recovery
+
+```
+GIVEN: Agent claims task (lease granted, TTL 30min)
+WHEN: Agent dies (tmux killed, auth expired, crash)
+THEN: After TTL, lease expires
+AND: Task requeued to ready
+AND: Another agent can claim it
+
+BASELINE: FAIL (no expiry sweep running, task stuck in active forever)
+```
+
+### TC-HEARTBEAT: Server detects dead agent
+
+```
+GIVEN: Agent connected, sending heartbeats every 25s
+WHEN: Agent stops sending heartbeats (crash/death)
+THEN: After 90s timeout, server marks agent idle/dead
+AND: Server announces agent status change via SSE
+AND: UI shows agent as disconnected
+
+BASELINE: FAIL (agents don't send heartbeats, server doesn't detect death)
+```
+
+---
+
+<!-- @section: config | v:1 | deps:[implementation] -->
+## Configuration (workflow.yaml)
+
+All operational decisions live in workflow.yaml — change the config, change the behavior. No code changes. Git diff shows what changed and when.
+
+```yaml
+# ─── Lease: prevents double-claiming ───
+# Decision: 30min TTL. Agent extends via heartbeat while working.
+# Changed from: no leases (twin conflict resolution only)
+# Changed because: two agents wasting work on same task is expensive
+lease:
+  ttl_minutes: 30
+  extend_on_heartbeat: true
+  expire_action: requeue_to_ready   # alternatives: block, notify_liaison
+  sweep_interval_seconds: 60
+
+# ─── Heartbeat: detect dead agents ───
+# Decision: 25s interval, 90s timeout. Mark idle on timeout.
+# Changed from: no heartbeat (agents assumed alive if tmux exists)
+# Changed because: auth expiry made agents silently dead (401 bug 2026-04-07)
+heartbeat:
+  interval_seconds: 25
+  timeout_seconds: 90
+  on_timeout: mark_idle             # alternatives: terminate, notify_liaison
+  sweep_interval_seconds: 30
+```
+
+**How to iterate:**
+- Change `ttl_minutes: 10` → faster recovery from dead agents
+- Change `expire_action: block` → don't auto-requeue, let liaison decide
+- Remove `lease:` section → no leases, pure conflict resolution
+- Change `on_timeout: terminate` → kill dead agent sessions
+- Every change: one YAML edit, git commit shows the decision change
+
+---
+
+<!-- @section: decisions | v:1 | deps:[config,tests] -->
 ## Decision Trail
 
-| # | Decision | Rationale |
-|---|----------|-----------|
-| D1 | SSE is THE delivery channel for both UI and agents | Same mechanism, same events. UI shows what agents receive. |
-| D2 | Lightweight SSE bridge, not monitor-v2.js | Bridge is event-driven (no polling). monitor-v2.js auto-claimed (wrong — server should coordinate). |
-| D3 | Team change events via broadcast | Same pattern as transition events. Kanban already handles SSE. |
-| D4 | Task announcer expands to all actionable states | Ready is not the only state that needs agent action. Approval, review, rework all need delivery. |
-| D5 | Baseline fails ARE the specification | TDD at architecture level. Don't fix reactively. Define what should pass, build until it does. |
+| # | Decision | Rationale | Config key | How to change |
+|---|----------|-----------|-----------|---------------|
+| D1 | SSE is THE delivery channel | Same mechanism for UI + agents. UI shows what agents receive. | — | Architectural, not config |
+| D2 | Lightweight SSE bridge, not monitor-v2.js | Event-driven (no polling). monitor-v2.js auto-claimed (wrong). | — | Architectural |
+| D3 | Team change events via broadcast | Same pattern as transition events. | — | Add/remove event types |
+| D4 | Announcer handles all actionable states | Ready is not the only state needing action. | workflow.yaml transitions | Add/remove states in announcer query |
+| D5 | Lease TTL 30 minutes | Max expected single-step work duration. | `lease.ttl_minutes` | Change number in YAML |
+| D6 | Requeue on lease expiry | Don't block — let another agent try. | `lease.expire_action` | Change to `block` or `notify_liaison` |
+| D7 | Heartbeat every 25s, timeout 90s | Detect death within ~2 minutes. | `heartbeat.interval_seconds`, `heartbeat.timeout_seconds` | Change numbers |
+| D8 | Mark idle on heartbeat timeout | Don't terminate — might be network glitch. | `heartbeat.on_timeout` | Change to `terminate` |
+| D9 | Baseline fails ARE the specification | TDD at architecture level. Build until tests pass. | — | Tests define done |

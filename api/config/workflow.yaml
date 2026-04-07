@@ -342,3 +342,13 @@ lease:
 cascade:
   on_complete: unblock_dependents
   auto_transition: pending_to_ready
+
+# ─── HEARTBEAT: detect dead agents ───
+# Decision: 25s interval, 90s timeout. Mark idle on timeout.
+# Changed from: no heartbeat (agents assumed alive if tmux exists)
+# Changed because: auth expiry made agents silently dead (401 bug 2026-04-07)
+heartbeat:
+  interval_seconds: 25
+  timeout_seconds: 90
+  on_timeout: mark_idle
+  sweep_interval_seconds: 30
