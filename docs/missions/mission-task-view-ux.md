@@ -337,7 +337,183 @@ AND: Column mapping matches updated WORKFLOW.md
 
 ---
 
-<!-- @section: decisions | v:2 -->
+<!-- @section: research-e | v:1 -->
+## Research Task E: Kanban + Workflow as Reusable Pattern
+
+### The opportunity
+
+While touching this code, Thomas asked: how can the kanban board and workflow be abstracted so it works for Mindspace tasks today, but also for any other use case — rename the columns, define different gates, different roles?
+
+### Current state: where the abstraction already exists
+
+**The workflow engine IS already abstract.** `api/lib/workflow-engine.ts` reads `api/config/workflow.yaml` and provides validation, routing, and instruction building. The comment on line 1 says it: *"The engine is GENERIC — all process logic comes from the config."*
+
+`workflow.yaml` defines:
+- **Transitions:** `from_status → to_status` with actors, gates, events
+- **Gates:** named validators with field + validation rule + error message
+- **Role routing:** fixed roles, review chain
+- **Instructions:** what each role does at each state
+
+Change the YAML → change the workflow. No code changes. This is already separation of concerns on the backend.
+
+### Current state: where the abstraction DOES NOT exist
+
+**The kanban UI has domain knowledge hardcoded everywhere.**
+
+| What | Where | Domain-specific? |
+|------|-------|-----------------|
+| Column definitions | `kanban.js:30-38` COLUMNS array | **Configurable** — but only at code level |
+| Status colors | `kanban.js:46-53` STATUS_COLORS | **Hardcoded** — every status name is written out |
+| Role colors | `kanban.js:55-58` ROLE_COLORS | **Hardcoded** — liaison, pdsa, dev, qa |
+| Terminal status check | `kanban.js:78,82,130,151` `['complete','cancelled']` | **Hardcoded** — repeated 4 times |
+| Filter logic | `kanban.js:73-101` filterTasks() | **Hardcoded** — assumes terminal = complete/cancelled |
+| Blocked reason display | `kanban.js:153-154` | **Hardcoded** — checks `status === 'blocked'` |
+| Active status check | `kanban.js:201` | **Hardcoded** — checks `status === 'active'` |
+| Card CSS classes | `kanban.js:156` | **Hardcoded** — `.completed`, `.cancelled` |
+
+The backend is a reusable engine. The frontend is a Mindspace-specific rendering.
+
+### Reflection: What needs to change
+
+The pattern has **three layers**:
+
+```
+┌─────────────────────────────────────────────┐
+│  Layer 3: Domain Configuration              │
+│  "Mindspace tasks use these columns,        │
+│   these statuses, these gates, these roles"  │
+│  ─ board-config.yaml (NEW)                  │
+│  ─ workflow.yaml (EXISTS)                   │
+├─────────────────────────────────────────────┤
+│  Layer 2: Generic Kanban Board (UI)         │
+│  "Render columns, cards, filters from       │
+│   configuration. Emit events."              │
+│  ─ kanban-board.js (REFACTOR from kanban.js)│
+├─────────────────────────────────────────────┤
+│  Layer 1: Generic Workflow Engine (API)     │
+│  "Validate transitions, enforce gates,      │
+│   route to roles from configuration."       │
+│  ─ workflow-engine.ts (EXISTS)              │
+│  ─ workflow.yaml (EXISTS)                   │
+└─────────────────────────────────────────────┘
+```
+
+**Layer 1 (engine) — already done.** Config-driven. Reusable.
+
+**Layer 2 (UI) — needs refactoring.** The kanban board should receive its configuration, not know it. What changes:
+
+| Current (hardcoded) | Abstracted (from config) |
+|---------------------|-------------------------|
+| `const COLUMNS = [...]` | Read from `board-config.yaml` or API endpoint |
+| `['complete','cancelled']` repeated 4x | `config.terminalStatuses` — defined once |
+| `STATUS_COLORS = {...}` | `config.statuses[name].color` |
+| `ROLE_COLORS = {...}` | `config.roles[name].color` |
+| `status === 'blocked'` | `config.statuses[name].isBlocked` or `config.blockedStatuses` |
+| `status === 'active'` | `config.statuses[name].isActive` or `config.activeStatuses` |
+| Filter options hardcoded in HTML | Generated from config |
+
+**Layer 3 (domain config) — new.** A configuration file that the board reads:
+
+```yaml
+# board-config.yaml — what the kanban board shows
+# One per use case. Mindspace tasks, content pipeline, hiring, etc.
+
+name: Mindspace Task Board
+description: PDSA-driven agent task workflow
+
+columns:
+  - id: queue
+    label: Queue
+    statuses: [pending, ready]
+    color: "#4CAF50"
+  - id: active
+    label: Active
+    statuses: [active, testing]
+    color: "#2196F3"
+  # ...
+
+statuses:
+  pending:  { color: "#9E9E9E", terminal: false }
+  ready:    { color: "#4CAF50", terminal: false }
+  active:   { color: "#2196F3", terminal: false }
+  complete: { color: "#4CAF50", terminal: true }
+  cancelled:{ color: "#F44336", terminal: true }
+  blocked:  { color: "#FF9800", terminal: false, showReason: true }
+  # ...
+
+roles:
+  liaison: { color: "#FF9800", label: "Liaison" }
+  pdsa:    { color: "#9C27B0", label: "PDSA" }
+  dev:     { color: "#4CAF50", label: "Dev" }
+  qa:      { color: "#2196F3", label: "QA" }
+
+filters:
+  - { value: "active", label: "Active tasks", showTerminal: false }
+  - { value: "1d",     label: "+ Completed (1 day)", showTerminalDays: 1 }
+  - { value: "7d",     label: "+ Completed (7 days)", showTerminalDays: 7 }
+  - { value: "30d",    label: "+ Completed (30 days)", showTerminalDays: 30 }
+  - { value: "all",    label: "All tasks", showTerminal: true }
+```
+
+### What a reuse looks like
+
+A different project (e.g., content pipeline) defines its own config:
+
+```yaml
+name: Content Pipeline
+columns:
+  - id: ideas
+    label: Ideas
+    statuses: [draft, proposed]
+  - id: writing
+    label: Writing
+    statuses: [writing, editing]
+  - id: review
+    label: Review
+    statuses: [fact_check, editorial]
+  - id: published
+    label: Published
+    statuses: [published]
+    
+statuses:
+  draft:      { color: "#9E9E9E", terminal: false }
+  proposed:   { color: "#FF9800", terminal: false }
+  writing:    { color: "#2196F3", terminal: false }
+  published:  { color: "#4CAF50", terminal: true }
+
+roles:
+  writer:  { color: "#2196F3", label: "Writer" }
+  editor:  { color: "#9C27B0", label: "Editor" }
+
+filters:
+  - { value: "active", label: "In progress" }
+  - { value: "all",    label: "All articles" }
+```
+
+Same kanban board component. Same workflow engine. Different configuration. Different columns, different gates, different roles.
+
+### The separation of concerns principle
+
+| Concern | Owns | Doesn't know about |
+|---------|------|---------------------|
+| **Board component** | Rendering columns, cards, filters, events | What statuses mean, what roles exist, what gates enforce |
+| **Workflow engine** | Transition validation, gate enforcement, role routing | How the UI renders, which columns exist |
+| **Domain config** | Status names, column mapping, role definitions, gate definitions | How rendering works, how validation is implemented |
+| **CSS/theme** | Colors, spacing, typography | Business logic, status meaning |
+
+### What this means for this mission
+
+The filter fix (D1) and the cancelled-in-blocked fix (D5) should be implemented as **configuration changes**, not code changes. If the board reads its config from a file:
+
+- D1 (remove Active/All buttons): `filters` section in config defines what controls exist
+- D5 (move cancelled to DONE): change `columns` config — move `cancelled` from blocked to done
+- D6 (keep REWORK column): already in config — just keep it
+
+The code change becomes: **make kanban.js read from config instead of hardcoding**. Then all future column/filter/status changes are config-only.
+
+---
+
+<!-- @section: decisions | v:3 -->
 ## Decisions
 
 | # | Decision | Rationale | Status |
@@ -348,3 +524,4 @@ AND: Column mapping matches updated WORKFLOW.md
 | D4 | Column mapping documented | WORKFLOW.md defines statuses. Kanban maps to columns. Both must agree. | Proposed |
 | D5 | Move `cancelled` from BLOCKED to DONE | Cancelled is terminal like complete. 571 cancelled tasks in BLOCKED column looks like 571 stuck tasks. Semantically wrong. | Proposed |
 | D6 | Keep REWORK column (diverge from WORKFLOW.md) | Dedicated REWORK column gives better visibility than mixing with QUEUE. Different urgency signal. Update WORKFLOW.md to match kanban. | Proposed |
+| D7 | Abstract kanban board as config-driven reusable pattern | Backend engine is already config-driven (workflow.yaml). Frontend is not. Introduce board-config.yaml so columns, statuses, roles, filters are configuration, not code. Same component, different config = different board for any use case. | Proposed |
