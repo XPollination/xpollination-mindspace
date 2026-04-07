@@ -1,10 +1,10 @@
 # Task View UX — Filtering, State Visibility, and Agent Awareness
 
 **Ref:** MISSION-TASK-VIEW-UX
-**Version:** v1.0.0
+**Version:** v1.1.0
 **Date:** 2026-04-07
 **Authors:** Thomas Pichler + LIAISON Agent
-**Status:** Draft — research phase
+**Status:** Draft — deep analysis complete
 
 <!-- @section: progression | v:1 -->
 ## Mission Progression
@@ -99,30 +99,68 @@ Agents read these markers. They know what the user sees without reading 600 line
 
 ---
 
-<!-- @section: research-b | v:1 -->
+<!-- @section: research-b | v:2 -->
 ## Research Task B: Filtering UX Flow
 
-### Current filtering controls (beta)
+### Current filtering controls (beta — verified 2026-04-07 via Chrome CDP)
 
 | Control | Type | Values | What it does |
 |---------|------|--------|-------------|
-| Project filter | Dropdown | All Projects, xpollination-mindspace, ... | Filters tasks by project |
-| Search | Text input | Free text | Filters by title match |
-| **Active button** | Toggle | Active (blue) / not active | When active: shows tasks NOT in complete/cancelled |
-| **All button** | Toggle | All / not active | When active: shows ALL tasks including completed |
-| **Completed filter** | Dropdown | Active only, +1 day, +7 days, +30 days, All | Controls how many completed tasks to show |
-| Liaison mode | Dropdown | Manual, Semi, Auto-Approval, Autonomous | Controls LIAISON approval behavior |
+| Project filter | Dropdown (`#project-filter`) | All Projects, Runner Architecture Verification, XPollination Mindspace, Xpollination Governance | Filters tasks by project |
+| Search | Text input (`#search`) | Free text | Filters by title/slug match |
+| **Active button** | Toggle (`.filter-btn`, `data-filter="active"`) | Blue when active | Sets `currentFilter = 'active'` |
+| **All button** | Toggle (`.filter-btn`, `data-filter="all"`) | Blue when active | Sets `currentFilter = 'all'` |
+| **Completed filter** | Dropdown (`#completed-filter`) | Active only, + Last 1 day, + Last 7 days, + Last 30 days, All | Also sets `currentFilter` to same variable |
+| Liaison mode | Dropdown (`#liaison-mode`) | Manual, Semi, Auto-Approval, Autonomous | Controls LIAISON approval behavior |
+| Team panel | Buttons | +Full Team, +Liaison, +PDSA, +Dev, +QA | Spawns agents |
+| Stats | Text | "0 active / 572 total" | Shows active vs total task counts |
 
-### The redundancy problem
+### Deep analysis: How buttons and dropdown interact (sandbox-verified)
 
-"Active" button + "Active only" in dropdown = same thing said twice.
-"All" button + "All" in dropdown = same thing said twice.
+Both controls modify the **same variable** (`currentFilter`). They do NOT sync with each other.
+
+**Button click handler** (kanban.js:336-343):
+```javascript
+btn.classList.add('active');
+currentFilter = btn.dataset.filter; // 'active' or 'all'
+// Does NOT update completedFilterEl.value
+```
+
+**Dropdown change handler** (kanban.js:350-355):
+```javascript
+currentFilter = completedFilterEl.value;
+document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+// Deactivates BOTH buttons — UI shows no button highlighted
+```
+
+### Verified filter states (sandbox test matrix, 7 combinations)
+
+| Action | Active btn | All btn | Dropdown | Visible cards | Problem |
+|--------|-----------|---------|----------|---------------|---------|
+| Initial (Active) | **on** | off | active | 0 (no active tasks) | — |
+| Click All | off | **on** | active | 572 (all tasks) | Dropdown still says "Active only" — misleading |
+| All + change to 1d | off | **off** | 1d | 0 | **Neither button highlighted.** User lost |
+| Click Active | **on** | off | 1d | 0 | Dropdown still shows "1d" — state mismatch |
+| Change to 7d | **off** | off | 7d | 0 | Clicking dropdown removes Active highlight |
+| Change to "All" (dropdown) | off | off | all | 572 | **All button NOT highlighted** even though showing all tasks |
+| Reset | off | off | active | 0 | Neither button active after reset |
+
+### The three UX bugs
+
+1. **Buttons and dropdown fight.** Changing dropdown deactivates buttons. Clicking button doesn't sync dropdown. User sees contradictory state.
+2. **Three unnamed states.** (a) Active highlighted, (b) All highlighted, (c) Neither highlighted + dropdown controls. State (c) has no visual indicator — user doesn't know which filter is in effect.
+3. **"+1 day" shows nothing because there are no active tasks.** The filter logic is: show non-terminal + terminal within N days. When 0 non-terminal exist and no tasks were completed recently, all options show 0. The feature is correct but useless without active tasks.
+
+### The redundancy problem (confirmed)
+
+"Active" button + "Active only" in dropdown = same `currentFilter = 'active'`.
+"All" button + "All" in dropdown = same `currentFilter = 'all'`.
 
 The "+1 day / +7 days / +30 days" options have NO equivalent in the Active/All buttons. These are the USEFUL options that the buttons can't express.
 
 ### Proposed simplification
 
-**Remove** the Active/All buttons. **Keep** the completed-tasks dropdown. Add clearer labels:
+**Remove** the Active/All buttons. **Keep** the completed-tasks dropdown as the single filter control. Add clearer labels:
 
 | Option | Shows |
 |--------|-------|
@@ -132,21 +170,79 @@ The "+1 day / +7 days / +30 days" options have NO equivalent in the Active/All b
 | + Completed (30 days) | Active + tasks completed in last month |
 | All tasks | Everything including old completed tasks |
 
-One control instead of two overlapping controls.
+One control instead of two overlapping controls. No state conflicts. No unnamed states.
 
-### Columns mapping to WORKFLOW.md
+---
 
-| Column | Statuses | From WORKFLOW.md |
-|--------|----------|-----------------|
+<!-- @section: research-d | v:1 -->
+## Research Task D: Column Process Flow Analysis
+
+### Columns: kanban.js vs WORKFLOW.md
+
+| Column | kanban.js statuses | WORKFLOW.md Viz Category | Delta |
+|--------|-------------------|--------------------------|-------|
+| QUEUE | pending, ready | QUEUE: pending, ready, **rework** | **Mismatch:** workflow puts rework in QUEUE |
+| ACTIVE | active, testing | ACTIVE: active, testing | Match |
+| REVIEW | review, approval | REVIEW: review, approval | Match |
+| APPROVED | approved | APPROVED: approved | Match |
+| REWORK | rework | *(not defined)* | **Kanban adds this column** |
+| BLOCKED | blocked, **cancelled** | BLOCKED: blocked, cancelled | Match (but semantically wrong) |
+| DONE | complete | COMPLETE: complete | Match (name differs) |
+
+### Analysis: Should REWORK have its own column?
+
+WORKFLOW.md says rework belongs in QUEUE. The kanban has a dedicated REWORK column.
+
+**Argument for REWORK column (kanban's current approach):**
+- Rework tasks have different urgency than new tasks — they represent returned work
+- Mixing "waiting to start" (QUEUE) with "needs fixes" (rework) hides urgency
+- A dedicated column gives immediate visibility to tasks that need attention
+- UX best practice: separate visual signal for "action needed" vs "waiting"
+
+**Argument against (WORKFLOW.md approach):**
+- Rework is just a re-entry to the flow — semantically it IS a queue
+- More columns = more horizontal scrolling
+- PDSA design path shows rework → active as a simple re-claim
+
+**Recommendation:** Keep the REWORK column. It provides better visibility. Update WORKFLOW.md to match.
+
+### Analysis: Should cancelled be in BLOCKED?
+
+Current: `cancelled` is mapped to BLOCKED column.
+WORKFLOW.md: Agrees — puts cancelled in BLOCKED category.
+
+**But this is semantically wrong:**
+- BLOCKED = paused, will resume → blocked tasks have `blocked_from_state` + `blocked_from_role`
+- CANCELLED = terminal, will not resume → cancelled is a final state like complete
+- A user seeing 571 "CANCELLED" cards in the BLOCKED column thinks 571 tasks are stuck. They're not stuck — they're done.
+
+**2026 UX best practice:** Terminal states (complete, cancelled) should be visually grouped. Non-terminal states should not mix with terminal ones.
+
+**Recommendation:** Move `cancelled` from BLOCKED to DONE. Both are terminal. The DONE column becomes "finished work" (complete + cancelled). The BLOCKED column becomes purely "paused work."
+
+Updated column mapping:
+
+| Column | Statuses | Description |
+|--------|----------|-------------|
 | QUEUE | pending, ready | Waiting to be claimed |
 | ACTIVE | active, testing | Work in progress |
 | REVIEW | review, approval | Being reviewed/approved |
 | APPROVED | approved | Human approved, awaiting next step |
 | REWORK | rework | Returned for fixes |
 | BLOCKED | blocked | Paused (external issue) |
-| DONE | complete, cancelled | Finished |
+| DONE | **complete, cancelled** | Finished (completed or cancelled) |
 
-WORKFLOW.md defines 11 statuses. The kanban maps them to 7 columns. This mapping MUST be documented so agents know where tasks appear.
+### Columns mapping (current vs proposed)
+
+| Column | Current (kanban.js:30-38) | Proposed | Change |
+|--------|--------------------------|----------|--------|
+| QUEUE | pending, ready | pending, ready | No change |
+| ACTIVE | active, testing | active, testing | No change |
+| REVIEW | review, approval | review, approval | No change |
+| APPROVED | approved | approved | No change |
+| REWORK | rework | rework | No change |
+| BLOCKED | blocked, **cancelled** | blocked | **Remove cancelled** |
+| DONE | complete | **complete, cancelled** | **Add cancelled** |
 
 ---
 
@@ -224,7 +320,25 @@ THEN: Agent reads ux-state.yaml instead of parsing 600 lines of JS
 AND: Agent's understanding matches reality (verified via Chrome CDP)
 ```
 
-### TC-UX-4: Prod/beta parity
+### TC-UX-4: Cancelled tasks in DONE, not BLOCKED
+```
+GIVEN: Kanban with completed and cancelled tasks
+WHEN: Filter shows all tasks
+THEN: Cancelled tasks appear in DONE column (not BLOCKED)
+AND: BLOCKED column only contains actively blocked tasks
+AND: Cancelled tasks are visually distinct from completed tasks (badge color)
+```
+
+### TC-UX-5: Filter state consistency
+```
+GIVEN: Kanban open with unified filter dropdown
+WHEN: User selects any filter option
+THEN: Current selection is always visually indicated
+AND: No contradictory states (e.g., button says Active, dropdown says All)
+AND: Filter state persists in sessionStorage
+```
+
+### TC-UX-6: Prod/beta parity
 ```
 GIVEN: Feature deployed to beta and verified
 WHEN: Feature deployed to prod
@@ -234,12 +348,14 @@ AND: No regression from beta features
 
 ---
 
-<!-- @section: decisions | v:1 -->
+<!-- @section: decisions | v:2 -->
 ## Decisions
 
-| # | Decision | Rationale |
-|---|----------|-----------|
-| D1 | Remove Active/All buttons | Redundant with completed-tasks dropdown. One control, not two. |
-| D2 | Structural comments in code | Agent reads markers, not 600 lines. Updated in same commit as code change. |
-| D3 | ux-state.yaml for agent awareness | Machine-readable. Verified via sandbox. Single source of truth for what user sees. |
-| D4 | Column mapping documented | WORKFLOW.md defines statuses. Kanban maps to columns. Both must agree. |
+| # | Decision | Rationale | Status |
+|---|----------|-----------|--------|
+| D1 | Remove Active/All buttons | Redundant with completed-tasks dropdown. Sandbox testing proved they fight: changing dropdown deactivates buttons, clicking buttons doesn't sync dropdown. Three unnamed states. | Proposed |
+| D2 | Structural comments in code | Agent reads markers, not 600 lines. Updated in same commit as code change. | Proposed |
+| D3 | ux-state.yaml for agent awareness | Machine-readable. Verified via sandbox. Single source of truth for what user sees. | Proposed |
+| D4 | Column mapping documented | WORKFLOW.md defines statuses. Kanban maps to columns. Both must agree. | Proposed |
+| D5 | Move `cancelled` from BLOCKED to DONE | Cancelled is terminal like complete. 571 cancelled tasks in BLOCKED column looks like 571 stuck tasks. Semantically wrong. | Proposed |
+| D6 | Keep REWORK column (diverge from WORKFLOW.md) | Dedicated REWORK column gives better visibility than mixing with QUEUE. Different urgency signal. Update WORKFLOW.md to match kanban. | Proposed |
