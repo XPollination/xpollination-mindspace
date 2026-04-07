@@ -152,6 +152,21 @@ WHERE t.status IN ('ready', 'approval', 'review', 'rework', 'approved')
 
 `pending` is already excluded. But agents received work for pending tasks anyway — through the SSE bridge delivering stale events. The bridge should verify task status before delivering.
 
+### Change 6: Agents must be blind to unclaimed tasks
+
+**Current state (verified 2026-04-07):**
+
+Agents see ALL task details at two points:
+1. **Task announcer** (task-announcer.ts:88-91): sends full `dna` object via SSE event — description, acceptance criteria, everything. The agent sees the task content before it's claimed.
+2. **OBJECT_QUERY** (a2a-message.ts:344-359): any agent can query ALL tasks with no role restriction. No filtering by claim status. Agent can read DNA of tasks assigned to other roles.
+3. **Auto-claim** (task-announcer.ts:105-111): the announcer claims ON BEHALF of the agent and delivers instructions in one step. The agent never explicitly says "I accept this task."
+
+**What should happen:**
+- Task announcement should be a **summary only**: slug, title, role, status. No DNA.
+- Agent explicitly claims: `TRANSITION slug ready→active` — only THEN receives full DNA.
+- OBJECT_QUERY should restrict: agents can only query tasks where `current_role = their role` AND `status IN (active, review, rework)` — tasks they're working on, not browsing.
+- The auto-claim in the announcer should be removed. Agents self-select and claim.
+
 ---
 
 <!-- @section: portable | v:1 -->
@@ -249,4 +264,5 @@ AND: Only tasks at ready or later are delivered
 | D4 | `set -g mouse on` in tmux.conf | Mousewheel should scroll, not send key events | Proposed |
 | D5 | Verify task status before SSE delivery | Pending tasks must not reach agents. Hard gate. | Proposed |
 | D6 | Twin configuration for workspace mount | Same container image, different mount path per hub. Robin's hub = different volume source. | Proposed |
-| D7 | Disable +Team when project is "All Projects" | An agent must be bound to a specific project workspace. "All Projects" has no workspace to mount. Currently team.ts hardcodes `xpollination-mindspace` as fallback (line 24) — this masks the problem. | Proposed |
+| D7 | Disable +Team when project is "All Projects" | An agent must be bound to a specific project workspace. "All Projects" has no workspace to mount. Currently team.ts hardcodes `xpollination-mindspace` as fallback (line 24) — this masks the problem. Buttons must be visually disabled (greyed out, cursor: not-allowed, no hover effect) with a tooltip "Select a project first". Immediate feedback — user sees why they can't click. | Proposed |
+| D8 | Agents blind to unclaimed task DNA | Announcements are summary-only (slug, title, role). Full DNA only after agent claims (ready→active). OBJECT_QUERY restricted to agent's own active tasks. Auto-claim in announcer removed — agents self-select. | Proposed |
