@@ -1,10 +1,10 @@
 # LIAISON Task Quality Gates — How to Create Tasks That Agents Can Execute
 
 **Ref:** MISSION-LIAISON-TASK-QUALITY
-**Version:** v1.0.0
+**Version:** v1.1.0
 **Date:** 2026-04-07
 **Authors:** Thomas Pichler + LIAISON Agent
-**Status:** Draft — first iteration from MISSION-TASK-VIEW-UX reflection
+**Status:** Draft — second iteration, PDSA-first gate + A2A enforcement TODO
 
 <!-- @section: problem | v:1 -->
 ## Problem Statement
@@ -119,6 +119,92 @@ For each task, LIAISON must define:
 
 **Hard question:** "When this task comes back as 'done', what exactly will I check?"
 
+### Gate 6: PDSA-First (Workflow Compliance)
+
+Every task MUST start with `role=pdsa`. The PDSA Design Path (WORKFLOW.md v19) is:
+
+```
+pending → ready(pdsa) → active(pdsa) → approval(human) → approved
+→ testing(qa) → ready(dev) → active(dev) → review chain → complete
+```
+
+DEV never receives a task directly. PDSA designs first. Human approves. QA writes tests. Then DEV implements.
+
+**What LIAISON got wrong:** Created 5 tasks with `role=dev` — T3 (refactor kanban.js), T4 (remove buttons), T5 (cancelled to DONE), T7 (structural comments), T8 (ux-state.yaml). These skip PDSA design and human approval entirely.
+
+**What should happen:** Each task starts as `role=pdsa`. PDSA produces the design (proposed_design in DNA). Task goes to `approval` for Thomas to review. After approval, the workflow engine routes to QA then DEV. The same task flows through the entire pipeline — you don't create separate pdsa/dev/qa tasks for the same work.
+
+**Hard question:** "Is this task's initial role `pdsa`? If not, why does it skip design?"
+
+Only exceptions:
+- Liaison content tasks (WORKFLOW.md "Liaison Content Path"): `role=liaison`
+- Tasks that are pure documentation with no design needed: still start pdsa for review
+
+---
+
+<!-- @section: todo | v:1 -->
+## TODO: Enforcement via A2A
+
+### The problem today
+
+The A2A OBJECT_CREATE handler (`api/routes/a2a-message.ts:721-733`) has **zero validation** on task creation:
+- No check that initial role = pdsa
+- No check for required DNA fields (9 mandatory)
+- No check that description is self-contained (length threshold)
+- No check for stakeholder, constraints
+- Accepts any role, any DNA, any status
+
+LIAISON (me) and the A2A LIAISON agent both use the same endpoint. If the endpoint doesn't validate, both will make the same mistakes.
+
+### The solution: A2A validation gate
+
+Add validation to OBJECT_CREATE for tasks:
+
+```javascript
+// In handleObjectCreate, case 'task':
+const dna = payload.dna || {};
+
+// Gate 6: PDSA-first
+if (dna.role && dna.role !== 'pdsa' && dna.role !== 'liaison') {
+  return res.status(400).json({ 
+    type: 'ERROR', 
+    error: 'Tasks must start with role=pdsa (PDSA Design Path). DEV and QA receive work through the workflow, not direct assignment.' 
+  });
+}
+
+// Gate 1: Required DNA fields
+const required = ['title', 'description', 'acceptance_criteria', 'stakeholder', 'priority', 'constraints'];
+const missing = required.filter(f => !dna[f]);
+if (missing.length > 0) {
+  return res.status(400).json({ 
+    type: 'ERROR', 
+    error: `Task DNA missing required fields: ${missing.join(', ')}. All 9 mandatory fields required.` 
+  });
+}
+
+// Gate 2: Self-contained (minimum description length)
+if (dna.description && dna.description.length < 200) {
+  return res.status(400).json({ 
+    type: 'ERROR', 
+    error: `Task description too short (${dna.description.length} chars). Must be self-contained (>200 chars) with embedded context, file paths, and reasoning.` 
+  });
+}
+```
+
+This makes the A2A server enforce the same gates regardless of whether LIAISON is a human-session CLI agent or the autonomous A2A LIAISON agent. One set of rules, one enforcement point.
+
+### Why A2A, not MCP
+
+Thomas preference: A2A. Rationale:
+- The A2A LIAISON agent and this CLI session both use the same A2A endpoint
+- One validation gate covers all callers
+- MCP would be a separate channel with separate rules — divergence risk
+- A2A is already the protocol for all agent communication
+
+### Status: Not yet implemented
+
+This is documented as a TODO. The validation gate should be added to the A2A OBJECT_CREATE handler as part of a future mission. For now, LIAISON must self-enforce Gates 1-6 manually before calling OBJECT_CREATE.
+
 ---
 
 <!-- @section: checklist | v:1 -->
@@ -127,14 +213,16 @@ For each task, LIAISON must define:
 Before activating tasks for the team, LIAISON runs this checklist:
 
 ```
-□ Every decision has at least one task
-□ Every task has all 9 DNA fields
-□ Every description embeds context (file paths, line numbers, reasoning)
-□ Every task passes the self-contained test
-□ Dependencies form a valid DAG (no cycles)
-□ Only tasks with zero unresolved dependencies are set to ready/active
-□ Verification protocol defined for each task
-□ Tasks created in the correct system (BETA for development, PROD for tracking)
+□ Every task starts with role=pdsa (PDSA-first, Gate 6)
+□ Every decision has at least one task (Gate 3)
+□ Every task has all 9 DNA fields (Gate 1)
+□ Every description embeds context — file paths, line numbers, reasoning (Gate 2)
+□ Every task passes the self-contained test (Gate 2)
+□ Dependencies form a valid DAG — no cycles (Gate 4)
+□ Only tasks with zero unresolved dependencies are set to ready (Gate 4)
+□ Tasks stay at pending until team is activated — announcer auto-advances ready/rework/approval
+□ Verification protocol defined for each task (Gate 5)
+□ Tasks created in the correct system (BETA for development, PROD for mission tracking)
 ```
 
 ---
@@ -148,8 +236,9 @@ Before activating tasks for the team, LIAISON runs this checklist:
 | **Decision gaps** | D2, D3 had no tasks — 2 of 7 decisions lost | Gate 3: systematic check |
 | **Missing stakeholder** | No task said who cares | Gate 1: mandatory field |
 | **Missing constraints** | No task said what the limits are | Gate 1: mandatory field |
-| **Auto-advance** | Task announcer claimed T1/T2 before agents existed | Set status to ready (not active) when agents not yet running |
+| **Auto-advance** | Task announcer claimed T1/T2 before agents existed | Set status to `pending` — announcer ignores pending. Only transition to `ready` when team is active. |
 | **Reference, don't embed** | "See mission Research Task E" instead of embedding the schema | Gate 2: embedded context |
+| **DEV tasks without PDSA** | T3-T5, T7-T8 created as role=dev, skipping PDSA design + approval | Gate 6: PDSA-first enforcement |
 
 ---
 
