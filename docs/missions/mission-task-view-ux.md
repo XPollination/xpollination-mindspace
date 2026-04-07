@@ -28,25 +28,14 @@
 
 ### What LIAISON observed (sandbox audit 2026-04-07)
 
-**PROD (mindspace.xpollination.earth/kanban):**
-- 5 columns: Queue, Active, Review, Approved, Done
-- Missing columns: Rework, Blocked (defined in WORKFLOW.md)
-- Missing: completed-tasks filter dropdown (Active only / +1d / +7d / +30d / All)
-- Missing: team panel (+Full Team, +1 role buttons)
-- Present but redundant: Active/All toggle buttons
-- Stats: "1 active / 616 total"
-- No task creation mechanism
-
-**BETA (beta-mindspace.xpollination.earth/kanban):**
+**Current state (beta-mindspace.xpollination.earth/kanban):**
 - 7 columns: Queue, Active, Review, Approved, Rework, Blocked, Done
-- Has completed-tasks dropdown: Active only, +1 day, +7 days, +30 days, All
-- Has team panel with spawn buttons
-- Same redundant Active/All toggle buttons
+- Completed-tasks dropdown: Active only, +1 day, +7 days, +30 days, All
+- Team panel with spawn buttons (+Full Team, +Liaison, +PDSA, +Dev, +QA)
+- Redundant Active/All toggle buttons alongside the dropdown
 - Stats: "0 active / 572 total"
-
-**Delta between prod and beta:**
-- Prod is missing 2 columns, completed filter, and team panel
-- Both have the redundant Active/All buttons
+- 571 cancelled tasks appearing in BLOCKED column (semantically wrong)
+- No task creation mechanism
 
 ### What agents don't know
 Agents working on the kanban have NO way to know:
@@ -338,12 +327,12 @@ AND: No contradictory states (e.g., button says Active, dropdown says All)
 AND: Filter state persists in sessionStorage
 ```
 
-### TC-UX-6: Prod/beta parity
+### TC-UX-6: REWORK column visible and documented
 ```
-GIVEN: Feature deployed to beta and verified
-WHEN: Feature deployed to prod
-THEN: Same columns, same filters, same team panel
-AND: No regression from beta features
+GIVEN: Kanban open
+THEN: REWORK column exists between APPROVED and BLOCKED
+AND: Tasks with status 'rework' appear in REWORK column
+AND: Column mapping matches updated WORKFLOW.md
 ```
 
 ---
