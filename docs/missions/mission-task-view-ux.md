@@ -519,31 +519,35 @@ The code change becomes: **make kanban.js read from config instead of hardcoding
 ### Execution order (dependency chain)
 
 ```
-ux-board-config-schema (pdsa)  ──┐
-                                 ├──> ux-kanban-config-driven (dev) ──┬──> ux-remove-filter-buttons (dev) ──┐
-ux-workflow-rework-column (pdsa) │                                   └──> ux-cancelled-to-done (dev) ──────┤
-                                 │                                                                         │
-                                 └─────────────────────────────────────────> ux-sandbox-verification (qa) <─┘
+                                                                      ┌──> ux-remove-filter-buttons (dev) ──┐
+ux-board-config-schema (pdsa) ──> ux-kanban-config-driven (dev) ──────┼──> ux-cancelled-to-done (dev) ──────┼──> ux-sandbox-verification (qa)
+                                                                      ├──> ux-structural-comments (dev)     ├──> ux-state-yaml (dev)
+ux-workflow-rework-column (pdsa) ─────────────────────────────────────┘                                     │
+                                                                                                            │
 ```
 
-### Tasks
+### Tasks (BETA system — 8 tasks, all with rich DNA)
 
 | # | Slug | Role | Priority | Depends on | Decision | Status |
 |---|------|------|----------|------------|----------|--------|
-| 1 | `ux-board-config-schema` | pdsa | high | — | D7 | pending |
-| 2 | `ux-workflow-rework-column` | pdsa | medium | — | D6 | pending |
+| 1 | `ux-board-config-schema` | pdsa | high | — | D7 | ready |
+| 2 | `ux-workflow-rework-column` | pdsa | medium | — | D6 | ready |
 | 3 | `ux-kanban-config-driven` | dev | high | T1 | D7 | pending |
 | 4 | `ux-remove-filter-buttons` | dev | high | T3 | D1 | pending |
 | 5 | `ux-cancelled-to-done` | dev | medium | T3 | D5 | pending |
 | 6 | `ux-sandbox-verification` | qa | high | T4, T5 | — | pending |
+| 7 | `ux-structural-comments` | dev | medium | T3 | D2 | pending |
+| 8 | `ux-state-yaml` | dev | medium | T4, T5 | D3 | pending |
 
 **Dependencies:**
 - T1 + T2: no dependencies — can start immediately (both PDSA)
 - T3: blocked by T1 — needs the schema before refactoring
-- T4 + T5: blocked by T3 — need config-driven board before changing config
-- T6: blocked by T4 + T5 — verifies the end result
+- T4, T5, T7: blocked by T3 — need config-driven board first
+- T6, T8: blocked by T4 + T5 — verify/document the end result
 
-**Start state:** T1 and T2 active. T3–T6 pending until dependencies resolve.
+**Start state:** T1 and T2 ready for PDSA. All others pending until dependencies resolve.
+
+**DNA richness:** All 8 tasks have: title, description (690-3000 chars), acceptance criteria, stakeholder, constraints, depends_on, mission_ref, decisions. Self-contained — agent reads DNA, not the mission.
 
 ---
 
@@ -649,6 +653,35 @@ verify 7 rows → verify rework is separate → verify cancelled is with complet
 | TC-UX-4 | Screenshot with "All" filter: cancelled in DONE, not BLOCKED |
 | TC-UX-5 | Screenshots of each filter option: selection always indicated |
 | TC-UX-6 | Screenshot shows REWORK column between APPROVED and BLOCKED |
+
+### T7: `ux-structural-comments` (DEV → LIAISON verifies)
+
+**What to verify:**
+1. `grep '@component' kanban.js` returns 3+ matches
+2. Each block has `@description`, `@user-sees`, `@behavior`
+3. `@config` references point to board-config.yaml
+4. `@user-sees` accurately describes what sandbox shows
+
+**How to test:**
+```
+grep '@component' kanban.js → count matches
+For each @user-sees → compare text against sandbox screenshot
+```
+
+### T8: `ux-state-yaml` (DEV → LIAISON verifies)
+
+**What to verify:**
+1. File exists at `viz/config/ux-state.yaml`
+2. Has `last_verified` date, `verified_by`, `pages.kanban` section
+3. Toolbar controls match what sandbox shows
+4. References board-config.yaml for columns/filters (no duplication)
+5. `known_issues` is empty or accurately reflects real issues
+
+**How to test (sandbox):**
+```
+Read ux-state.yaml → for each control listed → verify it exists in sandbox screenshot
+Compare ux-state.yaml columns against board-config.yaml columns → must match
+```
 
 ---
 
