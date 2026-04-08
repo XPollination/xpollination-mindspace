@@ -305,6 +305,79 @@ is_on_hetzner() {
     [[ "$RUN_MODE" == "hetzner" ]]
 }
 
+# --- Device Flow Authentication ---
+# Replaces static API key. User approves in browser, CLI gets JWT.
+# See: docs/missions/mission-agent-oauth-sessions.md
+
+authenticate_device_flow() {
+    local api_base="$1"
+    local session_name="$2"
+    local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
+    node_cmd="${node_cmd:-node}"
+
+    echo ""
+    echo "Authenticating with Mindspace..."
+
+    # Request device code
+    local response
+    response=$(curl -s -X POST "${api_base}/api/auth/device/code" \
+        -H "Content-Type: application/json" \
+        -d "{\"client_name\":\"claude-session ${session_name}\"}" 2>/dev/null)
+
+    local device_code user_code verification_uri
+    device_code=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).device_code)}catch{}" "$response" 2>/dev/null)
+    user_code=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).user_code)}catch{}" "$response" 2>/dev/null)
+    verification_uri=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).verification_uri)}catch{}" "$response" 2>/dev/null)
+
+    if [[ -z "$device_code" || -z "$user_code" ]]; then
+        echo "ERROR: Could not get device code from ${api_base}"
+        echo "Response: ${response}"
+        echo ""
+        echo "Falling back to API key from .env..."
+        return 1
+    fi
+
+    echo ""
+    echo "╔══════════════════════════════════════════════╗"
+    echo "║  Go to: ${verification_uri}"
+    echo "║  Enter code: ${user_code}"
+    echo "╚══════════════════════════════════════════════╝"
+    echo ""
+    echo "Waiting for approval..."
+
+    # Poll for approval (5s interval, 15min timeout)
+    local attempts=0
+    local max_attempts=180  # 15 min / 5s
+    while [ $attempts -lt $max_attempts ]; do
+        sleep 5
+        local token_response
+        token_response=$(curl -s -X POST "${api_base}/api/auth/device/token" \
+            -H "Content-Type: application/json" \
+            -d "{\"device_code\":\"${device_code}\"}" 2>/dev/null)
+
+        local token error
+        token=$($node_cmd -e "try{const d=JSON.parse(process.argv[1]);if(d.access_token)console.log(d.access_token)}catch{}" "$token_response" 2>/dev/null)
+        error=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).error||'')}catch{}" "$token_response" 2>/dev/null)
+
+        if [[ -n "$token" ]]; then
+            echo "✓ Authenticated"
+            XPO_SESSION_TOKEN="$token"
+            return 0
+        fi
+
+        if [[ "$error" == "expired_token" ]]; then
+            echo "✗ Code expired. Run claude-session again."
+            return 1
+        fi
+
+        # authorization_pending → keep polling
+        attempts=$((attempts + 1))
+    done
+
+    echo "✗ Timed out waiting for approval"
+    return 1
+}
+
 has_local_claude() {
     [[ "$RUN_MODE" == "local" ]]
 }
@@ -353,7 +426,14 @@ create_agents_session() {
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
-    # Resolve BRAIN_API_KEY
+    # Authenticate via OAuth device flow (replaces static API key for A2A)
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_device_flow "${api_url}" "$session"; then
+        echo "WARNING: Device flow failed. Agents will not have A2A auth."
+        echo "You can still use the agents but they won't receive SSE events."
+    fi
+
+    # Brain API key — ONLY for brain knowledge access, NOT for A2A
     local brain_key="${BRAIN_API_KEY:-}"
     if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
         brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
@@ -417,7 +497,12 @@ ROLE
 
         # Start xpo-agent body in background — delivers SSE events to this pane
         # Body waits for LLM ready before sending brain recovery prompts
-        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${pane} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        # Uses JWT from device flow for A2A auth, brain key only for knowledge access
+        local token_flag=""
+        if [[ -n "$XPO_SESSION_TOKEN" ]]; then
+            token_flag="--token ${XPO_SESSION_TOKEN}"
+        fi
+        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${pane} ${token_flag} > /tmp/xpo-agent-${role}.log 2>&1 &"
         tmux send-keys -t "${pane}" "$body_cmd" Enter
 
         # Write Claude launch script (--allowedTools list too long for send-keys)

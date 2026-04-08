@@ -38,6 +38,7 @@ const { values: args } = parseArgs({
     name:        { type: 'string' },
     interactive: { type: 'boolean', default: false },
     session:     { type: 'string' },
+    token:       { type: 'string' },
   },
 });
 
@@ -45,6 +46,7 @@ const ROLE        = args.role;
 const PROJECT     = args.project;
 const API_URL     = args.api;
 const API_KEY     = args['api-key'];
+const JWT_TOKEN   = args.token;  // OAuth device flow JWT — preferred over API key
 const WORKSPACE   = resolve(args.workspace);
 const LLM         = args.llm;
 const INTERACTIVE = args.interactive;
@@ -85,8 +87,8 @@ function verifyPrerequisites() {
     process.exit(1);
   }
 
-  if (!API_KEY) {
-    console.error('[AGENT] No API key. Set BRAIN_API_KEY or use --api-key');
+  if (!API_KEY && !JWT_TOKEN) {
+    console.error('[AGENT] No auth. Use --token (device flow JWT) or --api-key');
     process.exit(1);
   }
 }
@@ -251,15 +253,27 @@ async function waitForReadySignal(maxWait = 60) {
 // --- A2A Connection ---
 
 async function connectToA2A() {
+  // Build connect request — use JWT (device flow) if available, fall back to API key
+  const headers = { 'Content-Type': 'application/json' };
+  const identity = { agent_name: `xpo-agent-${ROLE}-${SHORT_ID}` };
+
+  if (JWT_TOKEN) {
+    // OAuth device flow: JWT in Authorization header
+    headers['Authorization'] = `Bearer ${JWT_TOKEN}`;
+  } else if (API_KEY) {
+    // Legacy: API key in identity
+    identity.api_key = API_KEY;
+  }
+
   const res = await fetch(`${API_URL}/a2a/connect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
-      identity: { agent_name: `xpo-agent-${ROLE}-${SHORT_ID}`, api_key: API_KEY },
+      identity,
       role: { current: ROLE, capabilities: [ROLE] },
       project: { slug: PROJECT },
       state: { status: 'active' },
-      metadata: { client: 'xpo-agent', version: '1.0.0', session: SESSION, workspace: WORKSPACE },
+      metadata: { client: 'xpo-agent', version: '2.0.0', session: SESSION, workspace: WORKSPACE },
     }),
   });
 
@@ -276,9 +290,12 @@ async function connectToA2A() {
   reconnectDelay = 5000;
   console.log(`[AGENT] Connected. agent_id=${agentId}`);
 
-  // Write credentials file for a2a-deliver.js — the soul reads this, not the API key directly
+  // Write credentials file for a2a-deliver.js — the soul reads this, not the key directly
   const envFile = `/tmp/xpo-agent-${ROLE}.env`;
-  writeFileSync(envFile, `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`);
+  const envContent = JWT_TOKEN
+    ? `A2A_API_URL=${API_URL}\nA2A_TOKEN=${JWT_TOKEN}\nA2A_AGENT_ID=${agentId}\n`
+    : `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`;
+  writeFileSync(envFile, envContent);
   try { chmodSync(envFile, 0o600); } catch { /* best effort */ }
 }
 

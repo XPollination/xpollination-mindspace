@@ -48,10 +48,12 @@ const { values: args } = parseArgs({
   strict: false,
 });
 
-// Resolve API URL and key: CLI arg > body env file > process env > default
+// Resolve API URL and auth: CLI arg > body env file > process env > default
 const bodyEnv = loadBodyEnv(args.role);
 if (!args['api-url']) args['api-url'] = bodyEnv.A2A_API_URL || process.env.MINDSPACE_API_URL || 'http://localhost:3101';
 if (!args['api-key']) args['api-key'] = bodyEnv.A2A_API_KEY || process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '';
+// JWT token from device flow (preferred over API key)
+const A2A_TOKEN = bodyEnv.A2A_TOKEN || '';
 
 if (!args.slug) {
   console.error('Usage: a2a-deliver.js --slug <task-slug> --transition <status> [--findings "..."] [--implementation "..."]');
@@ -62,12 +64,20 @@ async function deliver() {
   const API_URL = args['api-url'];
   const API_KEY = args['api-key'];
 
-  // Connect to get session token
+  // Connect — use JWT (device flow) if available, fall back to API key
+  const connectHeaders = { 'Content-Type': 'application/json' };
+  const identity = { agent_name: `deliver-${args.role}` };
+  if (A2A_TOKEN) {
+    connectHeaders['Authorization'] = `Bearer ${A2A_TOKEN}`;
+  } else if (API_KEY) {
+    identity.api_key = API_KEY;
+  }
+
   const connectRes = await fetch(`${API_URL}/a2a/connect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: connectHeaders,
     body: JSON.stringify({
-      identity: { agent_name: `deliver-${args.role}`, api_key: API_KEY },
+      identity,
       role: { current: args.role },
       project: { slug: 'xpollination-mindspace' },
       state: { status: 'active' },
