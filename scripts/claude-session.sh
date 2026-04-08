@@ -651,7 +651,7 @@ run_local_or_hetzner() {
     fi
 
     case "$session" in
-        claude-agents) create_agents_session "$session" ;;
+        claude-agents|a2a-team) create_agents_session "$session" ;;
         claude-dual)   create_dual_session "$session" ;;
         agent-*)
             # A2A Agent Body — single role agent connected to A2A
