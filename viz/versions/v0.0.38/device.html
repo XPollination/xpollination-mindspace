@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect Device — Mindspace</title>
+  <link rel="stylesheet" href="/kanban.css">
+  <style>
+    body { display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: var(--ms-bg); color: var(--ms-text); font-family: var(--ms-font); }
+    .device-card { background: var(--ms-card-bg); border-radius: 12px; padding: 2.5rem; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+    .device-card h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+    .device-card p { color: var(--ms-muted); margin: 0.5rem 0 1.5rem; }
+    .code-input { font-size: 2rem; text-align: center; letter-spacing: 0.3em; padding: 0.75rem; border: 2px solid var(--ms-border); border-radius: 8px; background: var(--ms-bg); color: var(--ms-text); width: 100%; box-sizing: border-box; text-transform: uppercase; }
+    .code-input:focus { outline: none; border-color: var(--ms-accent); }
+    .approve-btn { width: 100%; padding: 0.75rem; margin-top: 1rem; background: var(--ms-accent); color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    .approve-btn:hover { opacity: 0.9; }
+    .approve-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; display: none; }
+    .status.success { display: block; background: rgba(76, 175, 80, 0.1); color: #4CAF50; }
+    .status.error { display: block; background: rgba(244, 67, 54, 0.1); color: #F44336; }
+    .logo { width: 64px; height: 64px; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="device-card">
+    <img src="/assets/favicons/android-chrome-192x192.png" alt="Mindspace" class="logo" onerror="this.style.display='none'">
+    <h1>Connect Device</h1>
+    <p>Enter the code shown in your terminal</p>
+    <input type="text" class="code-input" id="code-input" maxlength="9" placeholder="XXXX-XXXX" autofocus>
+    <button class="approve-btn" id="approve-btn" onclick="approve()">Approve</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('code-input');
+    const btn = document.getElementById('approve-btn');
+    const status = document.getElementById('status');
+
+    // Auto-format: add dash after 4 chars
+    input.addEventListener('input', () => {
+      let val = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (val.length > 4) val = val.slice(0, 4) + '-' + val.slice(4, 8);
+      input.value = val;
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') approve();
+    });
+
+    async function approve() {
+      const code = input.value.trim();
+      if (code.length < 8) {
+        showStatus('Enter the full 8-character code', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Approving...';
+
+      try {
+        const res = await fetch('/api/auth/device/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_code: code }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          showStatus(data.message || 'Approved! You can close this page.', 'success');
+          btn.textContent = 'Approved';
+          input.disabled = true;
+        } else {
+          showStatus(data.error || 'Approval failed', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Approve';
+        }
+      } catch (err) {
+        showStatus('Connection error. Are you logged in?', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Approve';
+      }
+    }
+
+    function showStatus(msg, type) {
+      status.textContent = msg;
+      status.className = 'status ' + type;
+    }
+  </script>
+</body>
+</html>
