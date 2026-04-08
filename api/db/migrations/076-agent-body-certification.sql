@@ -1,11 +1,4 @@
--- Capability-based SSE gating.
--- can_stream is set server-side at connect time based on auth method.
--- Agents cannot self-assign capabilities.
---
--- Rules:
---   JWT auth (browser)              → can_stream = 1
---   API key + client='xpo-agent'    → can_stream = 1
---   API key + no body claim         → can_stream = 0
---
--- Security model: see api/routes/SECURITY.md
-ALTER TABLE agents ADD COLUMN can_stream INTEGER DEFAULT 0;
+-- Add is_body column to agents table for A2A body certification.
+-- Only certified bodies (xpo-agent.js) can open SSE streams.
+-- Souls (LLMs) receive events via tmux send-keys from the body.
+ALTER TABLE agents ADD COLUMN is_body INTEGER DEFAULT 0;
