@@ -432,17 +432,13 @@ async function main() {
   registerShutdownHandlers();
 
   // Step 1: Wait for LLM to be ready at prompt
-  if (!INTERACTIVE) {
-    waitForLlmReady();
-  }
+  waitForLlmReady();
 
   // Step 2: Connect to A2A (need agent_id for task state prompt)
   await connectToA2A();
 
   // Step 3: Brain-first startup — send prompts, wait for handshake
-  if (!INTERACTIVE) {
-    await sendStartupPrompts();
-  }
+  await sendStartupPrompts();
 
   // Step 4: SSE event loop — only after handshake
   while (true) {
