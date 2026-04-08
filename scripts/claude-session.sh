@@ -341,45 +341,14 @@ create_agents_session() {
     sync_skills
     sync_settings
 
-    # Write role prompts to temp files (avoids quoting issues in tmux send-keys)
-    cat > /tmp/claude-role-liaison.txt << 'ROLE'
-You are the LIAISON agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON(you), 1=PDSA, 2=DEV, 3=QA.
-Start: /xpo.claude.monitor liaison
-ROLE
+    local api_url="${MINDSPACE_API_URL:-http://localhost:3101}"
+    local workspace="${WORKING_DIR}/xpollination-mindspace"
+    local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
+    local deliver_script="${PROJECT_ROOT}/scripts/a2a-deliver.js"
+    local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
+    node_bin="${node_bin:-node}"
 
-    cat > /tmp/claude-role-pdsa.txt << 'ROLE'
-You are the PDSA agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON, 1=PDSA(you), 2=DEV, 3=QA.
-Start: /xpo.claude.monitor pdsa
-ROLE
-
-    cat > /tmp/claude-role-dev.txt << 'ROLE'
-You are the DEVELOPMENT agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON, 1=PDSA, 2=DEV(you), 3=QA.
-Start: /xpo.claude.monitor dev
-ROLE
-
-    cat > /tmp/claude-role-qa.txt << 'ROLE'
-You are the QA agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA(you).
-Start: /xpo.claude.monitor qa
-ROLE
-
-    # Determine terminal dimensions (passed via env from user-switch, or detect)
-    local cols="${TMUX_COLS:-$(tput cols 2>/dev/null || echo 200)}"
-    local rows="${TMUX_ROWS:-$(tput lines 2>/dev/null || echo 50)}"
-
-    # Create session with explicit size (pane 0: LIAISON)
-    tmux new-session -d -s "$session" -x "$cols" -y "$rows" -c "$WORKING_DIR"
-
-    # Pre-configure PATH — on Hetzner use nvm node, locally use existing PATH
-    if [[ -n "$NVM_NODE" ]]; then
-        tmux set-environment -t "$session" PATH "${NVM_NODE}:${WORKING_DIR}/xpollination-mcp-server/scripts:/usr/local/bin:/usr/bin:/bin"
-    fi
-
-    # Export BRAIN_API_KEY so hooks can authenticate with brain API
-    # Check: env var > Hetzner key file > project .env file
+    # Resolve BRAIN_API_KEY
     local brain_key="${BRAIN_API_KEY:-}"
     if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
         brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
@@ -387,41 +356,68 @@ ROLE
     if [[ -z "$brain_key" && -f "${PROJECT_ROOT}/.env" ]]; then
         brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
     fi
+
+    # Write A2A-aware role prompts (slim — brain provides the real knowledge at startup)
+    local roles=("liaison" "pdsa" "dev" "qa")
+    for role in "${roles[@]}"; do
+        cat > "/tmp/claude-role-${role}.txt" << ROLE
+You are the ${role^^} agent connected to A2A in a 4-agent tmux session (claude-agents).
+Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA.
+API: ${api_url} | Project: xpollination-mindspace
+
+The A2A body runs in background and delivers [TASK] messages via SSE.
+To deliver results:
+  node ${deliver_script} --slug <SLUG> --transition <STATUS> --role ${role} --api-url ${api_url} --api-key ${brain_key}
+ROLE
+    done
+
+    # Determine terminal dimensions
+    local cols="${TMUX_COLS:-$(tput cols 2>/dev/null || echo 200)}"
+    local rows="${TMUX_ROWS:-$(tput lines 2>/dev/null || echo 50)}"
+
+    # Create session with explicit size (pane 0: LIAISON)
+    tmux new-session -d -s "$session" -x "$cols" -y "$rows" -c "$workspace"
+
+    # Pre-configure PATH
+    if [[ -n "$NVM_NODE" ]]; then
+        tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+    fi
     if [ -n "$brain_key" ]; then
         tmux set-environment -t "$session" BRAIN_API_KEY "$brain_key"
     fi
 
-    # Split pane 0 → pane 1 to the right (PDSA) — left gets 34%, right gets 66%
-    # Note: use -l (not -p) — tmux 3.4 "-p" fails with "size missing" in detached sessions
-    tmux split-window -t "${session}:0.0" -h -l 66% -c "$WORKING_DIR"
-
-    # Split pane 1 → pane 2 to the right (DEV) — middle gets 50%, right gets 50% of 66%
-    tmux split-window -t "${session}:0.1" -h -l 50% -c "$WORKING_DIR"
-
-    # Split pane 2 vertically → pane 3 below (QA)
-    tmux split-window -t "${session}:0.2" -v -c "$WORKING_DIR"
+    # Split into 4 panes: LIAISON | PDSA | DEV / QA
+    tmux split-window -t "${session}:0.0" -h -l 66% -c "$workspace"
+    tmux split-window -t "${session}:0.1" -h -l 50% -c "$workspace"
+    tmux split-window -t "${session}:0.2" -v -c "$workspace"
 
     tmux rename-window -t "${session}:0" 'LIAISON | PDSA | DEV | QA'
 
-    # Enable mouse support (click to switch panes, scroll, resize)
+    # Enable mouse support (scroll, click, resize)
     tmux set-option -t "$session" mouse on
 
-    # Pane border labels — persistent role names (Claude overrides pane_title with its spinner)
+    # Pane border labels
     tmux set-option -t "$session" pane-border-status top
     tmux set-option -t "$session" pane-border-format \
         ' #{?#{==:#{pane_index},0},LIAISON,#{?#{==:#{pane_index},1},PDSA,#{?#{==:#{pane_index},2},DEV,QA}}} │ #{pane_title} '
 
-    # Start Claude in each pane with role via --append-system-prompt
-    echo "Starting Claude in 4 panes (this takes ~30s per pane)..."
+    echo "Starting 4 A2A agents (body in background, Claude in foreground)..."
 
-    # Write each agent's launch command to a temp script to avoid tmux send-keys
-    # length limits (the --allowedTools list is too long for send-keys)
-    local roles=("liaison" "pdsa" "dev" "qa")
+    # For each pane: start A2A body in background, then launch Claude
     for i in 0 1 2 3; do
         local role="${roles[$i]}"
+        local pane="${session}:0.${i}"
+
+        # Start xpo-agent body in background — delivers SSE events to this pane
+        # Body waits for LLM ready before sending brain recovery prompts
+        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${pane} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        tmux send-keys -t "${pane}" "$body_cmd" Enter
+
+        # Write Claude launch script (--allowedTools list too long for send-keys)
         local launch_script="/tmp/claude-launch-${role}.sh"
         {
             echo "#!/bin/bash"
+            echo "cd \"${workspace}\""
             echo "export AGENT_ROLE=${role}"
             printf '%s --allowedTools' "${CLAUDE_BIN}"
             for tool in "${ALLOWED_TOOLS[@]}"; do
@@ -430,7 +426,9 @@ ROLE
             printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$role"
         } > "$launch_script"
         chmod +x "$launch_script"
-        tmux send-keys -t "${session}:0.${i}" "bash ${launch_script}" Enter
+
+        # Launch Claude — body detects it via pane_current_command and starts brain recovery
+        tmux send-keys -t "${pane}" "bash ${launch_script}" Enter
     done
 
     # Wait for Claude to be ready in each pane, handle trust prompts
@@ -443,7 +441,8 @@ ROLE
     # Focus LIAISON pane
     tmux select-pane -t "${session}:0.0"
 
-    echo "All 4 agents started."
+    echo "All 4 agents started. A2A bodies running in background."
+    echo "Body logs: /tmp/xpo-agent-{liaison,pdsa,dev,qa}.log"
 }
 
 create_dual_session() {
