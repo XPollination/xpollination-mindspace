@@ -19,8 +19,11 @@ a2aStreamRouter.get('/:agent_id', (req, res) => {
     }
   }
 
-  // Hard gate: only certified bodies (xpo-agent) can open SSE streams
-  if (agent && !agent.is_body) {
+  // Hard gate: only certified bodies (xpo-agent) or browser clients can open SSE streams.
+  // Browser clients have names starting with "browser-" (from a2a-client.js).
+  // CLI agents (souls) must NOT open their own SSE — the body handles it.
+  const isBrowser = agent?.name?.startsWith('browser-');
+  if (agent && !agent.is_body && !isBrowser) {
     res.status(403).json({
       type: 'ERROR',
       error: 'SSE streams are managed by the A2A body (xpo-agent). ' +
