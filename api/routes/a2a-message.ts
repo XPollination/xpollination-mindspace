@@ -719,11 +719,37 @@ function handleObjectCreate(agent: any, body: any, res: Response): void {
       }
 
       case 'task': {
-        const slug = payload.slug || payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const dna = { title: payload.title, role: payload.current_role || 'liaison', description: payload.description || undefined, ...payload.dna };
+        const slug = payload.slug || payload.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+        // Gate 1: Role must be pdsa or liaison — no direct dev/qa assignment
+        const taskRole = payload.dna?.role || payload.current_role;
+        if (!taskRole) {
+          res.status(400).json({ type: 'ERROR', error: 'Task must have a role. Set dna.role to "pdsa" (PDSA Design Path) or "liaison" (Liaison Content Path).' });
+          return;
+        }
+        if (!['pdsa', 'liaison'].includes(taskRole)) {
+          res.status(400).json({ type: 'ERROR', error: `Task must start with role=pdsa (PDSA Design Path). Got: "${taskRole}". DEV and QA receive work through the workflow, not direct assignment. Set dna.role to "pdsa".` });
+          return;
+        }
+
+        // Gate 2: Required DNA fields
+        const dna = { ...payload.dna, title: payload.title, role: taskRole };
+        const requiredDna = ['title', 'description', 'acceptance_criteria'];
+        const missingDna = requiredDna.filter((f: string) => !dna[f] || (typeof dna[f] === 'string' && dna[f].trim().length === 0));
+        if (missingDna.length > 0) {
+          res.status(400).json({ type: 'ERROR', error: `Task DNA missing required fields: ${missingDna.join(', ')}. Every task needs: title, description, acceptance_criteria.` });
+          return;
+        }
+
+        // Gate 3: Description must be self-contained
+        if (dna.description.length < 100) {
+          res.status(400).json({ type: 'ERROR', error: `Task description too short (${dna.description.length} chars). Must be ≥100 chars — embed context, file paths, and reasoning so an agent can work without reading external documents.` });
+          return;
+        }
+
         db.prepare(
           'INSERT INTO tasks (id, project_slug, title, description, status, current_role, slug, dna_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(id, payload.project_slug, payload.title, payload.description || null, payload.status || config.defaults.status, payload.current_role || 'liaison', slug, JSON.stringify(dna), now, now);
+        ).run(id, payload.project_slug, payload.title, dna.description || null, payload.status || config.defaults.status, taskRole, slug, JSON.stringify(dna), now, now);
 
         const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
         const twin = formatTaskTwin(row);
