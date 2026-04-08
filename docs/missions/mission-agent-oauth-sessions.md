@@ -85,12 +85,18 @@ The viz settings tab shows active agent sessions:
 
 | Before | After |
 |--------|-------|
-| `.env` BRAIN_API_KEY (static) | OAuth device flow (per-session) |
+| `.env` BRAIN_API_KEY for A2A auth (static) | OAuth device flow (per-session JWT) |
 | Key rotation breaks agents silently | Token revocation disconnects cleanly |
 | One key for all agents | Per-user tokens (Thomas, Robin, each have own) |
 | No visibility | Settings tab shows active sessions |
 | No revocation | Disconnect button per agent |
 | Robin needs Thomas's key | Robin logs in with his own Google account |
+
+### What Stays
+
+**BRAIN_API_KEY remains** — but ONLY for brain (knowledge) API access (`localhost:3200`). It is NOT used for A2A agent authentication. Brain is a separate infrastructure service with its own auth. The key is managed by the server admin in `.env` or brain config, not through viz settings.
+
+The viz settings "API Key" rotation feature was for A2A agent keys — with OAuth, that's replaced by session management (connect/disconnect). The settings tab should clarify: the API key shown is for **brain knowledge access only**, not for agent authentication.
 
 ---
 
