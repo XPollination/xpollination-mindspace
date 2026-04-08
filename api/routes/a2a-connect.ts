@@ -25,7 +25,7 @@ function getAvailableActions(role: string | null): string[] {
  * Authenticate via API key (SHA-256 hash lookup) or JWT.
  * Returns userId or null.
  */
-function authenticateIdentity(req: Request, apiKey?: string): string | null {
+function authenticateIdentity(req: Request, apiKey?: string): { userId: string; method: 'api_key' | 'jwt' } | null {
   const db = getDb();
 
   // Path 1: API key in twin identity (agents, CLI)
@@ -39,7 +39,7 @@ function authenticateIdentity(req: Request, apiKey?: string): string | null {
     ).get(keyHash) as any;
 
     if (!keyRow || keyRow.revoked_at) return null;
-    return keyRow.user_id;
+    return { userId: keyRow.user_id, method: 'api_key' };
   }
 
   // Path 2: JWT from Authorization header (browser — viz proxy sets this from ms_session cookie)
@@ -48,7 +48,7 @@ function authenticateIdentity(req: Request, apiKey?: string): string | null {
     const token = authHeader.slice(7);
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (decoded.sub) return decoded.sub;
+      if (decoded.sub) return { userId: decoded.sub, method: 'jwt' };
     } catch { /* invalid JWT */ }
   }
 
@@ -79,11 +79,12 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   }
 
   // 3. Authenticate via API key or JWT
-  const userId = authenticateIdentity(req, api_key);
-  if (!userId) {
+  const auth = authenticateIdentity(req, api_key);
+  if (!auth) {
     res.status(401).json({ type: 'ERROR', error: 'Authentication failed: invalid API key or JWT' });
     return;
   }
+  const userId = auth.userId;
 
   const db = getDb();
 
@@ -124,8 +125,17 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   const capabilities = twin.role?.capabilities;
   const capabilitiesJson = Array.isArray(capabilities) ? JSON.stringify(capabilities) : null;
 
-  // Body certification: authenticated API key + metadata.client === 'xpo-agent'
-  const isBody = (twin.metadata?.client === 'xpo-agent' && userId) ? 1 : 0;
+  // Capability assignment — server decides based on auth method, agent cannot self-assign.
+  // See api/routes/SECURITY.md for the full model.
+  let canStream = 0;
+  if (auth.method === 'jwt') {
+    // Browser user session — always allowed to stream (UI needs real-time updates)
+    canStream = 1;
+  } else if (auth.method === 'api_key' && twin.metadata?.client === 'xpo-agent') {
+    // Certified A2A body — authenticated + declared itself as body
+    canStream = 1;
+  }
+  // API key without body claim → canStream stays 0 (soul, delivery agent)
 
   const existing = db.prepare(
     'SELECT id FROM agents WHERE user_id = ? AND name = ? AND (project_slug = ? OR (project_slug IS NULL AND ? IS NULL)) AND status != ?'
@@ -139,14 +149,14 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
     agentId = existing.id;
     isReconnect = true;
     db.prepare(
-      "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, is_body = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = 'active' WHERE id = ?"
-    ).run(agentSessionId, currentRole || null, capabilitiesJson, isBody, agentId);
+      "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, can_stream = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = 'active' WHERE id = ?"
+    ).run(agentSessionId, currentRole || null, capabilitiesJson, canStream, agentId);
   } else {
     // New registration: INSERT new agent
     agentId = randomUUID();
     db.prepare(
-      'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status, is_body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active', isBody);
+      'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status, can_stream) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active', canStream);
   }
 
   // 7. Generate session token (JWT) for brain API auth

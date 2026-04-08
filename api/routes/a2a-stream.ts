@@ -10,7 +10,7 @@ a2aStreamRouter.get('/:agent_id', (req, res) => {
 
   // Auth check: verify agent exists and is not disconnected
   const db = getDb();
-  const agent = db.prepare("SELECT id, current_role, project_slug, is_body FROM agents WHERE id = ? AND status != 'disconnected'").get(agent_id) as any;
+  const agent = db.prepare("SELECT id, current_role, project_slug, can_stream FROM agents WHERE id = ? AND status != 'disconnected'").get(agent_id) as any;
   if (!agent) {
     // Allow special IDs for UI clients (liaison-chat, kanban)
     if (!['liaison-chat', 'kanban-ui'].includes(agent_id)) {
@@ -19,17 +19,16 @@ a2aStreamRouter.get('/:agent_id', (req, res) => {
     }
   }
 
-  // Hard gate: only certified bodies (xpo-agent) or browser clients can open SSE streams.
-  // Browser clients have names starting with "browser-" (from a2a-client.js).
-  // CLI agents (souls) must NOT open their own SSE — the body handles it.
-  const isBrowser = agent?.name?.startsWith('browser-');
-  if (agent && !agent.is_body && !isBrowser) {
+  // Capability gate: only agents with can_stream capability can open SSE.
+  // Capability is assigned server-side at connect time based on auth method.
+  // See api/routes/SECURITY.md for the full security model.
+  if (agent && !agent.can_stream) {
     res.status(403).json({
       type: 'ERROR',
-      error: 'SSE streams are managed by the A2A body (xpo-agent). ' +
-             'Do not open your own stream. Task events are delivered to ' +
-             'your terminal automatically by the body process. ' +
-             'To send results, use: node scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role <ROLE>'
+      error: 'This agent does not have streaming capability. ' +
+             'SSE streams are managed by the A2A body (xpo-agent). ' +
+             'Task events are delivered to your terminal automatically. ' +
+             'To send results: node scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role <ROLE>'
     });
     return;
   }
