@@ -284,9 +284,11 @@ usage() {
 Usage: claude-session <session-name>
 
 Sessions:
-  claude-agents  4-pane layout (Liaison + PDSA + Dev + QA) [WORKFLOW.md v12]
-  claude-dual    3-pane layout (Orchestrator + PDSA+QA + Dev) [legacy]
-  <any-name>     Single-pane Claude session
+  claude-agents    4-pane layout (Liaison + PDSA + Dev + QA) [WORKFLOW.md v12]
+  claude-dual      3-pane layout (Orchestrator + PDSA+QA + Dev) [legacy]
+  agent-<role>     A2A agent body — connects to A2A, launches Claude with role
+                   Roles: agent-liaison, agent-pdsa, agent-dev, agent-qa
+  <any-name>       Single-pane Claude session
 
 The session is created if it doesn't exist, or attached if it does.
 Can be run as thomas — auto-switches to developer via sudo.
@@ -483,6 +485,59 @@ create_dual_session() {
     tmux select-pane -t "${session}:0.0"
 }
 
+create_agent_body_session() {
+    local session="$1"
+    local role="$2"
+
+    # Auto-deploy skills + hooks
+    sync_skills
+    sync_settings
+
+    local api_url="${MINDSPACE_API_URL:-http://localhost:3101}"
+    local workspace="${WORKING_DIR}/xpollination-mindspace"
+    local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
+
+    if [[ ! -f "$agent_script" ]]; then
+        echo "ERROR: xpo-agent.js not found at ${agent_script}"
+        exit 1
+    fi
+
+    # Resolve BRAIN_API_KEY
+    local brain_key="${BRAIN_API_KEY:-}"
+    if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
+        brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
+    fi
+    if [[ -z "$brain_key" && -f "${PROJECT_ROOT}/.env" ]]; then
+        brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
+    fi
+
+    echo "Starting A2A agent body: ${role}"
+    echo "  API:       ${api_url}"
+    echo "  Workspace: ${workspace}"
+    echo "  Script:    ${agent_script}"
+
+    # Create tmux session that runs xpo-agent.js as foreground process.
+    # xpo-agent.js will create a NESTED tmux session (runner-{role}-{id})
+    # with Claude inside it. This outer session shows the body's logs.
+    local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
+    node_bin="${node_bin:-node}"
+
+    local launch_cmd="BRAIN_API_KEY=${brain_key} ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace}"
+
+    tmux new-session -d -s "$session" -c "$workspace"
+
+    if [[ -n "$NVM_NODE" ]]; then
+        tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+    fi
+
+    tmux send-keys -t "${session}:0.0" "$launch_cmd" Enter
+
+    # Enable mouse (scroll support)
+    tmux set-option -t "$session" mouse on
+
+    echo "Agent body started. Attaching to session..."
+}
+
 create_single_session() {
     local session="$1"
 
@@ -551,6 +606,17 @@ run_local_or_hetzner() {
     case "$session" in
         claude-agents) create_agents_session "$session" ;;
         claude-dual)   create_dual_session "$session" ;;
+        agent-*)
+            # A2A Agent Body — single role agent connected to A2A
+            # Usage: claude-session agent-pdsa | agent-dev | agent-qa | agent-liaison
+            local role="${session#agent-}"
+            if [[ ! "$role" =~ ^(liaison|pdsa|dev|qa)$ ]]; then
+                echo "ERROR: Invalid agent role '${role}'"
+                echo "Use: agent-liaison, agent-pdsa, agent-dev, agent-qa"
+                exit 1
+            fi
+            create_agent_body_session "$session" "$role"
+            ;;
         *)             create_single_session "$session" ;;
     esac
 
