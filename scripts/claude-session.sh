@@ -516,21 +516,64 @@ create_agent_body_session() {
     echo "  Workspace: ${workspace}"
     echo "  Script:    ${agent_script}"
 
-    # Create tmux session that runs xpo-agent.js as foreground process.
-    # xpo-agent.js will create a NESTED tmux session (runner-{role}-{id})
-    # with Claude inside it. This outer session shows the body's logs.
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
-    local launch_cmd="BRAIN_API_KEY=${brain_key} ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace}"
+    if [[ "$role" == "liaison" ]]; then
+        # LIAISON mode: Claude runs in the pane (interactive), body runs in background.
+        # Thomas types directly to Claude. SSE events arrive as [TASK] messages.
+        tmux new-session -d -s "$session" -c "$workspace"
 
-    tmux new-session -d -s "$session" -c "$workspace"
+        if [[ -n "$NVM_NODE" ]]; then
+            tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+        fi
 
-    if [[ -n "$NVM_NODE" ]]; then
-        tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+        # Start body in background — delivers events to this session
+        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${session} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        tmux send-keys -t "${session}:0.0" "$body_cmd" Enter
+
+        # Small delay for body to connect, then launch Claude
+        tmux send-keys -t "${session}:0.0" "sleep 2" Enter
+
+        # Launch Claude with A2A system prompt
+        local launch_script="/tmp/claude-launch-${role}-a2a.sh"
+        {
+            echo "#!/bin/bash"
+            echo "cd \"${workspace}\""
+            echo "export AGENT_ROLE=${role}"
+            printf '%s --allowedTools' "${CLAUDE_BIN}"
+            for tool in "${ALLOWED_TOOLS[@]}"; do
+                printf ' %q' "$tool"
+            done
+            printf ' --append-system-prompt "$(cat /tmp/claude-role-%s-a2a.txt)"\n' "$role"
+        } > "$launch_script"
+        chmod +x "$launch_script"
+
+        # Write A2A-aware role prompt
+        cat > "/tmp/claude-role-${role}-a2a.txt" << ROLE
+You are the LIAISON agent connected to A2A.
+Session: ${session} | API: ${api_url} | Project: xpollination-mindspace
+
+The A2A body runs in background and delivers [TASK] messages to you via SSE events.
+You are also Thomas's interactive interface — respond to his direct questions.
+
+When you receive a [TASK], process it. To deliver results:
+  node ${agent_script%/src/a2a/xpo-agent.js}/scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role liaison --api-url ${api_url} --api-key ${brain_key}
+ROLE
+
+        tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
+    else
+        # Standard mode: xpo-agent runs as foreground, creates nested tmux for LLM.
+        local launch_cmd="BRAIN_API_KEY=${brain_key} ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace}"
+
+        tmux new-session -d -s "$session" -c "$workspace"
+
+        if [[ -n "$NVM_NODE" ]]; then
+            tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+        fi
+
+        tmux send-keys -t "${session}:0.0" "$launch_cmd" Enter
     fi
-
-    tmux send-keys -t "${session}:0.0" "$launch_cmd" Enter
 
     # Enable mouse (scroll support)
     tmux set-option -t "$session" mouse on

@@ -13,6 +13,9 @@
  *   node src/a2a/xpo-agent.js --role dev --project xpollination-mindspace
  *   node src/a2a/xpo-agent.js --role pdsa --api http://remote:3101 --workspace ~/project
  *   node src/a2a/xpo-agent.js --role qa --llm ollama
+ *
+ * Interactive mode (LIAISON — Claude in foreground, body in background):
+ *   node src/a2a/xpo-agent.js --role liaison --interactive --session my-session
  */
 
 import { parseArgs } from 'node:util';
@@ -26,24 +29,27 @@ import { existsSync } from 'node:fs';
 
 const { values: args } = parseArgs({
   options: {
-    role:      { type: 'string', default: 'dev' },
-    project:   { type: 'string', default: 'xpollination-mindspace' },
-    api:       { type: 'string', default: process.env.MINDSPACE_API_URL || 'http://localhost:3101' },
-    'api-key': { type: 'string', default: process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '' },
-    workspace: { type: 'string', default: process.cwd() },
-    llm:       { type: 'string', default: 'claude' },
-    name:      { type: 'string' },
+    role:        { type: 'string', default: 'dev' },
+    project:     { type: 'string', default: 'xpollination-mindspace' },
+    api:         { type: 'string', default: process.env.MINDSPACE_API_URL || 'http://localhost:3101' },
+    'api-key':   { type: 'string', default: process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '' },
+    workspace:   { type: 'string', default: process.cwd() },
+    llm:         { type: 'string', default: 'claude' },
+    name:        { type: 'string' },
+    interactive: { type: 'boolean', default: false },
+    session:     { type: 'string' },
   },
 });
 
-const ROLE       = args.role;
-const PROJECT    = args.project;
-const API_URL    = args.api;
-const API_KEY    = args['api-key'];
-const WORKSPACE  = resolve(args.workspace);
-const LLM        = args.llm;
-const SHORT_ID   = randomUUID().slice(0, 8);
-const SESSION    = args.name || `runner-${ROLE}-${SHORT_ID}`;
+const ROLE        = args.role;
+const PROJECT     = args.project;
+const API_URL     = args.api;
+const API_KEY     = args['api-key'];
+const WORKSPACE   = resolve(args.workspace);
+const LLM         = args.llm;
+const INTERACTIVE = args.interactive;
+const SHORT_ID    = randomUUID().slice(0, 8);
+const SESSION     = args.session || args.name || `runner-${ROLE}-${SHORT_ID}`;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
@@ -86,7 +92,20 @@ function verifyPrerequisites() {
 // --- Tmux Session ---
 
 function createTmuxSession() {
-  // Idempotent — reuse existing session
+  if (INTERACTIVE) {
+    // Interactive mode: the LLM session is the CURRENT tmux pane.
+    // We don't create a new session — we deliver events to SESSION (which must exist).
+    try {
+      execFileSync('tmux', ['has-session', '-t', SESSION], { stdio: 'pipe' });
+      console.log(`[AGENT] Interactive mode: delivering events to ${SESSION}`);
+    } catch {
+      console.error(`[AGENT] Interactive mode requires an existing tmux session: ${SESSION}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Standard mode: create a new tmux session for the LLM
   try {
     execFileSync('tmux', ['has-session', '-t', SESSION], { stdio: 'pipe' });
     console.log(`[AGENT] Reusing tmux session: ${SESSION}`);
@@ -286,10 +305,12 @@ function registerShutdownHandlers() {
       } catch { /* best effort */ }
     }
 
-    try {
-      execFileSync('tmux', ['kill-session', '-t', SESSION], { stdio: 'pipe' });
-      console.log(`[AGENT] Killed tmux session: ${SESSION}`);
-    } catch { /* already gone */ }
+    if (!INTERACTIVE) {
+      try {
+        execFileSync('tmux', ['kill-session', '-t', SESSION], { stdio: 'pipe' });
+        console.log(`[AGENT] Killed tmux session: ${SESSION}`);
+      } catch { /* already gone */ }
+    }
 
     process.exit(0);
   };
