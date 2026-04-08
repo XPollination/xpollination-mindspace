@@ -324,10 +324,10 @@ authenticate_device_flow() {
         -H "Content-Type: application/json" \
         -d "{\"client_name\":\"claude-session ${session_name}\"}" 2>/dev/null)
 
-    local device_code user_code verification_uri
+    local device_code user_code verification_uri_complete
     device_code=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).device_code)}catch{}" "$response" 2>/dev/null)
     user_code=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).user_code)}catch{}" "$response" 2>/dev/null)
-    verification_uri=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).verification_uri)}catch{}" "$response" 2>/dev/null)
+    verification_uri_complete=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).verification_uri_complete)}catch{}" "$response" 2>/dev/null)
 
     if [[ -z "$device_code" || -z "$user_code" ]]; then
         echo "ERROR: Could not get device code from ${api_base}"
@@ -338,10 +338,7 @@ authenticate_device_flow() {
     fi
 
     echo ""
-    echo "╔══════════════════════════════════════════════╗"
-    echo "║  Go to: ${verification_uri}"
-    echo "║  Enter code: ${user_code}"
-    echo "╚══════════════════════════════════════════════╝"
+    echo "  Approve: ${verification_uri_complete}"
     echo ""
     echo "Waiting for approval..."
 

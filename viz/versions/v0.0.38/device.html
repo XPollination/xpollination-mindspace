@@ -36,6 +36,14 @@
     const btn = document.getElementById('approve-btn');
     const status = document.getElementById('status');
 
+    // Pre-fill from URL ?code= parameter (clickable link from CLI)
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    if (urlCode) {
+      let val = urlCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (val.length > 4) val = val.slice(0, 4) + '-' + val.slice(4, 8);
+      input.value = val;
+    }
+
     // Auto-format: add dash after 4 chars
     input.addEventListener('input', () => {
       let val = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');

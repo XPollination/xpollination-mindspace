@@ -64,6 +64,7 @@ router.post('/code', (req: Request, res: Response) => {
     device_code: deviceCode,
     user_code: userCode,
     verification_uri: verificationUri,
+    verification_uri_complete: `${verificationUri}?code=${userCode}`,
     expires_in: CODE_EXPIRY_MINUTES * 60,
     interval: POLL_INTERVAL_SECONDS,
   });
