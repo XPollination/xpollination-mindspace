@@ -54,6 +54,8 @@ const SESSION     = args.session || args.name || `runner-${ROLE}-${SHORT_ID}`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 const DELIVER_SCRIPT = resolve(__dirname, '../../scripts/a2a-deliver.js');
+const BRAIN_URL  = process.env.BRAIN_API_URL || 'http://localhost:3200';
+const BRAIN_SESSION = randomUUID();
 
 // --- State ---
 
@@ -134,24 +136,114 @@ function buildLlmCommand() {
 function buildSystemPrompt() {
   return `You are the ${ROLE.toUpperCase()} agent in XPollination Mindspace.
 
-## Identity
-- Role: ${ROLE}
-- Session: ${SESSION}
-- A2A Server: ${API_URL}
-- Project: ${PROJECT}
-
-## Communication — A2A Protocol
-The SSE bridge delivers task events to you as [TASK] messages.
-
+## A2A Commands
 When you receive a [TASK], do the work described. When done, deliver results:
-
   node ${DELIVER_SCRIPT} --slug <TASK_SLUG> --transition <STATUS> --role ${ROLE} --api-url ${API_URL} --api-key ${API_KEY}
-
 Add --findings "..." or --implementation "..." to include your work output.
 
 ## Workspace
 Working directory: ${WORKSPACE}
 Git is available. Commit and push your changes following the git protocol.`;
+}
+
+// --- Startup: Wait for LLM ---
+
+function waitForLlmReady(maxWait = 30) {
+  console.log(`[AGENT] Waiting for LLM to be ready...`);
+  const target = LLM === 'claude' ? 'claude' : LLM;
+  for (let i = 0; i < maxWait; i++) {
+    try {
+      const cmd = execFileSync('tmux', ['display-message', '-t', SESSION, '-p', '#{pane_current_command}'], { stdio: 'pipe' }).toString().trim();
+      if (cmd === target || cmd === 'claude') {
+        console.log(`[AGENT] LLM ready (${cmd}, ${i}s)`);
+        return true;
+      }
+    } catch { /* pane may not exist yet */ }
+    execFileSync('sleep', ['1']);
+  }
+  console.warn(`[AGENT] LLM not detected after ${maxWait}s — proceeding anyway`);
+  return false;
+}
+
+// --- Startup: Prompt Sequence ---
+
+async function sendStartupPrompts() {
+  console.log('[AGENT] Starting brain-first recovery...');
+
+  // PROMPT 1: Brain recovery — LLM reads its role definition from brain
+  await sendPromptAndWait(buildBrainRecoveryPrompt());
+
+  // PROMPT 2: Approval mode (LIAISON only)
+  if (ROLE === 'liaison') {
+    await sendPromptAndWait(buildApprovalModePrompt());
+  }
+
+  // PROMPT 3: Task state — LLM queries A2A for current tasks
+  await sendPromptAndWait(buildTaskStatePrompt());
+
+  // PROMPT 4: Ready confirmation
+  await sendPromptAndWait('Confirm you are ready. State: (1) your role and key boundaries, (2) number of tasks assigned to you, (3) READY. The A2A event stream will start delivering [TASK] messages after you confirm.');
+
+  // Wait for READY signal
+  await waitForReadySignal();
+  console.log('[AGENT] Handshake complete — starting event stream');
+}
+
+function buildBrainRecoveryPrompt() {
+  const curlCmd = `curl -s -X POST ${BRAIN_URL}/api/v1/memory -H 'Content-Type: application/json' -H 'Authorization: Bearer ${API_KEY}' -d '{"prompt":"Recovery protocol and role definition for ${ROLE} agent. What are my responsibilities, boundaries, and latest operational learnings?","agent_id":"agent-${ROLE}","agent_name":"${ROLE.toUpperCase()}","session_id":"${BRAIN_SESSION}","read_only":true}'`;
+
+  return `You are the ${ROLE.toUpperCase()} agent. Before doing anything, recover your role definition from the shared brain. Run this command and read the result carefully — it defines who you are and what you must never do:\n\n${curlCmd}`;
+}
+
+function buildApprovalModePrompt() {
+  return `Check your approval mode. Run: curl -s ${API_URL}/api/settings/liaison-approval-mode
+
+Modes:
+- autonomous: You decide immediately. Document reasoning in liaison_reasoning. Do NOT ask Thomas. Do NOT wait. The mode IS the answer. You also drive the pipeline proactively.
+- semi: Present full task details. STOP. Wait for Thomas to type his decision. Do NOT proceed until he responds.
+- manual: Present details. Tell Thomas to click Confirm in the viz UI. STOP.
+- auto-approval: Same as autonomous for approval transitions. Thomas decides on completions.
+
+CRITICAL: Check mode BEFORE every decision transition. Thomas can change it at any time. Never cache.`;
+}
+
+function buildTaskStatePrompt() {
+  return `Query your current tasks. Run: curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{"agent_id":"${agentId}","type":"OBJECT_QUERY","object_type":"task","filters":{"current_role":"${ROLE}"}}'
+
+Report: how many tasks are assigned to you and their statuses.`;
+}
+
+async function sendPromptAndWait(prompt, maxWait = 90) {
+  deliverToTmux(prompt);
+
+  // Wait for LLM to process — detect idle prompt (❯)
+  for (let i = 0; i < maxWait; i += 2) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-5'], { stdio: 'pipe' }).toString();
+      const lines = capture.split('\n').filter(l => l.trim());
+      const lastLine = lines[lines.length - 1] || '';
+      // Claude's idle prompt starts with ❯
+      if (lastLine.startsWith('❯') || lastLine.startsWith('> ')) {
+        return;
+      }
+    } catch { /* capture may fail */ }
+  }
+  console.warn(`[AGENT] Prompt may not have been processed within ${maxWait}s`);
+}
+
+async function waitForReadySignal(maxWait = 60) {
+  for (let i = 0; i < maxWait; i += 2) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-10'], { stdio: 'pipe' }).toString();
+      if (capture.includes('READY')) {
+        return true;
+      }
+    } catch { /* capture may fail */ }
+  }
+  console.warn('[AGENT] READY signal not detected — proceeding anyway');
+  return false;
 }
 
 // --- A2A Connection ---
@@ -339,16 +431,30 @@ async function main() {
   createTmuxSession();
   registerShutdownHandlers();
 
-  // Connect + listen loop with reconnect
+  // Step 1: Wait for LLM to be ready at prompt
+  if (!INTERACTIVE) {
+    waitForLlmReady();
+  }
+
+  // Step 2: Connect to A2A (need agent_id for task state prompt)
+  await connectToA2A();
+
+  // Step 3: Brain-first startup — send prompts, wait for handshake
+  if (!INTERACTIVE) {
+    await sendStartupPrompts();
+  }
+
+  // Step 4: SSE event loop — only after handshake
   while (true) {
     try {
-      await connectToA2A();
       startHeartbeatLoop().catch(() => {});
       await listenForEvents();
     } catch (err) {
       console.error(`[AGENT] ${err.message}. Reconnecting in ${reconnectDelay / 1000}s...`);
       await new Promise(r => setTimeout(r, reconnectDelay));
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+      // Reconnect A2A on stream failure
+      try { await connectToA2A(); } catch { /* will retry in next loop */ }
     }
   }
 }
