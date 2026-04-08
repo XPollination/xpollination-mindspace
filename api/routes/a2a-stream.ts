@@ -10,13 +10,25 @@ a2aStreamRouter.get('/:agent_id', (req, res) => {
 
   // Auth check: verify agent exists and is not disconnected
   const db = getDb();
-  const agent = db.prepare("SELECT id, current_role, project_slug FROM agents WHERE id = ? AND status != 'disconnected'").get(agent_id) as any;
+  const agent = db.prepare("SELECT id, current_role, project_slug, is_body FROM agents WHERE id = ? AND status != 'disconnected'").get(agent_id) as any;
   if (!agent) {
     // Allow special IDs for UI clients (liaison-chat, kanban)
     if (!['liaison-chat', 'kanban-ui'].includes(agent_id)) {
       res.status(404).json({ error: 'Agent not found or disconnected' });
       return;
     }
+  }
+
+  // Hard gate: only certified bodies (xpo-agent) can open SSE streams
+  if (agent && !agent.is_body) {
+    res.status(403).json({
+      type: 'ERROR',
+      error: 'SSE streams are managed by the A2A body (xpo-agent). ' +
+             'Do not open your own stream. Task events are delivered to ' +
+             'your terminal automatically by the body process. ' +
+             'To send results, use: node scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role <ROLE>'
+    });
+    return;
   }
 
   // Register SSE connection with role metadata

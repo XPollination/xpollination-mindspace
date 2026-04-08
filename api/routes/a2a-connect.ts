@@ -124,6 +124,9 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   const capabilities = twin.role?.capabilities;
   const capabilitiesJson = Array.isArray(capabilities) ? JSON.stringify(capabilities) : null;
 
+  // Body certification: authenticated API key + metadata.client === 'xpo-agent'
+  const isBody = (twin.metadata?.client === 'xpo-agent' && userId) ? 1 : 0;
+
   const existing = db.prepare(
     'SELECT id FROM agents WHERE user_id = ? AND name = ? AND (project_slug = ? OR (project_slug IS NULL AND ? IS NULL)) AND status != ?'
   ).get(userId, agent_name, projectSlug, projectSlug, 'disconnected') as any;
@@ -136,14 +139,14 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
     agentId = existing.id;
     isReconnect = true;
     db.prepare(
-      "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = 'active' WHERE id = ?"
-    ).run(agentSessionId, currentRole || null, capabilitiesJson, agentId);
+      "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, is_body = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = 'active' WHERE id = ?"
+    ).run(agentSessionId, currentRole || null, capabilitiesJson, isBody, agentId);
   } else {
     // New registration: INSERT new agent
     agentId = randomUUID();
     db.prepare(
-      'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active');
+      'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status, is_body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active', isBody);
   }
 
   // 7. Generate session token (JWT) for brain API auth
