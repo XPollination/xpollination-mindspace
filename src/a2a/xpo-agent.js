@@ -23,7 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync, chmodSync } from 'node:fs';
 
 // --- CLI Args ---
 
@@ -138,8 +138,10 @@ function buildSystemPrompt() {
 
 ## A2A Commands
 When you receive a [TASK], do the work described. When done, deliver results:
-  node ${DELIVER_SCRIPT} --slug <TASK_SLUG> --transition <STATUS> --role ${ROLE} --api-url ${API_URL} --api-key ${API_KEY}
+  node ${DELIVER_SCRIPT} --slug <TASK_SLUG> --transition <STATUS> --role ${ROLE}
 Add --findings "..." or --implementation "..." to include your work output.
+
+Do NOT use curl to call A2A endpoints directly. All A2A communication goes through a2a-deliver.js.
 
 ## Workspace
 Working directory: ${WORKSPACE}
@@ -273,6 +275,11 @@ async function connectToA2A() {
   sessionToken = data.session_token;
   reconnectDelay = 5000;
   console.log(`[AGENT] Connected. agent_id=${agentId}`);
+
+  // Write credentials file for a2a-deliver.js — the soul reads this, not the API key directly
+  const envFile = `/tmp/xpo-agent-${ROLE}.env`;
+  writeFileSync(envFile, `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`);
+  try { chmodSync(envFile, 0o600); } catch { /* best effort */ }
 }
 
 // --- SSE Event Stream ---
@@ -349,7 +356,7 @@ function buildInstruction(eventType, data) {
   };
   const instruction = instructions[eventType] || 'Process this task.';
 
-  const deliverCmd = `node ${DELIVER_SCRIPT} --slug ${slug} --transition ${nextStatus} --role ${ROLE} --api-url ${API_URL} --api-key ${API_KEY}`;
+  const deliverCmd = `node ${DELIVER_SCRIPT} --slug ${slug} --transition ${nextStatus} --role ${ROLE}`;
   const context = data.dna?.description?.substring(0, 150) || title;
 
   return `[TASK] ${slug} — ${title}. Role: ${ROLE}. ${instruction} Context: ${context}. When done: ${deliverCmd}`;

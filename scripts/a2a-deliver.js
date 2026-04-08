@@ -12,6 +12,21 @@
  */
 
 const { parseArgs } = require('node:util');
+const fs = require('node:fs');
+
+// Read credentials from body's env file if available (written by xpo-agent.js)
+function loadBodyEnv(role) {
+  try {
+    const envFile = `/tmp/xpo-agent-${role}.env`;
+    const content = fs.readFileSync(envFile, 'utf-8');
+    const vars = {};
+    for (const line of content.split('\n')) {
+      const [key, ...rest] = line.split('=');
+      if (key && rest.length) vars[key.trim()] = rest.join('=').trim();
+    }
+    return vars;
+  } catch { return {}; }
+}
 
 const { values: args } = parseArgs({
   options: {
@@ -26,12 +41,17 @@ const { values: args } = parseArgs({
     'qa-tests': { type: 'string', default: '' },
     'abstract-ref': { type: 'string', default: '' },
     'rework-reason': { type: 'string', default: '' },
-    'api-url': { type: 'string', default: process.env.MINDSPACE_API_URL || 'http://localhost:3101' },
-    'api-key': { type: 'string', default: process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '' },
+    'api-url': { type: 'string' },
+    'api-key': { type: 'string' },
     role: { type: 'string', default: process.env.AGENT_ROLE || 'dev' },
   },
   strict: false,
 });
+
+// Resolve API URL and key: CLI arg > body env file > process env > default
+const bodyEnv = loadBodyEnv(args.role);
+if (!args['api-url']) args['api-url'] = bodyEnv.A2A_API_URL || process.env.MINDSPACE_API_URL || 'http://localhost:3101';
+if (!args['api-key']) args['api-key'] = bodyEnv.A2A_API_KEY || process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '';
 
 if (!args.slug) {
   console.error('Usage: a2a-deliver.js --slug <task-slug> --transition <status> [--findings "..."] [--implementation "..."]');

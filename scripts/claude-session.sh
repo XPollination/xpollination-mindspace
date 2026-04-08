@@ -362,17 +362,19 @@ create_agents_session() {
         brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
     fi
 
-    # Write A2A-aware role prompts (slim — brain provides the real knowledge at startup)
+    # Write A2A-aware role prompts — no API key exposed to the soul
     local roles=("liaison" "pdsa" "dev" "qa")
     for role in "${roles[@]}"; do
         cat > "/tmp/claude-role-${role}.txt" << ROLE
 You are the ${role^^} agent connected to A2A in a 4-agent tmux session (claude-agents).
 Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA.
-API: ${api_url} | Project: xpollination-mindspace
+Project: xpollination-mindspace
 
 The A2A body runs in background and delivers [TASK] messages via SSE.
 To deliver results:
-  node ${deliver_script} --slug <SLUG> --transition <STATUS> --role ${role} --api-url ${api_url} --api-key ${brain_key}
+  node ${deliver_script} --slug <SLUG> --transition <STATUS> --role ${role}
+
+Do NOT use curl to call A2A endpoints directly. All A2A communication goes through a2a-deliver.js.
 ROLE
     done
 
@@ -553,16 +555,18 @@ create_agent_body_session() {
         } > "$launch_script"
         chmod +x "$launch_script"
 
-        # Write A2A-aware role prompt
+        # Write A2A-aware role prompt — no API key exposed to the soul
         cat > "/tmp/claude-role-${role}-a2a.txt" << ROLE
 You are the LIAISON agent connected to A2A.
-Session: ${session} | API: ${api_url} | Project: xpollination-mindspace
+Session: ${session} | Project: xpollination-mindspace
 
 The A2A body runs in background and delivers [TASK] messages to you via SSE events.
 You are also Thomas's interactive interface — respond to his direct questions.
 
 When you receive a [TASK], process it. To deliver results:
-  node ${agent_script%/src/a2a/xpo-agent.js}/scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role liaison --api-url ${api_url} --api-key ${brain_key}
+  node ${agent_script%/src/a2a/xpo-agent.js}/scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role liaison
+
+Do NOT use curl to call A2A endpoints directly. All A2A communication goes through a2a-deliver.js.
 ROLE
 
         tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
