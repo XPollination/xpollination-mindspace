@@ -292,6 +292,11 @@ Sessions:
 
 The session is created if it doesn't exist, or attached if it does.
 Can be run as thomas — auto-switches to developer via sudo.
+
+A2A server:
+  Default: http://localhost:3101 (BETA / mindspace-test container)
+  To use PROD: export MINDSPACE_API_URL=http://10.33.33.1:3100
+  Set this BEFORE running claude-session.
 EOF
     exit 1
 }
