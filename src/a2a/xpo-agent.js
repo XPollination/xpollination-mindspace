@@ -166,21 +166,26 @@ Git is available. Commit and push your changes following the git protocol.`;
 
 // --- Startup: Wait for LLM ---
 
-function waitForLlmReady(maxWait = 30) {
-  console.log(`[AGENT] Waiting for LLM to be ready...`);
+/**
+ * Poll pane until LLM process appears. No timeout — keeps checking until found.
+ * Returns a promise that resolves when LLM is detected.
+ */
+async function waitForLlmReady() {
+  console.log(`[AGENT] Polling for LLM...`);
   const target = LLM === 'claude' ? 'claude' : LLM;
-  for (let i = 0; i < maxWait; i++) {
+  let elapsed = 0;
+  while (true) {
     try {
       const cmd = execFileSync('tmux', ['display-message', '-t', SESSION, '-p', '#{pane_current_command}'], { stdio: 'pipe' }).toString().trim();
       if (cmd === target || cmd === 'claude') {
-        console.log(`[AGENT] LLM ready (${cmd}, ${i}s)`);
-        return true;
+        console.log(`[AGENT] LLM ready (${cmd}, ${elapsed}s)`);
+        return;
       }
     } catch { /* pane may not exist yet */ }
-    execFileSync('sleep', ['1']);
+    await new Promise(r => setTimeout(r, 2000));
+    elapsed += 2;
+    if (elapsed % 30 === 0) console.log(`[AGENT] Still waiting for LLM... (${elapsed}s)`);
   }
-  console.warn(`[AGENT] LLM not detected after ${maxWait}s — proceeding anyway`);
-  return false;
 }
 
 // --- Startup: Prompt Sequence ---
@@ -550,16 +555,19 @@ async function main() {
   createTmuxSession();
   registerShutdownHandlers();
 
-  // Step 1: Wait for LLM to be ready at prompt
-  waitForLlmReady();
-
-  // Step 2: Connect to A2A (need agent_id for task state prompt)
+  // Step 1: Connect to A2A immediately (don't wait for LLM)
   await connectToA2A();
 
-  // Step 3: Brain-first startup — send prompts, wait for handshake
-  await sendStartupPrompts();
+  // Step 2: In parallel — poll for LLM + start SSE
+  // LLM polling + prompt delivery runs independently of the event stream
+  (async () => {
+    await waitForLlmReady();
+    console.log('[AGENT] LLM detected — delivering startup prompts');
+    await sendStartupPrompts();
+    console.log('[AGENT] Handshake complete');
+  })().catch(err => console.error(`[AGENT] Prompt delivery failed: ${err.message}`));
 
-  // Step 4: SSE event loop — only after handshake
+  // Step 3: SSE event loop — starts immediately, doesn't wait for LLM
   while (true) {
     try {
       startHeartbeatLoop().catch(() => {});
