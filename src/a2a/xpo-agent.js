@@ -401,16 +401,16 @@ function handleEvent(eventType, data) {
 
   if (eventType === 'revoked') {
     console.log('[AGENT] Device key REVOKED by user. Shutting down gracefully.');
-    // Tell the LLM to stop, then exit it
-    deliverToTmux('/clear');
+    // Sequence: Escape (cancel active work) → wait → /exit (shut down Claude)
+    try {
+      execFileSync('tmux', ['send-keys', '-t', SESSION, 'Escape'], { timeout: 3000 });
+    } catch { /* best effort */ }
     setTimeout(() => {
       try {
-        // Send Escape to cancel any pending input, then /exit to shut down Claude
-        execFileSync('tmux', ['send-keys', '-t', SESSION, 'Escape'], { timeout: 3000 });
         execFileSync('tmux', ['send-keys', '-t', SESSION, '/exit', 'Enter'], { timeout: 3000 });
       } catch { /* best effort */ }
-      process.exit(0);
-    }, 2000);
+      setTimeout(() => process.exit(0), 2000);
+    }, 1000);
     return;
   } else if (actionableEvents.includes(eventType)) {
     console.log(`[AGENT] ${eventType}: ${data.task_slug || ''}`);

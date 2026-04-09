@@ -235,8 +235,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Authentication required' }));
         return;
       }
-      // D1: Redirect browser requests to /login with return_to
-      const returnTo = pathname !== '/' ? `?return_to=${encodeURIComponent(pathname)}` : '';
+      // D1: Redirect browser requests to /login with return_to (preserve query string)
+      const fullPath = pathname + url.search;
+      const returnTo = fullPath !== '/' ? `?return_to=${encodeURIComponent(fullPath)}` : '';
       res.writeHead(302, { 'Location': `/login${returnTo}` });
       res.end();
       return;
