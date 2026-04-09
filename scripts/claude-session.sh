@@ -305,9 +305,74 @@ is_on_hetzner() {
     [[ "$RUN_MODE" == "hetzner" ]]
 }
 
-# --- Device Flow Authentication ---
-# Replaces static API key. User approves in browser, CLI gets JWT.
-# See: docs/missions/mission-agent-oauth-sessions.md
+# --- Device Key Authentication ---
+# Ed25519 persistent device keys. Register once, connect forever.
+# See: docs/missions/mission-agent-oauth-sessions.md v2.1
+
+check_device_key() {
+    local api_base="$1"
+    local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
+    node_cmd="${node_cmd:-node}"
+
+    local server_host
+    server_host=$(echo "$api_base" | sed 's|https\?://||' | sed 's|:.*||' | sed 's|/.*||')
+    local key_file="${HOME}/.xp0/keys/${server_host}.json"
+
+    if [[ -f "$key_file" ]]; then
+        local key_id
+        key_id=$($node_cmd -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).key_id)}catch{}" "$key_file" 2>/dev/null)
+        if [[ -n "$key_id" ]]; then
+            XPO_KEY_FILE="$key_file"
+            echo "  Device key: ${key_id} (${key_file})"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+register_device_key() {
+    local api_base="$1"
+    local jwt_token="$2"
+    local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
+    node_cmd="${node_cmd:-node}"
+    local register_script="${PROJECT_ROOT}/scripts/device-key-register.js"
+
+    $node_cmd "$register_script" --api "$api_base" --token "$jwt_token"
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        local server_host
+        server_host=$(echo "$api_base" | sed 's|https\?://||' | sed 's|:.*||' | sed 's|/.*||')
+        XPO_KEY_FILE="${HOME}/.xp0/keys/${server_host}.json"
+        return 0
+    fi
+    return 1
+}
+
+authenticate_or_load_key() {
+    local api_base="$1"
+    local session_name="$2"
+
+    # 1. Check for existing device key
+    if check_device_key "$api_base"; then
+        return 0
+    fi
+
+    # 2. No key — run device flow to get bootstrap JWT
+    if authenticate_device_flow "$api_base" "$session_name"; then
+        # 3. Register device key using the JWT
+        if register_device_key "$api_base" "$XPO_SESSION_TOKEN"; then
+            echo "  Device key registered."
+            return 0
+        fi
+        # Key registration failed — fall back to JWT for this session
+        echo "  WARNING: Key registration failed. Using JWT (24h)."
+        return 0
+    fi
+    return 1
+}
+
+# --- Device Flow (bootstrap for first-time registration) ---
 
 authenticate_device_flow() {
     local api_base="$1"
@@ -423,10 +488,11 @@ create_agents_session() {
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
-    # Authenticate via OAuth device flow (replaces static API key for A2A)
+    # Authenticate via device key (persistent) or device flow (bootstrap)
     local XPO_SESSION_TOKEN=""
-    if ! authenticate_device_flow "${api_url}" "$session"; then
-        echo "WARNING: Device flow failed. Agents will not have A2A auth."
+    local XPO_KEY_FILE=""
+    if ! authenticate_or_load_key "${api_url}" "$session"; then
+        echo "WARNING: Authentication failed. Agents will not have A2A auth."
         echo "You can still use the agents but they won't receive SSE events."
     fi
 
@@ -494,12 +560,14 @@ ROLE
 
         # Start xpo-agent body in background — delivers SSE events to this pane
         # Body waits for LLM ready before sending brain recovery prompts
-        # Uses JWT from device flow for A2A auth, brain key only for knowledge access
-        local token_flag=""
-        if [[ -n "$XPO_SESSION_TOKEN" ]]; then
-            token_flag="--token ${XPO_SESSION_TOKEN}"
+        # Uses device key (persistent) or JWT (24h fallback) for A2A auth
+        local auth_flag=""
+        if [[ -n "$XPO_KEY_FILE" ]]; then
+            auth_flag="--key ${XPO_KEY_FILE}"
+        elif [[ -n "$XPO_SESSION_TOKEN" ]]; then
+            auth_flag="--token ${XPO_SESSION_TOKEN}"
         fi
-        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${pane} ${token_flag} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${pane} ${auth_flag} > /tmp/xpo-agent-${role}.log 2>&1 &"
         tmux send-keys -t "${pane}" "$body_cmd" Enter
 
         # Write Claude launch script (--allowedTools list too long for send-keys)
@@ -607,6 +675,18 @@ create_agent_body_session() {
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
+    # Authenticate via device key or device flow
+    local XPO_SESSION_TOKEN=""
+    local XPO_KEY_FILE=""
+    authenticate_or_load_key "${api_url}" "$session" || true
+
+    local auth_flag=""
+    if [[ -n "$XPO_KEY_FILE" ]]; then
+        auth_flag="--key ${XPO_KEY_FILE}"
+    elif [[ -n "$XPO_SESSION_TOKEN" ]]; then
+        auth_flag="--token ${XPO_SESSION_TOKEN}"
+    fi
+
     if [[ "$role" == "liaison" ]]; then
         # LIAISON mode: Claude runs in the pane (interactive), body runs in background.
         # Thomas types directly to Claude. SSE events arrive as [TASK] messages.
@@ -617,7 +697,7 @@ create_agent_body_session() {
         fi
 
         # Start body in background — delivers events to this session
-        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${session} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${session} ${auth_flag} > /tmp/xpo-agent-${role}.log 2>&1 &"
         tmux send-keys -t "${session}:0.0" "$body_cmd" Enter
 
         # Small delay for body to connect, then launch Claude
@@ -654,7 +734,7 @@ ROLE
         tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
     else
         # Standard mode: xpo-agent runs as foreground, creates nested tmux for LLM.
-        local launch_cmd="BRAIN_API_KEY=${brain_key} ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace}"
+        local launch_cmd="BRAIN_API_KEY=${brain_key} ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} ${auth_flag}"
 
         tmux new-session -d -s "$session" -c "$workspace"
 

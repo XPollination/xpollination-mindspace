@@ -20,10 +20,10 @@
 
 import { parseArgs } from 'node:util';
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createPrivateKey, sign } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 
 // --- CLI Args ---
 
@@ -39,6 +39,7 @@ const { values: args } = parseArgs({
     interactive: { type: 'boolean', default: false },
     session:     { type: 'string' },
     token:       { type: 'string' },
+    key:         { type: 'string' },  // path to ~/.xp0/keys/<server>.json
   },
 });
 
@@ -46,7 +47,20 @@ const ROLE        = args.role;
 const PROJECT     = args.project;
 const API_URL     = args.api;
 const API_KEY     = args['api-key'];
-const JWT_TOKEN   = args.token;  // OAuth device flow JWT — preferred over API key
+const JWT_TOKEN   = args.token;  // OAuth device flow JWT — fallback
+const KEY_FILE    = args.key;    // Ed25519 device key — preferred
+
+// Load device key if provided
+let deviceKey = null;
+if (KEY_FILE) {
+  try {
+    deviceKey = JSON.parse(readFileSync(KEY_FILE, 'utf-8'));
+    console.log(`[AGENT] Using device key: ${deviceKey.key_id}`);
+  } catch (err) {
+    console.error(`[AGENT] Cannot read key file: ${KEY_FILE} — ${err.message}`);
+    process.exit(1);
+  }
+}
 const WORKSPACE   = resolve(args.workspace);
 const LLM         = args.llm;
 const INTERACTIVE = args.interactive;
@@ -87,8 +101,8 @@ function verifyPrerequisites() {
     process.exit(1);
   }
 
-  if (!API_KEY && !JWT_TOKEN) {
-    console.error('[AGENT] No auth. Use --token (device flow JWT) or --api-key');
+  if (!deviceKey && !API_KEY && !JWT_TOKEN) {
+    console.error('[AGENT] No auth. Use --key (device key), --token (JWT), or --api-key');
     process.exit(1);
   }
 }
@@ -253,36 +267,76 @@ async function waitForReadySignal(maxWait = 60) {
 // --- A2A Connection ---
 
 async function connectToA2A() {
-  // Build connect request — use JWT (device flow) if available, fall back to API key
   const headers = { 'Content-Type': 'application/json' };
   const identity = { agent_name: `xpo-agent-${ROLE}-${SHORT_ID}` };
+  const twinBody = {
+    identity,
+    role: { current: ROLE, capabilities: [ROLE] },
+    project: { slug: PROJECT },
+    state: { status: 'active' },
+    metadata: { client: 'xpo-agent', version: '2.1.0', session: SESSION, workspace: WORKSPACE },
+  };
 
-  if (JWT_TOKEN) {
-    // OAuth device flow: JWT in Authorization header
+  let data;
+
+  if (deviceKey) {
+    // Ed25519 challenge-response (persistent device key)
+    // Step 1: Request challenge
+    identity.key_id = deviceKey.key_id;
+    const challengeRes = await fetch(`${API_URL}/a2a/connect`, {
+      method: 'POST', headers,
+      body: JSON.stringify(twinBody),
+    });
+    if (!challengeRes.ok) {
+      const err = await challengeRes.text();
+      throw new Error(`A2A connect failed: ${err}`);
+    }
+    const challengeData = await challengeRes.json();
+    if (challengeData.type === 'ERROR') throw new Error(`A2A error: ${challengeData.error}`);
+    if (challengeData.type !== 'CHALLENGE') throw new Error(`Expected CHALLENGE, got ${challengeData.type}`);
+
+    // Step 2: Sign nonce with private key
+    const privKey = createPrivateKey(deviceKey.private_key);
+    const nonce = Buffer.from(challengeData.challenge, 'base64');
+    const signature = sign(null, nonce, privKey);
+    identity.signature = signature.toString('base64');
+
+    // Step 3: Send signature for verification
+    const verifyRes = await fetch(`${API_URL}/a2a/connect`, {
+      method: 'POST', headers,
+      body: JSON.stringify(twinBody),
+    });
+    if (!verifyRes.ok) {
+      const err = await verifyRes.text();
+      throw new Error(`A2A verify failed: ${err}`);
+    }
+    data = await verifyRes.json();
+  } else if (JWT_TOKEN) {
+    // OAuth device flow JWT (24h fallback)
     headers['Authorization'] = `Bearer ${JWT_TOKEN}`;
+    const res = await fetch(`${API_URL}/a2a/connect`, {
+      method: 'POST', headers,
+      body: JSON.stringify(twinBody),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`A2A connect failed: ${err}`);
+    }
+    data = await res.json();
   } else if (API_KEY) {
-    // Legacy: API key in identity
+    // Legacy API key
     identity.api_key = API_KEY;
+    const res = await fetch(`${API_URL}/a2a/connect`, {
+      method: 'POST', headers,
+      body: JSON.stringify(twinBody),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`A2A connect failed: ${err}`);
+    }
+    data = await res.json();
   }
 
-  const res = await fetch(`${API_URL}/a2a/connect`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      identity,
-      role: { current: ROLE, capabilities: [ROLE] },
-      project: { slug: PROJECT },
-      state: { status: 'active' },
-      metadata: { client: 'xpo-agent', version: '2.0.0', session: SESSION, workspace: WORKSPACE },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`A2A connect failed: ${err}`);
-  }
-
-  const data = await res.json();
   if (data.type === 'ERROR') throw new Error(`A2A error: ${data.error}`);
 
   agentId = data.agent_id;
@@ -290,11 +344,13 @@ async function connectToA2A() {
   reconnectDelay = 5000;
   console.log(`[AGENT] Connected. agent_id=${agentId}`);
 
-  // Write credentials file for a2a-deliver.js — the soul reads this, not the key directly
+  // Write credentials file for a2a-deliver.js
   const envFile = `/tmp/xpo-agent-${ROLE}.env`;
-  const envContent = JWT_TOKEN
-    ? `A2A_API_URL=${API_URL}\nA2A_TOKEN=${JWT_TOKEN}\nA2A_AGENT_ID=${agentId}\n`
-    : `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`;
+  const envContent = deviceKey
+    ? `A2A_API_URL=${API_URL}\nA2A_KEY_FILE=${KEY_FILE}\nA2A_AGENT_ID=${agentId}\n`
+    : JWT_TOKEN
+      ? `A2A_API_URL=${API_URL}\nA2A_TOKEN=${JWT_TOKEN}\nA2A_AGENT_ID=${agentId}\n`
+      : `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`;
   writeFileSync(envFile, envContent);
   try { chmodSync(envFile, 0o600); } catch { /* best effort */ }
 }
