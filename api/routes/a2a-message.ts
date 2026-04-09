@@ -360,6 +360,11 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
         const params: any[] = [];
         if (projectSlug) { sql += ' AND project_slug = ?'; params.push(projectSlug); }
         if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
+        if (filters?.status_not_in) {
+          const excluded = filters.status_not_in.split(',').map((s: string) => s.trim());
+          sql += ` AND status NOT IN (${excluded.map(() => '?').join(',')})`;
+          params.push(...excluded);
+        }
         if (filters?.current_role) { sql += ' AND current_role = ?'; params.push(filters.current_role); }
         if (filters?.slug) { sql += ' AND slug = ?'; params.push(filters.slug); }
         if (filters?.id) { sql += ' AND id = ?'; params.push(filters.id); }

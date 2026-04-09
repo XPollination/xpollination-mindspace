@@ -542,6 +542,7 @@ RULES:
 - Do NOT use curl to call A2A endpoints — all A2A goes through a2a-deliver.cjs
 - Do NOT run /monitor or agent-monitor.cjs — the body handles event delivery
 - Do NOT query brain for your role definition — CLAUDE.md already has it
+- Do NOT query the database directly (better-sqlite3, SQL) — use a2a-deliver.cjs or interface-cli.js
 - Your role definition is in CLAUDE.md (auto-loaded). Brain is for task context only.
 ROLE
     done
@@ -760,6 +761,7 @@ RULES:
 - Do NOT use curl to call A2A endpoints — all A2A goes through a2a-deliver.cjs
 - Do NOT run /monitor or agent-monitor.cjs — the body handles event delivery
 - Do NOT query brain for your role definition — CLAUDE.md already has it
+- Do NOT query the database directly (better-sqlite3, SQL) — use a2a-deliver.cjs or interface-cli.js
 - Your role definition is in CLAUDE.md (auto-loaded). Brain is for task context only.
 ROLE
 

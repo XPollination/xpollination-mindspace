@@ -226,9 +226,9 @@ CRITICAL: Check mode BEFORE every decision transition. Thomas can change it at a
 }
 
 function buildTaskStatePrompt() {
-  return `Query your current tasks. Run: curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{"agent_id":"${agentId}","type":"OBJECT_QUERY","object_type":"task","filters":{"current_role":"${ROLE}"}}'
+  return `Query your active tasks. Run: curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{"agent_id":"${agentId}","type":"OBJECT_QUERY","object_type":"task","filters":{"current_role":"${ROLE}","status_not_in":"complete,cancelled,blocked"}}'
 
-Report: how many tasks are assigned to you and their statuses.`;
+Report briefly: how many tasks and their statuses. Do NOT query the database directly.`;
 }
 
 async function sendPromptAndWait(prompt, maxWait = 90) {
