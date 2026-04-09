@@ -287,6 +287,16 @@ async function connectToA2A() {
       method: 'POST', headers,
       body: JSON.stringify(twinBody),
     });
+    if (challengeRes.status === 401) {
+      console.error('[AGENT] Device key revoked or invalid. Shutting down.');
+      writeStatus({ connected: false, sse: 'revoked' });
+      try { execFileSync('tmux', ['send-keys', '-t', SESSION, 'Escape'], { timeout: 3000 }); } catch {}
+      setTimeout(() => {
+        try { execFileSync('tmux', ['send-keys', '-t', SESSION, '/exit', 'Enter'], { timeout: 3000 }); } catch {}
+        setTimeout(() => process.exit(1), 2000);
+      }, 1000);
+      return;
+    }
     if (!challengeRes.ok) {
       const err = await challengeRes.text();
       throw new Error(`A2A connect failed: ${err}`);
