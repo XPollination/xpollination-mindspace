@@ -1,182 +1,202 @@
-# Agent OAuth Sessions — Device Flow Auth + Session Management
+# Agent Sessions — Persistent Device Keys + Connection Management
 
 **Ref:** MISSION-AGENT-OAUTH-SESSIONS
-**Version:** v1.0.0
-**Date:** 2026-04-08
-**Authors:** Thomas Pichler + LIAISON Agent
-**Status:** Draft — design complete, ready for implementation
-**Supersedes:** Static API key authentication for agents (.env BRAIN_API_KEY)
+**Version:** v2.0.0
+**Date:** 2026-04-09
+**Authors:** Thomas Pichler + Claude (interactive design session)
+**Status:** In Progress
+**Supersedes:** v1.0.0 (device flow with 24h JWT)
 
 ---
 
-## Problem Statement
+## Problem Statement (v2)
 
-Agents authenticate with a static API key from `.env`. When the key is rotated (via viz settings), the `.env` file is not updated. Agents die silently. Nobody asks for the new key. Nobody updates the file. The `.env` and the database are out of sync.
+v1 solved the static API key problem with OAuth device flow + 24h JWTs. But 24h expiry creates a new problem: **agent sessions die on weekends.**
 
-This doesn't scale:
-- Static key = single shared secret for all agents
-- Key rotation breaks all agents with no recovery path
-- Robin can't use his own identity — he'd need Thomas's API key
-- No visibility into which agent sessions are active
-- No way to revoke a specific agent's access
+Thomas starts `claude-session a2a-team` Friday afternoon. Agents build context over hours. Saturday morning, JWT expires. A2A bodies silently lose connectivity. Monday: 4 agents with intact Claude context but no A2A — orphaned.
+
+The session IS the work. Kill the session = kill the context. A 24h timer is hostile to the use case.
+
+Additionally:
+- Every `claude-session` run requires a new browser approval (friction)
+- Server reboot = re-authenticate (friction)
+- No visibility into which agent connections are active
+- The body is LLM-agnostic (Claude, Cursor, ChatGPT, Grok, local AI) — credentials must NOT live in `~/.claude/`
 
 ---
 
-## Solution: Device Flow OAuth + Session Management
+## Solution: Persistent Device Keys + Connection Tracking
 
-### Authentication: Device Flow
+### Mental Model: SSH Keys for Agent Sessions
 
-Standard OAuth device flow (RFC 8628). Same pattern as `gh auth login`.
-
-```
-Thomas runs:  claude-session a2a-team
-
-Script:       POST /api/auth/device
-              → { device_code: "abc123", user_code: "ABCD-1234", 
-                  verification_url: "https://mindspace.xpollination.earth/device" }
-
-Script prints: ┌─────────────────────────────────────────────┐
-               │  Go to: mindspace.xpollination.earth/device  │
-               │  Enter code: ABCD-1234                       │
-               └─────────────────────────────────────────────┘
-
-Thomas:       Opens URL on phone/laptop (already logged in)
-              Enters code → "Allow Claude Session to connect?" → Allow
-
-Script:       Polls GET /api/auth/device/abc123
-              → pending... pending... → { token: "jwt..." }
-
-Script:       JWT received → passes to xpo-agent bodies
-              Bodies authenticate with JWT (not API key)
-              4 agents start. Done.
-```
-
-**Why device flow:**
-- Works over SSH (headless server — no browser on Hetzner)
-- Thomas approves on ANY device (phone, laptop, tablet)
-- Token is per-session, short-lived (24h)
-- No static secrets anywhere
-- Robin uses the same flow with his own Google login
-
-### Session Management: Settings Tab
-
-The viz settings tab shows active agent sessions:
+Like SSH: register a key once per machine, connect unlimited times until revoked.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  Active Agent Sessions                                       │
-├──────────┬──────────┬─────────────┬──────────┬──────────────┤
-│  Role    │  Body    │  Connected  │  Expires │  Action      │
-├──────────┼──────────┼─────────────┼──────────┼──────────────┤
-│  LIAISON │  online  │  18:40 CET  │  23h     │  [Disconnect]│
-│  PDSA    │  online  │  18:40 CET  │  23h     │  [Disconnect]│
-│  DEV     │  online  │  18:40 CET  │  23h     │  [Disconnect]│
-│  QA      │  online  │  18:40 CET  │  23h     │  [Disconnect]│
-├──────────┴──────────┴─────────────┴──────────┴──────────────┤
-│  [Disconnect All]                          [Rotate Session]  │
-└──────────────────────────────────────────────────────────────┘
+1 User (Thomas)
+└── N Device Keys (one per machine)
+    ├── 🔑 "Hetzner CX22" — registered 2026-04-09
+    │   ├── liaison (a2a-team:0.0) — last seen: 30s ago
+    │   ├── pdsa (a2a-team:0.1) — last seen: 45s ago
+    │   ├── dev (a2a-team:0.2) — last seen: 1m ago
+    │   └── qa (a2a-team:0.3) — last seen: 2m ago
+    │
+    └── 🔑 "MacBook Pro" — registered 2026-04-05
+        └── liaison (agent-liaison) — last seen: 3 days ago
 ```
 
-- **Disconnect** → revokes the session token → body gets 401 → exits cleanly
-- **Disconnect All** → kills all agent sessions
-- **Rotate Session** → issues new tokens, invalidates old ones
+### Key Lifecycle
 
-### What This Replaces
+```
+FIRST TIME (per machine):
+  claude-session a2a-team
+    → No credential found at ~/.xpollination/keys/<server>.key
+    → Device flow: POST /api/auth/device/code → user_code
+    → User approves in browser (one time)
+    → Server generates keypair, returns private key
+    → Stored at ~/.xpollination/keys/<server-fingerprint>.key
+    → Bodies connect with key. Done.
 
-| Before | After |
-|--------|-------|
-| `.env` BRAIN_API_KEY for A2A auth (static) | OAuth device flow (per-session JWT) |
-| Key rotation breaks agents silently | Token revocation disconnects cleanly |
-| One key for all agents | Per-user tokens (Thomas, Robin, each have own) |
-| No visibility | Settings tab shows active sessions |
-| No revocation | Disconnect button per agent |
-| Robin needs Thomas's key | Robin logs in with his own Google account |
+EVERY SUBSEQUENT TIME (same machine):
+  claude-session a2a-team
+    → Credential found at ~/.xpollination/keys/<server>.key
+    → Bodies connect with key. No browser needed. Instant.
+    → Works after reboot, after tmux kill, after weeks.
 
-### What Stays
+  claude-session agent-liaison
+    → Same key. No re-auth. Instant.
 
-**BRAIN_API_KEY remains** — but ONLY for brain (knowledge) API access (`localhost:3200`). It is NOT used for A2A agent authentication. Brain is a separate infrastructure service with its own auth. The key is managed by the server admin in `.env` or brain config, not through viz settings.
+REVOCATION (from Settings page):
+  Thomas clicks "Revoke" on "Hetzner CX22" key
+    → Server marks key as revoked
+    → All SSE streams authenticated with that key: closed
+    → Bodies detect disconnect → exit gracefully
+    → Next claude-session run: key rejected → triggers new device flow
+```
 
-The viz settings "API Key" rotation feature was for A2A agent keys — with OAuth, that's replaced by session management (connect/disconnect). The settings tab should clarify: the API key shown is for **brain knowledge access only**, not for agent authentication.
+### Credential Storage
+
+Credentials live in `~/.xpollination/` (NOT `~/.claude/`).
+
+**Why:** The xpo-agent body is LLM-agnostic. It works with Claude Code, Cursor, ChatGPT, Grok, any local AI. The credential belongs to the xpollination identity system, not any specific LLM.
+
+```
+~/.xpollination/
+├── keys/
+│   ├── beta-mindspace.key         # Key for beta server
+│   └── mindspace.key              # Key for prod server
+└── config.json                    # Optional: default server, preferences
+```
+
+### What Changes from v1
+
+| v1 (24h JWT) | v2 (Persistent Keys) |
+|---|---|
+| Authenticate every `claude-session` run | Authenticate once per machine |
+| 24h expiry kills weekend sessions | No expiry — lives until revoked |
+| JWT is stateless (can't revoke cleanly) | Key-based (server-side session table) |
+| Credential in env var / /tmp file | Credential in `~/.xpollination/keys/` |
+| Per-session token | Per-machine key with N connections |
+| No connection tracking | Server tracks every agent connection |
+| Settings shows "Active Sessions" (useless) | Settings shows "Connected Devices" with agent details |
 
 ---
 
 ## Architecture
 
+### Data Model
+
+```sql
+-- One row per registered device key (machine)
+CREATE TABLE device_keys (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,                    -- "Hetzner CX22", "MacBook Pro"
+  public_key_hash TEXT NOT NULL UNIQUE,  -- SHA-256 of public key
+  created_at TEXT DEFAULT (datetime('now')),
+  last_active TEXT,                      -- Updated on any connection activity
+  revoked_at TEXT,                       -- NULL = active, non-NULL = revoked
+  UNIQUE(user_id, name)
+);
+
+-- One row per active agent connection (body)
+CREATE TABLE agent_connections (
+  id TEXT PRIMARY KEY,
+  device_key_id TEXT NOT NULL REFERENCES device_keys(id),
+  agent_name TEXT NOT NULL,              -- "liaison", "pdsa", "dev", "qa"
+  session_name TEXT,                     -- "a2a-team", "agent-liaison"
+  connected_at TEXT DEFAULT (datetime('now')),
+  last_heartbeat TEXT,
+  disconnected_at TEXT,                  -- NULL = connected
+  UNIQUE(device_key_id, agent_name, session_name)
+);
+```
+
+### Authentication Flow
+
 ```
 claude-session.sh
   │
-  ├─ POST /api/auth/device → device_code + user_code
-  ├─ Print verification URL + code
-  ├─ Poll GET /api/auth/device/{code} until approved
-  ├─ Receive JWT
+  ├─ Check ~/.xpollination/keys/<server>.key
+  │   ├─ EXISTS + VALID → skip device flow
+  │   └─ MISSING or REVOKED → device flow:
+  │       ├─ POST /api/auth/device/code → user_code
+  │       ├─ Print clickable URL: https://beta-mindspace.../device?code=XXXX
+  │       ├─ Poll /api/auth/device/token until approved
+  │       ├─ Receive keypair → store private key at ~/.xpollination/keys/<server>.key
+  │       └─ Continue
   │
-  ├─ Start xpo-agent bodies with JWT (not API key):
-  │   xpo-agent.js --role pdsa --token $JWT
+  ├─ Start xpo-agent bodies with key path:
+  │   xpo-agent.js --role pdsa --key ~/.xpollination/keys/<server>.key
   │
   └─ xpo-agent.js:
-      ├─ POST /a2a/connect with Authorization: Bearer $JWT
-      ├─ Server sees JWT → auth.method = 'jwt' → can_stream = 1
-      ├─ Write JWT to /tmp/xpo-agent-{role}.env (for a2a-deliver.js)
-      └─ a2a-deliver.js reads JWT from env file → authenticates as the user
+      ├─ Sign challenge with private key → POST /a2a/connect
+      ├─ Server validates signature against stored public key
+      ├─ Registers agent_connection (role, session_name)
+      ├─ SSE stream opened → heartbeats update last_heartbeat
+      └─ On disconnect: agent_connection.disconnected_at set
 ```
 
-### Token Lifecycle
+### Revocation Flow (Reverse of Login)
 
 ```
-Device flow → JWT issued (24h TTL)
-  → Body connects with JWT → can_stream = 1
-  → Body writes JWT to env file → deliver script reads it
-  → Token expires after 24h → body gets 401 → exits
-  → Thomas restarts claude-session → new device flow → new JWT
-  
-OR:
-  → Thomas clicks Disconnect in settings → token revoked immediately
-  → Body gets 401 on next heartbeat → exits cleanly
+User clicks "Revoke" on Connected Devices page
+  → PATCH /api/auth/device-keys/:id { revoked_at: now() }
+  → Server finds all active SSE streams for this key
+  → Server sends SSE event: { type: "REVOKED" }
+  → Server closes all SSE streams for this key
+  → Each body receives REVOKED event:
+      ├─ Logs "Session revoked by user"
+      ├─ Optionally sends message to LLM pane: "A2A revoked. Run claude-session to reconnect."
+      └─ Body process exits
+  → Next claude-session run: key rejected (revoked) → triggers new device flow
 ```
 
 ---
 
-## Implementation Plan
+## Settings UI: Connected Devices
 
-### Phase 1: Device Flow Auth Endpoints
+Replace "Active Sessions" with "Connected Devices":
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/auth/device` | POST | Start device flow → returns device_code, user_code, verification_url |
-| `/api/auth/device/:code` | GET | Poll for approval → returns pending or token |
-| `/device` | GET (viz) | Verification page — user enters code, approves |
-
-### Phase 2: claude-session.sh Integration
-
-Replace API key resolution with device flow:
-```bash
-# OLD:
-brain_key=$(grep BRAIN_API_KEY .env)
-export BRAIN_API_KEY=$brain_key
-
-# NEW:
-JWT=$(device_flow_auth)  # handles POST + print + poll
-export XPO_SESSION_TOKEN=$JWT
 ```
-
-### Phase 3: xpo-agent.js Token Mode
-
-Add `--token` flag alongside `--api-key`:
-```bash
-xpo-agent.js --role pdsa --token $JWT
+┌─────────────────────────────────────────────────────────────────┐
+│  Connected Devices                                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  🔑 Hetzner CX22              registered Apr 9 · active now    │
+│  ├── liaison (a2a-team)        last seen: 30s ago               │
+│  ├── pdsa (a2a-team)           last seen: 45s ago               │
+│  ├── dev (a2a-team)            last seen: 1m ago                │
+│  └── qa (a2a-team)             last seen: 2m ago                │
+│                                                    [Revoke Key] │
+│                                                                 │
+│  🔑 MacBook Pro                registered Apr 5 · 3 days ago   │
+│  └── No active agents                                          │
+│                                                    [Revoke Key] │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  4 active agents across 2 devices          [Revoke All Devices] │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-Body connects with JWT in Authorization header instead of API key in identity.
-
-### Phase 4: Settings Tab — Active Sessions UI
-
-- API: `GET /api/sessions` → list active agent sessions
-- API: `DELETE /api/sessions/:id` → revoke session
-- Viz: settings page shows session table with disconnect buttons
-
-### Phase 5: Remove +Team from Viz
-
-The viz +Team buttons spawn agents inside Docker (deprecated). Remove them. Agent spawning is now `claude-session` only.
 
 ---
 
@@ -184,12 +204,14 @@ The viz +Team buttons spawn agents inside Docker (deprecated). Remove them. Agen
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D1 | Device flow (RFC 8628) | Headless-compatible. Works over SSH. Standard. |
-| D2 | Per-session JWT, not static API key | No key rotation problem. Per-user identity. Revocable. |
-| D3 | Settings tab for session management | Visibility + control. Thomas sees what's connected. |
-| D4 | Remove +Team from viz | Agents run on host via claude-session, not in Docker container. |
-| D5 | a2a-deliver.js reads JWT from body's env file | Soul never has credentials in its prompt. Body mediates. |
-| D6 | 24h token TTL | Long enough for a work day. Short enough for security. Restart = re-auth. |
+| D1 | Device flow for first-time registration only | Subsequent connections use stored key. No browser needed. |
+| D2 | No token expiry — revocation only | Agent sessions must survive weekends. 24h expiry is hostile. |
+| D3 | Per-machine key, not per-session | One key covers all `claude-session` invocations on that machine. |
+| D4 | Credentials in `~/.xpollination/keys/` | Body is LLM-agnostic. Not tied to Claude, Cursor, or any provider. |
+| D5 | Server tracks agent connections per key | Visibility into what's connected. Heartbeats show liveness. |
+| D6 | Revoke key = disconnect all agents on that machine | Clean, predictable. One action, all connections dropped. |
+| D7 | Unlimited bodies per key | Like SSH: one key, unlimited sessions. No artificial limits. |
+| D8 | Connected Devices replaces Active Sessions | Current Active Sessions is not useful. Devices + agents is. |
 
 ---
 
@@ -197,9 +219,50 @@ The viz +Team buttons spawn agents inside Docker (deprecated). Remove them. Agen
 
 | Property | How |
 |----------|-----|
-| No static secrets | Device flow issues per-session tokens |
-| User-scoped | Each token tied to a user (Thomas, Robin) |
-| Revocable | Settings tab → Disconnect → immediate 401 |
-| Time-limited | 24h TTL, refresh on restart |
-| Headless-safe | Device flow works over SSH (no browser on server needed) |
-| Soul isolation | JWT in body's env file, not in prompt |
+| No static secrets in `.env` | Device keys replace API keys for A2A auth |
+| User-scoped | Each key tied to a user (Thomas, Robin) |
+| Machine-scoped | Each key tied to a machine (Hetzner, MacBook) |
+| Revocable | Settings → Revoke Key → immediate disconnect |
+| No expiry timer | Sessions survive weekends, holidays, vacations |
+| Headless-safe | Device flow works over SSH (first time only) |
+| LLM-agnostic | `~/.xpollination/` not tied to any AI provider |
+| Soul isolation | Key in file, not in LLM prompt |
+
+---
+
+## Implementation Phases
+
+### Phase 1: Device Keys Table + Registration
+- Migration: `device_keys` + `agent_connections` tables
+- Endpoint: `/api/auth/device-keys` — register, list, revoke
+- Update device flow to generate + store keypair on approval
+
+### Phase 2: Key-Based Auth in xpo-agent
+- `--key` flag replaces `--token` in xpo-agent.js
+- Challenge-response auth on `/a2a/connect`
+- Agent connection tracking with heartbeats
+
+### Phase 3: claude-session Key Management
+- Check `~/.xpollination/keys/` before triggering device flow
+- Store key on first registration
+- All `claude-session` variants use the same key
+
+### Phase 4: Connected Devices UI
+- Settings page: list device keys with nested agent connections
+- Revoke button per key
+- Real-time last-seen via heartbeat polling
+
+### Phase 5: Graceful Revocation
+- SSE REVOKED event → body exits
+- Body sends farewell message to LLM pane
+- Cleanup of stale connections (no heartbeat > 5min)
+
+---
+
+## What Stays
+
+**BRAIN_API_KEY remains** — for brain knowledge API access only (`localhost:3200`). Separate infrastructure, separate auth. Managed in `.env`, not through viz settings.
+
+**Device flow remains** — but only for first-time key registration, not every session start.
+
+**The settings page API Key** — for programmatic Brain API access. Not for agent auth.
