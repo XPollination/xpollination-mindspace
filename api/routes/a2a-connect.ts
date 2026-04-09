@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'node:crypto';
 import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { getDb } from '../db/connection.js';
+import { createChallenge, consumeChallenge, cleanupExpired } from '../lib/challenge-store.js';
 
 export const a2aConnectRouter = Router();
 
@@ -21,16 +23,54 @@ function getAvailableActions(role: string | null): string[] {
   return ROLE_ACTIONS[role || 'dev'] || ROLE_ACTIONS.dev;
 }
 
+type AuthResult =
+  | { userId: string; method: 'api_key' | 'jwt'; deviceKeyId?: undefined }
+  | { userId: string; method: 'device_key'; deviceKeyId: string }
+  | { userId: null; method: 'device_key_challenge'; deviceKeyId?: undefined }
+  | null;
+
 /**
- * Authenticate via API key (SHA-256 hash lookup) or JWT.
- * Returns userId or null.
+ * Authenticate via device key, API key, or JWT.
+ * Returns userId + method, or a challenge signal for device key flow.
  */
-function authenticateIdentity(req: Request, apiKey?: string): { userId: string; method: 'api_key' | 'jwt' } | null {
+function authenticateIdentity(req: Request, identity: any): AuthResult {
   const db = getDb();
 
-  // Path 1: API key in twin identity (agents, CLI)
-  if (apiKey) {
-    const keyHash = createHash('sha256').update(apiKey).digest('hex');
+  // Path 1: Ed25519 device key (challenge-response)
+  if (identity?.key_id) {
+    const keyRow = db.prepare(
+      'SELECT id, user_id, public_key_pem, revoked_at FROM device_keys WHERE id = ?'
+    ).get(identity.key_id) as any;
+
+    if (!keyRow || keyRow.revoked_at) return null;
+
+    if (!identity.signature) {
+      // Step 1: Client requests challenge — return signal (handled in route)
+      return { userId: null, method: 'device_key_challenge' };
+    }
+
+    // Step 2: Verify Ed25519 signature against stored public key
+    const nonce = consumeChallenge(identity.key_id);
+    if (!nonce) return null; // no pending challenge or expired
+
+    try {
+      const pubKey = crypto.createPublicKey(keyRow.public_key_pem);
+      const sigBuf = Buffer.from(identity.signature, 'base64');
+      const valid = crypto.verify(null, nonce, pubKey, sigBuf);
+      if (!valid) return null;
+    } catch {
+      return null;
+    }
+
+    // Update last_active on successful auth
+    db.prepare("UPDATE device_keys SET last_active = datetime('now') WHERE id = ?").run(keyRow.id);
+
+    return { userId: keyRow.user_id, method: 'device_key', deviceKeyId: keyRow.id };
+  }
+
+  // Path 2: API key in twin identity (agents, CLI)
+  if (identity?.api_key) {
+    const keyHash = createHash('sha256').update(identity.api_key).digest('hex');
     const keyRow = db.prepare(
       `SELECT ak.id AS key_id, ak.revoked_at, u.id AS user_id
        FROM api_keys ak
@@ -42,7 +82,7 @@ function authenticateIdentity(req: Request, apiKey?: string): { userId: string; 
     return { userId: keyRow.user_id, method: 'api_key' };
   }
 
-  // Path 2: JWT from Authorization header (browser — viz proxy sets this from ms_session cookie)
+  // Path 3: JWT from Authorization header (browser — viz proxy sets this from ms_session cookie)
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
@@ -54,6 +94,9 @@ function authenticateIdentity(req: Request, apiKey?: string): { userId: string; 
 
   return null;
 }
+
+// Cleanup expired challenges every 5 minutes
+setInterval(cleanupExpired, 5 * 60 * 1000);
 
 // POST /a2a/connect — A2A CHECKIN handler
 a2aConnectRouter.post('/', (req: Request, res: Response) => {
@@ -78,13 +121,21 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  // 3. Authenticate via API key or JWT
-  const auth = authenticateIdentity(req, api_key);
+  // 3. Authenticate via device key, API key, or JWT
+  const auth = authenticateIdentity(req, twin.identity);
   if (!auth) {
-    res.status(401).json({ type: 'ERROR', error: 'Authentication failed: invalid API key or JWT' });
+    res.status(401).json({ type: 'ERROR', error: 'Authentication failed: invalid device key, API key, or JWT' });
     return;
   }
-  const userId = auth.userId;
+
+  // Device key challenge-response step 1: return nonce
+  if (auth.method === 'device_key_challenge') {
+    const challenge = createChallenge(twin.identity.key_id);
+    res.status(200).json({ type: 'CHALLENGE', challenge, expires_in: 60 });
+    return;
+  }
+
+  const userId = auth.userId as string;
 
   const db = getDb();
 
@@ -131,6 +182,9 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   if (auth.method === 'jwt') {
     // Browser user session — always allowed to stream (UI needs real-time updates)
     canStream = 1;
+  } else if (auth.method === 'device_key' && twin.metadata?.client === 'xpo-agent') {
+    // Ed25519 device key — persistent auth, always allowed to stream
+    canStream = 1;
   } else if (auth.method === 'api_key' && twin.metadata?.client === 'xpo-agent') {
     // Certified A2A body — authenticated + declared itself as body
     canStream = 1;
@@ -144,19 +198,33 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   let agentId: string;
   let isReconnect = false;
 
+  const deviceKeyId = auth.method === 'device_key' ? auth.deviceKeyId : null;
+
   if (existing) {
     // Re-registration: UPDATE existing agent
     agentId = existing.id;
     isReconnect = true;
     db.prepare(
-      "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, can_stream = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = 'active' WHERE id = ?"
-    ).run(agentSessionId, currentRole || null, capabilitiesJson, canStream, agentId);
+      "UPDATE agents SET session_id = ?, current_role = ?, capabilities = ?, can_stream = ?, device_key_id = ?, connected_at = datetime('now'), last_seen = datetime('now'), status = 'active' WHERE id = ?"
+    ).run(agentSessionId, currentRole || null, capabilitiesJson, canStream, deviceKeyId, agentId);
   } else {
     // New registration: INSERT new agent
     agentId = randomUUID();
     db.prepare(
-      'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status, can_stream) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active', canStream);
+      'INSERT INTO agents (id, user_id, name, current_role, capabilities, project_slug, session_id, status, can_stream, device_key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(agentId, userId, agent_name, currentRole || null, capabilitiesJson, projectSlug, agentSessionId, 'active', canStream, deviceKeyId);
+  }
+
+  // Track agent connection for device key (Connected Devices UI)
+  if (deviceKeyId) {
+    // Close any previous connection for this agent+key combo
+    db.prepare(
+      "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE device_key_id = ? AND agent_name = ? AND disconnected_at IS NULL"
+    ).run(deviceKeyId, agent_name);
+    // Insert new connection
+    db.prepare(
+      'INSERT INTO agent_connections (id, device_key_id, agent_id, agent_name, session_name, role, project_slug) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(randomUUID(), deviceKeyId, agentId, agent_name, twin.metadata?.session || null, currentRole, projectSlug);
   }
 
   // 7. Generate session token (JWT) for brain API auth

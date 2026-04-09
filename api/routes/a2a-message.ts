@@ -128,6 +128,13 @@ function handleHeartbeat(agent: any, _body: any, res: Response): void {
     }
   } catch { /* lease table may not exist in all envs */ }
 
+  // Update agent_connections heartbeat (for Connected Devices UI)
+  try {
+    db.prepare(
+      "UPDATE agent_connections SET last_heartbeat = datetime('now') WHERE agent_id = ? AND disconnected_at IS NULL"
+    ).run(agent.id);
+  } catch { /* table may not exist yet */ }
+
   res.status(200).json({
     type: 'ACK',
     original_type: 'HEARTBEAT',
@@ -184,6 +191,13 @@ function handleDisconnect(agent: any, _body: any, res: Response): void {
   const db = getDb();
   db.prepare("UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now'), last_seen = datetime('now') WHERE id = ?")
     .run(agent.id);
+
+  // Mark agent_connections as disconnected
+  try {
+    db.prepare(
+      "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE agent_id = ? AND disconnected_at IS NULL"
+    ).run(agent.id);
+  } catch { /* table may not exist yet */ }
 
   // Expire active bond
   const bond = getActiveBond(agent.id);
