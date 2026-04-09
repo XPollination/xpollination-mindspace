@@ -188,34 +188,65 @@ async function waitForLlmReady() {
   }
 }
 
+// --- Brain Access via A2A ---
+
+async function queryBrainViaA2A(prompt) {
+  try {
+    const res = await fetch(`${API_URL}/a2a/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({
+        type: 'BRAIN_QUERY',
+        agent_id: agentId,
+        prompt,
+        read_only: true,
+        full_content: true,
+      }),
+    });
+    const data = await res.json();
+    if (data.type === 'BRAIN_RESULT' && data.result?.sources?.length) {
+      return data.result.sources.slice(0, 3).map(s => s.content || s.content_preview).join('\n\n');
+    }
+    return data.result?.response || null;
+  } catch (err) {
+    console.error(`[AGENT] Brain query failed: ${err.message}`);
+    return null;
+  }
+}
+
 // --- Startup: Prompt Sequence ---
 
 async function sendStartupPrompts() {
-  console.log('[AGENT] Starting brain-first recovery...');
+  console.log('[AGENT] Starting recovery via A2A...');
 
-  // PROMPT 1: Brain recovery — LLM reads its role definition from brain
-  await sendPromptAndWait(buildBrainRecoveryPrompt());
+  // Body queries brain — LLM receives results, no curl needed
+  const brainContext = await queryBrainViaA2A(
+    `Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?`
+  );
+  console.log(`[AGENT] Brain recovery: ${brainContext ? 'context found' : 'no context'}`);
+
+  // PROMPT 1: Brain context + task query + ready confirmation (single prompt)
+  const taskQueryCmd = `curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{"agent_id":"${agentId}","type":"OBJECT_QUERY","object_type":"task","filters":{"current_role":"${ROLE}","status_not_in":"complete,cancelled,blocked"}}'`;
+
+  let startupPrompt = '';
+  if (brainContext) {
+    startupPrompt += `[BRAIN RECOVERY]\nYour recent context from brain (do NOT query brain yourself — the body handles brain access):\n\n${brainContext}\n\n`;
+  } else {
+    startupPrompt += `Brain had no recent context for you. Your role is in CLAUDE.md (auto-loaded).\n\n`;
+  }
+
+  startupPrompt += `Query your active tasks: ${taskQueryCmd}\n\nThen confirm ready: (1) role and boundaries, (2) tasks assigned, (3) READY.`;
+
+  await sendPromptAndWait(startupPrompt);
 
   // PROMPT 2: Approval mode (LIAISON only)
   if (ROLE === 'liaison') {
     await sendPromptAndWait(buildApprovalModePrompt());
   }
 
-  // PROMPT 3: Task state — LLM queries A2A for current tasks
-  await sendPromptAndWait(buildTaskStatePrompt());
-
-  // PROMPT 4: Ready confirmation
-  await sendPromptAndWait('Confirm you are ready. State: (1) your role and key boundaries, (2) number of tasks assigned to you, (3) READY. The A2A event stream will start delivering [TASK] messages after you confirm.');
-
   // Wait for READY signal
   await waitForReadySignal();
   console.log('[AGENT] Handshake complete — starting event stream');
-}
-
-function buildBrainRecoveryPrompt() {
-  const curlCmd = `curl -s -X POST ${BRAIN_URL}/api/v1/memory -H 'Content-Type: application/json' -H 'Authorization: Bearer ${API_KEY}' -d '{"prompt":"Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?","agent_id":"agent-${ROLE}","agent_name":"${ROLE.toUpperCase()}","session_id":"${BRAIN_SESSION}","read_only":true,"full_content":true}'`;
-
-  return `Recover your recent context from the shared brain. Your role definition is already in CLAUDE.md — do NOT query brain for that. This single query returns full content — do NOT make follow-up queries:\n\n${curlCmd}`;
 }
 
 function buildApprovalModePrompt() {
@@ -230,11 +261,7 @@ Modes:
 CRITICAL: Check mode BEFORE every decision transition. Thomas can change it at any time. Never cache.`;
 }
 
-function buildTaskStatePrompt() {
-  return `Query your active tasks. Run: curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{"agent_id":"${agentId}","type":"OBJECT_QUERY","object_type":"task","filters":{"current_role":"${ROLE}","status_not_in":"complete,cancelled,blocked"}}'
-
-Report briefly: how many tasks and their statuses. Do NOT query the database directly.`;
-}
+// buildTaskStatePrompt removed — merged into sendStartupPrompts()
 
 async function sendPromptAndWait(prompt, maxWait = 90) {
   deliverToTmux(prompt);
@@ -425,14 +452,13 @@ async function listenForEvents() {
 
 // --- Event Handling ---
 
-function handleEvent(eventType, data) {
+async function handleEvent(eventType, data) {
   writeStatus({ last_event: new Date().toISOString(), last_event_type: eventType });
   const actionableEvents = ['task_available', 'task_assigned', 'approval_needed', 'review_needed', 'rework_needed'];
 
   if (eventType === 'revoked') {
     writeStatus({ connected: false, sse: 'revoked' });
     console.log('[AGENT] Device key REVOKED by user. Shutting down gracefully.');
-    // Sequence: Escape (cancel active work) → wait → /exit (shut down Claude)
     try {
       execFileSync('tmux', ['send-keys', '-t', SESSION, 'Escape'], { timeout: 3000 });
     } catch { /* best effort */ }
@@ -445,7 +471,15 @@ function handleEvent(eventType, data) {
     return;
   } else if (actionableEvents.includes(eventType)) {
     console.log(`[AGENT] ${eventType}: ${data.task_slug || ''}`);
-    deliverToTmux(buildInstruction(eventType, data));
+    // Brain read: enrich task with brain context before delivering
+    const brainContext = await queryBrainViaA2A(
+      `Recent decisions, procedures, and context for task: ${data.task_slug || ''} ${data.title || ''}`
+    );
+    const instruction = buildInstruction(eventType, data);
+    const enriched = brainContext
+      ? `${instruction}\n\n[BRAIN CONTEXT]\n${brainContext}`
+      : instruction;
+    deliverToTmux(enriched);
   } else if (eventType === 'connected') {
     console.log(`[AGENT] SSE connected`);
   }
@@ -476,7 +510,9 @@ function buildInstruction(eventType, data) {
   const deliverCmd = `node ${DELIVER_SCRIPT} --slug ${slug} --transition ${nextStatus} --role ${ROLE}`;
   const context = data.dna?.description?.substring(0, 150) || title;
 
-  return `[TASK] ${slug} — ${title}. Role: ${ROLE}. ${instruction} Context: ${context}. When done: ${deliverCmd}`;
+  const brainContributeCmd = `curl -s -X POST ${API_URL}/a2a/message -H "Content-Type: application/json" -H "Authorization: Bearer ${sessionToken}" -d '{"type":"BRAIN_CONTRIBUTE","agent_id":"${agentId}","prompt":"Task ${slug}: <YOUR KEY FINDINGS AND DECISIONS>","topic":"${slug}"}'`;
+
+  return `[TASK] ${slug} — ${title}. Role: ${ROLE}. ${instruction} Context: ${context}. When done: ${deliverCmd}\nThen contribute learnings to brain: ${brainContributeCmd}`;
 }
 
 function deliverToTmux(message) {

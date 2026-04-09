@@ -923,7 +923,7 @@ const BRAIN_API_URL = process.env.BRAIN_API_URL || 'http://localhost:3200';
 const BRAIN_SERVICE_KEY = process.env.BRAIN_SERVICE_KEY || process.env.BRAIN_API_KEY || '';
 
 async function handleBrainQuery(agent: any, body: any, res: Response): Promise<void> {
-  const { prompt, read_only, session_id: clientSessionId } = body;
+  const { prompt, read_only, session_id: clientSessionId, full_content, filter_category } = body;
   if (!prompt) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: prompt' }); return; }
 
   try {
@@ -936,6 +936,8 @@ async function handleBrainQuery(agent: any, body: any, res: Response): Promise<v
         agent_name: agent.name || agent.id,
         session_id: clientSessionId || agent.session_id,
         read_only: read_only !== false,
+        ...(full_content && { full_content: true }),
+        ...(filter_category && { filter_category }),
       }),
     });
     const data = await brainRes.json();
