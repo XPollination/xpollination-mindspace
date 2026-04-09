@@ -216,15 +216,15 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
   }
 
   // Track agent connection for device key (Connected Devices UI)
+  // Dedup on role + session_name (stable identity), not agent_name (has random suffix)
+  const sessionName = twin.metadata?.session || null;
   if (deviceKeyId) {
-    // Close any previous connection for this agent+key combo
     db.prepare(
-      "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE device_key_id = ? AND agent_name = ? AND disconnected_at IS NULL"
-    ).run(deviceKeyId, agent_name);
-    // Insert new connection
+      "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE device_key_id = ? AND role = ? AND session_name IS ? AND disconnected_at IS NULL"
+    ).run(deviceKeyId, currentRole, sessionName);
     db.prepare(
       'INSERT INTO agent_connections (id, device_key_id, agent_id, agent_name, session_name, role, project_slug) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(randomUUID(), deviceKeyId, agentId, agent_name, twin.metadata?.session || null, currentRole, projectSlug);
+    ).run(randomUUID(), deviceKeyId, agentId, agent_name, sessionName, currentRole, projectSlug);
   }
 
   // 7. Generate session token (JWT) for brain API auth
