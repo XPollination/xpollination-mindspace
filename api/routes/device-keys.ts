@@ -10,6 +10,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import { getDb } from '../db/connection.js';
+import { disconnectByDeviceKey } from '../lib/sse-manager.js';
 
 export const deviceKeysRouter = Router();
 
@@ -130,9 +131,10 @@ deviceKeysRouter.patch('/:id', (req: Request, res: Response) => {
     "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE device_key_id = ? AND disconnected_at IS NULL"
   ).run(id);
 
-  // Phase 5: SSE disconnection will be added here via disconnectByDeviceKey()
+  // Actively disconnect SSE streams for this key
+  const sseDisconnected = disconnectByDeviceKey(id);
 
-  res.json({ id, revoked: true, connections_closed: disconnected.changes });
+  res.json({ id, revoked: true, connections_closed: disconnected.changes, sse_disconnected: sseDisconnected });
 });
 
 /**
@@ -154,6 +156,7 @@ deviceKeysRouter.delete('/revoke-all', (req: Request, res: Response) => {
   let totalKeys = 0;
   let totalConns = 0;
 
+  let totalSse = 0;
   for (const key of keyIds) {
     db.prepare("UPDATE device_keys SET revoked_at = datetime('now') WHERE id = ?").run(key.id);
     const r = db.prepare(
@@ -161,7 +164,8 @@ deviceKeysRouter.delete('/revoke-all', (req: Request, res: Response) => {
     ).run(key.id);
     totalKeys++;
     totalConns += r.changes;
+    totalSse += disconnectByDeviceKey(key.id);
   }
 
-  res.json({ keys_revoked: totalKeys, connections_closed: totalConns });
+  res.json({ keys_revoked: totalKeys, connections_closed: totalConns, sse_disconnected: totalSse });
 });

@@ -399,7 +399,11 @@ async function listenForEvents() {
 function handleEvent(eventType, data) {
   const actionableEvents = ['task_available', 'task_assigned', 'approval_needed', 'review_needed', 'rework_needed'];
 
-  if (actionableEvents.includes(eventType)) {
+  if (eventType === 'revoked') {
+    console.log('[AGENT] Device key REVOKED by user. Disconnecting.');
+    deliverToTmux('[A2A] Session revoked. Run claude-session to reconnect with a new key.');
+    process.exit(0);
+  } else if (actionableEvents.includes(eventType)) {
     console.log(`[AGENT] ${eventType}: ${data.task_slug || ''}`);
     deliverToTmux(buildInstruction(eventType, data));
   } else if (eventType === 'connected') {
