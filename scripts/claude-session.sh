@@ -322,9 +322,23 @@ check_device_key() {
         local key_id
         key_id=$($node_cmd -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).key_id)}catch{}" "$key_file" 2>/dev/null)
         if [[ -n "$key_id" ]]; then
-            XPO_KEY_FILE="$key_file"
-            echo "  Device key: ${key_id} (${key_file})"
-            return 0
+            # Validate key is not revoked — send key_id to server, expect CHALLENGE
+            local check_res
+            check_res=$(curl -s -X POST "${api_base}/a2a/connect" \
+                -H "Content-Type: application/json" \
+                -d "{\"identity\":{\"agent_name\":\"key-check\",\"key_id\":\"${key_id}\"},\"role\":{\"current\":\"liaison\"},\"project\":{\"slug\":\"xpollination-mindspace\"},\"state\":{\"status\":\"active\"},\"metadata\":{\"client\":\"key-check\"}}" 2>/dev/null)
+            local check_type
+            check_type=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).type||'')}catch{console.log('')}" "$check_res" 2>/dev/null)
+
+            if [[ "$check_type" == "CHALLENGE" ]]; then
+                XPO_KEY_FILE="$key_file"
+                echo "  Device key: ${key_id} (valid)"
+                return 0
+            else
+                echo "  Device key ${key_id} revoked or invalid. Re-registering..."
+                mv "$key_file" "${key_file}.revoked" 2>/dev/null
+                return 1
+            fi
         fi
     fi
     return 1
