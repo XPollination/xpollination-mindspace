@@ -47,12 +47,17 @@ deviceKeysRouter.post('/register', (req: Request, res: Response) => {
   const db = getDb();
   const publicKeyHash = crypto.createHash('sha256').update(public_key).digest('hex');
 
-  // Check for duplicate
-  const existing = db.prepare('SELECT id FROM device_keys WHERE public_key_hash = ?').get(publicKeyHash) as any;
-  if (existing) {
-    res.status(409).json({ error: 'Key already registered', key_id: existing.id });
+  // Check for exact duplicate (same key)
+  const exactDup = db.prepare('SELECT id FROM device_keys WHERE public_key_hash = ?').get(publicKeyHash) as any;
+  if (exactDup) {
+    res.status(409).json({ error: 'Key already registered', key_id: exactDup.id });
     return;
   }
+
+  // Auto-revoke previous keys for same user+name (one active key per device name)
+  db.prepare(
+    "UPDATE device_keys SET revoked_at = datetime('now') WHERE user_id = ? AND name = ? AND revoked_at IS NULL"
+  ).run(user.id, name);
 
   const keyId = 'dk_' + crypto.randomBytes(12).toString('hex');
 
@@ -79,9 +84,15 @@ deviceKeysRouter.get('/', (req: Request, res: Response) => {
   }
 
   const db = getDb();
+  // Show only the latest key per device name (current active + most recent revoked)
   const keys = db.prepare(
-    'SELECT id, name, created_at, last_active, revoked_at FROM device_keys WHERE user_id = ? ORDER BY created_at DESC'
-  ).all(user.id) as any[];
+    `SELECT dk.* FROM device_keys dk
+     INNER JOIN (
+       SELECT name, MAX(created_at) as latest FROM device_keys WHERE user_id = ? GROUP BY name
+     ) latest ON dk.name = latest.name AND dk.created_at = latest.latest
+     WHERE dk.user_id = ?
+     ORDER BY dk.created_at DESC`
+  ).all(user.id, user.id) as any[];
 
   const includeDisconnected = req.query.include_disconnected === 'true';
 
