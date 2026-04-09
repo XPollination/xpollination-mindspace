@@ -521,17 +521,28 @@ create_agents_session() {
 
     # Write A2A-aware role prompts — no API key exposed to the soul
     local roles=("liaison" "pdsa" "dev" "qa")
+    local deliver_cjs="${PROJECT_ROOT}/scripts/a2a-deliver.cjs"
     for role in "${roles[@]}"; do
         cat > "/tmp/claude-role-${role}.txt" << ROLE
-You are the ${role^^} agent connected to A2A in a 4-agent tmux session (claude-agents).
+You are the ${role^^} agent in a 4-agent tmux session (a2a-team).
 Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA.
 Project: xpollination-mindspace
 
-The A2A body runs in background and delivers [TASK] messages via SSE.
-To deliver results:
-  node ${deliver_script} --slug <SLUG> --transition <STATUS> --role ${role}
+ARCHITECTURE:
+- A2A body runs in background (xpo-agent.js) — handles auth, SSE, heartbeats
+- You receive [TASK] messages automatically via SSE — do NOT connect to A2A yourself
+- A2A server: http://localhost:3101 (do NOT curl it directly)
+- Body credentials: /tmp/xpo-agent-${role}.env
+- Body status: cat /tmp/xpo-agent-${role}.status
 
-Do NOT use curl to call A2A endpoints directly. All A2A communication goes through a2a-deliver.js.
+DELIVERING RESULTS:
+  node ${deliver_cjs} --slug <SLUG> --transition <STATUS> --role ${role}
+
+RULES:
+- Do NOT use curl to call A2A endpoints — all A2A goes through a2a-deliver.cjs
+- Do NOT run /monitor or agent-monitor.cjs — the body handles event delivery
+- Do NOT query brain for your role definition — CLAUDE.md already has it
+- Your role definition is in CLAUDE.md (auto-loaded). Brain is for task context only.
 ROLE
     done
 
@@ -733,16 +744,23 @@ create_agent_body_session() {
 
         # Write A2A-aware role prompt — no API key exposed to the soul
         cat > "/tmp/claude-role-${role}-a2a.txt" << ROLE
-You are the LIAISON agent connected to A2A.
-Session: ${session} | Project: xpollination-mindspace
-
-The A2A body runs in background and delivers [TASK] messages to you via SSE events.
+You are the LIAISON agent. Session: ${session} | Project: xpollination-mindspace
 You are also Thomas's interactive interface — respond to his direct questions.
 
-When you receive a [TASK], process it. To deliver results:
-  node ${agent_script%/src/a2a/xpo-agent.js}/scripts/a2a-deliver.js --slug <SLUG> --transition <STATUS> --role liaison
+ARCHITECTURE:
+- A2A body runs in background (xpo-agent.js) — handles auth, SSE, heartbeats
+- You receive [TASK] messages automatically via SSE — do NOT connect to A2A yourself
+- A2A server: http://localhost:3101 (do NOT curl it directly)
+- Body status: cat /tmp/xpo-agent-${role}.status
 
-Do NOT use curl to call A2A endpoints directly. All A2A communication goes through a2a-deliver.js.
+DELIVERING RESULTS:
+  node ${agent_script%/src/a2a/xpo-agent.js}/scripts/a2a-deliver.cjs --slug <SLUG> --transition <STATUS> --role liaison
+
+RULES:
+- Do NOT use curl to call A2A endpoints — all A2A goes through a2a-deliver.cjs
+- Do NOT run /monitor or agent-monitor.cjs — the body handles event delivery
+- Do NOT query brain for your role definition — CLAUDE.md already has it
+- Your role definition is in CLAUDE.md (auto-loaded). Brain is for task context only.
 ROLE
 
         tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter

@@ -208,9 +208,9 @@ async function sendStartupPrompts() {
 }
 
 function buildBrainRecoveryPrompt() {
-  const curlCmd = `curl -s -X POST ${BRAIN_URL}/api/v1/memory -H 'Content-Type: application/json' -H 'Authorization: Bearer ${API_KEY}' -d '{"prompt":"Recovery protocol and role definition for ${ROLE} agent. What are my responsibilities, boundaries, and latest operational learnings?","agent_id":"agent-${ROLE}","agent_name":"${ROLE.toUpperCase()}","session_id":"${BRAIN_SESSION}","read_only":true}'`;
+  const curlCmd = `curl -s -X POST ${BRAIN_URL}/api/v1/memory -H 'Content-Type: application/json' -H 'Authorization: Bearer ${API_KEY}' -d '{"prompt":"Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?","agent_id":"agent-${ROLE}","agent_name":"${ROLE.toUpperCase()}","session_id":"${BRAIN_SESSION}","read_only":true}'`;
 
-  return `You are the ${ROLE.toUpperCase()} agent. Before doing anything, recover your role definition from the shared brain. Run this command and read the result carefully — it defines who you are and what you must never do:\n\n${curlCmd}`;
+  return `Recover your recent context from the shared brain. Your role definition is already in CLAUDE.md — do NOT query brain for that. This query is for task state and recent decisions only:\n\n${curlCmd}`;
 }
 
 function buildApprovalModePrompt() {
@@ -353,6 +353,19 @@ async function connectToA2A() {
       : `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`;
   writeFileSync(envFile, envContent);
   try { chmodSync(envFile, 0o600); } catch { /* best effort */ }
+
+  // Write status file for agents to verify body is alive
+  writeStatus({ connected: true, agent_id: agentId, sse: 'pending', last_event: null });
+}
+
+const STATUS_FILE = `/tmp/xpo-agent-${ROLE}.status`;
+function writeStatus(fields) {
+  try {
+    let current = {};
+    try { current = JSON.parse(readFileSync(STATUS_FILE, 'utf-8')); } catch { /* first write */ }
+    const updated = { ...current, ...fields, updated_at: new Date().toISOString() };
+    writeFileSync(STATUS_FILE, JSON.stringify(updated));
+  } catch { /* best effort */ }
 }
 
 // --- SSE Event Stream ---
@@ -366,6 +379,7 @@ async function listenForEvents() {
   });
 
   if (!res.ok) throw new Error(`SSE stream failed: ${res.status}`);
+  writeStatus({ sse: 'open' });
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -397,9 +411,11 @@ async function listenForEvents() {
 // --- Event Handling ---
 
 function handleEvent(eventType, data) {
+  writeStatus({ last_event: new Date().toISOString(), last_event_type: eventType });
   const actionableEvents = ['task_available', 'task_assigned', 'approval_needed', 'review_needed', 'rework_needed'];
 
   if (eventType === 'revoked') {
+    writeStatus({ connected: false, sse: 'revoked' });
     console.log('[AGENT] Device key REVOKED by user. Shutting down gracefully.');
     // Sequence: Escape (cancel active work) → wait → /exit (shut down Claude)
     try {
