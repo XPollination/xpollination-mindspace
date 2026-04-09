@@ -208,9 +208,9 @@ async function sendStartupPrompts() {
 }
 
 function buildBrainRecoveryPrompt() {
-  const curlCmd = `curl -s -X POST ${BRAIN_URL}/api/v1/memory -H 'Content-Type: application/json' -H 'Authorization: Bearer ${API_KEY}' -d '{"prompt":"Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?","agent_id":"agent-${ROLE}","agent_name":"${ROLE.toUpperCase()}","session_id":"${BRAIN_SESSION}","read_only":true}'`;
+  const curlCmd = `curl -s -X POST ${BRAIN_URL}/api/v1/memory -H 'Content-Type: application/json' -H 'Authorization: Bearer ${API_KEY}' -d '{"prompt":"Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?","agent_id":"agent-${ROLE}","agent_name":"${ROLE.toUpperCase()}","session_id":"${BRAIN_SESSION}","read_only":true,"full_content":true}'`;
 
-  return `Recover your recent context from the shared brain. Your role definition is already in CLAUDE.md — do NOT query brain for that. This query is for task state and recent decisions only:\n\n${curlCmd}`;
+  return `Recover your recent context from the shared brain. Your role definition is already in CLAUDE.md — do NOT query brain for that. This single query returns full content — do NOT make follow-up queries:\n\n${curlCmd}`;
 }
 
 function buildApprovalModePrompt() {
