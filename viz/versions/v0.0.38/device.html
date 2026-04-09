@@ -42,6 +42,9 @@
       let val = urlCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (val.length > 4) val = val.slice(0, 4) + '-' + val.slice(4, 8);
       input.value = val;
+      input.readOnly = true;
+      btn.textContent = 'Authenticate';
+      document.querySelector('.device-card p').textContent = 'Confirm this agent session';
     }
 
     // Auto-format: add dash after 4 chars
