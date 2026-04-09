@@ -49,16 +49,16 @@ Like SSH: register a key once per machine, connect unlimited times until revoked
 ```
 FIRST TIME (per machine):
   claude-session a2a-team
-    → No credential found at ~/.xpollination/keys/<server>.key
+    → No credential found at ~/.xp0/keys/<server>.key
     → Device flow: POST /api/auth/device/code → user_code
     → User approves in browser (one time)
     → Server generates keypair, returns private key
-    → Stored at ~/.xpollination/keys/<server-fingerprint>.key
+    → Stored at ~/.xp0/keys/<server-fingerprint>.key
     → Bodies connect with key. Done.
 
 EVERY SUBSEQUENT TIME (same machine):
   claude-session a2a-team
-    → Credential found at ~/.xpollination/keys/<server>.key
+    → Credential found at ~/.xp0/keys/<server>.key
     → Bodies connect with key. No browser needed. Instant.
     → Works after reboot, after tmux kill, after weeks.
 
@@ -75,12 +75,12 @@ REVOCATION (from Settings page):
 
 ### Credential Storage
 
-Credentials live in `~/.xpollination/` (NOT `~/.claude/`).
+Credentials live in `~/.xp0/` (NOT `~/.claude/`).
 
 **Why:** The xpo-agent body is LLM-agnostic. It works with Claude Code, Cursor, ChatGPT, Grok, any local AI. The credential belongs to the xpollination identity system, not any specific LLM.
 
 ```
-~/.xpollination/
+~/.xp0/
 ├── keys/
 │   ├── beta-mindspace.json        # Key for beta server
 │   └── mindspace.json             # Key for prod server
@@ -134,7 +134,7 @@ Server: opens SSE stream, registers agent_connection
 | Authenticate every `claude-session` run | Authenticate once per machine |
 | 24h expiry kills weekend sessions | No expiry — lives until revoked |
 | JWT is stateless (can't revoke cleanly) | Key-based (server-side session table) |
-| Credential in env var / /tmp file | Credential in `~/.xpollination/keys/` |
+| Credential in env var / /tmp file | Credential in `~/.xp0/keys/` |
 | Per-session token | Per-machine key with N connections |
 | No connection tracking | Server tracks every agent connection |
 | Settings shows "Active Sessions" (useless) | Settings shows "Connected Devices" with agent details |
@@ -176,7 +176,7 @@ CREATE TABLE agent_connections (
 ```
 claude-session.sh
   │
-  ├─ Check ~/.xpollination/keys/<server>.json
+  ├─ Check ~/.xp0/keys/<server>.json
   │   ├─ EXISTS → skip device flow, use stored key
   │   └─ MISSING → first-time registration:
   │       ├─ Client generates Ed25519 keypair locally
@@ -186,14 +186,14 @@ claude-session.sh
   │       ├─ On approval: POST /api/auth/device-keys/register
   │       │   { public_key: "<PEM>", name: "<hostname>" }
   │       │   → { key_id: "dk_a1b2c3" }
-  │       ├─ Store { key_id, private_key, server, user } at ~/.xpollination/keys/<server>.json
+  │       ├─ Store { key_id, private_key, server, user } at ~/.xp0/keys/<server>.json
   │       └─ Continue
   │
   │  NOTE: Keypair generated CLIENT-SIDE. Private key never sent to server.
   │        Server only receives and stores the public key.
   │
   ├─ Start xpo-agent bodies with key path:
-  │   xpo-agent.js --role pdsa --key ~/.xpollination/keys/<server>.json
+  │   xpo-agent.js --role pdsa --key ~/.xp0/keys/<server>.json
   │
   └─ xpo-agent.js:
       ├─ POST /a2a/connect { key_id: "dk_a1b2c3" }
@@ -207,7 +207,7 @@ claude-session.sh
 
 RECONNECT (after reboot, tmux kill, etc.):
   claude-session.sh
-    → ~/.xpollination/keys/<server>.json exists → no device flow
+    → ~/.xp0/keys/<server>.json exists → no device flow
     → Bodies connect with challenge-response → instant
     → No browser. No approval. Same key.
 ```
@@ -265,7 +265,7 @@ Replace "Active Sessions" with "Connected Devices":
 | D3 | Ed25519 keypair + challenge-response | State of the art. Same crypto as SSH, WireGuard. Private key never leaves machine. |
 | D4 | Keypair generated client-side | Server only stores public key. Private key never transmitted. |
 | D5 | Per-machine key, not per-session | One key covers all `claude-session` invocations on that machine. |
-| D6 | Credentials in `~/.xpollination/keys/` | Body is LLM-agnostic. Not tied to Claude, Cursor, or any provider. |
+| D6 | Credentials in `~/.xp0/keys/` | Body is LLM-agnostic. Not tied to Claude, Cursor, or any provider. |
 | D7 | Server tracks agent connections per key | Visibility into what's connected. Heartbeats show liveness. |
 | D8 | Revoke key = disconnect all agents on that machine | Clean, predictable. One action, all connections dropped. |
 | D9 | Unlimited bodies per key | Like SSH: one key, unlimited sessions. No artificial limits. |
@@ -286,7 +286,7 @@ Replace "Active Sessions" with "Connected Devices":
 | Revocable | Settings → Revoke Key → immediate SSE disconnect |
 | No expiry timer | Sessions survive weekends, holidays, vacations |
 | Headless-safe | Device flow works over SSH (first time only) |
-| LLM-agnostic | `~/.xpollination/` not tied to any AI provider |
+| LLM-agnostic | `~/.xp0/` not tied to any AI provider |
 | Soul isolation | Key file path passed to body, not in LLM prompt |
 
 ---
@@ -308,7 +308,7 @@ Replace "Active Sessions" with "Connected Devices":
 - Replaces current JWT-based auth on `/a2a/connect`
 
 ### Phase 3: claude-session Key Management
-- Check `~/.xpollination/keys/<server>.json` before triggering device flow
+- Check `~/.xp0/keys/<server>.json` before triggering device flow
 - On first registration: `crypto.generateKeyPairSync('ed25519')` client-side
 - Store `{ key_id, private_key, server, user, algorithm }` as JSON
 - `--key <path>` flag replaces `--token` in xpo-agent.js

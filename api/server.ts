@@ -18,6 +18,7 @@ import { getDb, closeDb } from './db/connection.js';
 import { invitesRouter } from './routes/invites.js';
 import { settingsRouter } from './routes/settings.js';
 import { deviceAuthRouter } from './routes/device-auth.js';
+import { deviceKeysRouter } from './routes/device-keys.js';
 import { livekitRouter } from './routes/livekit.js';
 import { requireApiKeyOrJwt } from './middleware/require-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
@@ -73,6 +74,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/keys', requireApiKeyOrJwt, keysRouter);
 app.use('/api/auth/oauth', oauthRouter);
 app.use('/api/auth/device', deviceAuthRouter);
+app.use('/api/auth/device-keys', requireApiKeyOrJwt, deviceKeysRouter);
 app.use('/api/projects', requireApiKeyOrJwt, projectsRouter);
 // Agent pool must be before agentsRouter (which has /:agentId catch-all)
 app.get('/api/agents/pool', requireApiKeyOrJwt, (req, res) => {
