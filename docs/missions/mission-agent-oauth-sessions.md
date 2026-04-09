@@ -82,9 +82,49 @@ Credentials live in `~/.xpollination/` (NOT `~/.claude/`).
 ```
 ~/.xpollination/
 ├── keys/
-│   ├── beta-mindspace.key         # Key for beta server
-│   └── mindspace.key              # Key for prod server
+│   ├── beta-mindspace.json        # Key for beta server
+│   └── mindspace.json             # Key for prod server
 └── config.json                    # Optional: default server, preferences
+```
+
+Key file format (self-documenting JSON):
+```json
+{
+  "server": "beta-mindspace.xpollination.earth",
+  "key_id": "dk_a1b2c3",
+  "user": "thomas.pichler@xpollination.earth",
+  "registered": "2026-04-09T10:00:00Z",
+  "algorithm": "ed25519",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIJ...\n-----END PRIVATE KEY-----"
+}
+```
+
+### Cryptography: Ed25519 (SSH-equivalent)
+
+**Algorithm:** Ed25519 — the same used by modern SSH, WireGuard, Signal.
+- Private key never leaves the machine
+- Nothing secret transmitted over the wire (only signatures)
+- Replay-resistant (challenge-response with server nonce)
+- Native Node.js support (`crypto.generateKeyPairSync('ed25519')`)
+
+**Why Ed25519 over alternatives:**
+
+| Option | Verdict |
+|--------|---------|
+| Ed25519 + challenge-response | State of the art. Private key stays local. |
+| Bearer token (GitHub PAT style) | Token IS the secret — interceptable |
+| mTLS (client certificates) | Operational complexity, overkill |
+| WebAuthn/Passkeys | Browser-only, not for headless CLI |
+| RSA | Slower, bigger keys, no advantage |
+
+**Challenge-response protocol:**
+```
+Client: POST /a2a/connect { key_id: "dk_a1b2c3" }
+Server: { challenge: "<random-32-byte-nonce>" }
+Client: sign(nonce, privateKey) → signature
+Client: POST /a2a/verify { key_id: "dk_a1b2c3", signature: "<base64>" }
+Server: verify(nonce, publicKey, signature) → authenticated
+Server: opens SSE stream, registers agent_connection
 ```
 
 ### What Changes from v1
@@ -136,24 +176,40 @@ CREATE TABLE agent_connections (
 ```
 claude-session.sh
   │
-  ├─ Check ~/.xpollination/keys/<server>.key
-  │   ├─ EXISTS + VALID → skip device flow
-  │   └─ MISSING or REVOKED → device flow:
-  │       ├─ POST /api/auth/device/code → user_code
+  ├─ Check ~/.xpollination/keys/<server>.json
+  │   ├─ EXISTS → skip device flow, use stored key
+  │   └─ MISSING → first-time registration:
+  │       ├─ Client generates Ed25519 keypair locally
+  │       ├─ POST /api/auth/device/code → user_code (start device flow)
   │       ├─ Print clickable URL: https://beta-mindspace.../device?code=XXXX
   │       ├─ Poll /api/auth/device/token until approved
-  │       ├─ Receive keypair → store private key at ~/.xpollination/keys/<server>.key
+  │       ├─ On approval: POST /api/auth/device-keys/register
+  │       │   { public_key: "<PEM>", name: "<hostname>" }
+  │       │   → { key_id: "dk_a1b2c3" }
+  │       ├─ Store { key_id, private_key, server, user } at ~/.xpollination/keys/<server>.json
   │       └─ Continue
   │
+  │  NOTE: Keypair generated CLIENT-SIDE. Private key never sent to server.
+  │        Server only receives and stores the public key.
+  │
   ├─ Start xpo-agent bodies with key path:
-  │   xpo-agent.js --role pdsa --key ~/.xpollination/keys/<server>.key
+  │   xpo-agent.js --role pdsa --key ~/.xpollination/keys/<server>.json
   │
   └─ xpo-agent.js:
-      ├─ Sign challenge with private key → POST /a2a/connect
-      ├─ Server validates signature against stored public key
-      ├─ Registers agent_connection (role, session_name)
+      ├─ POST /a2a/connect { key_id: "dk_a1b2c3" }
+      ├─ Server responds with nonce (challenge)
+      ├─ Client signs nonce with private key
+      ├─ POST /a2a/verify { key_id, signature }
+      ├─ Server verifies against stored public key → authenticated
+      ├─ Server registers agent_connection (role, session_name)
       ├─ SSE stream opened → heartbeats update last_heartbeat
       └─ On disconnect: agent_connection.disconnected_at set
+
+RECONNECT (after reboot, tmux kill, etc.):
+  claude-session.sh
+    → ~/.xpollination/keys/<server>.json exists → no device flow
+    → Bodies connect with challenge-response → instant
+    → No browser. No approval. Same key.
 ```
 
 ### Revocation Flow (Reverse of Login)
@@ -205,13 +261,15 @@ Replace "Active Sessions" with "Connected Devices":
 | # | Decision | Rationale |
 |---|----------|-----------|
 | D1 | Device flow for first-time registration only | Subsequent connections use stored key. No browser needed. |
-| D2 | No token expiry — revocation only | Agent sessions must survive weekends. 24h expiry is hostile. |
-| D3 | Per-machine key, not per-session | One key covers all `claude-session` invocations on that machine. |
-| D4 | Credentials in `~/.xpollination/keys/` | Body is LLM-agnostic. Not tied to Claude, Cursor, or any provider. |
-| D5 | Server tracks agent connections per key | Visibility into what's connected. Heartbeats show liveness. |
-| D6 | Revoke key = disconnect all agents on that machine | Clean, predictable. One action, all connections dropped. |
-| D7 | Unlimited bodies per key | Like SSH: one key, unlimited sessions. No artificial limits. |
-| D8 | Connected Devices replaces Active Sessions | Current Active Sessions is not useful. Devices + agents is. |
+| D2 | No expiry — revocation only | Agent sessions must survive weekends. 24h expiry is hostile. |
+| D3 | Ed25519 keypair + challenge-response | State of the art. Same crypto as SSH, WireGuard. Private key never leaves machine. |
+| D4 | Keypair generated client-side | Server only stores public key. Private key never transmitted. |
+| D5 | Per-machine key, not per-session | One key covers all `claude-session` invocations on that machine. |
+| D6 | Credentials in `~/.xpollination/keys/` | Body is LLM-agnostic. Not tied to Claude, Cursor, or any provider. |
+| D7 | Server tracks agent connections per key | Visibility into what's connected. Heartbeats show liveness. |
+| D8 | Revoke key = disconnect all agents on that machine | Clean, predictable. One action, all connections dropped. |
+| D9 | Unlimited bodies per key | Like SSH: one key, unlimited sessions. No artificial limits. |
+| D10 | Connected Devices replaces Active Sessions | Current Active Sessions is not useful. Devices + agents is. |
 
 ---
 
@@ -219,43 +277,56 @@ Replace "Active Sessions" with "Connected Devices":
 
 | Property | How |
 |----------|-----|
-| No static secrets in `.env` | Device keys replace API keys for A2A auth |
+| No static secrets in `.env` | Ed25519 keypairs replace API keys for A2A auth |
+| Private key never transmitted | Generated client-side. Server only stores public key. |
+| Nothing secret on the wire | Challenge-response: only signatures travel over HTTP |
+| Replay-resistant | Server nonce is random per connection attempt |
 | User-scoped | Each key tied to a user (Thomas, Robin) |
 | Machine-scoped | Each key tied to a machine (Hetzner, MacBook) |
-| Revocable | Settings → Revoke Key → immediate disconnect |
+| Revocable | Settings → Revoke Key → immediate SSE disconnect |
 | No expiry timer | Sessions survive weekends, holidays, vacations |
 | Headless-safe | Device flow works over SSH (first time only) |
 | LLM-agnostic | `~/.xpollination/` not tied to any AI provider |
-| Soul isolation | Key in file, not in LLM prompt |
+| Soul isolation | Key file path passed to body, not in LLM prompt |
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Device Keys Table + Registration
+### Phase 1: Device Keys Table + Registration Endpoint
 - Migration: `device_keys` + `agent_connections` tables
-- Endpoint: `/api/auth/device-keys` — register, list, revoke
-- Update device flow to generate + store keypair on approval
+- Endpoint: `POST /api/auth/device-keys/register` — accepts public key PEM + device name
+- Endpoint: `GET /api/auth/device-keys` — list user's keys
+- Endpoint: `PATCH /api/auth/device-keys/:id` — revoke
+- Modify device flow: after browser approval, client sends public key to register endpoint
 
-### Phase 2: Key-Based Auth in xpo-agent
-- `--key` flag replaces `--token` in xpo-agent.js
-- Challenge-response auth on `/a2a/connect`
-- Agent connection tracking with heartbeats
+### Phase 2: Challenge-Response Auth in A2A Connect
+- `POST /a2a/connect { key_id }` → returns `{ challenge: "<nonce>" }`
+- `POST /a2a/verify { key_id, signature }` → server verifies Ed25519 signature
+- On success: SSE stream opened, agent_connection row created
+- Heartbeats update `last_heartbeat` on agent_connection
+- Replaces current JWT-based auth on `/a2a/connect`
 
 ### Phase 3: claude-session Key Management
-- Check `~/.xpollination/keys/` before triggering device flow
-- Store key on first registration
-- All `claude-session` variants use the same key
+- Check `~/.xpollination/keys/<server>.json` before triggering device flow
+- On first registration: `crypto.generateKeyPairSync('ed25519')` client-side
+- Store `{ key_id, private_key, server, user, algorithm }` as JSON
+- `--key <path>` flag replaces `--token` in xpo-agent.js
+- All `claude-session` variants (a2a-team, agent-liaison, etc.) use the same key file
 
-### Phase 4: Connected Devices UI
-- Settings page: list device keys with nested agent connections
+### Phase 4: Connected Devices UI (Settings Page)
+- Replace "Active Sessions" with "Connected Devices"
+- List device keys with nested agent connections
+- Show: key name, registered date, last active, agent count
+- Per-agent: role, session_name, last_heartbeat
 - Revoke button per key
-- Real-time last-seen via heartbeat polling
+- "Revoke All Devices" button
 
-### Phase 5: Graceful Revocation
-- SSE REVOKED event → body exits
-- Body sends farewell message to LLM pane
-- Cleanup of stale connections (no heartbeat > 5min)
+### Phase 5: Graceful Revocation + Cleanup
+- SSE `REVOKED` event → body logs + exits gracefully
+- Body optionally sends farewell message to LLM pane
+- Stale connection cleanup: agent_connections with no heartbeat > 5min → mark disconnected
+- Revoked key → all SSE streams closed server-side
 
 ---
 
