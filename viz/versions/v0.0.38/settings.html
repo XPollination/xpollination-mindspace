@@ -72,10 +72,14 @@
       <div class="msg" id="runner-target-msg"></div>
     </div>
 
-    <!-- Active Sessions -->
+    <!-- Connected Devices -->
     <div class="ms-card">
-      <h2 style="margin-bottom:0.5rem;">Active Sessions</h2>
-      <div id="sessions-list"><div class="ms-loading" style="padding:8px 0;"><div class="ms-spinner"></div></div></div>
+      <h2 style="margin-bottom:0.5rem;">Connected Devices</h2>
+      <p style="font-size:0.85rem;color:var(--ms-muted);margin-bottom:0.75rem;">Each device key allows unlimited agent connections. Revoking a key disconnects all its agents.</p>
+      <div id="devices-list"><div class="ms-loading" style="padding:8px 0;"><div class="ms-spinner"></div></div></div>
+      <div style="margin-top:0.5rem;text-align:right;">
+        <button class="ms-btn ms-btn-danger" onclick="revokeAllDevices()" id="revoke-all-btn" style="display:none;font-size:0.85rem;">Revoke All Devices</button>
+      </div>
     </div>
 
     <!-- Account -->
@@ -132,18 +136,54 @@
       } catch { el.textContent = 'Network error'; }
     }
 
-    async function loadSessions() {
+    function timeAgo(iso) {
+      if (!iso) return 'never';
+      const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (s < 60) return s + 's ago';
+      if (s < 3600) return Math.floor(s/60) + 'm ago';
+      if (s < 86400) return Math.floor(s/3600) + 'h ago';
+      return Math.floor(s/86400) + 'd ago';
+    }
+
+    async function loadDevices() {
+      const el = document.getElementById('devices-list');
       try {
-        const res = await fetch('/api/auth/sessions');
-        const data = await res.json();
-        const el = document.getElementById('sessions-list');
-        if (data.sessions && data.sessions.length > 0) {
-          el.innerHTML = data.sessions.map(s =>
-            '<div style="padding:0.3rem 0;border-bottom:1px solid var(--ms-border);font-size:0.85rem;">' +
-            '<strong>' + (s.user_agent || 'unknown') + '</strong> — ' + s.ip_address + ' — ' + new Date(s.created_at).toLocaleDateString() + '</div>'
-          ).join('');
-        } else { el.textContent = 'No active sessions'; }
-      } catch { document.getElementById('sessions-list').textContent = 'Failed to load sessions'; }
+        const res = await fetch('/api/auth/device-keys');
+        const keys = await res.json();
+        if (!Array.isArray(keys) || keys.length === 0) {
+          el.textContent = 'No registered devices. Run claude-session to register.';
+          return;
+        }
+        document.getElementById('revoke-all-btn').style.display = '';
+        el.innerHTML = keys.map(key => {
+          const conns = (key.connections || []).filter(c => !c.disconnected_at);
+          const isRevoked = !!key.revoked_at;
+          const lastActive = key.last_active ? timeAgo(key.last_active) : 'never';
+          return '<div style="padding:0.75rem 0;border-bottom:1px solid var(--ms-border);' + (isRevoked ? 'opacity:0.5;' : '') + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<div><strong>' + key.name + '</strong> <span style="font-size:0.75rem;color:var(--ms-muted);">registered ' + new Date(key.created_at).toLocaleDateString() + ' &middot; ' + (isRevoked ? 'REVOKED' : lastActive) + '</span></div>' +
+              (!isRevoked ? '<button class="ms-btn ms-btn-danger" style="font-size:0.8rem;padding:0.25rem 0.5rem;" onclick="revokeDevice(\'' + key.id + '\')">Revoke</button>' : '') +
+            '</div>' +
+            '<div style="padding-left:1.5rem;margin-top:0.25rem;">' +
+              (conns.length === 0
+                ? '<span style="font-size:0.8rem;color:var(--ms-muted);">No active agents</span>'
+                : conns.map(c => '<div style="font-size:0.8rem;padding:2px 0;">' + (c.role || '?') + ' (' + (c.session_name || 'direct') + ') — last seen: ' + timeAgo(c.last_heartbeat) + '</div>').join('')) +
+            '</div>' +
+          '</div>';
+        }).join('');
+      } catch { el.textContent = 'Failed to load devices'; }
+    }
+
+    async function revokeDevice(id) {
+      if (!confirm('Revoke this device key? All agents on this device will be disconnected.')) return;
+      await fetch('/api/auth/device-keys/' + id, { method: 'PATCH' });
+      loadDevices();
+    }
+
+    async function revokeAllDevices() {
+      if (!confirm('Revoke ALL device keys? Every agent will be disconnected.')) return;
+      await fetch('/api/auth/device-keys/revoke-all', { method: 'DELETE' });
+      loadDevices();
     }
 
     async function loadAccount() {
@@ -244,7 +284,7 @@
     });
 
     loadMyProjects();
-    loadSessions();
+    loadDevices();
     loadAccount();
     loadRunnerTarget();
   </script>
