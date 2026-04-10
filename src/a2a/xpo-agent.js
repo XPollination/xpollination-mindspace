@@ -526,21 +526,21 @@ function buildInstruction(eventType, data) {
 
 function deliverToTmux(message) {
   try {
-    // Use bracketed paste via tmux load-buffer + paste-buffer.
-    // This delivers the message as a paste (single atomic block), not as typed keystrokes.
-    // Claude Code recognizes bracketed paste and handles it correctly:
-    // multi-line content stays as one input, and the subsequent Enter submits it.
+    // Bracketed paste via NAMED tmux buffer to avoid cross-body race condition.
+    // The tmux paste buffer is GLOBAL — without -b, parallel bodies overwrite each other.
     //
-    // The previous approach (send-keys with embedded newlines + Enter) failed because
-    // tmux types the newlines, Claude enters multi-line input mode, and the trailing
-    // Enter is consumed as another newline rather than as submit.
+    // Required flags:
+    //   -b <name> : use a named buffer per body (avoids global buffer race)
+    //   -p        : enable bracketed paste mode (critical — Claude treats as paste, not typed)
+    //   -r        : do not replace LF with separator (preserve newlines)
+    //   -d        : delete the named buffer after pasting (cleanup)
+    const bufferName = `xpo-${ROLE}`;
     const tmpFile = `/tmp/xpo-deliver-${ROLE}.txt`;
     writeFileSync(tmpFile, message);
-    execFileSync('tmux', ['load-buffer', tmpFile], { timeout: 5000 });
-    execFileSync('tmux', ['paste-buffer', '-t', SESSION, '-d'], { timeout: 5000 });  // -d deletes buffer after
-    // Small delay so paste is fully processed before Enter
+    execFileSync('tmux', ['load-buffer', '-b', bufferName, tmpFile], { timeout: 5000 });
+    execFileSync('tmux', ['paste-buffer', '-b', bufferName, '-p', '-r', '-d', '-t', SESSION], { timeout: 5000 });
     execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
-    console.log(`[AGENT] Delivered to ${SESSION} (paste mode)`);
+    console.log(`[AGENT] Delivered to ${SESSION} (bracketed paste, buffer ${bufferName})`);
   } catch (err) {
     console.error(`[AGENT] tmux delivery failed: ${err.message}`);
   }
