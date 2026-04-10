@@ -31,7 +31,7 @@ const { values: args } = parseArgs({
   options: {
     role:        { type: 'string', default: 'dev' },
     project:     { type: 'string', default: 'xpollination-mindspace' },
-    api:         { type: 'string', default: process.env.MINDSPACE_API_URL || 'http://localhost:3101' },
+    api:         { type: 'string' },  // optional override — normally read from key file
     'api-key':   { type: 'string', default: process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '' },
     workspace:   { type: 'string', default: process.cwd() },
     llm:         { type: 'string', default: 'claude' },
@@ -45,7 +45,6 @@ const { values: args } = parseArgs({
 
 const ROLE        = args.role;
 const PROJECT     = args.project;
-const API_URL     = args.api;
 const API_KEY     = args['api-key'];
 const JWT_TOKEN   = args.token;  // OAuth device flow JWT — fallback
 const KEY_FILE    = args.key;    // Ed25519 device key — preferred
@@ -61,6 +60,26 @@ if (KEY_FILE) {
     process.exit(1);
   }
 }
+
+// API URL resolution — single source of truth chain:
+//   1. Key file's server field (captured at registration, locked to that environment)
+//   2. --api CLI arg (override only for first-time bootstrap before key exists)
+//   3. Hard error — no env var defaults, no silent drift
+function resolveApiUrl() {
+  if (deviceKey?.server) {
+    // Modern format: server is the full URL (http://... or https://...)
+    if (deviceKey.server.startsWith('http')) return deviceKey.server;
+    // Legacy format: server is just a hostname — convert
+    if (deviceKey.server === 'localhost') return 'http://localhost:3101';
+    return `https://${deviceKey.server}/api`;
+  }
+  if (args.api) return args.api;
+  console.error('[AGENT] No API URL: provide --key (with server) or --api for bootstrap');
+  process.exit(1);
+}
+const API_URL = resolveApiUrl();
+console.log(`[AGENT] API URL: ${API_URL} (source: ${deviceKey?.server ? 'key file' : '--api'})`);
+
 const WORKSPACE   = resolve(args.workspace);
 const LLM         = args.llm;
 const INTERACTIVE = args.interactive;
@@ -70,7 +89,6 @@ const SESSION     = args.session || args.name || `runner-${ROLE}-${SHORT_ID}`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 const DELIVER_SCRIPT = resolve(__dirname, '../../scripts/a2a-deliver.js');
-const BRAIN_URL  = process.env.BRAIN_API_URL || 'http://localhost:3200';
 const BRAIN_SESSION = randomUUID();
 
 // --- State ---

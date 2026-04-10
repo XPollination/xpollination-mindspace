@@ -56,19 +56,21 @@ async function main() {
 
   const data = await res.json();
 
-  // 3. Determine server host for filename
+  // 3. Determine server host for filename (just hostname, not full URL)
   const serverHost = apiBase
     .replace(/^https?:\/\//, '')
-    .replace(/:\d+$/, '')
-    .replace(/\//g, '');
+    .replace(/:\d+.*$/, '')
+    .replace(/\/.*$/, '');
 
   // 4. Write key file
+  // server field stores the FULL API URL (single source of truth) — body uses this directly
   const keysDir = join(process.env.HOME || '/tmp', '.xp0', 'keys');
   mkdirSync(keysDir, { recursive: true });
 
   const keyFile = join(keysDir, `${serverHost}.json`);
   const keyData = {
-    server: serverHost,
+    server: apiBase,  // FULL URL — body uses this as API_URL with no further processing
+    server_host: serverHost,  // hostname only, for reference
     key_id: data.key_id,
     user: data.user || '',
     registered: data.registered || new Date().toISOString(),
