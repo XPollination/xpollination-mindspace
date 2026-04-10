@@ -36,12 +36,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:-xpo-test-jwt-secret-2026}
       - FRONTEND_URL=https://beta-mindspace.xpollination.earth
       - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
-      # Service discovery — A2A advertises this URL to bodies via WELCOME response.
-      # The hive is the public entry point for A2A. Bodies switch to this after
-      # bootstrap. To migrate A2A to a new host: change CANONICAL_HIVE_URL here,
-      # point DNS to new server, restart — bodies pick up on next connect.
-      # There is NO separate "API" — agents talk to A2A only.
-      - CANONICAL_HIVE_URL=https://beta-mindspace.xpollination.earth/api
+      # CANONICAL_HIVE_URL — temporarily disabled.
+      # The public proxy at beta-mindspace.xpollination.earth/api adds session-cookie
+      # auth that blocks A2A device-key flow. When bodies switch to it, they get 401
+      # on /a2a/connect (proxy auth, not real revocation). Until the proxy is fixed
+      # to bypass auth for /api/a2a/* paths, bodies stay on the bootstrap URL
+      # (localhost from req.host). See brain thought on "service discovery blocked
+      # by proxy auth" for the full story.
+      # - CANONICAL_HIVE_URL=https://beta-mindspace.xpollination.earth/api
       - LIVEKIT_URL=wss://meet.xpollination.earth
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
