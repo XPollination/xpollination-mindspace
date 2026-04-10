@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { getDb } from '../db/connection.js';
-import { createChallenge, consumeChallenge, cleanupExpired } from '../lib/challenge-store.js';
+import { createChallenge, getPendingChallenges, removeChallenge, cleanupExpired } from '../lib/challenge-store.js';
 
 export const a2aConnectRouter = Router();
 
@@ -49,18 +49,26 @@ function authenticateIdentity(req: Request, identity: any): AuthResult {
       return { userId: null, method: 'device_key_challenge' };
     }
 
-    // Step 2: Verify Ed25519 signature against stored public key
-    const nonce = consumeChallenge(identity.key_id);
-    if (!nonce) return null; // no pending challenge or expired
+    // Step 2: Verify Ed25519 signature against ANY pending challenge for this key.
+    // Multiple bodies may have outstanding challenges concurrently — try each.
+    const pendingNonces = getPendingChallenges(identity.key_id);
+    if (pendingNonces.length === 0) return null;
 
+    let matchedNonce: Buffer | null = null;
     try {
       const pubKey = crypto.createPublicKey(keyRow.public_key_pem);
       const sigBuf = Buffer.from(identity.signature, 'base64');
-      const valid = crypto.verify(null, nonce, pubKey, sigBuf);
-      if (!valid) return null;
+      for (const nonce of pendingNonces) {
+        if (crypto.verify(null, nonce, pubKey, sigBuf)) {
+          matchedNonce = nonce;
+          break;
+        }
+      }
     } catch {
       return null;
     }
+    if (!matchedNonce) return null;
+    removeChallenge(identity.key_id, matchedNonce);
 
     // Update last_active on successful auth
     db.prepare("UPDATE device_keys SET last_active = datetime('now') WHERE id = ?").run(keyRow.id);
