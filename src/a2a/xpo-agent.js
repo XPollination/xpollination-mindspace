@@ -526,23 +526,21 @@ function buildInstruction(eventType, data) {
 
 function deliverToTmux(message) {
   try {
-    // Send message + Enter
-    execFileSync('tmux', ['send-keys', '-t', SESSION, message, 'Enter'], { timeout: 5000 });
-    console.log(`[AGENT] Delivered to ${SESSION}`);
-
-    // Multi-line messages need a SECOND Enter to actually submit (Claude Code paste mode).
-    // Verify after 1s — if message still visible in input area (starts with ❯ followed by msg), send extra Enter.
-    setTimeout(() => {
-      try {
-        const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-15'], { stdio: 'pipe' }).toString();
-        // If the prompt still has visible input (❯ followed by a non-empty line), send Enter again
-        const firstChars = message.substring(0, 30).replace(/\n/g, ' ');
-        if (capture.includes(firstChars) && /❯\s+\S/.test(capture)) {
-          execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 3000 });
-          console.log(`[AGENT] Submitted multi-line message with extra Enter`);
-        }
-      } catch { /* best effort */ }
-    }, 1000);
+    // Use bracketed paste via tmux load-buffer + paste-buffer.
+    // This delivers the message as a paste (single atomic block), not as typed keystrokes.
+    // Claude Code recognizes bracketed paste and handles it correctly:
+    // multi-line content stays as one input, and the subsequent Enter submits it.
+    //
+    // The previous approach (send-keys with embedded newlines + Enter) failed because
+    // tmux types the newlines, Claude enters multi-line input mode, and the trailing
+    // Enter is consumed as another newline rather than as submit.
+    const tmpFile = `/tmp/xpo-deliver-${ROLE}.txt`;
+    writeFileSync(tmpFile, message);
+    execFileSync('tmux', ['load-buffer', tmpFile], { timeout: 5000 });
+    execFileSync('tmux', ['paste-buffer', '-t', SESSION, '-d'], { timeout: 5000 });  // -d deletes buffer after
+    // Small delay so paste is fully processed before Enter
+    execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
+    console.log(`[AGENT] Delivered to ${SESSION} (paste mode)`);
   } catch (err) {
     console.error(`[AGENT] tmux delivery failed: ${err.message}`);
   }
