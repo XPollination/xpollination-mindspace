@@ -584,19 +584,18 @@ async function deliverToTmux(message) {
     writeFileSync(tmpFile, message);
     execFileSync('tmux', ['load-buffer', '-b', bufferName, tmpFile], { timeout: 5000 });
     execFileSync('tmux', ['paste-buffer', '-b', bufferName, '-p', '-r', '-d', '-t', SESSION], { timeout: 5000 });
-    // Poll the pane for the paste to be rendered (message visible in input area).
-    // Then send Enter. This avoids hard-coding wait times and handles slow renders.
-    const firstChars = message.replace(/\s+/g, ' ').substring(0, 20);
+    // Poll the pane for the LAST chars of the message — guarantees paste fully streamed.
+    // First-chars detection gives false positive while paste is still in progress.
+    const lastChars = message.replace(/\s+/g, ' ').slice(-20).trim();
     let polled = 0;
-    const maxPolls = 30;  // 30 * 200ms = 6s max
+    const maxPolls = 50;  // 50 * 200ms = 10s max
     while (polled < maxPolls) {
       await new Promise(r => setTimeout(r, 200));
       polled++;
       try {
-        const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-30'], { stdio: 'pipe' }).toString();
-        // Normalize whitespace for comparison (paste may wrap differently)
+        const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-40'], { stdio: 'pipe' }).toString();
         const normalized = capture.replace(/\s+/g, ' ');
-        if (normalized.includes(firstChars)) break;
+        if (normalized.includes(lastChars)) break;
       } catch { /* keep polling */ }
     }
     // Extra settling time so Claude finishes rendering before Enter
