@@ -197,6 +197,53 @@ async function waitForLlmReady() {
   }
 }
 
+// --- A2A Queries (body queries on behalf of LLM, never the LLM itself) ---
+
+async function queryTasksViaA2A() {
+  try {
+    const res = await fetch(`${API_URL}/a2a/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({
+        type: 'OBJECT_QUERY',
+        agent_id: agentId,
+        object_type: 'task',
+        filters: { current_role: ROLE, status_not_in: 'complete,cancelled,blocked' },
+      }),
+    });
+    const data = await res.json();
+    return data.objects || data.result?.objects || [];
+  } catch (err) {
+    console.error(`[AGENT] Task query failed: ${err.message}`);
+    return [];
+  }
+}
+
+async function queryApprovalMode() {
+  try {
+    const res = await fetch(`${API_URL}/api/settings/liaison-approval-mode`, {
+      headers: { 'Authorization': `Bearer ${sessionToken}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.mode || data.value || null;
+  } catch (err) {
+    console.error(`[AGENT] Approval mode query failed: ${err.message}`);
+    return null;
+  }
+}
+
+function summarizeTasks(tasks) {
+  if (!tasks || tasks.length === 0) return 'No active tasks.';
+  const byStatus = {};
+  tasks.forEach(t => {
+    const s = t.state?.status || t.status || 'unknown';
+    byStatus[s] = (byStatus[s] || 0) + 1;
+  });
+  const counts = Object.entries(byStatus).map(([s, n]) => `${n} ${s}`).join(', ');
+  return `${tasks.length} active task${tasks.length === 1 ? '' : 's'}: ${counts}`;
+}
+
 // --- Brain Access via A2A ---
 
 async function queryBrainViaA2A(prompt) {
@@ -223,54 +270,49 @@ async function queryBrainViaA2A(prompt) {
   }
 }
 
-// --- Startup: Prompt Sequence ---
+// --- Startup: Single Consolidated Prompt ---
 
 async function sendStartupPrompts() {
-  console.log('[AGENT] Starting recovery via A2A...');
+  console.log('[AGENT] Body querying state on behalf of LLM...');
 
-  // Body queries brain — LLM receives results, no curl needed
-  const brainContext = await queryBrainViaA2A(
-    `Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?`
-  );
-  console.log(`[AGENT] Brain recovery: ${brainContext ? 'context found' : 'no context'}`);
+  // Body queries everything in parallel — LLM never touches A2A directly
+  const [brainContext, tasks, approvalMode] = await Promise.all([
+    queryBrainViaA2A(`Current task state, recent decisions, and pending work for ${ROLE} agent. What was I working on?`),
+    queryTasksViaA2A(),
+    ROLE === 'liaison' ? queryApprovalMode() : Promise.resolve(null),
+  ]);
 
-  // PROMPT 1: Brain context + task query + ready confirmation (single prompt)
-  const taskQueryCmd = `curl -s -X POST ${API_URL}/a2a/message -H 'Content-Type: application/json' -d '{"agent_id":"${agentId}","type":"OBJECT_QUERY","object_type":"task","filters":{"current_role":"${ROLE}","status_not_in":"complete,cancelled,blocked"}}'`;
+  console.log(`[AGENT] Brain: ${brainContext ? 'context' : 'none'} | Tasks: ${tasks.length} | Mode: ${approvalMode || 'n/a'}`);
 
-  let startupPrompt = '';
+  // Build a single consolidated startup prompt — pure text, no commands
+  const sections = [];
+
   if (brainContext) {
-    startupPrompt += `[BRAIN RECOVERY]\nYour recent context from brain (do NOT query brain yourself — the body handles brain access):\n\n${brainContext}\n\n`;
+    sections.push(`[BRAIN CONTEXT]\n${brainContext}`);
   } else {
-    startupPrompt += `Brain had no recent context for you. Your role is in CLAUDE.md (auto-loaded).\n\n`;
+    sections.push(`[BRAIN] No prior context. Your role is in CLAUDE.md.`);
   }
 
-  startupPrompt += `Query your active tasks: ${taskQueryCmd}\n\nThen confirm ready: (1) role and boundaries, (2) tasks assigned, (3) READY.`;
+  sections.push(`[TASKS] ${summarizeTasks(tasks)}`);
 
-  await sendPromptAndWait(startupPrompt);
-
-  // PROMPT 2: Approval mode (LIAISON only)
-  if (ROLE === 'liaison') {
-    await sendPromptAndWait(buildApprovalModePrompt());
+  if (ROLE === 'liaison' && approvalMode) {
+    const modeDesc = {
+      autonomous: 'You decide immediately. Document reasoning in liaison_reasoning. Do NOT ask Thomas. The mode IS the answer.',
+      semi: 'Present full task details. STOP. Wait for Thomas to type his decision.',
+      manual: 'Present details. Tell Thomas to click Confirm in the viz UI. STOP.',
+      'auto-approval': 'Same as autonomous for approval transitions. Thomas decides on completions.',
+    }[approvalMode] || 'Unknown mode — ask Thomas.';
+    sections.push(`[APPROVAL MODE] ${approvalMode} — ${modeDesc}\nNote: Body re-checks this before each task. Mode can change at any time.`);
   }
+
+  sections.push(`Confirm READY by stating: (1) your role and boundaries, (2) task count, (3) READY.`);
+
+  await sendPromptAndWait(sections.join('\n\n'));
 
   // Wait for READY signal
   await waitForReadySignal();
   console.log('[AGENT] Handshake complete — starting event stream');
 }
-
-function buildApprovalModePrompt() {
-  return `Check your approval mode. Run: curl -s ${API_URL}/api/settings/liaison-approval-mode
-
-Modes:
-- autonomous: You decide immediately. Document reasoning in liaison_reasoning. Do NOT ask Thomas. Do NOT wait. The mode IS the answer. You also drive the pipeline proactively.
-- semi: Present full task details. STOP. Wait for Thomas to type his decision. Do NOT proceed until he responds.
-- manual: Present details. Tell Thomas to click Confirm in the viz UI. STOP.
-- auto-approval: Same as autonomous for approval transitions. Thomas decides on completions.
-
-CRITICAL: Check mode BEFORE every decision transition. Thomas can change it at any time. Never cache.`;
-}
-
-// buildTaskStatePrompt removed — merged into sendStartupPrompts()
 
 async function sendPromptAndWait(prompt, maxWait = 90) {
   await deliverToTmux(prompt);
@@ -515,13 +557,12 @@ function buildInstruction(eventType, data) {
     rework_needed:   `Fix the issues: ${data.rework_reason || 'see task DNA'}.`,
   };
   const instruction = instructions[eventType] || 'Process this task.';
-
-  const deliverCmd = `node ${DELIVER_SCRIPT} --slug ${slug} --transition ${nextStatus} --role ${ROLE}`;
   const context = data.dna?.description?.substring(0, 150) || title;
 
-  const brainContributeCmd = `curl -s -X POST ${API_URL}/a2a/message -H "Content-Type: application/json" -H "Authorization: Bearer ${sessionToken}" -d '{"type":"BRAIN_CONTRIBUTE","agent_id":"${agentId}","prompt":"Task ${slug}: <YOUR KEY FINDINGS AND DECISIONS>","topic":"${slug}"}'`;
-
-  return `[TASK] ${slug} — ${title}. Role: ${ROLE}. ${instruction} Context: ${context}. When done: ${deliverCmd}\nThen contribute learnings to brain: ${brainContributeCmd}`;
+  // Pure-text task instruction. No URLs, no curl, no localhost.
+  // - To deliver results: a2a-deliver.cjs (the script handles the URL configuration)
+  // - To contribute to brain: just complete the task; the body will prompt for learnings
+  return `[TASK] ${slug} — ${title}\nRole: ${ROLE} | Next status: ${nextStatus}\n${instruction}\nContext: ${context}\n\nWhen done, deliver via: node ${DELIVER_SCRIPT} --slug ${slug} --transition ${nextStatus} --role ${ROLE}`;
 }
 
 async function deliverToTmux(message) {
