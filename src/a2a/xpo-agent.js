@@ -273,7 +273,7 @@ CRITICAL: Check mode BEFORE every decision transition. Thomas can change it at a
 // buildTaskStatePrompt removed — merged into sendStartupPrompts()
 
 async function sendPromptAndWait(prompt, maxWait = 90) {
-  deliverToTmux(prompt);
+  await deliverToTmux(prompt);
 
   // Wait for LLM to process — detect idle prompt (❯)
   for (let i = 0; i < maxWait; i += 2) {
@@ -488,7 +488,7 @@ async function handleEvent(eventType, data) {
     const enriched = brainContext
       ? `${instruction}\n\n[BRAIN CONTEXT]\n${brainContext}`
       : instruction;
-    deliverToTmux(enriched);
+    await deliverToTmux(enriched);
   } else if (eventType === 'connected') {
     console.log(`[AGENT] SSE connected`);
   }
@@ -524,23 +524,30 @@ function buildInstruction(eventType, data) {
   return `[TASK] ${slug} — ${title}. Role: ${ROLE}. ${instruction} Context: ${context}. When done: ${deliverCmd}\nThen contribute learnings to brain: ${brainContributeCmd}`;
 }
 
-function deliverToTmux(message) {
+async function deliverToTmux(message) {
   try {
     // Bracketed paste via NAMED tmux buffer to avoid cross-body race condition.
-    // The tmux paste buffer is GLOBAL — without -b, parallel bodies overwrite each other.
     //
     // Required flags:
     //   -b <name> : use a named buffer per body (avoids global buffer race)
-    //   -p        : enable bracketed paste mode (critical — Claude treats as paste, not typed)
+    //   -p        : enable bracketed paste mode (Claude treats as paste, not typed)
     //   -r        : do not replace LF with separator (preserve newlines)
     //   -d        : delete the named buffer after pasting (cleanup)
+    //
+    // CRITICAL: paste-buffer is asynchronous. The data streams through tmux to the
+    // terminal over time. If Enter is sent immediately after, it arrives BEFORE the
+    // paste content finishes streaming, and Claude submits empty input.
+    // Wait for the paste to complete before sending Enter.
     const bufferName = `xpo-${ROLE}`;
     const tmpFile = `/tmp/xpo-deliver-${ROLE}.txt`;
     writeFileSync(tmpFile, message);
     execFileSync('tmux', ['load-buffer', '-b', bufferName, tmpFile], { timeout: 5000 });
     execFileSync('tmux', ['paste-buffer', '-b', bufferName, '-p', '-r', '-d', '-t', SESSION], { timeout: 5000 });
+    // Wait for paste to fully stream through (longer for bigger messages)
+    const waitMs = Math.max(500, Math.min(3000, message.length * 2));
+    await new Promise(r => setTimeout(r, waitMs));
     execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
-    console.log(`[AGENT] Delivered to ${SESSION} (bracketed paste, buffer ${bufferName})`);
+    console.log(`[AGENT] Delivered to ${SESSION} (paste ${message.length}b, waited ${waitMs}ms)`);
   } catch (err) {
     console.error(`[AGENT] tmux delivery failed: ${err.message}`);
   }
