@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="-apple-system, system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#ea580c"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" font-size="20" font-weight="700" fill="#111">Agent Sessions Architecture</text>
+  <text x="450" y="50" text-anchor="middle" font-size="13" fill="#666">User device → Body → LLM, with A2A as the only protocol</text>
+
+  <!-- USER DEVICE box (light gray container) -->
+  <rect x="40" y="80" width="500" height="500" rx="12" fill="#f9fafb" stroke="#d1d5db" stroke-width="2"/>
+  <text x="60" y="105" font-size="14" font-weight="700" fill="#374151">USER DEVICE (laptop, server, anywhere)</text>
+
+  <!-- claude-session CLI -->
+  <rect x="60" y="125" width="200" height="60" rx="8" fill="#fff" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="160" y="148" text-anchor="middle" font-size="13" font-weight="600" fill="#111">claude-session (CLI)</text>
+  <text x="160" y="166" text-anchor="middle" font-size="11" fill="#666">First run: device flow + key registration</text>
+  <text x="160" y="178" text-anchor="middle" font-size="11" fill="#666">Subsequent: load key, launch body</text>
+
+  <!-- Device key file -->
+  <rect x="290" y="125" width="220" height="60" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="400" y="148" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">~/.xp0/keys/&lt;server&gt;.json</text>
+  <text x="400" y="166" text-anchor="middle" font-size="11" fill="#92400e">Ed25519 private key + canonical URL</text>
+  <text x="400" y="178" text-anchor="middle" font-size="11" fill="#92400e">Single source of truth for the body</text>
+
+  <!-- Body process -->
+  <rect x="60" y="220" width="450" height="180" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="285" y="245" text-anchor="middle" font-size="14" font-weight="700" fill="#1e3a8a">xpo-agent.js (Body)</text>
+  <text x="285" y="263" text-anchor="middle" font-size="11" fill="#1e40af">LLM-agnostic middleware — works with Claude, Cursor, any LLM</text>
+
+  <!-- Body responsibilities -->
+  <g font-size="11" fill="#1e3a8a">
+    <text x="80" y="290">• Authenticates via Ed25519 challenge-response</text>
+    <text x="80" y="308">• Opens SSE event stream</text>
+    <text x="80" y="326">• Queries brain via A2A BRAIN_QUERY (never direct)</text>
+    <text x="80" y="344">• Queries tasks via A2A OBJECT_QUERY</text>
+    <text x="80" y="362">• Reads canonical URL from WELCOME — switches from bootstrap</text>
+    <text x="80" y="380">• Delivers consolidated text prompts to LLM via tmux paste-buffer</text>
+  </g>
+
+  <!-- LLM process -->
+  <rect x="60" y="430" width="450" height="130" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+  <text x="285" y="455" text-anchor="middle" font-size="14" font-weight="700" fill="#854d0e">Claude Code (LLM)</text>
+  <text x="285" y="473" text-anchor="middle" font-size="11" fill="#854d0e">Pluggable reasoning engine — runs in a tmux pane</text>
+  <g font-size="11" fill="#854d0e">
+    <text x="80" y="497">Sees ONLY: brain context, task summary, role boundaries</text>
+    <text x="80" y="515">Never sees: URLs, curl commands, JWT tokens, protocol details</text>
+    <text x="80" y="533">Delivers results via: a2a-deliver.cjs (script)</text>
+    <text x="80" y="551">Could be replaced with Cursor / ChatGPT / Grok / any LLM</text>
+  </g>
+
+  <!-- Arrow: claude-session → body -->
+  <line x1="160" y1="186" x2="160" y2="218" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="170" y="206" font-size="10" fill="#666">spawns</text>
+
+  <!-- Arrow: key → body -->
+  <line x1="400" y1="186" x2="400" y2="218" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="410" y="206" font-size="10" fill="#92400e">reads</text>
+
+  <!-- Arrow: body → llm (delivers prompts) -->
+  <line x1="285" y1="402" x2="285" y2="428" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="295" y="420" font-size="10" fill="#2563eb">delivers prompts (paste)</text>
+
+  <!-- HIVE / A2A SERVER box (right side) -->
+  <rect x="600" y="80" width="270" height="500" rx="12" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
+  <text x="620" y="105" font-size="14" font-weight="700" fill="#0c4a6e">HIVE (canonical entry)</text>
+  <text x="620" y="120" font-size="11" fill="#0369a1">hive.xpollination.earth</text>
+
+  <!-- A2A Server -->
+  <rect x="620" y="140" width="230" height="180" rx="8" fill="#fff" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="735" y="163" text-anchor="middle" font-size="13" font-weight="700" fill="#0c4a6e">A2A Server</text>
+  <text x="735" y="178" text-anchor="middle" font-size="11" fill="#0369a1">The only protocol</text>
+
+  <g font-size="11" fill="#0c4a6e">
+    <text x="635" y="200">• /a2a/connect (auth)</text>
+    <text x="635" y="218">• /a2a/stream (SSE)</text>
+    <text x="635" y="236">• /a2a/message (BRAIN_QUERY,</text>
+    <text x="643" y="250">  OBJECT_QUERY, DELIVER, ...)</text>
+    <text x="635" y="270">• /a2a/connect WELCOME →</text>
+    <text x="643" y="284">  services.hive (canonical URL)</text>
+    <text x="635" y="304">• Device key registry</text>
+  </g>
+
+  <!-- Brain (proxied through A2A) -->
+  <rect x="620" y="340" width="230" height="100" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="735" y="365" text-anchor="middle" font-size="13" font-weight="700" fill="#14532d">Brain (Qdrant)</text>
+  <text x="735" y="383" text-anchor="middle" font-size="11" fill="#15803d">Multilingual embeddings</text>
+  <text x="735" y="401" text-anchor="middle" font-size="11" fill="#15803d">Pheromone-weighted memory</text>
+  <text x="735" y="419" text-anchor="middle" font-size="11" fill="#15803d">Accessed via BRAIN_QUERY only</text>
+
+  <!-- Mindspace (PM system) -->
+  <rect x="620" y="460" width="230" height="100" rx="8" fill="#fae8ff" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="735" y="485" text-anchor="middle" font-size="13" font-weight="700" fill="#581c87">Mindspace (PM)</text>
+  <text x="735" y="503" text-anchor="middle" font-size="11" fill="#7e22ce">Tasks, missions, requirements</text>
+  <text x="735" y="521" text-anchor="middle" font-size="11" fill="#7e22ce">Visions, decisions, navigation</text>
+  <text x="735" y="539" text-anchor="middle" font-size="11" fill="#7e22ce">Accessed via OBJECT_QUERY</text>
+
+  <!-- Arrow: A2A → Brain -->
+  <line x1="735" y1="320" x2="735" y2="338" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="745" y="332" font-size="10" fill="#666">proxy</text>
+
+  <!-- Arrow: A2A → Mindspace -->
+  <line x1="735" y1="440" x2="735" y2="458" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="745" y="452" font-size="10" fill="#666">queries</text>
+
+  <!-- Big arrow: body ↔ A2A (Ed25519 + bracketed paste) -->
+  <line x1="510" y1="310" x2="618" y2="220" stroke="#ea580c" stroke-width="3" marker-end="url(#arrow-orange)"/>
+  <line x1="618" y1="240" x2="510" y2="335" stroke="#ea580c" stroke-width="3" marker-end="url(#arrow-orange)"/>
+  <text x="540" y="265" font-size="11" font-weight="700" fill="#9a3412">A2A only</text>
+  <text x="540" y="278" font-size="10" fill="#9a3412">Ed25519 + SSE</text>
+
+  <!-- Caption: configuration story -->
+  <text x="450" y="605" text-anchor="middle" font-size="11" font-style="italic" fill="#6b7280">
+    To migrate to a new host: change CANONICAL_HIVE_URL on the A2A server. Bodies discover the new URL on next connect. Zero changes on user devices.
+  </text>
+</svg>
