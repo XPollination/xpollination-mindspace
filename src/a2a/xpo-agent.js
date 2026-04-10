@@ -457,12 +457,14 @@ async function connectToA2A() {
   sessionToken = data.session_token;
   reconnectDelay = 5000;
 
-  // Service discovery: A2A advertises the canonical URL we should use from now on.
-  // This lets the operator migrate the API to a new host without touching bodies —
-  // change CANONICAL_API_URL on the A2A server, restart, bodies pick up on next connect.
-  if (data.services?.api && data.services.api !== API_URL) {
-    console.log(`[AGENT] Switching to canonical URL: ${API_URL} → ${data.services.api}`);
-    API_URL = data.services.api;
+  // Service discovery: A2A advertises the canonical hive URL we should use.
+  // The hive is the public entry point for A2A — bodies use it for everything
+  // after the bootstrap connect. To migrate A2A to a new host, change
+  // CANONICAL_HIVE_URL on the A2A server — bodies pick it up on next connect.
+  // No separate "API" — there is only A2A.
+  if (data.services?.hive && data.services.hive !== API_URL) {
+    console.log(`[AGENT] Switching to hive URL: ${API_URL} → ${data.services.hive}`);
+    API_URL = data.services.hive;
   }
   console.log(`[AGENT] Connected. agent_id=${agentId} via ${API_URL}`);
 

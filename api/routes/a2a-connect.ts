@@ -269,16 +269,19 @@ a2aConnectRouter.post('/', (req: Request, res: Response) => {
       heartbeat: `/api/agents/${agentId}/heartbeat`,
       disconnect: `/api/agents/${agentId}/status`
     },
-    // Service discovery: canonical URLs the body should use going forward.
-    // CANONICAL_API_URL is configured ONCE per A2A server. To migrate to a new
-    // host, update this env var and restart A2A — bodies pick up the new URL on
-    // their next connect/reconnect. Bodies should NEVER store localhost or any
-    // host-specific URL — they always use what A2A advertises here.
+    // Service discovery — canonical URLs bodies should use going forward.
+    // There is no separate "API" — agents talk to A2A only. The hive URL is
+    // the public canonical entry point for A2A. To migrate A2A to a new host:
+    // change CANONICAL_HIVE_URL on the new server, restart, point DNS — bodies
+    // automatically use the new URL on their next connect.
+    //
+    // brain: null because bodies never query brain directly — they use A2A
+    //        BRAIN_QUERY messages, A2A proxies internally.
+    // viz:   for human-facing UI references (not used by bodies).
     services: {
-      api: process.env.CANONICAL_API_URL || `${req.protocol}://${req.get('host')}`,
-      brain: process.env.CANONICAL_BRAIN_URL || null,  // null = use BRAIN_QUERY messages, never direct
-      viz:   process.env.CANONICAL_VIZ_URL   || null,
-      hive:  process.env.CANONICAL_HIVE_URL  || null,
+      hive:  process.env.CANONICAL_HIVE_URL || `${req.protocol}://${req.get('host')}`,
+      brain: null,
+      viz:   process.env.CANONICAL_VIZ_URL || null,
     },
     available_actions: getAvailableActions(currentRole),
     protocol_version: '2.0',
