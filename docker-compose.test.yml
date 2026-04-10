@@ -36,6 +36,11 @@ services:
       - JWT_SECRET=${JWT_SECRET:-xpo-test-jwt-secret-2026}
       - FRONTEND_URL=https://beta-mindspace.xpollination.earth
       - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
+      # Service discovery — A2A advertises these URLs to bodies via WELCOME response.
+      # Bodies use these instead of localhost. To migrate the API to a new host,
+      # change CANONICAL_API_URL here, restart this container — bodies pick it up.
+      - CANONICAL_API_URL=https://beta-mindspace.xpollination.earth/api
+      - CANONICAL_HIVE_URL=https://hive.xpollination.earth
       - LIVEKIT_URL=wss://meet.xpollination.earth
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t

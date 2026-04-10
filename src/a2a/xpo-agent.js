@@ -77,8 +77,11 @@ function resolveApiUrl() {
   console.error('[AGENT] No API URL: provide --key (with server) or --api for bootstrap');
   process.exit(1);
 }
-const API_URL = resolveApiUrl();
-console.log(`[AGENT] API URL: ${API_URL} (source: ${deviceKey?.server ? 'key file' : '--api'})`);
+// Bootstrap URL — used only for the very first /a2a/connect call.
+// After WELCOME, we switch to the canonical URL advertised by A2A (services.api).
+// This lets operators migrate the API host without touching any body config.
+let API_URL = resolveApiUrl();
+console.log(`[AGENT] Bootstrap API URL: ${API_URL} (will switch to canonical from WELCOME)`);
 
 const WORKSPACE   = resolve(args.workspace);
 const LLM         = args.llm;
@@ -453,7 +456,15 @@ async function connectToA2A() {
   agentId = data.agent_id;
   sessionToken = data.session_token;
   reconnectDelay = 5000;
-  console.log(`[AGENT] Connected. agent_id=${agentId}`);
+
+  // Service discovery: A2A advertises the canonical URL we should use from now on.
+  // This lets the operator migrate the API to a new host without touching bodies —
+  // change CANONICAL_API_URL on the A2A server, restart, bodies pick up on next connect.
+  if (data.services?.api && data.services.api !== API_URL) {
+    console.log(`[AGENT] Switching to canonical URL: ${API_URL} → ${data.services.api}`);
+    API_URL = data.services.api;
+  }
+  console.log(`[AGENT] Connected. agent_id=${agentId} via ${API_URL}`);
 
   // Write credentials file for a2a-deliver.js
   const envFile = `/tmp/xpo-agent-${ROLE}.env`;
