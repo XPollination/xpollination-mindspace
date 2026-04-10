@@ -543,11 +543,25 @@ async function deliverToTmux(message) {
     writeFileSync(tmpFile, message);
     execFileSync('tmux', ['load-buffer', '-b', bufferName, tmpFile], { timeout: 5000 });
     execFileSync('tmux', ['paste-buffer', '-b', bufferName, '-p', '-r', '-d', '-t', SESSION], { timeout: 5000 });
-    // Wait for paste to fully stream through (longer for bigger messages)
-    const waitMs = Math.max(500, Math.min(3000, message.length * 2));
-    await new Promise(r => setTimeout(r, waitMs));
+    // Poll the pane for the paste to be rendered (message visible in input area).
+    // Then send Enter. This avoids hard-coding wait times and handles slow renders.
+    const firstChars = message.replace(/\s+/g, ' ').substring(0, 20);
+    let polled = 0;
+    const maxPolls = 30;  // 30 * 200ms = 6s max
+    while (polled < maxPolls) {
+      await new Promise(r => setTimeout(r, 200));
+      polled++;
+      try {
+        const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-30'], { stdio: 'pipe' }).toString();
+        // Normalize whitespace for comparison (paste may wrap differently)
+        const normalized = capture.replace(/\s+/g, ' ');
+        if (normalized.includes(firstChars)) break;
+      } catch { /* keep polling */ }
+    }
+    // Extra settling time so Claude finishes rendering before Enter
+    await new Promise(r => setTimeout(r, 500));
     execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
-    console.log(`[AGENT] Delivered to ${SESSION} (paste ${message.length}b, waited ${waitMs}ms)`);
+    console.log(`[AGENT] Delivered to ${SESSION} (paste ${message.length}b, settled after ${polled * 200}ms)`);
   } catch (err) {
     console.error(`[AGENT] tmux delivery failed: ${err.message}`);
   }
