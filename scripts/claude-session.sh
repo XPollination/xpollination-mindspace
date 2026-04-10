@@ -597,12 +597,13 @@ ROLE
         tmux send-keys -t "${pane}" "$body_cmd" Enter
 
         # Write Claude launch script (--allowedTools list too long for send-keys)
+        # Use exec so bash is replaced by claude — tmux pane_current_command will show 'claude'
         local launch_script="/tmp/claude-launch-${role}.sh"
         {
             echo "#!/bin/bash"
             echo "cd \"${workspace}\""
             echo "export AGENT_ROLE=${role}"
-            printf '%s --allowedTools' "${CLAUDE_BIN}"
+            printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
             for tool in "${ALLOWED_TOOLS[@]}"; do
                 printf ' %q' "$tool"
             done
@@ -729,13 +730,13 @@ create_agent_body_session() {
         # Small delay for body to connect, then launch Claude
         tmux send-keys -t "${session}:0.0" "sleep 2" Enter
 
-        # Launch Claude with A2A system prompt
+        # Launch Claude with A2A system prompt — exec replaces bash with claude
         local launch_script="/tmp/claude-launch-${role}-a2a.sh"
         {
             echo "#!/bin/bash"
             echo "cd \"${workspace}\""
             echo "export AGENT_ROLE=${role}"
-            printf '%s --allowedTools' "${CLAUDE_BIN}"
+            printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
             for tool in "${ALLOWED_TOOLS[@]}"; do
                 printf ' %q' "$tool"
             done

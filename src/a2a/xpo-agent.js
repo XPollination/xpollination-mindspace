@@ -167,8 +167,10 @@ Git is available. Commit and push your changes following the git protocol.`;
 // --- Startup: Wait for LLM ---
 
 /**
- * Poll pane until LLM process appears. No timeout — keeps checking until found.
- * Returns a promise that resolves when LLM is detected.
+ * Poll pane until LLM is ready. Two detection methods:
+ * 1. pane_current_command matches LLM (works when launched via exec)
+ * 2. pane content shows the Claude UI signature (works when launched via wrapper script)
+ * No timeout — keeps checking until found.
  */
 async function waitForLlmReady() {
   console.log(`[AGENT] Polling for LLM...`);
@@ -176,9 +178,16 @@ async function waitForLlmReady() {
   let elapsed = 0;
   while (true) {
     try {
+      // Method 1: process name
       const cmd = execFileSync('tmux', ['display-message', '-t', SESSION, '-p', '#{pane_current_command}'], { stdio: 'pipe' }).toString().trim();
       if (cmd === target || cmd === 'claude') {
         console.log(`[AGENT] LLM ready (${cmd}, ${elapsed}s)`);
+        return;
+      }
+      // Method 2: pane content signature (Claude UI markers)
+      const pane = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p'], { stdio: 'pipe' }).toString();
+      if (pane.includes('Claude Code') || pane.includes('Opus 4') || /❯\s*$/m.test(pane)) {
+        console.log(`[AGENT] LLM ready (content-detected, ${elapsed}s)`);
         return;
       }
     } catch { /* pane may not exist yet */ }
