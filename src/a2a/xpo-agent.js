@@ -78,7 +78,7 @@ function resolveApiUrl() {
   process.exit(1);
 }
 // Bootstrap URL — used only for the very first /a2a/connect call.
-// After WELCOME, we switch to the canonical URL advertised by A2A (services.api).
+// After WELCOME, we switch to the canonical URL advertised by A2A (services.hive).
 // This lets operators migrate the API host without touching any body config.
 let API_URL = resolveApiUrl();
 console.log(`[AGENT] Bootstrap API URL: ${API_URL} (will switch to canonical from WELCOME)`);
