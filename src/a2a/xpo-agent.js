@@ -855,9 +855,10 @@ async function connectToA2A() {
   }
   console.log(`[AGENT] Connected. agent_id=${agentId} via ${API_URL}`);
 
-  // Write env file — debugging visibility only (LLM no longer needs credentials)
+  // Write env file — body credentials for tools (pm-status, etc.) that query via A2A.
+  // The LLM doesn't read this directly — tools do.
   const envFile = `/tmp/xpo-agent-${ROLE}.env`;
-  writeFileSync(envFile, `A2A_API_URL=${API_URL}\nA2A_AGENT_ID=${agentId}\n`);
+  writeFileSync(envFile, `A2A_API_URL=${API_URL}\nA2A_AGENT_ID=${agentId}\nA2A_TOKEN=${sessionToken}\n`);
   try { chmodSync(envFile, 0o600); } catch { /* best effort */ }
 
   // Write status file for agents to verify body is alive

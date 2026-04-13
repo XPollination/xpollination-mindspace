@@ -38,12 +38,31 @@ Consistent markdown rendering rules for all LIAISON output in this skill:
 
 ---
 
-## Step 1: Scan Projects + Brain Health
+## Step 0: Load A2A Credentials
 
-Run the pm-status script to scan all project databases AND get brain health in one command:
+All data access goes through A2A. Load the body's credentials once:
 
 ```bash
-node /home/developer/workspaces/github/PichlerThomas/xpollination-mcp-server/viz/pm-status.cjs
+eval $(cat /tmp/xpo-agent-liaison.env 2>/dev/null || cat /tmp/xpo-agent-pdsa.env 2>/dev/null || echo "A2A_API_URL=http://localhost:3101")
+```
+
+This sets `A2A_API_URL` and `A2A_TOKEN` for all subsequent commands.
+
+**A2A query helper** (use throughout this skill):
+```bash
+# Query: send A2A message and get JSON response
+curl -s -X POST "$A2A_API_URL/a2a/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $A2A_TOKEN" \
+  -d '{"type":"OBJECT_QUERY","agent_id":"pm-status","object_type":"task","filters":{...}}'
+```
+
+## Step 1: Scan Projects + Brain Health
+
+Run the pm-status script (queries via A2A, not direct DB):
+
+```bash
+node viz/pm-status.cjs
 ```
 
 This returns JSON with:
@@ -153,11 +172,15 @@ The `review→complete` transition enforces quality gates. LIAISON must set thes
 
 **Pattern for batch completions:**
 ```bash
-# 1. Set all gate fields
-DATABASE_PATH=$DB node $CLI update-dna <slug> '{"abstract_ref":"https://...","changelog_ref":"https://...","test_pass_count":4,"test_total_count":4,"liaison_reasoning":"COMPLETE: ..."}' liaison
+# 1. Update DNA gate fields via A2A
+curl -s -X POST "$A2A_API_URL/a2a/message" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $A2A_TOKEN" \
+  -d '{"type":"OBJECT_UPDATE","agent_id":"pm-status","object_type":"task","object_id":"<slug>","updates":{"abstract_ref":"https://...","changelog_ref":"https://...","test_pass_count":4,"test_total_count":4,"liaison_reasoning":"COMPLETE: ..."}}'
 
-# 2. Then transition
-DATABASE_PATH=$DB node $CLI transition <slug> complete liaison
+# 2. Then transition via A2A DELIVER
+curl -s -X POST "$A2A_API_URL/a2a/message" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $A2A_TOKEN" \
+  -d '{"type":"DELIVER","agent_id":"pm-status","task_slug":"<slug>","transition_to":"complete"}'
 ```
 
 Use the task's `pdsa_ref` as `abstract_ref` if no separate abstract exists. Use the implementation commit URL as `changelog_ref`.
@@ -282,13 +305,15 @@ For each individual task (or when Thomas selects "Review Individually" for a bat
 
 1. **Check current LIAISON approval mode BEFORE each task:**
    ```bash
-   curl -s http://localhost:4100/api/settings/liaison-approval-mode
+   curl -s "$A2A_API_URL/api/settings/liaison-approval-mode" -H "Authorization: Bearer $A2A_TOKEN"
    ```
    Thomas can change the mode at any time via the viz. NEVER cache or assume the mode — always check fresh before each decision.
 
 2. **Get full DNA:**
    ```bash
-   DATABASE_PATH=$DB node $CLI get <slug>
+   curl -s -X POST "$A2A_API_URL/a2a/message" \
+     -H "Content-Type: application/json" -H "Authorization: Bearer $A2A_TOKEN" \
+     -d '{"type":"OBJECT_QUERY","agent_id":"pm-status","object_type":"task","filters":{"slug":"<slug>"}}'
    ```
 
 3. **Run automated verification checks** (between DNA retrieval and presentation):
@@ -428,9 +453,9 @@ For each individual task (or when Thomas selects "Review Individually" for a bat
    **MANUAL mode:** Present the task details. Tell Thomas to click Confirm in the mindspace viz. STOP and wait for Thomas to confirm he has clicked. Then execute the transition.
 
 6. **Execute the transition** based on decision:
-   - Approve: `DATABASE_PATH=$DB node $CLI transition <slug> approved liaison`
-   - Complete: `DATABASE_PATH=$DB node $CLI transition <slug> complete liaison`
-   - Rework: `DATABASE_PATH=$DB node $CLI transition <slug> rework liaison`
+   - Approve: `curl -s -X POST "$A2A_API_URL/a2a/message" -H "Content-Type: application/json" -H "Authorization: Bearer $A2A_TOKEN" -d '{"type":"DELIVER","agent_id":"pm-status","task_slug":"<slug>","transition_to":"approved"}'`
+   - Complete: `curl -s -X POST "$A2A_API_URL/a2a/message" -H "Content-Type: application/json" -H "Authorization: Bearer $A2A_TOKEN" -d '{"type":"DELIVER","agent_id":"pm-status","task_slug":"<slug>","transition_to":"complete"}'`
+   - Rework: `curl -s -X POST "$A2A_API_URL/a2a/message" -H "Content-Type: application/json" -H "Authorization: Bearer $A2A_TOKEN" -d '{"type":"DELIVER","agent_id":"pm-status","task_slug":"<slug>","transition_to":"rework"}'`
 
 7. **Only then** present the next task.
 
@@ -518,10 +543,7 @@ RECOMMENDATION
 
 ## Reference
 
-- **CLI:** `xpollination-mcp-server/src/db/interface-cli.js`
-- **Project DBs:**
-  - `xpollination-best-practices/data/xpollination.db`
-  - `xpollination-mcp-server/data/xpollination.db`
-  - `HomePage/data/xpollination.db`
-- **Brain API:** `POST http://localhost:3200/api/v1/memory`
-- **Workflow:** `xpollination-mcp-server/docs/WORKFLOW.md`
+- **Data access:** All queries via A2A (OBJECT_QUERY, BRAIN_QUERY). No direct DB access.
+- **PM Status script:** `viz/pm-status.cjs` — queries A2A using body session token
+- **Body credentials:** `/tmp/xpo-agent-{role}.env` (A2A_API_URL, A2A_TOKEN)
+- **Workflow:** `tracks/process/context/WORKFLOW.md`
