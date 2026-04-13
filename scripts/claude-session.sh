@@ -7,14 +7,20 @@
 #   - Hetzner (any user)    → runs tmux directly (auto-switches to developer)
 #   - Remote (e.g. Synology)→ SSHes to Hetzner via VPN
 #
-# Usage:
-#   claude-session <session-name>
+# Zero-knowledge: the command name determines the environment.
+# No flags needed. Symlink names:
+#   claude-session-beta  → connects to Beta Hive (:3101)
+#   claude-session-prod  → connects to Prod Hive (:3100)
+#   claude-session       → defaults to beta
 #
-# Examples:
-#   claude-session claude-agents     # 4-pane: Liaison + PDSA + Dev + QA
-#   claude-session claude-dual       # 3-pane: Orchestrator + PDSA+QA + Dev
-#   claude-session claude-pdsa       # Single-pane PDSA agent
-#   claude-session my-session        # Single-pane Claude session
+# Usage:
+#   claude-session-beta a2a-team      # 4-pane team on Beta
+#   claude-session-prod a2a-team      # 4-pane team on Prod
+#   claude-session-beta liaison       # Single-pane liaison on Beta
+#   claude-session-prod dev           # Single-pane dev on Prod
+#
+# Install (creates symlinks):
+#   npm run install:sessions
 #
 # Behavior:
 #   - Session exists   → attaches to it (idempotent)
@@ -69,6 +75,14 @@ readonly HETZNER_HOME="/home/${HETZNER_USER}"
 readonly SELF_PATH="$(realpath "$0")"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# --- Environment from script name (zero-knowledge) ---
+# claude-session-beta → beta, claude-session-prod → prod, claude-session → beta
+_SCRIPT_NAME="$(basename "$0")"
+case "$_SCRIPT_NAME" in
+    claude-session-prod|claude-session-prod.sh) readonly XPO_ENV="prod" ;;
+    *)                                          readonly XPO_ENV="beta" ;;
+esac
 
 if [[ -x "${HETZNER_HOME}/.local/bin/claude" ]]; then
     # On Hetzner
@@ -500,15 +514,14 @@ create_agents_session() {
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
-    # Environment determines which Hive to connect to (device key has the URL)
-    local env="${XPO_ENV:-beta}"
-    local key_file="${HETZNER_HOME}/.xp0/keys/${env}.json"
+    # Device key determines which Hive (env from script name: claude-session-beta/prod)
+    local key_file="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
     if [[ ! -f "$key_file" ]]; then
         echo "ERROR: Device key not found: ${key_file}"
-        echo "Register with: node scripts/device-key-register.js --server <URL> --name ${env}"
+        echo "Register with: node scripts/device-key-register.js --server <URL> --env ${XPO_ENV}"
         exit 1
     fi
-    echo "Environment: ${env} (key: ${key_file})"
+    echo "Environment: ${XPO_ENV} (key: ${key_file})"
 
     # Write self-describing role prompts — no URLs, no scripts, no protocol details
     # The body sends [AVAILABLE] and [SUMMARY] messages with response options embedded.
@@ -660,16 +673,15 @@ create_agent_body_session() {
         exit 1
     fi
 
-    # Environment determines which Hive (device key has the URL)
-    local env="${XPO_ENV:-beta}"
-    local key_file="${HETZNER_HOME}/.xp0/keys/${env}.json"
+    # Device key determines which Hive (env from script name: claude-session-beta/prod)
+    local key_file="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
     if [[ ! -f "$key_file" ]]; then
         echo "ERROR: Device key not found: ${key_file}"
-        echo "Register with: node scripts/device-key-register.js --server <URL> --name ${env}"
+        echo "Register with: node scripts/device-key-register.js --server <URL> --env ${XPO_ENV}"
         exit 1
     fi
 
-    echo "Starting A2A agent body: ${role} (env: ${env})"
+    echo "Starting A2A agent body: ${role} (env: ${XPO_ENV})"
     echo "  Key:       ${key_file}"
     echo "  Workspace: ${workspace}"
     echo "  Script:    ${agent_script}"
