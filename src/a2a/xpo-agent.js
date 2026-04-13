@@ -461,12 +461,18 @@ async function executeClaimHandshake(brainQuery) {
 let lastHelpCheck = '';  // dedup: don't respond to same HELP twice
 
 async function checkForHelpRequest(capture) {
-  // Only parse text AFTER the last ❯ (= user/LLM input, not agent output).
-  // Agent output contains markers as text (e.g. "HELP: Marker" as heading)
-  // which would false-positive. Only react to input after the prompt.
-  const lastPromptIdx = capture.lastIndexOf('❯');
-  const inputArea = lastPromptIdx >= 0 ? capture.slice(lastPromptIdx) : '';
-  const markers = parseMarkers(inputArea);
+  // Only parse the LAST input line (after the final ❯ that has content).
+  // Skip empty prompts. Skip agent output that contains markers as text.
+  const lines = capture.split('\n');
+  let inputLine = '';
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].startsWith('❯') && lines[i].trim().length > 1) {
+      inputLine = lines[i];
+      break;
+    }
+  }
+  if (!inputLine) return false;
+  const markers = parseMarkers(inputLine);
   if (!markers.help) return false;
   if (markers.help === lastHelpCheck) return false; // already answered
   lastHelpCheck = markers.help;
@@ -494,11 +500,14 @@ async function checkForHelpRequest(capture) {
 
 function startIdleWatcher() {
   // Poll pane every 10s while IDLE to detect HELP: requests
+  // ONLY check when agent is at idle prompt — avoids false positives
+  // from agent output that contains "HELP:" as text.
   if (workPollTimer) clearInterval(workPollTimer);
   workPollTimer = setInterval(async () => {
     if (bodyState !== 'IDLE') return;
     try {
       const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-15'], { stdio: 'pipe' }).toString();
+      if (!paneHasIdlePrompt(capture)) return; // agent still outputting
       await checkForHelpRequest(capture);
     } catch { /* capture may fail */ }
   }, 10000);
