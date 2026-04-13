@@ -117,6 +117,13 @@ function setState(s) {
   writeStatus({ body_state: s, current_task: currentTask?.slug || null });
 }
 
+// Check if Claude Code shows the idle ❯ prompt anywhere in captured text.
+// Claude renders hints below the prompt ("? for shortcuts", session limit),
+// so ❯ is NOT always on the last line.
+function paneHasIdlePrompt(capturedText) {
+  return capturedText.split('\n').some(l => l.startsWith('❯') || l.startsWith('> '));
+}
+
 function clearTask() {
   currentTask = null;
   hasUpdates = false;
@@ -215,12 +222,10 @@ async function waitForLlmReady() {
   while (true) {
     try {
       // Wait for the ❯ prompt — the ONLY reliable signal that Claude Code
-      // is ready for input. Process name and "Claude Code" banner match
-      // BEFORE the prompt appears, causing premature paste.
-      const pane = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-5'], { stdio: 'pipe' }).toString();
-      const lines = pane.split('\n').filter(l => l.trim());
-      const last = lines[lines.length - 1] || '';
-      if (last.startsWith('❯')) {
+      // is ready for input. Check ANY line (not just last) because Claude
+      // renders hints/status below the prompt line (e.g. "? for shortcuts").
+      const pane = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-10'], { stdio: 'pipe' }).toString();
+      if (pane.split('\n').some(l => l.startsWith('❯'))) {
         console.log(`[AGENT] LLM ready (❯ prompt, ${elapsed}s)`);
         return;
       }
@@ -460,7 +465,7 @@ function startCompletionDetection() {
       const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-5'], { stdio: 'pipe' }).toString();
       const lines = capture.split('\n').filter(l => l.trim());
       const last = lines[lines.length - 1] || '';
-      if (last.startsWith('❯') || last.startsWith('> ')) {
+      if (paneHasIdlePrompt(capture)) {
         clearInterval(workPollTimer);
         workPollTimer = null;
         console.log('[AGENT] LLM idle detected — requesting summary');
@@ -493,7 +498,7 @@ async function pollForSummaryResponse(retryCount) {
       // Only parse after LLM returns to idle
       const lines = capture.split('\n').filter(l => l.trim());
       const last = lines[lines.length - 1] || '';
-      if (!(last.startsWith('❯') || last.startsWith('> '))) continue; // still working
+      if (!paneHasIdlePrompt(capture)) continue; // still working
 
       const markers = parseMarkers(capture);
       if (!markers.learnings && !markers.transition && !markers.findings) continue; // no markers yet
@@ -672,7 +677,7 @@ async function sendPromptAndWait(prompt, maxWait = 90) {
       const lines = capture.split('\n').filter(l => l.trim());
       const lastLine = lines[lines.length - 1] || '';
       // Claude's idle prompt starts with ❯
-      if (lastLine.startsWith('❯') || lastLine.startsWith('> ')) {
+      if (paneHasIdlePrompt(capture)) {
         return;
       }
     } catch { /* capture may fail */ }
@@ -940,7 +945,7 @@ async function deliverToTmux(message) {
         const check = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-2'], { stdio: 'pipe' }).toString();
         const checkLines = check.split('\n').filter(l => l.trim());
         const lastLine = checkLines[checkLines.length - 1] || '';
-        if (!lastLine.startsWith('❯')) break; // Claude is processing — success
+        if (!paneHasIdlePrompt(check)) break; // Claude is processing — success
         // Still at prompt — Enter didn't submit. Retry.
         console.log(`[AGENT] Enter didn't submit (retry ${retry + 1}/3) — resending`);
         await new Promise(r => setTimeout(r, 1000));
