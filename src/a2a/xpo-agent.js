@@ -101,6 +101,9 @@ let sessionToken = null;
 let reconnectDelay = 5000;
 const MAX_RECONNECT_DELAY = 30000;
 
+// --- WELCOME metadata (populated by connectToA2A) ---
+let availableActions = [];   // from WELCOME response — what this agent can do
+
 // --- Body State Machine ---
 // States: IDLE → TASK_OFFERED → BRAIN_PENDING → WORKING → SUMMARIZING → DELIVERING → IDLE
 let bodyState = 'IDLE';
@@ -616,8 +619,39 @@ async function sendStartupPrompts() {
 
   console.log(`[AGENT] Brain: ${brainContext ? 'context' : 'none'} | Tasks: ${tasks.length} | Mode: ${approvalMode || 'n/a'}`);
 
-  // Build a single consolidated startup prompt — pure text, no commands
+  // Build startup prompt: tutorial (from WELCOME) + brain + tasks + ready
   const sections = [];
+
+  // Tutorial — derived from WELCOME available_actions, self-describing
+  const actionMap = {
+    OBJECT_QUERY:      'query tasks, missions, requirements',
+    BRAIN_QUERY:       'search shared knowledge (brain)',
+    BRAIN_CONTRIBUTE:  'store learnings in shared knowledge',
+    TRANSITION:        'transition tasks between states',
+    DELIVER:           'deliver task results',
+    OBJECT_CREATE:     'create new tasks or missions',
+    OBJECT_UPDATE:     'update task DNA and metadata',
+    DECISION_REQUEST:  'request a decision from the team',
+    DECISION_RESPONSE: 'respond to a decision request',
+  };
+  const capabilities = availableActions
+    .filter(a => actionMap[a])
+    .map(a => `  - ${actionMap[a]}`)
+    .join('\n');
+  sections.push(`[CONNECTED] You are connected to the Hive via your A2A body.
+Your body handles all server communication. You communicate via text markers.
+
+Your capabilities through the body:
+${capabilities || '  (none announced)'}
+
+How it works:
+  1. Body sends [AVAILABLE] with a task → you respond CLAIM: yes/no + BRAIN: <question>
+  2. Body sends [BRAIN] context + [CLAIMED] → you do the work
+  3. Body sends [SUMMARY] → you respond LEARNINGS: + TRANSITION: + FINDINGS:
+  4. Body sends [DELIVERED] → done, next task arrives automatically
+
+Every message from the body carries its response options. Just follow the markers.
+Do NOT run scripts, curl, or query databases — the body handles everything.`);
 
   if (brainContext) {
     sections.push(`[BRAIN CONTEXT]\n${brainContext}`);
@@ -637,7 +671,7 @@ async function sendStartupPrompts() {
     sections.push(`[APPROVAL MODE] ${approvalMode} — ${modeDesc}\nNote: Body re-checks this before each task. Mode can change at any time.`);
   }
 
-  sections.push(`Confirm READY by stating: (1) your role and boundaries, (2) task count, (3) READY.`);
+  sections.push(`Confirm READY by stating: (1) your role and boundaries, (2) that you understand the marker protocol, (3) READY.`);
 
   await sendPromptAndWait(sections.join('\n\n'));
 
@@ -770,6 +804,8 @@ async function connectToA2A() {
   agentId = data.agent_id;
   sessionToken = data.session_token;
   reconnectDelay = 5000;
+  // Save WELCOME metadata for startup tutorial
+  availableActions = data.available_actions || [];
 
   // Service discovery: A2A advertises the canonical hive URL we should use.
   // The hive is the public entry point for A2A — bodies use it for everything
