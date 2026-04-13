@@ -461,20 +461,28 @@ async function executeClaimHandshake(brainQuery) {
 let lastObjectQuery = '';  // dedup
 
 async function checkForObjectQuery(capture) {
-  const lines = capture.split('\n');
-  let inputLine = '';
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (lines[i].startsWith('❯') && lines[i].trim().length > 1) {
-      inputLine = lines[i];
+  // Agent writes OBJECT_QUERY: as OUTPUT (line starts with ● not ❯).
+  // Search ALL lines in the capture for the marker. Dedup prevents re-processing.
+  // Only called when agent is idle (paneHasIdlePrompt guard in caller).
+  // Find OBJECT_QUERY: in capture. If the value looks like JSON, collect
+  // continuation lines (tmux wraps long lines, breaking JSON across lines).
+  let queryText = '';
+  const captureLines = capture.split('\n');
+  for (let i = 0; i < captureLines.length; i++) {
+    const m = captureLines[i].match(/OBJECT_QUERY:\s*(.+)/i);
+    if (m) {
+      queryText = m[1].trim();
+      // If it starts with { but doesn't end with }, collect wrapped lines
+      if (queryText.startsWith('{') && !queryText.endsWith('}')) {
+        for (let j = i + 1; j < captureLines.length && j < i + 5; j++) {
+          queryText += captureLines[j].trim();
+          if (queryText.endsWith('}')) break;
+        }
+      }
       break;
     }
   }
-  if (!inputLine) return false;
-
-  // Look for OBJECT_QUERY: in the input — agent may write JSON or key=value
-  const match = inputLine.match(/OBJECT_QUERY:\s*(.+)/i);
-  if (!match) return false;
-  const queryText = match[1].trim();
+  if (!queryText) return false;
   if (queryText === lastObjectQuery) return false;
   lastObjectQuery = queryText;
 
@@ -527,21 +535,16 @@ async function checkForObjectQuery(capture) {
 let lastHelpCheck = '';  // dedup: don't respond to same HELP twice
 
 async function checkForHelpRequest(capture) {
-  // Only parse the LAST input line (after the final ❯ that has content).
-  // Skip empty prompts. Skip agent output that contains markers as text.
-  const lines = capture.split('\n');
-  let inputLine = '';
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (lines[i].startsWith('❯') && lines[i].trim().length > 1) {
-      inputLine = lines[i];
-      break;
-    }
+  // Agent writes HELP: as OUTPUT (● HELP: ...) not as input (❯ HELP: ...).
+  // Search all lines. Dedup prevents re-processing. Only called when idle.
+  let helpText = null;
+  for (const line of capture.split('\n')) {
+    const m = line.match(/HELP:\s*(.*)/i);
+    if (m && m[1].trim()) { helpText = m[1].trim(); break; }
   }
-  if (!inputLine) return false;
-  const markers = parseMarkers(inputLine);
-  if (!markers.help) return false;
-  if (markers.help === lastHelpCheck) return false; // already answered
-  lastHelpCheck = markers.help;
+  if (!helpText) return false;
+  if (helpText === lastHelpCheck) return false; // already answered
+  lastHelpCheck = helpText;
 
   console.log(`[AGENT] HELP request: ${markers.help}`);
   try {
@@ -769,7 +772,8 @@ Type HELP: to see all available A2A capabilities.`);
     sections.push(`[BRAIN] No prior context. Your role is in CLAUDE.md.`);
   }
 
-  sections.push(`[TASKS for ${ROLE}] ${summarizeTasks(tasks)}`);
+  sections.push(`[TASKS for ${ROLE}] ${summarizeTasks(tasks)}
+To query all tasks: OBJECT_QUERY: task status=pending`);
 
   if (ROLE === 'liaison' && approvalMode) {
     const modeDesc = {
