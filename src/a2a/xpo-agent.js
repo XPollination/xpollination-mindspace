@@ -622,34 +622,17 @@ async function sendStartupPrompts() {
   // Build startup prompt: tutorial (from WELCOME) + brain + tasks + ready
   const sections = [];
 
-  // Tutorial — fetched from Hive DESCRIBE (auto-generated from server code)
-  let hiveDocs = '';
-  try {
-    const desc = await a2aMessage({ type: 'DESCRIBE' });
-    if (desc.type === 'DESCRIPTION' && desc.actions) {
-      const lines = Object.entries(desc.actions).map(([type, meta]) => {
-        let line = `  ${type}: ${meta.description}`;
-        if (meta.example) line += `\n    example: ${JSON.stringify(meta.example)}`;
-        return line;
-      });
-      hiveDocs = lines.join('\n');
-    }
-  } catch (err) {
-    console.error(`[AGENT] DESCRIBE failed: ${err.message}`);
-  }
-
+  // Startup = short tutorial only. DESCRIBE docs come on-demand via A2A.
   sections.push(`[CONNECTED] You are connected to the Hive via your A2A body.
-Your body handles all server communication. You communicate via text markers.
 
 How it works:
-  1. Body sends [AVAILABLE] with a task → you respond CLAIM: yes/no + BRAIN: <question>
-  2. Body sends [BRAIN] context + [CLAIMED] → you do the work
+  1. Body sends [AVAILABLE] → you respond CLAIM: yes/no + BRAIN: <question>
+  2. Body sends [BRAIN] + [CLAIMED] → you do the work
   3. Body sends [SUMMARY] → you respond LEARNINGS: + TRANSITION: + FINDINGS:
-  4. Body sends [DELIVERED] → done, next task arrives automatically
+  4. Body sends [DELIVERED] → done, next task arrives
 
-Every message from the body carries its response options. Just follow the markers.
-Do NOT run scripts, curl, or query databases — the body handles everything.
-${hiveDocs ? `\nHive capabilities (auto-generated):\n${hiveDocs}` : ''}`);
+Every message carries its response options. Follow the markers.
+Do NOT run scripts, curl, or query databases — body handles everything.`);
 
   if (brainContext) {
     sections.push(`[BRAIN CONTEXT]\n${brainContext}`);
@@ -946,10 +929,13 @@ async function deliverToTmux(message) {
         if (normalized.includes(lastChars)) break;
       } catch { /* keep polling */ }
     }
-    // Extra settling time so Claude finishes rendering before Enter
-    await new Promise(r => setTimeout(r, 500));
+    // Settling time scales with message size — large pastes need more render time.
+    // Claude Code's input handler needs time to process bracketed paste content.
+    // No Enter retry — external keystroke injection is a known race condition anti-pattern.
+    const settleMs = Math.max(1500, Math.min(5000, Math.floor(message.length / 400) * 1000));
+    await new Promise(r => setTimeout(r, settleMs));
     execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
-    console.log(`[AGENT] Delivered to ${SESSION} (paste ${message.length}b, settled after ${polled * 200}ms)`);
+    console.log(`[AGENT] Delivered to ${SESSION} (paste ${message.length}b, settled after ${polled * 200 + settleMs}ms)`);
   } catch (err) {
     console.error(`[AGENT] tmux delivery failed: ${err.message}`);
   }
