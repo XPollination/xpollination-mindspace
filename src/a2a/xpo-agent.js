@@ -211,20 +211,17 @@ Git is available. Commit and push your changes following the git protocol.`;
  */
 async function waitForLlmReady() {
   console.log(`[AGENT] Polling for LLM...`);
-  const target = LLM === 'claude' ? 'claude' : LLM;
   let elapsed = 0;
   while (true) {
     try {
-      // Method 1: process name
-      const cmd = execFileSync('tmux', ['display-message', '-t', SESSION, '-p', '#{pane_current_command}'], { stdio: 'pipe' }).toString().trim();
-      if (cmd === target || cmd === 'claude') {
-        console.log(`[AGENT] LLM ready (${cmd}, ${elapsed}s)`);
-        return;
-      }
-      // Method 2: pane content signature (Claude UI markers)
-      const pane = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p'], { stdio: 'pipe' }).toString();
-      if (pane.includes('Claude Code') || pane.includes('Opus 4') || /❯\s*$/m.test(pane)) {
-        console.log(`[AGENT] LLM ready (content-detected, ${elapsed}s)`);
+      // Wait for the ❯ prompt — the ONLY reliable signal that Claude Code
+      // is ready for input. Process name and "Claude Code" banner match
+      // BEFORE the prompt appears, causing premature paste.
+      const pane = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-5'], { stdio: 'pipe' }).toString();
+      const lines = pane.split('\n').filter(l => l.trim());
+      const last = lines[lines.length - 1] || '';
+      if (last.startsWith('❯')) {
+        console.log(`[AGENT] LLM ready (❯ prompt, ${elapsed}s)`);
         return;
       }
     } catch { /* pane may not exist yet */ }
