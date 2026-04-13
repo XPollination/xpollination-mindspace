@@ -769,7 +769,7 @@ Type HELP: to see all available A2A capabilities.`);
     sections.push(`[BRAIN] No prior context. Your role is in CLAUDE.md.`);
   }
 
-  sections.push(`[TASKS] ${summarizeTasks(tasks)}`);
+  sections.push(`[TASKS for ${ROLE}] ${summarizeTasks(tasks)}`);
 
   if (ROLE === 'liaison' && approvalMode) {
     const modeDesc = {
