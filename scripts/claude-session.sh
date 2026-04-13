@@ -323,19 +323,27 @@ is_on_hetzner() {
 # Ed25519 persistent device keys. Register once, connect forever.
 # See: docs/missions/mission-agent-oauth-sessions.md v2.1
 
+# --- Bootstrap URL mapping (only used for first-time registration) ---
+# Once a key is registered, the URL lives in the key file. This mapping
+# is the ONLY place environment-specific URLs appear.
+env_to_bootstrap_url() {
+    case "$1" in
+        prod) echo "http://localhost:3100" ;;
+        *)    echo "http://localhost:3101" ;;
+    esac
+}
+
 check_device_key() {
-    local api_base="$1"
+    # Uses XPO_ENV (from script name) for key filename
     local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
     node_cmd="${node_cmd:-node}"
-
-    local server_host
-    server_host=$(echo "$api_base" | sed 's|https\?://||' | sed 's|:.*||' | sed 's|/.*||')
-    local key_file="${HOME}/.xp0/keys/${server_host}.json"
+    local key_file="${HOME}/.xp0/keys/${XPO_ENV}.json"
 
     if [[ -f "$key_file" ]]; then
-        local key_id
+        local key_id api_base
         key_id=$($node_cmd -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).key_id)}catch{}" "$key_file" 2>/dev/null)
-        if [[ -n "$key_id" ]]; then
+        api_base=$($node_cmd -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).server)}catch{}" "$key_file" 2>/dev/null)
+        if [[ -n "$key_id" && -n "$api_base" ]]; then
             # Validate key is not revoked — send key_id to server, expect CHALLENGE
             local check_res
             check_res=$(curl -s -X POST "${api_base}/a2a/connect" \
@@ -346,7 +354,7 @@ check_device_key() {
 
             if [[ "$check_type" == "CHALLENGE" ]]; then
                 XPO_KEY_FILE="$key_file"
-                echo "  Device key: ${key_id} (valid)"
+                echo "  Device key: ${key_id} (${XPO_ENV}, valid)"
                 return 0
             else
                 echo "  Device key ${key_id} revoked or invalid. Re-registering..."
@@ -365,24 +373,23 @@ register_device_key() {
     node_cmd="${node_cmd:-node}"
     local register_script="${PROJECT_ROOT}/scripts/device-key-register.js"
 
-    $node_cmd "$register_script" --api "$api_base" --token "$jwt_token"
+    $node_cmd "$register_script" --api "$api_base" --token "$jwt_token" --env "$XPO_ENV"
     local exit_code=$?
 
     if [[ $exit_code -eq 0 ]]; then
-        local server_host
-        server_host=$(echo "$api_base" | sed 's|https\?://||' | sed 's|:.*||' | sed 's|/.*||')
-        XPO_KEY_FILE="${HOME}/.xp0/keys/${server_host}.json"
+        XPO_KEY_FILE="${HOME}/.xp0/keys/${XPO_ENV}.json"
         return 0
     fi
     return 1
 }
 
 authenticate_or_load_key() {
-    local api_base="$1"
-    local session_name="$2"
+    local session_name="$1"
+    local api_base
+    api_base="$(env_to_bootstrap_url "$XPO_ENV")"
 
     # 1. Check for existing device key
-    if check_device_key "$api_base"; then
+    if check_device_key; then
         return 0
     fi
 
@@ -390,12 +397,11 @@ authenticate_or_load_key() {
     if authenticate_device_flow "$api_base" "$session_name"; then
         # 3. Register device key using the JWT
         if register_device_key "$api_base" "$XPO_SESSION_TOKEN"; then
-            echo "  Device key registered."
+            echo "  Device key registered (${XPO_ENV})."
             return 0
         fi
-        # Key registration failed — fall back to JWT for this session
-        echo "  WARNING: Key registration failed. Using JWT (24h)."
-        return 0
+        echo "  WARNING: Key registration failed."
+        return 1
     fi
     return 1
 }
@@ -514,13 +520,14 @@ create_agents_session() {
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
-    # Device key determines which Hive (env from script name: claude-session-beta/prod)
-    local key_file="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
-    if [[ ! -f "$key_file" ]]; then
-        echo "ERROR: Device key not found: ${key_file}"
-        echo "Register with: node scripts/device-key-register.js --server <URL> --env ${XPO_ENV}"
+    # Authenticate: load existing key or bootstrap via device flow
+    local XPO_KEY_FILE=""
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_or_load_key "$session"; then
+        echo "ERROR: Authentication failed for ${XPO_ENV}. Cannot start agents."
         exit 1
     fi
+    local key_file="$XPO_KEY_FILE"
     echo "Environment: ${XPO_ENV} (key: ${key_file})"
 
     # Write self-describing role prompts — no URLs, no scripts, no protocol details
@@ -673,13 +680,14 @@ create_agent_body_session() {
         exit 1
     fi
 
-    # Device key determines which Hive (env from script name: claude-session-beta/prod)
-    local key_file="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
-    if [[ ! -f "$key_file" ]]; then
-        echo "ERROR: Device key not found: ${key_file}"
-        echo "Register with: node scripts/device-key-register.js --server <URL> --env ${XPO_ENV}"
+    # Authenticate: load existing key or bootstrap via device flow
+    local XPO_KEY_FILE=""
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_or_load_key "$session"; then
+        echo "ERROR: Authentication failed for ${XPO_ENV}. Cannot start agent."
         exit 1
     fi
+    local key_file="$XPO_KEY_FILE"
 
     echo "Starting A2A agent body: ${role} (env: ${XPO_ENV})"
     echo "  Key:       ${key_file}"
