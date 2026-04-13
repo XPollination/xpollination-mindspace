@@ -78,11 +78,15 @@ readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # --- Environment from script name (zero-knowledge) ---
 # claude-session-beta → beta, claude-session-prod → prod, claude-session → beta
-_SCRIPT_NAME="$(basename "$0")"
-case "$_SCRIPT_NAME" in
-    claude-session-prod|claude-session-prod.sh) readonly XPO_ENV="prod" ;;
-    *)                                          readonly XPO_ENV="beta" ;;
-esac
+# XPO_ENV may already be set from sudo re-exec (preserves through user switch)
+if [[ -z "${XPO_ENV:-}" ]]; then
+    _SCRIPT_NAME="$(basename "$0")"
+    case "$_SCRIPT_NAME" in
+        claude-session-prod|claude-session-prod.sh) XPO_ENV="prod" ;;
+        *)                                          XPO_ENV="beta" ;;
+    esac
+fi
+readonly XPO_ENV
 
 if [[ -x "${HETZNER_HOME}/.local/bin/claude" ]]; then
     # On Hetzner
@@ -308,8 +312,9 @@ The session is created if it doesn't exist, or attached if it does.
 Can be run as thomas — auto-switches to developer via sudo.
 
 A2A server:
-  Default: http://localhost:3101 (BETA / mindspace-test container)
-  To use PROD: export MINDSPACE_API_URL=http://10.33.33.1:3100
+  Environment determined by command name:
+    claude-session-beta → Beta Hive (:3101)
+    claude-session-prod → Prod Hive (:3100)
   Set this BEFORE running claude-session.
 EOF
     exit 1
@@ -337,7 +342,7 @@ check_device_key() {
     # Uses XPO_ENV (from script name) for key filename
     local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
     node_cmd="${node_cmd:-node}"
-    local key_file="${HOME}/.xp0/keys/${XPO_ENV}.json"
+    local key_file="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
 
     if [[ -f "$key_file" ]]; then
         local key_id api_base
@@ -377,7 +382,7 @@ register_device_key() {
     local exit_code=$?
 
     if [[ $exit_code -eq 0 ]]; then
-        XPO_KEY_FILE="${HOME}/.xp0/keys/${XPO_ENV}.json"
+        XPO_KEY_FILE="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
         return 0
     fi
     return 1
@@ -802,7 +807,7 @@ run_local_or_hetzner() {
         COLS=$(tput cols 2>/dev/null || echo 200)
         ROWS=$(tput lines 2>/dev/null || echo 50)
         echo "Switching to developer user (${COLS}x${ROWS})..."
-        exec sudo -i -u developer env TMUX_COLS="$COLS" TMUX_ROWS="$ROWS" bash "$SELF_PATH" "$session"
+        exec sudo -i -u developer env TMUX_COLS="$COLS" TMUX_ROWS="$ROWS" XPO_ENV="$XPO_ENV" bash "$SELF_PATH" "$session"
     fi
 
     # Unset TMUX to allow running from inside an existing tmux session
