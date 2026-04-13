@@ -3,11 +3,104 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { sign, createPrivateKey } from "node:crypto";
+
 const BRAIN_API = "http://localhost:3200/api/v1/memory";
+const MINDSPACE_API = process.env.MINDSPACE_API_URL || "http://localhost:3101";
 const MCP_PORT = parseInt(process.env.MCP_PORT || "3201", 10);
 
 // Per-user auth: MCP passes the client's Bearer token through to brain API.
 // No hardcoded API key — each user authenticates with their Mindspace API key.
+
+// --- Mindspace A2A connection (MCP server authenticates as service agent) ---
+let mindspaceToken: string | null = null;
+let mindspaceAgentId: string | null = null;
+
+async function connectToMindspace(): Promise<void> {
+  const keyPath = process.env.MCP_KEY_FILE || join(homedir(), ".xp0", "keys", "mcp-service.json");
+  let keyData: { key_id: string; private_key: string; server?: string };
+  try {
+    keyData = JSON.parse(readFileSync(keyPath, "utf-8"));
+  } catch {
+    console.warn(`[MCP] No service key at ${keyPath} — mindspace tools unavailable`);
+    return;
+  }
+
+  const apiUrl = keyData.server || MINDSPACE_API;
+
+  // Step 1: send connect with key_id → get CHALLENGE
+  const connectRes = await fetch(`${apiUrl}/a2a/connect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      identity: { agent_name: "hive-mcp-service", key_id: keyData.key_id },
+      role: { current: "orchestrator" },
+      project: { slug: "xpollination-mindspace" },
+      state: { status: "active" },
+      metadata: { client: "hive-mcp" },
+    }),
+  });
+  const connectData = await connectRes.json() as any;
+
+  if (connectData.type === "CHALLENGE") {
+    // Step 2: sign nonce with Ed25519 private key
+    const privateKey = createPrivateKey(keyData.private_key);
+    const nonce = Buffer.from(connectData.nonce, "base64");
+    const signature = sign(null, nonce, privateKey);
+
+    const authRes = await fetch(`${apiUrl}/a2a/connect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identity: { agent_name: "hive-mcp-service", key_id: keyData.key_id },
+        role: { current: "orchestrator" },
+        project: { slug: "xpollination-mindspace" },
+        state: { status: "active" },
+        metadata: { client: "hive-mcp" },
+        challenge_response: { signature: signature.toString("base64") },
+      }),
+    });
+    const authData = await authRes.json() as any;
+    if (authData.type === "ERROR") throw new Error(`A2A auth failed: ${authData.error}`);
+    mindspaceToken = authData.session_token;
+    mindspaceAgentId = authData.agent_id;
+    console.log(`[MCP] Connected to Mindspace: agent_id=${mindspaceAgentId}`);
+  } else if (connectData.session_token) {
+    // Direct welcome (API key auth fallback)
+    mindspaceToken = connectData.session_token;
+    mindspaceAgentId = connectData.agent_id;
+    console.log(`[MCP] Connected to Mindspace (direct): agent_id=${mindspaceAgentId}`);
+  } else {
+    console.warn(`[MCP] Mindspace connect failed:`, connectData.error || "unknown");
+  }
+}
+
+async function callMindspace(body: Record<string, unknown>): Promise<any> {
+  if (!mindspaceToken) {
+    try { await connectToMindspace(); } catch (e) {
+      throw new Error(`Mindspace not available: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (!mindspaceToken) throw new Error("Mindspace not connected — register service key first");
+
+  const res = await fetch(`${MINDSPACE_API}/a2a/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${mindspaceToken}` },
+    body: JSON.stringify({ ...body, agent_id: mindspaceAgentId || "mcp-hive" }),
+  });
+  const data = await res.json() as any;
+
+  // Reconnect on expired token
+  if (data.error === "Invalid session" || data.error === "Token expired" || res.status === 401) {
+    mindspaceToken = null;
+    await connectToMindspace();
+    return callMindspace(body); // retry once
+  }
+  return data;
+}
 
 async function callBrain(prompt: string, bearerToken: string, context?: string, session_id?: string, full_content?: boolean, read_only?: boolean): Promise<unknown> {
   const body: Record<string, unknown> = { prompt, agent_id: "mcp-client", agent_name: "MCP Client" };
@@ -76,7 +169,7 @@ function createMcpServer(bearerToken: string): McpServer {
     async ({ prompt, context, session_id }) => {
       const data = await callBrain(prompt, bearerToken, context, session_id) as Record<string, unknown>;
       const trace = data.trace as Record<string, unknown> | undefined;
-      const contributed = trace?.thoughts_contributed ?? 0;
+      const contributed = (trace?.thoughts_contributed as number) ?? 0;
       const prefix = contributed > 0
         ? "Thought stored successfully."
         : "Not stored (too short or interrogative). Still retrieved related thoughts:";
@@ -97,6 +190,95 @@ function createMcpServer(bearerToken: string): McpServer {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: "text" as const, text: `Error: ${message}` }], isError: true };
+      }
+    }
+  );
+
+  // --- Mindspace Tools (query/deliver tasks via A2A) ---
+
+  mcp.tool(
+    "query_tasks",
+    "Query tasks from Mindspace. Returns lean list: slug, title, status, role. Use get_task for full DNA.",
+    {
+      status: z.string().optional().describe("Filter: pending, ready, active, review, approval, complete..."),
+      role: z.string().optional().describe("Filter: dev, pdsa, qa, liaison"),
+      project: z.string().optional().describe("Project slug, or __all__ for all"),
+      limit: z.number().optional().describe("Max results (default 50)"),
+    },
+    async ({ status, role, project, limit }) => {
+      try {
+        const filters: Record<string, unknown> = {};
+        if (status) filters.status = status;
+        if (role) filters.current_role = role;
+        if (project) filters.project_slug = project;
+        if (limit) filters.limit = limit;
+        const data = await callMindspace({ type: "OBJECT_QUERY", object_type: "task", filters });
+        const lean = (data.objects || []).map((t: any) => ({
+          slug: t.slug, title: t.dna?.title || t.title, status: t.status, role: t.current_role,
+        }));
+        return { content: [{ type: "text" as const, text: JSON.stringify({ count: lean.length, tasks: lean }, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : err}` }], isError: true };
+      }
+    }
+  );
+
+  mcp.tool(
+    "get_task",
+    "Get full task details including DNA. Use after query_tasks to drill into a specific task.",
+    {
+      slug: z.string().describe("Task slug or ID"),
+    },
+    async ({ slug }) => {
+      try {
+        const data = await callMindspace({ type: "OBJECT_QUERY", object_type: "task", filters: { slug } });
+        const task = data.objects?.[0];
+        if (!task) return { content: [{ type: "text" as const, text: "Task not found" }], isError: true };
+        return { content: [{ type: "text" as const, text: JSON.stringify(task, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : err}` }], isError: true };
+      }
+    }
+  );
+
+  mcp.tool(
+    "deliver_task",
+    "Deliver task results. Automatically contributes learnings to brain (enforced), then transitions the task.",
+    {
+      slug: z.string().describe("Task slug"),
+      transition: z.string().describe("Target status: review, approval, testing, complete"),
+      findings: z.string().describe("What was done — implementation details"),
+      learnings: z.string().min(50).describe("Key learnings for brain (min 50 chars) — decisions, patterns, what to remember"),
+    },
+    async ({ slug, transition, findings, learnings }) => {
+      try {
+        // 1. Brain contribute (enforced — not optional)
+        const brain = await callMindspace({ type: "BRAIN_CONTRIBUTE", prompt: learnings, topic: slug });
+        const thoughtId = brain.thought_id || null;
+        // 2. Deliver with brain_contribution_id
+        const result = await callMindspace({
+          type: "DELIVER", task_slug: slug, transition_to: transition,
+          payload: { findings, brain_contribution_id: thoughtId },
+        });
+        return { content: [{ type: "text" as const, text: JSON.stringify({ brain_thought_id: thoughtId, delivery: result }, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : err}` }], isError: true };
+      }
+    }
+  );
+
+  mcp.tool(
+    "claim_task",
+    "Claim a ready task (transitions ready→active). Only works if task matches your role.",
+    {
+      slug: z.string().describe("Task slug to claim"),
+    },
+    async ({ slug }) => {
+      try {
+        const result = await callMindspace({ type: "CLAIM_TASK", task_slug: slug });
+        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : err}` }], isError: true };
       }
     }
   );
@@ -171,6 +353,11 @@ export async function startMcpServer(): Promise<void> {
   });
 
   httpServer.listen(MCP_PORT, "0.0.0.0", () => {
-    console.log(`MCP server (brain wrapper) running on http://0.0.0.0:${MCP_PORT}`);
+    console.log(`MCP server (brain + mindspace) running on http://0.0.0.0:${MCP_PORT}`);
+  });
+
+  // Connect to Mindspace A2A at startup (non-blocking — tools work after connection)
+  connectToMindspace().catch((err) => {
+    console.warn(`[MCP] Mindspace connection deferred: ${err.message}`);
   });
 }
