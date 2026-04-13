@@ -5,7 +5,7 @@
  * Called by claude-session.sh after device flow approval.
  * Generates keypair locally, sends public key to server, stores private key at ~/.xp0/keys/<server>.json.
  *
- * Usage: node device-key-register.js --api <url> --token <jwt>
+ * Usage: node device-key-register.js --api <url> --token <jwt> [--env beta|prod]
  */
 
 import { generateKeyPairSync, createPublicKey } from 'node:crypto';
@@ -19,6 +19,7 @@ const { values: args } = parseArgs({
     api:   { type: 'string' },
     token: { type: 'string' },
     name:  { type: 'string', default: hostname() },
+    env:   { type: 'string' },  // beta, prod — overrides key filename
   },
   strict: false,
 });
@@ -67,7 +68,9 @@ async function main() {
   const keysDir = join(process.env.HOME || '/tmp', '.xp0', 'keys');
   mkdirSync(keysDir, { recursive: true });
 
-  const keyFile = join(keysDir, `${serverHost}.json`);
+  // --env overrides filename (beta.json, prod.json), falls back to hostname
+  const keyFileName = args.env || serverHost;
+  const keyFile = join(keysDir, `${keyFileName}.json`);
   const keyData = {
     server: apiBase,  // FULL URL — body uses this as API_URL with no further processing
     server_host: serverHost,  // hostname only, for reference

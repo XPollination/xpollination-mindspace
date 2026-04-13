@@ -495,33 +495,25 @@ create_agents_session() {
     sync_skills
     sync_settings
 
-    local api_url="${MINDSPACE_API_URL:-http://localhost:3101}"
     local workspace="${WORKING_DIR}/xpollination-mindspace"
     local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
-    local deliver_script="${PROJECT_ROOT}/scripts/a2a-deliver.js"
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
 
-    # Authenticate via device key (persistent) or device flow (bootstrap)
-    local XPO_SESSION_TOKEN=""
-    local XPO_KEY_FILE=""
-    if ! authenticate_or_load_key "${api_url}" "$session"; then
-        echo "WARNING: Authentication failed. Agents will not have A2A auth."
-        echo "You can still use the agents but they won't receive SSE events."
+    # Environment determines which Hive to connect to (device key has the URL)
+    local env="${XPO_ENV:-beta}"
+    local key_file="${HETZNER_HOME}/.xp0/keys/${env}.json"
+    if [[ ! -f "$key_file" ]]; then
+        echo "ERROR: Device key not found: ${key_file}"
+        echo "Register with: node scripts/device-key-register.js --server <URL> --name ${env}"
+        exit 1
     fi
+    echo "Environment: ${env} (key: ${key_file})"
 
-    # Brain API key — ONLY for brain knowledge access, NOT for A2A
-    local brain_key="${BRAIN_API_KEY:-}"
-    if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
-        brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
-    fi
-    if [[ -z "$brain_key" && -f "${PROJECT_ROOT}/.env" ]]; then
-        brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
-    fi
-
-    # Write A2A-aware role prompts — no API key exposed to the soul
+    # Write self-describing role prompts — no URLs, no scripts, no protocol details
+    # The body sends [AVAILABLE] and [SUMMARY] messages with response options embedded.
+    # The LLM learns the protocol from the messages themselves.
     local roles=("liaison" "pdsa" "dev" "qa")
-    local deliver_cjs="${PROJECT_ROOT}/scripts/a2a-deliver.cjs"
     for role in "${roles[@]}"; do
         cat > "/tmp/claude-role-${role}.txt" << ROLE
 You are the ${role^^} agent in a 4-agent tmux session (a2a-team).
@@ -529,21 +521,16 @@ Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA.
 Project: xpollination-mindspace
 
 ARCHITECTURE:
-- A2A body runs in background (xpo-agent.js) — handles auth, SSE, heartbeats
-- You receive [TASK] messages automatically via SSE — do NOT connect to A2A yourself
-- A2A server: http://localhost:3101 (do NOT curl it directly)
-- Body credentials: /tmp/xpo-agent-${role}.env
+- A2A body runs in background (xpo-agent.js) — handles auth, events, brain, delivery
+- You receive [AVAILABLE] task offers and [SUMMARY] requests with response options
+- The body handles ALL server communication — you just do the work and respond to markers
 - Body status: cat /tmp/xpo-agent-${role}.status
 
-DELIVERING RESULTS:
-  node ${deliver_cjs} --slug <SLUG> --transition <STATUS> --role ${role}
-
 RULES:
-- Do NOT use curl to call A2A endpoints — all A2A goes through a2a-deliver.cjs
-- Do NOT run /monitor or agent-monitor.cjs — the body handles event delivery
-- Do NOT query brain for your role definition — CLAUDE.md already has it
-- Do NOT query the database directly (better-sqlite3, SQL) — use a2a-deliver.cjs or interface-cli.js
-- Your role definition is in CLAUDE.md (auto-loaded). Brain is for task context only.
+- Do NOT run a2a-deliver.cjs or interface-cli.js — the body handles delivery
+- Do NOT use curl to call API endpoints — the body handles all A2A
+- Do NOT query brain directly — the body provides brain context and captures your learnings
+- Your role definition is in CLAUDE.md (auto-loaded)
 ROLE
     done
 
@@ -558,10 +545,6 @@ ROLE
     if [[ -n "$NVM_NODE" ]]; then
         tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
     fi
-    if [ -n "$brain_key" ]; then
-        tmux set-environment -t "$session" BRAIN_API_KEY "$brain_key"
-    fi
-
     # Split into 4 panes: LIAISON | PDSA | DEV / QA
     tmux split-window -t "${session}:0.0" -h -l 66% -c "$workspace"
     tmux split-window -t "${session}:0.1" -h -l 50% -c "$workspace"
@@ -584,16 +567,9 @@ ROLE
         local role="${roles[$i]}"
         local pane="${session}:0.${i}"
 
-        # Start xpo-agent body in background — delivers SSE events to this pane
-        # Body waits for LLM ready before sending brain recovery prompts
-        # Uses device key (persistent) or JWT (24h fallback) for A2A auth
-        local auth_flag=""
-        if [[ -n "$XPO_KEY_FILE" ]]; then
-            auth_flag="--key ${XPO_KEY_FILE}"
-        elif [[ -n "$XPO_SESSION_TOKEN" ]]; then
-            auth_flag="--token ${XPO_SESSION_TOKEN}"
-        fi
-        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${pane} ${auth_flag} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        # Start xpo-agent body in background — device key determines which Hive to connect to
+        # Body reads server URL from key file (no --api needed), handles all A2A protocol
+        local body_cmd="nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --interactive --session ${pane} --key ${key_file} > /tmp/xpo-agent-${role}.log 2>&1 &"
         tmux send-keys -t "${pane}" "$body_cmd" Enter
 
         # Write Claude launch script (--allowedTools list too long for send-keys)
@@ -676,7 +652,6 @@ create_agent_body_session() {
     sync_skills
     sync_settings
 
-    local api_url="${MINDSPACE_API_URL:-http://localhost:3101}"
     local workspace="${WORKING_DIR}/xpollination-mindspace"
     local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
 
@@ -685,34 +660,22 @@ create_agent_body_session() {
         exit 1
     fi
 
-    # Resolve BRAIN_API_KEY
-    local brain_key="${BRAIN_API_KEY:-}"
-    if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
-        brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
-    fi
-    if [[ -z "$brain_key" && -f "${PROJECT_ROOT}/.env" ]]; then
-        brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
+    # Environment determines which Hive (device key has the URL)
+    local env="${XPO_ENV:-beta}"
+    local key_file="${HETZNER_HOME}/.xp0/keys/${env}.json"
+    if [[ ! -f "$key_file" ]]; then
+        echo "ERROR: Device key not found: ${key_file}"
+        echo "Register with: node scripts/device-key-register.js --server <URL> --name ${env}"
+        exit 1
     fi
 
-    echo "Starting A2A agent body: ${role}"
-    echo "  API:       ${api_url}"
+    echo "Starting A2A agent body: ${role} (env: ${env})"
+    echo "  Key:       ${key_file}"
     echo "  Workspace: ${workspace}"
     echo "  Script:    ${agent_script}"
 
     local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
     node_bin="${node_bin:-node}"
-
-    # Authenticate via device key or device flow
-    local XPO_SESSION_TOKEN=""
-    local XPO_KEY_FILE=""
-    authenticate_or_load_key "${api_url}" "$session" || true
-
-    local auth_flag=""
-    if [[ -n "$XPO_KEY_FILE" ]]; then
-        auth_flag="--key ${XPO_KEY_FILE}"
-    elif [[ -n "$XPO_SESSION_TOKEN" ]]; then
-        auth_flag="--token ${XPO_SESSION_TOKEN}"
-    fi
 
     if [[ "$role" == "liaison" ]]; then
         # LIAISON mode: Claude runs in the pane (interactive), body runs in background.
@@ -723,14 +686,14 @@ create_agent_body_session() {
             tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
         fi
 
-        # Start body in background — delivers events to this session
-        local body_cmd="BRAIN_API_KEY=${brain_key} nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} --interactive --session ${session} ${auth_flag} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        # Start body in background — device key determines which Hive
+        local body_cmd="nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --interactive --session ${session} --key ${key_file} > /tmp/xpo-agent-${role}.log 2>&1 &"
         tmux send-keys -t "${session}:0.0" "$body_cmd" Enter
 
         # Small delay for body to connect, then launch Claude
         tmux send-keys -t "${session}:0.0" "sleep 2" Enter
 
-        # Launch Claude with A2A system prompt — exec replaces bash with claude
+        # Launch Claude with self-describing role prompt
         local launch_script="/tmp/claude-launch-${role}-a2a.sh"
         {
             echo "#!/bin/bash"
@@ -740,36 +703,14 @@ create_agent_body_session() {
             for tool in "${ALLOWED_TOOLS[@]}"; do
                 printf ' %q' "$tool"
             done
-            printf ' --append-system-prompt "$(cat /tmp/claude-role-%s-a2a.txt)"\n' "$role"
+            printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$role"
         } > "$launch_script"
         chmod +x "$launch_script"
-
-        # Write A2A-aware role prompt — no API key exposed to the soul
-        cat > "/tmp/claude-role-${role}-a2a.txt" << ROLE
-You are the LIAISON agent. Session: ${session} | Project: xpollination-mindspace
-You are also Thomas's interactive interface — respond to his direct questions.
-
-ARCHITECTURE:
-- A2A body runs in background (xpo-agent.js) — handles auth, SSE, heartbeats
-- You receive [TASK] messages automatically via SSE — do NOT connect to A2A yourself
-- A2A server: http://localhost:3101 (do NOT curl it directly)
-- Body status: cat /tmp/xpo-agent-${role}.status
-
-DELIVERING RESULTS:
-  node ${agent_script%/src/a2a/xpo-agent.js}/scripts/a2a-deliver.cjs --slug <SLUG> --transition <STATUS> --role liaison
-
-RULES:
-- Do NOT use curl to call A2A endpoints — all A2A goes through a2a-deliver.cjs
-- Do NOT run /monitor or agent-monitor.cjs — the body handles event delivery
-- Do NOT query brain for your role definition — CLAUDE.md already has it
-- Do NOT query the database directly (better-sqlite3, SQL) — use a2a-deliver.cjs or interface-cli.js
-- Your role definition is in CLAUDE.md (auto-loaded). Brain is for task context only.
-ROLE
 
         tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
     else
         # Standard mode: xpo-agent runs as foreground, creates nested tmux for LLM.
-        local launch_cmd="BRAIN_API_KEY=${brain_key} ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --api ${api_url} --workspace ${workspace} ${auth_flag}"
+        local launch_cmd="${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --key ${key_file}"
 
         tmux new-session -d -s "$session" -c "$workspace"
 

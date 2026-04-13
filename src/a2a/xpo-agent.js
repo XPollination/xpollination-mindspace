@@ -32,7 +32,7 @@ const { values: args } = parseArgs({
     role:        { type: 'string', default: 'dev' },
     project:     { type: 'string', default: 'xpollination-mindspace' },
     api:         { type: 'string' },  // optional override — normally read from key file
-    'api-key':   { type: 'string', default: process.env.BRAIN_API_KEY || process.env.BRAIN_AGENT_KEY || '' },
+    'api-key':   { type: 'string', default: '' },  // legacy, prefer --key (device key) or --token (JWT)
     workspace:   { type: 'string', default: process.cwd() },
     llm:         { type: 'string', default: 'claude' },
     name:        { type: 'string' },
@@ -91,7 +91,7 @@ const SESSION     = args.session || args.name || `runner-${ROLE}-${SHORT_ID}`;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
-const DELIVER_SCRIPT = resolve(__dirname, '../../scripts/a2a-deliver.js');
+// DELIVER_SCRIPT removed — body handles delivery directly via A2A (mission m/40145a57)
 const BRAIN_SESSION = randomUUID();
 
 // --- State ---
@@ -100,6 +100,25 @@ let agentId = null;
 let sessionToken = null;
 let reconnectDelay = 5000;
 const MAX_RECONNECT_DELAY = 30000;
+
+// --- Body State Machine ---
+// States: IDLE → TASK_OFFERED → BRAIN_PENDING → WORKING → SUMMARIZING → DELIVERING → IDLE
+let bodyState = 'IDLE';
+let currentTask = null;   // { slug, title, dna, brainSessionId }
+let hasUpdates = false;    // SSE events arrived while not IDLE
+let workPollTimer = null;  // completion detection interval
+
+function setState(s) {
+  console.log(`[AGENT] State: ${bodyState} → ${s}${currentTask ? ` (task: ${currentTask.slug})` : ''}`);
+  bodyState = s;
+  writeStatus({ body_state: s, current_task: currentTask?.slug || null });
+}
+
+function clearTask() {
+  currentTask = null;
+  hasUpdates = false;
+  if (workPollTimer) { clearInterval(workPollTimer); workPollTimer = null; }
+}
 
 // --- Prerequisites ---
 
@@ -113,12 +132,6 @@ function verifyPrerequisites() {
 
   if (!existsSync(WORKSPACE)) {
     console.error(`[AGENT] Workspace does not exist: ${WORKSPACE}`);
-    process.exit(1);
-  }
-
-  if (!existsSync(DELIVER_SCRIPT)) {
-    console.error(`[AGENT] Deliver script not found: ${DELIVER_SCRIPT}`);
-    console.error('        Run from the xpollination-mindspace repo root.');
     process.exit(1);
   }
 
@@ -218,21 +231,25 @@ async function waitForLlmReady() {
   }
 }
 
-// --- A2A Queries (body queries on behalf of LLM, never the LLM itself) ---
+// --- A2A Message Helper (single auth'd request to Hive) ---
+
+async function a2aMessage(body) {
+  const res = await fetch(`${API_URL}/a2a/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+    body: JSON.stringify({ ...body, agent_id: agentId }),
+  });
+  return res.json();
+}
+
+// --- A2A Queries (body queries on behalf of LLM) ---
 
 async function queryTasksViaA2A() {
   try {
-    const res = await fetch(`${API_URL}/a2a/message`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-      body: JSON.stringify({
-        type: 'OBJECT_QUERY',
-        agent_id: agentId,
-        object_type: 'task',
-        filters: { current_role: ROLE, status_not_in: 'complete,cancelled,blocked' },
-      }),
+    const data = await a2aMessage({
+      type: 'OBJECT_QUERY', object_type: 'task',
+      filters: { current_role: ROLE, status_not_in: 'complete,cancelled,blocked' },
     });
-    const data = await res.json();
     return data.objects || data.result?.objects || [];
   } catch (err) {
     console.error(`[AGENT] Task query failed: ${err.message}`);
@@ -269,18 +286,9 @@ function summarizeTasks(tasks) {
 
 async function queryBrainViaA2A(prompt) {
   try {
-    const res = await fetch(`${API_URL}/a2a/message`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-      body: JSON.stringify({
-        type: 'BRAIN_QUERY',
-        agent_id: agentId,
-        prompt,
-        read_only: true,
-        full_content: true,
-      }),
+    const data = await a2aMessage({
+      type: 'BRAIN_QUERY', prompt, read_only: true, full_content: true,
     });
-    const data = await res.json();
     if (data.type === 'BRAIN_RESULT' && data.result?.sources?.length) {
       return data.result.sources.slice(0, 3).map(s => s.content || s.content_preview).join('\n\n');
     }
@@ -288,6 +296,309 @@ async function queryBrainViaA2A(prompt) {
   } catch (err) {
     console.error(`[AGENT] Brain query failed: ${err.message}`);
     return null;
+  }
+}
+
+function formatBrainResult(data) {
+  if (data.type === 'BRAIN_RESULT' && data.result?.sources?.length) {
+    return data.result.sources.slice(0, 3).map(s => s.content || s.content_preview).join('\n\n');
+  }
+  return data.result?.response || 'No results.';
+}
+
+// --- Marker Parsing (LLM → Body structured text) ---
+
+function parseMarkers(text) {
+  const result = {};
+  const lines = text.split('\n');
+  const markers = ['CLAIM', 'BRAIN', 'LEARNINGS', 'TRANSITION', 'FINDINGS', 'PICK'];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    for (const m of markers) {
+      if (line.toUpperCase().startsWith(m + ':')) {
+        let value = line.slice(m.length + 1).trim();
+        // Multi-line: collect until next marker or ❯ prompt
+        if (['LEARNINGS', 'FINDINGS', 'BRAIN'].includes(m)) {
+          const extra = [];
+          for (let j = i + 1; j < lines.length; j++) {
+            const next = lines[j].trim();
+            if (markers.some(k => next.toUpperCase().startsWith(k + ':')) || next.startsWith('❯')) break;
+            extra.push(lines[j]);
+          }
+          if (extra.length) value += '\n' + extra.join('\n');
+        }
+        result[m.toLowerCase()] = value.trim();
+      }
+    }
+  }
+  return result;
+}
+
+// --- Proactive Task Query (self-healing, no buffer) ---
+
+async function queryAndOffer() {
+  if (bodyState !== 'IDLE') return;
+  try {
+    const data = await a2aMessage({
+      type: 'OBJECT_QUERY', object_type: 'task',
+      filters: { current_role: ROLE, status: 'ready' },
+    });
+    const list = data.objects || [];
+    if (list.length === 0) {
+      console.log(`[AGENT] No ready tasks for ${ROLE}`);
+      return;
+    }
+    console.log(`[AGENT] ${list.length} task(s) available for ${ROLE}`);
+    offerTask(list[0]);
+  } catch (err) {
+    console.error(`[AGENT] queryAndOffer failed: ${err.message}`);
+  }
+}
+
+function offerTask(task) {
+  setState('TASK_OFFERED');
+  currentTask = { slug: task.slug || task.id, title: task.title, dna: task.dna || {} };
+  // Self-describing: message carries its own response protocol
+  const desc = currentTask.dna.description?.substring(0, 300) || task.title || 'No description';
+  const prompt = `[AVAILABLE] ${currentTask.slug} — ${currentTask.title}
+${desc}
+
+Respond with:
+  CLAIM: yes    — to claim this task
+  CLAIM: no     — to skip and see next
+  BRAIN: <text> — what context you need from shared knowledge`;
+  deliverToTmux(prompt).then(() => pollForClaimResponse());
+}
+
+// --- Claim Handshake ---
+
+async function pollForClaimResponse() {
+  const maxWait = 120; // seconds
+  for (let elapsed = 0; elapsed < maxWait; elapsed += 5) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-30'], { stdio: 'pipe' }).toString();
+      const markers = parseMarkers(capture);
+
+      if (markers.claim) {
+        const claim = markers.claim.toLowerCase().trim();
+        if (claim === 'no' || claim.startsWith('no')) {
+          console.log(`[AGENT] LLM declined task ${currentTask?.slug}`);
+          clearTask();
+          setState('IDLE');
+          await queryAndOffer(); // try next
+          return;
+        }
+        if (claim === 'yes' || claim.startsWith('yes')) {
+          console.log(`[AGENT] LLM claimed task ${currentTask?.slug}, brain: ${markers.brain ? 'yes' : 'none'}`);
+          await executeClaimHandshake(markers.brain || `Context for task: ${currentTask.slug} ${currentTask.title}`);
+          return;
+        }
+      }
+    } catch { /* capture may fail */ }
+  }
+  // Timeout — no response
+  console.warn(`[AGENT] No claim response after ${maxWait}s`);
+  await deliverToTmux(`[TIMEOUT] No claim response for ${currentTask?.slug}. Skipping.`);
+  clearTask();
+  setState('IDLE');
+}
+
+async function executeClaimHandshake(brainQuery) {
+  // 1. Query brain with LLM's question
+  setState('BRAIN_PENDING');
+  let brainSessionId = BRAIN_SESSION;
+  try {
+    const brain = await a2aMessage({
+      type: 'BRAIN_QUERY', prompt: brainQuery, read_only: true, full_content: true,
+    });
+    brainSessionId = brain.trace?.session_id || brain.result?.session_id || BRAIN_SESSION;
+    const brainText = formatBrainResult(brain);
+    await deliverToTmux(`[BRAIN]\n${brainText}`);
+  } catch (err) {
+    console.error(`[AGENT] Brain query failed: ${err.message}`);
+    await deliverToTmux('[BRAIN] Brain unavailable. Proceeding without context.');
+  }
+  currentTask.brainSessionId = brainSessionId;
+
+  // 2. Claim task (ready → active)
+  try {
+    const result = await a2aMessage({
+      type: 'DELIVER',
+      task_slug: currentTask.slug,
+      transition_to: 'active',
+      payload: { memory_query_session: brainSessionId },
+    });
+
+    if (result.type === 'DELIVERY_ACCEPTED' || result.type === 'TRANSITION_ACCEPTED') {
+      setState('WORKING');
+      await deliverToTmux(`[CLAIMED] ${currentTask.slug} — dir zugewiesen. Starte die Arbeit.`);
+      startCompletionDetection();
+    } else {
+      const error = result.error || result.gate || 'Unknown rejection';
+      console.error(`[AGENT] Claim rejected: ${error}`);
+      await deliverToTmux(`[CLAIM-FAILED] ${currentTask.slug}: ${error}. Nächster Task wird gesucht.`);
+      clearTask();
+      setState('IDLE');
+      await queryAndOffer();
+    }
+  } catch (err) {
+    console.error(`[AGENT] Claim failed: ${err.message}`);
+    await deliverToTmux(`[CLAIM-FAILED] ${currentTask.slug}: ${err.message}`);
+    clearTask();
+    setState('IDLE');
+    await queryAndOffer();
+  }
+}
+
+// --- Completion Detection + Summary Loop ---
+
+function startCompletionDetection() {
+  if (workPollTimer) clearInterval(workPollTimer);
+  workPollTimer = setInterval(async () => {
+    try {
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-5'], { stdio: 'pipe' }).toString();
+      const lines = capture.split('\n').filter(l => l.trim());
+      const last = lines[lines.length - 1] || '';
+      if (last.startsWith('❯') || last.startsWith('> ')) {
+        clearInterval(workPollTimer);
+        workPollTimer = null;
+        console.log('[AGENT] LLM idle detected — requesting summary');
+        setState('SUMMARIZING');
+        await requestSummary();
+      }
+    } catch { /* capture may fail */ }
+  }, 10000);
+}
+
+async function requestSummary(retryCount = 0) {
+  // Self-describing: message carries its valid response options
+  const prompt = `[SUMMARY] Task ${currentTask.slug} — provide your results.
+
+Respond with:
+  LEARNINGS: <key decisions, patterns, what to remember — minimum 50 chars>
+  TRANSITION: review | approval | testing | complete
+  FINDINGS: <what you did, what you found, implementation details>`;
+
+  await deliverToTmux(prompt);
+  await pollForSummaryResponse(retryCount);
+}
+
+async function pollForSummaryResponse(retryCount) {
+  const maxWait = 120;
+  for (let elapsed = 0; elapsed < maxWait; elapsed += 5) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-50'], { stdio: 'pipe' }).toString();
+      // Only parse after LLM returns to idle
+      const lines = capture.split('\n').filter(l => l.trim());
+      const last = lines[lines.length - 1] || '';
+      if (!(last.startsWith('❯') || last.startsWith('> '))) continue; // still working
+
+      const markers = parseMarkers(capture);
+      if (!markers.learnings && !markers.transition && !markers.findings) continue; // no markers yet
+
+      // Validate
+      if (!markers.learnings || markers.learnings.length < 50) {
+        if (retryCount < 3) {
+          console.warn('[AGENT] LEARNINGS too short or missing, retrying');
+          await deliverToTmux(`[SUMMARY-RETRY] LEARNINGS must be at least 50 characters. Currently: ${markers.learnings?.length || 0} chars.`);
+          return pollForSummaryResponse(retryCount + 1);
+        }
+      }
+      if (!markers.transition) {
+        if (retryCount < 3) {
+          console.warn('[AGENT] TRANSITION missing, retrying');
+          await deliverToTmux(`[SUMMARY-RETRY] TRANSITION is required. Valid options: review | approval | testing | complete`);
+          return pollForSummaryResponse(retryCount + 1);
+        }
+      }
+
+      // Parse successful — deliver results
+      console.log(`[AGENT] Summary parsed: transition=${markers.transition}, learnings=${markers.learnings?.length}ch, findings=${markers.findings?.length || 0}ch`);
+      await deliverResults(
+        markers.learnings || `Task ${currentTask.slug} completed by ${ROLE}`,
+        markers.transition || 'review',
+        markers.findings || ''
+      );
+      return;
+    } catch { /* capture may fail */ }
+  }
+
+  // Timeout
+  if (retryCount < 3) {
+    console.warn(`[AGENT] Summary timeout (${retryCount + 1}/3), retrying`);
+    await requestSummary(retryCount + 1);
+  } else {
+    console.error('[AGENT] Summary failed after 3 retries — contributing raw capture to brain');
+    // Best effort: capture what's there and contribute
+    try {
+      const raw = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-50'], { stdio: 'pipe' }).toString();
+      await a2aMessage({
+        type: 'BRAIN_CONTRIBUTE',
+        prompt: `Unstructured output from ${ROLE} agent on task ${currentTask.slug}:\n${raw.slice(-500)}`,
+        topic: currentTask.slug,
+      });
+    } catch { /* best effort */ }
+    await deliverToTmux(`[ERROR] Could not parse summary after 3 attempts. Task ${currentTask.slug} remains active. Manual intervention needed.`);
+    clearTask();
+    setState('IDLE');
+  }
+}
+
+async function deliverResults(learnings, transition, findings) {
+  setState('DELIVERING');
+
+  // 1. Brain contribute — body enforces, every time
+  let thoughtId = null;
+  try {
+    const brain = await a2aMessage({
+      type: 'BRAIN_CONTRIBUTE',
+      prompt: learnings,
+      topic: currentTask.slug,
+    });
+    thoughtId = brain.thought_id || null;
+    if (thoughtId) {
+      console.log(`[AGENT] Brain contribution: ${thoughtId}`);
+    } else {
+      console.warn('[AGENT] Brain contribute returned no thought_id');
+    }
+  } catch (err) {
+    console.error(`[AGENT] Brain contribute failed: ${err.message}`);
+  }
+
+  // 2. Deliver task transition
+  try {
+    const result = await a2aMessage({
+      type: 'DELIVER',
+      task_slug: currentTask.slug,
+      transition_to: transition,
+      payload: {
+        findings: findings || undefined,
+        brain_contribution_id: thoughtId || undefined,
+      },
+    });
+
+    if (result.type === 'DELIVERY_ACCEPTED' || result.type === 'TRANSITION_ACCEPTED') {
+      console.log(`[AGENT] Delivered: ${currentTask.slug} → ${transition}`);
+      await deliverToTmux(`[DELIVERED] ${currentTask.slug} → ${transition}. Brain: ${thoughtId || 'none'}. Bereit für nächsten Task.`);
+      clearTask();
+      setState('IDLE');
+      // Proactive: check for more work
+      await queryAndOffer();
+    } else {
+      const error = result.error || result.gate || JSON.stringify(result).slice(0, 200);
+      console.error(`[AGENT] Delivery rejected: ${error}`);
+      await deliverToTmux(`[DELIVER-FAILED] ${error}\n\nBitte korrigieren und erneut antworten mit:\n  LEARNINGS: ...\n  TRANSITION: ...\n  FINDINGS: ...`);
+      setState('SUMMARIZING');
+      // Go back to polling for corrected summary
+      pollForSummaryResponse(0);
+    }
+  } catch (err) {
+    console.error(`[AGENT] Delivery failed: ${err.message}`);
+    await deliverToTmux(`[DELIVER-FAILED] ${err.message}`);
+    setState('SUMMARIZING');
+    pollForSummaryResponse(0);
   }
 }
 
@@ -332,7 +643,10 @@ async function sendStartupPrompts() {
 
   // Wait for READY signal
   await waitForReadySignal();
-  console.log('[AGENT] Handshake complete — starting event stream');
+  console.log('[AGENT] Handshake complete — checking for work');
+
+  // Proactive: query for available tasks after startup (like an agent entering the room)
+  await queryAndOffer();
 }
 
 async function sendPromptAndWait(prompt, maxWait = 90) {
@@ -468,14 +782,9 @@ async function connectToA2A() {
   }
   console.log(`[AGENT] Connected. agent_id=${agentId} via ${API_URL}`);
 
-  // Write credentials file for a2a-deliver.js
+  // Write env file — debugging visibility only (LLM no longer needs credentials)
   const envFile = `/tmp/xpo-agent-${ROLE}.env`;
-  const envContent = deviceKey
-    ? `A2A_API_URL=${API_URL}\nA2A_KEY_FILE=${KEY_FILE}\nA2A_AGENT_ID=${agentId}\n`
-    : JWT_TOKEN
-      ? `A2A_API_URL=${API_URL}\nA2A_TOKEN=${JWT_TOKEN}\nA2A_AGENT_ID=${agentId}\n`
-      : `A2A_API_URL=${API_URL}\nA2A_API_KEY=${API_KEY}\nA2A_AGENT_ID=${agentId}\n`;
-  writeFileSync(envFile, envContent);
+  writeFileSync(envFile, `A2A_API_URL=${API_URL}\nA2A_AGENT_ID=${agentId}\n`);
   try { chmodSync(envFile, 0o600); } catch { /* best effort */ }
 
   // Write status file for agents to verify body is alive
@@ -552,49 +861,23 @@ async function handleEvent(eventType, data) {
     }, 1000);
     return;
   } else if (actionableEvents.includes(eventType)) {
-    console.log(`[AGENT] ${eventType}: ${data.task_slug || ''}`);
-    // Brain read: enrich task with brain context before delivering
-    const brainContext = await queryBrainViaA2A(
-      `Recent decisions, procedures, and context for task: ${data.task_slug || ''} ${data.title || ''}`
-    );
-    const instruction = buildInstruction(eventType, data);
-    const enriched = brainContext
-      ? `${instruction}\n\n[BRAIN CONTEXT]\n${brainContext}`
-      : instruction;
-    await deliverToTmux(enriched);
+    console.log(`[AGENT] ${eventType}: ${data.task_slug || ''} (state: ${bodyState})`);
+    if (bodyState === 'IDLE') {
+      // Proactive: query fresh state from Hive, don't use the event data directly
+      queryAndOffer().catch(err => console.error(`[AGENT] queryAndOffer failed: ${err.message}`));
+    } else {
+      // LLM is busy — note that updates exist, don't interrupt
+      hasUpdates = true;
+      console.log(`[AGENT] Buffered notification (LLM busy with ${currentTask?.slug || 'unknown'})`);
+    }
   } else if (eventType === 'connected') {
     console.log(`[AGENT] SSE connected`);
   }
 }
 
-function buildInstruction(eventType, data) {
-  const slug = data.task_slug || '';
-  const title = data.title || '';
-
-  const transitionMap = {
-    task_available:  { pdsa: 'approval', dev: 'review', qa: 'review', liaison: 'review' },
-    task_assigned:   { pdsa: 'approval', dev: 'review', qa: 'review', liaison: 'review' },
-    approval_needed: { liaison: 'approved' },
-    review_needed:   { qa: 'review', pdsa: 'review', liaison: 'complete' },
-    rework_needed:   { pdsa: 'approval', dev: 'review', qa: 'review' },
-  };
-  const nextStatus = transitionMap[eventType]?.[ROLE] || 'review';
-
-  const instructions = {
-    task_available:  'Do the work described.',
-    task_assigned:   'Do the work described.',
-    approval_needed: 'Review this and approve or reject.',
-    review_needed:   'Review the work. If it passes, forward it.',
-    rework_needed:   `Fix the issues: ${data.rework_reason || 'see task DNA'}.`,
-  };
-  const instruction = instructions[eventType] || 'Process this task.';
-  const context = data.dna?.description?.substring(0, 150) || title;
-
-  // Pure-text task instruction. No URLs, no curl, no localhost.
-  // - To deliver results: a2a-deliver.cjs (the script handles the URL configuration)
-  // - To contribute to brain: just complete the task; the body will prompt for learnings
-  return `[TASK] ${slug} — ${title}\nRole: ${ROLE} | Next status: ${nextStatus}\n${instruction}\nContext: ${context}\n\nWhen done, deliver via: node ${DELIVER_SCRIPT} --slug ${slug} --transition ${nextStatus} --role ${ROLE}`;
-}
+// buildInstruction() removed — replaced by offerTask() + queryAndOffer() (mission m/40145a57)
+// The body now offers tasks via [AVAILABLE] with self-describing response options,
+// not via hardcoded instructions with a2a-deliver.cjs commands.
 
 async function deliverToTmux(message) {
   try {
