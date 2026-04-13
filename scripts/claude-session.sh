@@ -754,13 +754,71 @@ create_agent_body_session() {
 
 create_single_session() {
     local session="$1"
+    local role="${2:-liaison}"  # default role for single-pane sessions
 
-    # Auto-deploy skills + hooks before launching agents
+    # Auto-deploy skills + hooks
     sync_skills
     sync_settings
 
-    tmux new-session -d -s "$session" -c "$WORKING_DIR"
-    tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN" Enter
+    local workspace="${WORKING_DIR}/xpollination-mindspace"
+    local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
+    local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
+    node_bin="${node_bin:-node}"
+
+    # Authenticate: load existing key or bootstrap via device flow
+    local XPO_KEY_FILE=""
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_or_load_key "$session"; then
+        echo "WARNING: Authentication failed for ${XPO_ENV}. Starting without A2A body."
+        tmux new-session -d -s "$session" -c "$WORKING_DIR"
+        tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN" Enter
+        return
+    fi
+    local key_file="$XPO_KEY_FILE"
+    echo "Environment: ${XPO_ENV} (key: ${key_file})"
+
+    tmux new-session -d -s "$session" -c "$workspace"
+
+    if [[ -n "$NVM_NODE" ]]; then
+        tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+    fi
+
+    # Start body in background — connects to Hive, delivers events
+    local body_cmd="nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --interactive --session ${session}:0.0 --key ${key_file} > /tmp/xpo-agent-${session}.log 2>&1 &"
+    tmux send-keys -t "${session}:0.0" "$body_cmd" Enter
+
+    # Write role prompt
+    cat > "/tmp/claude-role-${session}.txt" << ROLE
+You are an agent in session: ${session} | Role: ${role} | Env: ${XPO_ENV}
+Project: xpollination-mindspace
+
+ARCHITECTURE:
+- A2A body runs in background — handles auth, events, brain, delivery
+- You receive [AVAILABLE] task offers and [SUMMARY] requests with response options
+- The body handles ALL server communication
+- Body status: cat /tmp/xpo-agent-${session}.status
+
+RULES:
+- Do NOT run a2a-deliver.cjs or interface-cli.js — the body handles delivery
+- Do NOT use curl to call API endpoints — the body handles all A2A
+- Do NOT query brain directly — the body provides context and captures learnings
+ROLE
+
+    # Launch Claude
+    local launch_script="/tmp/claude-launch-${session}.sh"
+    {
+        echo "#!/bin/bash"
+        echo "cd \"${workspace}\""
+        echo "export AGENT_ROLE=${role}"
+        printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
+        for tool in "${ALLOWED_TOOLS[@]}"; do
+            printf ' %q' "$tool"
+        done
+        printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$session"
+    } > "$launch_script"
+    chmod +x "$launch_script"
+
+    tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
 }
 
 run_remote() {
@@ -817,21 +875,19 @@ run_local_or_hetzner() {
         exec tmux attach -t "$session"
     fi
 
+    # Detect role from session name if it matches a known role
+    local role="liaison"  # default
+    case "$session" in
+        *liaison*) role="liaison" ;;
+        *pdsa*)    role="pdsa" ;;
+        *dev*)     role="dev" ;;
+        *qa*)      role="qa" ;;
+    esac
+
     case "$session" in
         claude-agents|a2a-team) create_agents_session "$session" ;;
         claude-dual)   create_dual_session "$session" ;;
-        agent-*)
-            # A2A Agent Body — single role agent connected to A2A
-            # Usage: claude-session agent-pdsa | agent-dev | agent-qa | agent-liaison
-            local role="${session#agent-}"
-            if [[ ! "$role" =~ ^(liaison|pdsa|dev|qa)$ ]]; then
-                echo "ERROR: Invalid agent role '${role}'"
-                echo "Use: agent-liaison, agent-pdsa, agent-dev, agent-qa"
-                exit 1
-            fi
-            create_agent_body_session "$session" "$role"
-            ;;
-        *)             create_single_session "$session" ;;
+        *)             create_single_session "$session" "$role" ;;
     esac
 
     exec tmux attach -t "$session"
