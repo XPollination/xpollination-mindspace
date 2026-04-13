@@ -461,7 +461,12 @@ async function executeClaimHandshake(brainQuery) {
 let lastHelpCheck = '';  // dedup: don't respond to same HELP twice
 
 async function checkForHelpRequest(capture) {
-  const markers = parseMarkers(capture);
+  // Only parse text AFTER the last ❯ (= user/LLM input, not agent output).
+  // Agent output contains markers as text (e.g. "HELP: Marker" as heading)
+  // which would false-positive. Only react to input after the prompt.
+  const lastPromptIdx = capture.lastIndexOf('❯');
+  const inputArea = lastPromptIdx >= 0 ? capture.slice(lastPromptIdx) : '';
+  const markers = parseMarkers(inputArea);
   if (!markers.help) return false;
   if (markers.help === lastHelpCheck) return false; // already answered
   lastHelpCheck = markers.help;
