@@ -316,7 +316,7 @@ function formatBrainResult(data) {
 function parseMarkers(text) {
   const result = {};
   const lines = text.split('\n');
-  const markers = ['CLAIM', 'BRAIN', 'LEARNINGS', 'TRANSITION', 'FINDINGS', 'PICK', 'HELP'];
+  const markers = ['CLAIM', 'BRAIN', 'LEARNINGS', 'TRANSITION', 'FINDINGS', 'PICK', 'HELP', 'OBJECT_QUERY'];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     for (const m of markers) {
@@ -456,6 +456,72 @@ async function executeClaimHandshake(brainQuery) {
   }
 }
 
+// --- OBJECT_QUERY: ad-hoc queries from LLM ---
+
+let lastObjectQuery = '';  // dedup
+
+async function checkForObjectQuery(capture) {
+  const lines = capture.split('\n');
+  let inputLine = '';
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].startsWith('❯') && lines[i].trim().length > 1) {
+      inputLine = lines[i];
+      break;
+    }
+  }
+  if (!inputLine) return false;
+
+  // Look for OBJECT_QUERY: in the input — agent may write JSON or key=value
+  const match = inputLine.match(/OBJECT_QUERY:\s*(.+)/i);
+  if (!match) return false;
+  const queryText = match[1].trim();
+  if (queryText === lastObjectQuery) return false;
+  lastObjectQuery = queryText;
+
+  console.log(`[AGENT] OBJECT_QUERY request: ${queryText.slice(0, 100)}`);
+
+  // Parse: try JSON first, fall back to simple filters
+  let queryBody;
+  try {
+    const parsed = JSON.parse(queryText);
+    queryBody = { type: 'OBJECT_QUERY', ...parsed };
+  } catch {
+    // Simple format: OBJECT_QUERY: task status=pending role=liaison
+    const parts = queryText.split(/\s+/);
+    const objectType = parts[0] || 'task';
+    const filters = {};
+    for (const p of parts.slice(1)) {
+      const [k, v] = p.split('=');
+      if (k && v) filters[k] = v;
+    }
+    queryBody = { type: 'OBJECT_QUERY', object_type: objectType, filters };
+  }
+
+  try {
+    const data = await a2aMessage(queryBody);
+    const objects = data.objects || [];
+    // Format result as readable text
+    let resultText;
+    if (objects.length === 0) {
+      resultText = `[QUERY RESULT] No ${queryBody.object_type || 'objects'} found matching filters.`;
+    } else {
+      const summary = objects.map(o => {
+        const slug = o.slug || o.short_id || o.id;
+        const title = o.title || '';
+        const status = o.status || o.state?.status || '';
+        const role = o.current_role || '';
+        return `  - ${slug}: ${title} (${status}${role ? '+' + role : ''})`;
+      }).join('\n');
+      resultText = `[QUERY RESULT] ${objects.length} ${queryBody.object_type || 'object'}(s):\n${summary}`;
+    }
+    await deliverToTmux(resultText);
+  } catch (err) {
+    console.error(`[AGENT] OBJECT_QUERY failed: ${err.message}`);
+    await deliverToTmux(`[QUERY RESULT] Query failed: ${err.message}`);
+  }
+  return true;
+}
+
 // --- HELP: on-demand A2A docs (DESCRIBE) ---
 
 let lastHelpCheck = '';  // dedup: don't respond to same HELP twice
@@ -509,6 +575,7 @@ function startIdleWatcher() {
       const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-15'], { stdio: 'pipe' }).toString();
       if (!paneHasIdlePrompt(capture)) return; // agent still outputting
       await checkForHelpRequest(capture);
+      await checkForObjectQuery(capture);
     } catch { /* capture may fail */ }
   }, 10000);
 }
