@@ -101,10 +101,14 @@ export class Runner {
     return claimed;
   }
 
-  async executeTask(taskTwin: Twin): Promise<Twin> {
+  async executeTask(taskTwin: Twin, onChunk?: (chunk: string) => void): Promise<Twin> {
     const content = taskTwin.content as Record<string, unknown>;
-    const prompt = [content.title, content.description].filter(Boolean).join('\n\n');
-    const result = await this.bridge.execute(prompt);
+    const parts = [content.title, content.description, content.acceptance_criteria,
+      content.proposed_design, content.findings].filter(Boolean);
+    const prompt = parts.join('\n\n');
+    const result = onChunk
+      ? await this.bridge.executeStreaming(prompt, onChunk)
+      : await this.bridge.execute(prompt);
     const withResult = await evolve(taskTwin, { result });
     await this.opts.storage.dock(withResult);
     return withResult;

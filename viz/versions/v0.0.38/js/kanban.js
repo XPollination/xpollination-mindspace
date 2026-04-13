@@ -197,6 +197,23 @@ function showDetail(task) {
   ].filter(Boolean);
   if (workFields.length) html += renderSection('Work', workFields, false);
 
+  // Live Output (shown when task is active — runner streaming)
+  if (task.status === 'active') {
+    html += renderSection('Live Output', [
+      `<div id="live-output-${esc(task.slug)}" class="live-output-container">
+         <pre class="live-output-pre"></pre>
+         <div class="live-output-status">Waiting for runner...</div>
+       </div>`
+    ], true);
+  }
+
+  // Runner output (shown when complete — final result)
+  if (dna.runner_output) {
+    html += renderSection('Runner Output', [
+      `<pre style="white-space:pre-wrap;font-size:12px;">${esc(dna.runner_output)}</pre>`
+    ], false);
+  }
+
   // Reviews
   const reviewFields = [
     dna.qa_review ? field('QA Review', formatReview(dna.qa_review)) : '',
@@ -415,6 +432,35 @@ async function init() {
       }
     });
 
+    // Runner live output streaming
+    client.on('runner_output', (data) => {
+      const pre = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-pre`);
+      if (pre) { pre.textContent += data.chunk; pre.scrollTop = pre.scrollHeight; }
+      const status = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-status`);
+      if (status) status.textContent = 'Runner active...';
+    });
+
+    client.on('runner_claim', (data) => {
+      try {
+        const updated = client.query('task', { slug: data.task_slug });
+        if (updated && updated.length) { cache.set('task', data.task_slug, updated[0]); }
+      } catch { /* silent */ }
+      renderBoard();
+    });
+
+    client.on('runner_complete', async (data) => {
+      const status = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-status`);
+      if (status) status.textContent = 'Completed';
+      try {
+        const updated = await client.query('task', { slug: data.task_slug });
+        if (updated.length) { cache.set('task', data.task_slug, updated[0]); renderBoard(); }
+      } catch { /* silent */ }
+    });
+
+    // Team change events — real-time update when agents spawn/terminate
+    client.on('agent_spawned', () => loadTeam());
+    client.on('agent_terminated', () => loadTeam());
+
     // Deep link: /kanban?task=slug
     const params = new URLSearchParams(window.location.search);
     const taskParam = params.get('task');
@@ -476,7 +522,9 @@ async function addAgent(role) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role }),
+      credentials: 'same-origin',
     });
+    if (!res.ok) { console.warn('addAgent:', res.status, await res.text()); return; }
     const data = await res.json();
     teamAgents.push(data);
     renderTeamStatus();
@@ -486,7 +534,8 @@ async function addAgent(role) {
 async function addFullTeam() {
   const project = getTeamProject();
   try {
-    const res = await fetch(`/api/team/${project}/full`, { method: 'POST' });
+    const res = await fetch(`/api/team/${project}/full`, { method: 'POST', credentials: 'same-origin' });
+    if (!res.ok) { console.warn('addFullTeam:', res.status); return; }
     const data = await res.json();
     if (data.agents) teamAgents.push(...data.agents);
     renderTeamStatus();
@@ -495,7 +544,7 @@ async function addFullTeam() {
 
 async function terminateAgent(id) {
   const project = getTeamProject();
-  await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE' });
+  await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE', credentials: 'same-origin' });
   teamAgents = teamAgents.filter(a => a.id !== id);
   renderTeamStatus();
 }
@@ -503,7 +552,8 @@ async function terminateAgent(id) {
 async function loadTeam() {
   const project = getTeamProject();
   try {
-    const res = await fetch(`/api/team/${project}`);
+    const res = await fetch(`/api/team/${project}`, { credentials: 'same-origin' });
+    if (!res.ok) return;
     const data = await res.json();
     teamAgents = data.agents || [];
     renderTeamStatus();
@@ -514,17 +564,151 @@ function renderTeamStatus() {
   const el = document.getElementById('team-status');
   if (!el) return;
   if (teamAgents.length === 0) {
-    el.textContent = 'No agents';
+    el.innerHTML = 'No agents';
     return;
   }
-  const dots = teamAgents.map(a =>
-    `<span class="team-runner-dot ${a.status || 'ready'}" title="${a.role}: ${a.status || 'ready'}"></span>`
-  ).join('');
-  el.innerHTML = `${dots} ${teamAgents.length} agent${teamAgents.length > 1 ? 's' : ''}`;
+  // Filter out stopped/dead agents from display
+  const liveAgents = teamAgents.filter(a => a.status !== 'stopped' && a.status !== 'disconnected');
+  if (liveAgents.length === 0) {
+    el.innerHTML = 'No agents';
+    return;
+  }
+  el.innerHTML = liveAgents.map(a => {
+    const hasTerminal = a.session && a.session.startsWith('runner-');
+    return `
+    <div class="runner-card" data-id="${a.id}">
+      <span class="team-runner-dot ${a.status || 'ready'}"></span>
+      <span class="runner-role">${a.role}</span>
+      <span class="runner-status">${a.status || 'ready'}</span>
+      ${hasTerminal ? `<button class="runner-open" onclick="openTerminal('${a.session}', '${a.role}')">Open</button>` : ''}
+      <button class="team-terminate" data-action="terminate" onclick="terminateAgent('${a.id}')">×</button>
+    </div>`;
+  }).join('') + ` ${liveAgents.length} agent${liveAgents.length > 1 ? 's' : ''}`;
 }
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'now';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  return `${min}m ago`;
+}
+
+async function switchRole(id, newRole) {
+  const project = getTeamProject();
+  try {
+    await fetch(`/api/team/${project}/agent/${id}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole }),
+    });
+    await loadTeam();
+  } catch (e) { console.warn('switchRole failed:', e); }
+}
+
+// Expose team functions globally (kanban.js is a module, onclick needs window scope)
+window.addAgent = addAgent;
+window.addFullTeam = addFullTeam;
+window.terminateAgent = terminateAgent;
+window.switchRole = switchRole;
 
 // Reload team when project filter changes
 document.getElementById('project-filter')?.addEventListener('change', loadTeam);
 
 // Initial team load
 setTimeout(loadTeam, 1500);
+
+// ═══════════════════════════════════════════════════════════════
+// Agent Terminal — xterm.js WebSocket bridge to tmux session
+// ═══════════════════════════════════════════════════════════════
+
+let activeTerminal = null;
+let activeWebSocket = null;
+
+function openTerminal(sessionName, role) {
+  const overlay = document.getElementById('terminal-overlay');
+  const panel = document.getElementById('terminal-panel');
+  const container = document.getElementById('terminal-container');
+  const title = document.getElementById('terminal-title');
+
+  title.textContent = `${(role || '').toUpperCase()} Agent — ${sessionName}`;
+  overlay.classList.add('active');
+  panel.classList.add('active');
+
+  // Clean up previous terminal
+  container.innerHTML = '';
+  if (activeWebSocket) { activeWebSocket.close(); activeWebSocket = null; }
+  if (activeTerminal) { activeTerminal.dispose(); activeTerminal = null; }
+
+  // Create xterm.js instance
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    theme: { background: '#1a1a2e', foreground: '#e0e0e0', cursor: '#ea580c' },
+  });
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+  setTimeout(() => fitAddon.fit(), 100);
+  activeTerminal = term;
+
+  // Connect WebSocket to tmux session
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws/terminal/${sessionName}`);
+  activeWebSocket = ws;
+
+  const wsUrl = `${proto}//${location.host}/ws/terminal/${sessionName}`;
+  term.write(`\x1b[33mConnecting: ${wsUrl}\x1b[0m\r\n`);
+  console.log('[terminal] connecting:', wsUrl);
+
+  ws.onopen = () => {
+    term.write('\x1b[32mWebSocket connected. Waiting for terminal data...\x1b[0m\r\n');
+    console.log('[terminal] WebSocket OPEN');
+    fitAddon.fit();
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+  };
+  ws.onmessage = (e) => {
+    console.log('[terminal] data received:', typeof e.data, e.data?.length || e.data?.size || 0, 'bytes');
+    if (typeof e.data === 'string') term.write(e.data);
+    else if (e.data instanceof Blob) e.data.text().then(t => term.write(t));
+    else if (e.data instanceof ArrayBuffer) term.write(new Uint8Array(e.data));
+  };
+  ws.onclose = (e) => {
+    term.write(`\r\n\x1b[31m[Session disconnected] code=${e.code} reason=${e.reason}\x1b[0m\r\n`);
+    console.log('[terminal] WebSocket CLOSED:', e.code, e.reason);
+  };
+  ws.onerror = (e) => {
+    term.write('\r\n\x1b[31m[Connection error]\x1b[0m\r\n');
+    console.log('[terminal] WebSocket ERROR');
+  };
+
+  // Send terminal input to WebSocket (bidirectional)
+  term.onData((data) => { if (ws.readyState === 1) ws.send(data); });
+
+  // Handle window resize
+  const resizeHandler = () => {
+    fitAddon.fit();
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  };
+  window.addEventListener('resize', resizeHandler);
+  panel._resizeHandler = resizeHandler;
+}
+
+function closeTerminal() {
+  const panel = document.getElementById('terminal-panel');
+  document.getElementById('terminal-overlay')?.classList.remove('active');
+  panel?.classList.remove('active');
+  if (activeWebSocket) { activeWebSocket.close(); activeWebSocket = null; }
+  if (activeTerminal) { activeTerminal.dispose(); activeTerminal = null; }
+  if (panel?._resizeHandler) {
+    window.removeEventListener('resize', panel._resizeHandler);
+    panel._resizeHandler = null;
+  }
+}
+
+window.openTerminal = openTerminal;
+window.closeTerminal = closeTerminal;

@@ -1,0 +1,291 @@
+# Board Configuration — Kanban UI Source of Truth
+# All rendering knowledge in one file. kanban.js reads this and renders.
+# Change this file → change the board. No JS changes needed.
+#
+# Companion to workflow.yaml:
+#   workflow.yaml  → owns transitions, gates, role routing (process)
+#   board-config.yaml → owns columns, colors, filters, field display (rendering)
+#
+# Version: 1.0.0
+# Decision: D7 (MISSION-TASK-VIEW-UX)
+
+# ═══════════════════════════════════════════════════════════════
+# BOARD: identity
+# ═══════════════════════════════════════════════════════════════
+
+board:
+  name: Mindspace Task Board
+  description: PDSA-driven agent task workflow
+
+# ═══════════════════════════════════════════════════════════════
+# STATUSES: every status the board can render
+# Each status has a CSS variable for color, flags for behavior.
+# CSS owns the actual color values (mindspace.css :root).
+# ═══════════════════════════════════════════════════════════════
+
+statuses:
+  pending:
+    label: Pending
+    color: var(--ms-status-pending)
+    terminal: false
+  ready:
+    label: Ready
+    color: var(--ms-status-ready)
+    terminal: false
+  active:
+    label: Active
+    color: var(--ms-status-active)
+    terminal: false
+  testing:
+    label: Testing
+    color: var(--ms-status-testing)
+    terminal: false
+  review:
+    label: Review
+    color: var(--ms-status-review)
+    terminal: false
+  approval:
+    label: Approval
+    color: var(--ms-status-approval)
+    terminal: false
+  approved:
+    label: Approved
+    color: var(--ms-status-approved)
+    terminal: false
+  rework:
+    label: Rework
+    color: var(--ms-status-rework)
+    terminal: false
+  blocked:
+    label: Blocked
+    color: var(--ms-status-blocked)
+    terminal: false
+    show_reason: true           # card shows dna.blocked_reason inline
+  complete:
+    label: Complete
+    color: var(--ms-status-complete)
+    terminal: true
+  cancelled:
+    label: Cancelled
+    color: var(--ms-status-cancelled)
+    terminal: true
+
+# ═══════════════════════════════════════════════════════════════
+# ROLES: agent roles the board recognizes
+# Color references CSS variables. Label is the display name.
+# ═══════════════════════════════════════════════════════════════
+
+roles:
+  liaison:
+    label: Liaison
+    color: var(--ms-role-liaison)
+  pdsa:
+    label: PDSA
+    color: var(--ms-role-pdsa)
+  dev:
+    label: Dev
+    color: var(--ms-role-dev)
+  qa:
+    label: QA
+    color: var(--ms-role-qa)
+
+# ═══════════════════════════════════════════════════════════════
+# COLUMNS: left-to-right board layout
+# Each column groups one or more statuses.
+# Order here = order on screen. Every status must appear in
+# exactly one column.
+# ═══════════════════════════════════════════════════════════════
+
+columns:
+  - id: queue
+    label: Queue
+    statuses: [pending, ready]
+    color: var(--ms-status-ready)
+
+  - id: active
+    label: Active
+    statuses: [active, testing]
+    color: var(--ms-status-active)
+
+  - id: review
+    label: Review
+    statuses: [review, approval]
+    color: var(--ms-status-review)
+
+  - id: approved
+    label: Approved
+    statuses: [approved]
+    color: var(--ms-status-approved)
+
+  - id: rework
+    label: Rework
+    statuses: [rework]
+    color: var(--ms-status-rework)
+
+  - id: blocked
+    label: Blocked
+    statuses: [blocked]
+    color: var(--ms-status-blocked)
+
+  - id: done
+    label: Done
+    statuses: [complete, cancelled]
+    color: var(--ms-status-complete)
+
+# ═══════════════════════════════════════════════════════════════
+# FILTERS: completed-tasks dropdown options
+# The single filter control replacing Active/All buttons.
+# Each entry defines what tasks are visible.
+# ═══════════════════════════════════════════════════════════════
+
+filters:
+  default: active
+
+  options:
+    - value: active
+      label: Active tasks
+      show_terminal: false
+
+    - value: 1d
+      label: "+ Completed (1 day)"
+      show_terminal: true
+      terminal_days: 1
+
+    - value: 7d
+      label: "+ Completed (7 days)"
+      show_terminal: true
+      terminal_days: 7
+
+    - value: 30d
+      label: "+ Completed (30 days)"
+      show_terminal: true
+      terminal_days: 30
+
+    - value: all
+      label: All tasks
+      show_terminal: true
+
+# ═══════════════════════════════════════════════════════════════
+# CARD: what a task card shows on the board
+# Fields reference dna.{field} or twin-level fields.
+# ═══════════════════════════════════════════════════════════════
+
+card:
+  title: dna.title || slug
+  badges:
+    - field: status
+      color_from: statuses
+    - field: dna.role
+      color_from: roles
+  meta:
+    - field: project_slug
+      label: project
+    - field: dna.claimed_by
+      label: claimed
+      truncate: 16
+
+# ═══════════════════════════════════════════════════════════════
+# DETAIL: sections shown in the task detail panel
+# Each section lists fields. Fields with no value are hidden.
+# format: text (default), pre (preformatted), badge, link, time
+# ═══════════════════════════════════════════════════════════════
+
+detail:
+  sections:
+    - id: overview
+      label: Overview
+      expanded: true
+      fields:
+        - { key: status,                  label: Status,              format: badge,  color_from: statuses }
+        - { key: dna.role,                label: Role,                format: badge,  color_from: roles }
+        - { key: slug,                    label: Slug,                format: text }
+        - { key: project_slug,            label: Project,             format: text }
+        - { key: dna.priority,            label: Priority,            format: text }
+        - { key: dna.group,               label: Group,               format: text }
+        - { key: dna.description,         label: Description,         format: text }
+        - { key: dna.acceptance_criteria,  label: Acceptance Criteria, format: pre }
+
+    - id: work
+      label: Work
+      expanded: false
+      fields:
+        - { key: dna.findings,            label: Findings,            format: pre }
+        - { key: dna.proposed_design,      label: Proposed Design,     format: pre }
+        - { key: dna.implementation,       label: Implementation,      format: impl }
+        - { key: dna.dev_findings,         label: Dev Findings,        format: pre }
+
+    - id: live_output
+      label: Live Output
+      expanded: true
+      show_when: { status: active }
+      fields:
+        - { key: _runner_stream,          label: Output,              format: stream }
+
+    - id: runner_output
+      label: Runner Output
+      expanded: false
+      fields:
+        - { key: dna.runner_output,        label: Output,              format: pre }
+
+    - id: reviews
+      label: Reviews
+      expanded: false
+      fields:
+        - { key: dna.qa_review,            label: QA Review,           format: review }
+        - { key: dna.pdsa_review,          label: PDSA Review,         format: review }
+        - { key: dna.qa_tests,             label: QA Tests,            format: text }
+        - { key: dna.test_pass_count,      label: Tests,               format: test_count, total_key: dna.test_total_count }
+
+    - id: decisions
+      label: Decisions
+      expanded: false
+      fields:
+        - { key: dna.human_answer,         label: Human Decision,      format: text }
+        - { key: dna.human_answer_at,      label: Decision Time,       format: time }
+        - { key: dna.approval_mode,        label: Approval Mode,       format: text }
+        - { key: dna.liaison_reasoning,    label: Liaison Reasoning,   format: text }
+        - { key: dna.rework_reason,        label: Rework Reason,       format: text }
+        - { key: dna.rework_count,         label: Rework Count,        format: text }
+
+    - id: links
+      label: Links
+      expanded: false
+      fields:
+        - { key: dna.requirement_refs,     label: Requirements,        format: link_list }
+        - { key: dna.pdsa_ref,             label: PDSA Ref,            format: link }
+        - { key: dna.abstract_ref,         label: Abstract,            format: link }
+        - { key: dna.changelog_ref,        label: Changelog,           format: link }
+        - { key: dna.depends_on,           label: Depends On,          format: slug_list }
+
+    - id: meta
+      label: Meta
+      expanded: false
+      fields:
+        - { key: created_at,              label: Created,             format: time }
+        - { key: updated_at,              label: Updated,             format: time }
+
+# ═══════════════════════════════════════════════════════════════
+# ACTIONS: buttons in the detail panel
+# condition: when the button is visible
+# transition: what status to move to on click
+# ═══════════════════════════════════════════════════════════════
+
+actions:
+  - id: confirm
+    label: Confirm
+    style: primary
+    condition:
+      status_in: [review, approval]
+    transition: complete
+    fields:
+      human_confirmed: true
+      human_confirmed_via: viz
+
+  - id: rework
+    label: Rework
+    style: danger
+    condition:
+      status_not_in: [complete, cancelled, pending]
+    transition: rework
+    prompt: "Rework reason:"
+    prompt_field: rework_reason

@@ -1,7 +1,7 @@
 import { FileStorageAdapter } from '../storage/file-storage-adapter.js';
 import { LibP2PTransport } from '../transport/libp2p-transport.js';
 import { create, sign, evolve } from '../twin/kernel.js';
-import { validate as validateTransaction, verifyCID, resolveConflict } from '../validation/transaction-validator.js';
+import { validate as validateTransaction, verifyCID, resolveConflict, verifyWorkflow } from '../validation/transaction-validator.js';
 import { RelationPermissionResolver, checkRateLimit, type RateLimitPolicy } from '../auth/permission-resolver.js';
 import type { Twin } from '../twin/types.js';
 import type { StorageAdapter } from '../storage/types.js';
@@ -167,30 +167,21 @@ export class MindspaceNode {
   }
 
   private async autoResolveConflict(logicalId: string, heads: string[]): Promise<void> {
-    const winnerCid = resolveConflict(heads);
-    const winnerTwin = await this.storage.resolve(winnerCid);
-    if (!winnerTwin) return;
-
-    // Undock ALL heads (including winner) — then dock only the merge twin
-    const losers = heads.filter((h) => h !== winnerCid);
-    for (const loserCid of losers) {
-      await this.storage.undock(loserCid);
+    // Deterministic resolution: lowest CID wins. No merge twins — both nodes
+    // independently pick the same winner and undock the same losers.
+    // Loop because undocking a leaf can expose its parent as a new head.
+    let currentHeads = heads;
+    while (currentHeads.length > 1) {
+      const winnerCid = resolveConflict(currentHeads);
+      for (const loserCid of currentHeads.filter((h) => h !== winnerCid)) {
+        await this.storage.undock(loserCid);
+      }
+      currentHeads = await this.storage.heads(logicalId);
     }
-
-    // Create merge twin from winner with mergedFrom metadata
-    const merged = await evolve(winnerTwin, {
-      mergedFrom: losers,
-      conflict_resolved: true,
-    });
-    await this.storage.dock(merged);
-    this.taskIndex.set(logicalId, merged);
-
-    // Propagate so other nodes converge
-    await this.transport.publish('xp0/tasks', {
-      type: 'twin.evolved',
-      cid: merged.cid,
-      kind: 'task',
-    });
+    if (currentHeads.length === 1) {
+      const winner = await this.storage.resolve(currentHeads[0]);
+      if (winner) this.taskIndex.set(logicalId, winner);
+    }
   }
 
   async forgetTwin(cid: string): Promise<void> {
@@ -209,6 +200,24 @@ export class MindspaceNode {
     return signed;
   }
 
+  // --- Runner management (public) ---
+
+  getRunners(): Array<{ id: string; role: string; status: string }> {
+    return this.runners.map((r) => ({
+      id: r.id,
+      role: r.role,
+      status: r.runner.getStatus(),
+    }));
+  }
+
+  async terminateRunner(id: string): Promise<{ brainContributed: boolean }> {
+    const idx = this.runners.findIndex((r) => r.id === id);
+    if (idx === -1) throw new Error('Runner not found');
+    await this.runners[idx].runner.stop();
+    this.runners.splice(idx, 1);
+    return { brainContributed: true };
+  }
+
   // --- Task management ---
 
   async createTask(opts: {
@@ -217,7 +226,13 @@ export class MindspaceNode {
     role: string;
     project: string;
     logicalId?: string;
+    actor?: string;
   }): Promise<Twin> {
+    // D9: Only LIAISON role can create tasks
+    if (opts.actor && opts.actor !== 'liaison') {
+      throw new Error(`Task creation not allowed: only liaison can create tasks, got '${opts.actor}'`);
+    }
+
     const logicalId = opts.logicalId || opts.title.toLowerCase().replace(/\s+/g, '-');
     const content: Record<string, unknown> = {
       title: opts.title,
@@ -275,6 +290,23 @@ export class MindspaceNode {
   async transitionTask(logicalId: string, status: string, actor: string): Promise<Twin> {
     const current = await this.getLatestTwin(logicalId) || await this.getTaskByLogicalId(logicalId);
     if (!current) throw new Error(`Task ${logicalId} not found`);
+
+    const currentContent = current.content as Record<string, unknown>;
+    const currentStatus = currentContent.status as string;
+    const taskRole = currentContent.role as string;
+
+    // Role consistency: actor must match task role for claiming (ready→active)
+    if (status === 'active' && currentStatus === 'ready' && actor !== taskRole) {
+      throw new Error(`Role not allowed: task role is '${taskRole}', actor is '${actor}'`);
+    }
+
+    // Workflow validation: check state machine allows this transition
+    const proposed = { ...current, content: { ...currentContent, status } } as Twin;
+    const wfResult = verifyWorkflow(current, proposed);
+    if (!wfResult.valid) {
+      throw new Error(wfResult.reason || `Workflow transition ${currentStatus}→${status} not allowed`);
+    }
+
     return this.evolveTwin(current, { status, claimed_by: actor });
   }
 
@@ -290,7 +322,17 @@ export class MindspaceNode {
 
   // --- Runner management ---
 
-  async addRunner(opts: { role: string; autoClaimDelay?: number; heartbeatInterval?: number; delegationScope?: { operations: string[]; roles: string[] } }): Promise<IntegrationRunner> {
+  async addRunner(opts: {
+    role: string;
+    autoClaimDelay?: number;
+    heartbeatInterval?: number;
+    delegationScope?: { operations: string[]; roles: string[] };
+    callbacks?: {
+      onClaim?: (logicalId: string, runnerId: string) => void;
+      onChunk?: (logicalId: string, chunk: string) => void;
+      onComplete?: (logicalId: string, result: string, nextStatus: string) => void;
+    };
+  }): Promise<IntegrationRunner> {
     const kp = await generateKeyPair();
     const did = deriveDID(kp.publicKey);
 
@@ -316,7 +358,7 @@ export class MindspaceNode {
     this.runners.push(managed);
 
     // Start auto-claim loop if configured
-    const ir = new IntegrationRunner(runner, opts.role, this);
+    const ir = new IntegrationRunner(runner, opts.role, this, opts.callbacks);
     if (opts.autoClaimDelay !== undefined) {
       ir.startAutoClaim(opts.autoClaimDelay);
     } else {
@@ -324,19 +366,6 @@ export class MindspaceNode {
     }
 
     return ir;
-  }
-
-  getRunners(): ManagedRunner[] {
-    return this.runners;
-  }
-
-  async terminateRunner(id: string): Promise<{ brainContributed: boolean }> {
-    const idx = this.runners.findIndex((r) => r.id === id);
-    if (idx >= 0) {
-      await this.runners[idx].runner.stop();
-      this.runners.splice(idx, 1);
-    }
-    return { brainContributed: true };
   }
 
   async revokeDelegation(runnerId: string): Promise<void> {
@@ -390,12 +419,19 @@ export class IntegrationRunner {
   private node: MindspaceNode;
   private listening = false;
   private autoClaimTimer: ReturnType<typeof setInterval> | null = null;
+  private callbacks?: {
+    onClaim?: (logicalId: string, runnerId: string) => void;
+    onChunk?: (logicalId: string, chunk: string) => void;
+    onComplete?: (logicalId: string, result: string, nextStatus: string) => void;
+  };
+  currentTaskLogicalId: string | null = null;
 
-  constructor(runner: Runner, role: string, node: MindspaceNode) {
+  constructor(runner: Runner, role: string, node: MindspaceNode, callbacks?: IntegrationRunner['callbacks']) {
     this.runner = runner;
     this.role = role;
     this.node = node;
     this.listening = true;
+    this.callbacks = callbacks;
   }
 
   isListening(): boolean {
@@ -460,16 +496,24 @@ export class IntegrationRunner {
 
           // State machine: each iteration handles ONE step
           if (content.status === 'ready' && !content.claimed_by) {
-            // Pre-claim check: is the task STILL ready at head level?
+            // Pre-claim check: are ALL heads still ready?
             const logId = content.logicalId as string | undefined;
             if (logId) {
               const currentHeads = await this.node.storage.heads(logId);
-              if (currentHeads.length > 0) {
-                const headTwin = await this.node.storage.resolve(currentHeads[0]);
-                if (headTwin && (headTwin.content as any).status !== 'ready') {
-                  break; // Already claimed by someone else, skip
+              for (const hCid of currentHeads) {
+                const ht = await this.node.storage.resolve(hCid);
+                if (ht && (ht.content as any).status !== 'ready') {
+                  break; // Already claimed by someone else
                 }
               }
+              // Re-check: if any head is not ready, skip claiming
+              const stillReady = currentHeads.length === 0 || (await Promise.all(
+                currentHeads.map(async (h) => {
+                  const t = await this.node.storage.resolve(h);
+                  return !t || (t.content as any).status === 'ready';
+                }),
+              )).every(Boolean);
+              if (!stillReady) break;
             }
 
             // Rate limit check
@@ -485,11 +529,30 @@ export class IntegrationRunner {
               target: claimed.cid,
               relationType: 'executes',
             });
+
+            // Post-claim conflict check: back off immediately if outcompeted
+            if (logId) {
+              const postHeads = await this.node.storage.heads(logId);
+              if (postHeads.length > 1) {
+                const winnerCid = resolveConflict(postHeads);
+                if (claimed.cid !== winnerCid) {
+                  // I lost — undock my claim before publishing
+                  await this.node.storage.undock(claimed.cid);
+                  break;
+                }
+              }
+            }
+
             await this.node.transport.publish('xp0/tasks', {
               type: 'twin.evolved',
               cid: claimed.cid,
               kind: 'task',
             });
+            // Callback: runner claimed a task
+            if (logId) {
+              this.currentTaskLogicalId = logId;
+              this.callbacks?.onClaim?.(logId, myDID);
+            }
             break;
           }
 
@@ -507,8 +570,11 @@ export class IntegrationRunner {
                 }
               }
             }
-            // Step 2: Execute
-            const executed = await this.runner.executeTask(task);
+            // Step 2: Execute (with streaming callback if available)
+            const chunkCb = logId && this.callbacks?.onChunk
+              ? (chunk: string) => this.callbacks!.onChunk!(logId, chunk)
+              : undefined;
+            const executed = await this.runner.executeTask(task, chunkCb);
             await this.node.transport.publish('xp0/tasks', {
               type: 'twin.evolved',
               cid: executed.cid,
@@ -528,6 +594,9 @@ export class IntegrationRunner {
                 cid: transitioned.cid,
                 kind: 'task',
               });
+              // Callback: runner completed task
+              this.currentTaskLogicalId = null;
+              this.callbacks?.onComplete?.(logicalId, content.result as string, nextStatus);
             }
             break;
           }

@@ -1,11 +1,15 @@
 import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
 
+// Multilingual model — DE↔EN concept recognition (~0.88 cross-language similarity)
+// See: docs/missions/mission-multilingual-brain.md
+const MODEL_ID = "Xenova/multilingual-e5-small";
+
 let extractor: FeatureExtractionPipeline | null = null;
 
 async function getExtractor(): Promise<FeatureExtractionPipeline> {
   if (!extractor) {
-    console.log("Loading embedding model (all-MiniLM-L6-v2)...");
-    extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    console.log(`Loading embedding model (${MODEL_ID})...`);
+    extractor = await pipeline("feature-extraction", MODEL_ID);
     console.log("Embedding model loaded.");
   }
   return extractor;

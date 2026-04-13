@@ -235,8 +235,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Authentication required' }));
         return;
       }
-      // D1: Redirect browser requests to /login with return_to
-      const returnTo = pathname !== '/' ? `?return_to=${encodeURIComponent(pathname)}` : '';
+      // D1: Redirect browser requests to /login with return_to (preserve query string)
+      const fullPath = pathname + url.search;
+      const returnTo = fullPath !== '/' ? `?return_to=${encodeURIComponent(fullPath)}` : '';
       res.writeHead(302, { 'Location': `/login${returnTo}` });
       res.end();
       return;
@@ -300,41 +301,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // --- Team Management API (local process management, not proxied) ---
-  if (pathname.match(/^\/api\/team\/[^/]+$/) && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ agents: [], capacity: { max: 4, current: 0 }, message: 'Runner team API — MindspaceNode integration pending' }));
-    return;
-  }
-  if (pathname.match(/^\/api\/team\/[^/]+\/agent$/) && req.method === 'POST') {
-    const body = await readBody(req);
-    const { role } = JSON.parse(body);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ id: 'pending', role, status: 'ready', message: 'Runner spawn API — MindspaceNode integration pending' }));
-    return;
-  }
-  if (pathname.match(/^\/api\/team\/[^/]+\/full$/) && req.method === 'POST') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ agents: ['liaison','pdsa','qa','dev'].map(r => ({ id: 'pending', role: r, status: 'ready' })), message: 'Full team API — MindspaceNode integration pending' }));
-    return;
-  }
-  if (pathname.match(/^\/api\/team\/[^/]+\/agent\/[^/]+$/) && req.method === 'DELETE') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'stopped', message: 'Terminate API — MindspaceNode integration pending' }));
-    return;
-  }
-  if (pathname.match(/^\/api\/team\/[^/]+\/agent\/[^/]+\/role$/) && req.method === 'PUT') {
-    const body = await readBody(req);
-    const { role } = JSON.parse(body);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ new_role: role, message: 'Role switch API — MindspaceNode integration pending' }));
-    return;
-  }
-  if (pathname.match(/^\/api\/team\/[^/]+\/agent\/[^/]+\/status$/) && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ready', message: 'Status API — MindspaceNode integration pending' }));
-    return;
-  }
+  // Team Management API — proxied to API server (no local stubs)
 
   // SSE streaming proxy: pipe /a2a/stream/* without buffering (EventSource needs streaming)
   // HEAD requests return immediately (session validation), GET opens SSE stream
@@ -529,21 +496,31 @@ const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 // WebSocket upgrade proxy for terminal connections → API server
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  console.log(`[ws-upgrade] ${req.url} upgrade=${req.headers.upgrade} connection=${req.headers.connection}`);
   if (url.pathname.startsWith('/ws/terminal/')) {
+    console.log(`[ws-upgrade] proxying to localhost:${API_PORT}${url.pathname}`);
+    const fwdHeaders = { ...req.headers, host: `localhost:${API_PORT}` };
+    console.log(`[ws-upgrade] headers: upgrade=${fwdHeaders.upgrade} connection=${fwdHeaders.connection}`);
     const proxyReq = http.request({
       hostname: 'localhost', port: API_PORT, path: url.pathname,
-      method: 'GET', headers: { ...req.headers, host: `localhost:${API_PORT}` }
+      method: 'GET', headers: fwdHeaders
     });
     proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+      console.log(`[ws-upgrade] upstream 101 received, piping`);
       socket.write('HTTP/1.1 101 Switching Protocols\r\n' +
         Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n') +
         '\r\n\r\n');
       proxySocket.pipe(socket);
       socket.pipe(proxySocket);
     });
-    proxyReq.on('error', () => socket.destroy());
+    proxyReq.on('response', (proxyRes) => {
+      console.log(`[ws-upgrade] upstream HTTP response (NOT upgrade): ${proxyRes.statusCode}`);
+      socket.destroy();
+    });
+    proxyReq.on('error', (err) => { console.log(`[ws-upgrade] proxy error: ${err.message}`); socket.destroy(); });
     proxyReq.end();
   } else {
+    console.log(`[ws-upgrade] rejected: ${url.pathname}`);
     socket.destroy();
   }
 });

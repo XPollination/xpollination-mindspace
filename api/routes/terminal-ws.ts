@@ -31,18 +31,22 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url || '/', `http://localhost`);
   const sessionName = url.pathname.split('/').pop() || 'default';
 
-  // Try to proxy to host agent runtime
+  // If session exists locally, attach directly (no proxy roundtrip)
+  if (sessionExists(sessionName)) {
+    fallbackToLocalTmux(ws, sessionName);
+    return;
+  }
+
+  // Try to proxy to host agent runtime (for sessions on the host machine)
   try {
     const upstream = new WebSocket(`${RUNTIME_WS}/ws/terminal/${sessionName}`);
 
     upstream.on('open', () => {
-      // Proxy: client → upstream
       ws.on('message', (data) => {
         if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
       });
     });
 
-    // Proxy: upstream → client
     upstream.on('message', (data) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
     });
@@ -52,7 +56,6 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     });
 
     upstream.on('error', () => {
-      // Runtime proxy failed — fall back to local tmux
       upstream.close();
       fallbackToLocalTmux(ws, sessionName);
     });
@@ -61,7 +64,6 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     ws.on('error', () => upstream.close());
 
   } catch {
-    // Runtime not available — fall back to local tmux
     fallbackToLocalTmux(ws, sessionName);
   }
 });
@@ -111,7 +113,8 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
   }
 
   const sessionName = url.pathname.split('/').pop() || '';
-  const sessionUserId = sessionName.replace(/^agent-[a-z]+-/, '');
+  // Extract user ID from session name patterns: agent-{role}-{userId} or runner-{role}-{shortId}
+  const sessionUserId = sessionName.replace(/^(agent|runner)-[a-z]+-/, '');
   const cookies = (req.headers.cookie || '').split(';').reduce((acc: Record<string,string>, c) => {
     const [k, v] = c.trim().split('=');
     if (k && v) acc[k] = v;
@@ -122,7 +125,7 @@ export function handleTerminalUpgrade(req: IncomingMessage, socket: Duplex, head
   if (token && sessionUserId && sessionUserId !== 'default') {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'changeme') as any;
-      if (decoded.sub && decoded.sub !== sessionUserId) {
+      if (decoded.sub && !decoded.sub.startsWith(sessionUserId) && sessionUserId !== decoded.sub) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
         return;

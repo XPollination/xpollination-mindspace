@@ -23,6 +23,12 @@ services:
       - "127.0.0.1:3101:3101"
       - "127.0.0.1:4201:4201"
     volumes:
+      # Live-mount entire workspace over /app — all code changes visible after restart.
+      # Rebuild only needed for: new npm dependencies, Dockerfile changes.
+      - /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace:/app
+      # Preserve node_modules from build (host workspace mount would overwrite them)
+      - beta-node-modules:/app/node_modules
+      # Data volumes (more specific = overrides workspace's data/)
       - /mnt/HC_Volume_105173237/mindspace/data-test/mindspace:/app/data
       - /mnt/HC_Volume_105173237/mindspace/data-prod:/app/mindspace-data:ro
       - /home/developer/workspaces/github/PichlerThomas:/workspace:ro
@@ -36,6 +42,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:-xpo-test-jwt-secret-2026}
       - FRONTEND_URL=https://beta-mindspace.xpollination.earth
       - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
+      # CANONICAL_HIVE_URL — temporarily disabled.
+      # The public proxy at beta-mindspace.xpollination.earth/api adds session-cookie
+      # auth that blocks A2A device-key flow. When bodies switch to it, they get 401
+      # on /a2a/connect (proxy auth, not real revocation). Until the proxy is fixed
+      # to bypass auth for /api/a2a/* paths, bodies stay on the bootstrap URL
+      # (localhost from req.host). See brain thought on "service discovery blocked
+      # by proxy auth" for the full story.
+      # - CANONICAL_HIVE_URL=https://beta-mindspace.xpollination.earth/api
       - LIVEKIT_URL=wss://meet.xpollination.earth
       - LIVEKIT_API_KEY=c15ad0a4d81c1507
       - LIVEKIT_API_SECRET=iv9l5sSFnGgZdmlBWF+bE4u/GxOnvjAH0kLFJlzdXIEQ4r/t
@@ -53,6 +67,10 @@ services:
       - beta-net
     restart: unless-stopped
 
+
+volumes:
+  beta-node-modules:
+    # Populated from build image on first run. Delete to refresh: docker volume rm beta-node-modules
 
 networks:
   beta-net:
