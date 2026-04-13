@@ -26,6 +26,9 @@ services:
       - /mnt/HC_Volume_105173237/mindspace/data-test/mindspace:/app/data
       - /mnt/HC_Volume_105173237/mindspace/data-prod:/app/mindspace-data:ro
       - /home/developer/workspaces/github/PichlerThomas:/workspace:ro
+      # Live-mount API source — tsx reads TS directly, no rebuild needed.
+      # Change .ts → restart container (not rebuild) → instant iteration.
+      - /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/api:/app/api
     environment:
       - NODE_ENV=test
       - DATABASE_PATH=/app/data/mindspace.db
