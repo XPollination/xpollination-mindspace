@@ -23,12 +23,15 @@ services:
       - "127.0.0.1:3101:3101"
       - "127.0.0.1:4201:4201"
     volumes:
+      # Live-mount entire workspace over /app — all code changes visible after restart.
+      # Rebuild only needed for: new npm dependencies, Dockerfile changes.
+      - /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace:/app
+      # Preserve node_modules from build (host workspace mount would overwrite them)
+      - beta-node-modules:/app/node_modules
+      # Data volumes (more specific = overrides workspace's data/)
       - /mnt/HC_Volume_105173237/mindspace/data-test/mindspace:/app/data
       - /mnt/HC_Volume_105173237/mindspace/data-prod:/app/mindspace-data:ro
       - /home/developer/workspaces/github/PichlerThomas:/workspace:ro
-      # Live-mount API source — tsx reads TS directly, no rebuild needed.
-      # Change .ts → restart container (not rebuild) → instant iteration.
-      - /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace/api:/app/api
     environment:
       - NODE_ENV=test
       - DATABASE_PATH=/app/data/mindspace.db
@@ -64,6 +67,10 @@ services:
       - beta-net
     restart: unless-stopped
 
+
+volumes:
+  beta-node-modules:
+    # Populated from build image on first run. Delete to refresh: docker volume rm beta-node-modules
 
 networks:
   beta-net:
