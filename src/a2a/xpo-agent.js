@@ -932,26 +932,12 @@ async function deliverToTmux(message) {
       } catch { /* keep polling */ }
     }
     // Settling time scales with message size — large pastes need more render time.
-    const settleMs = Math.max(1500, Math.min(5000, Math.floor(message.length / 400) * 1000));
+    // NO Enter retry — external keystroke injection races with human input
+    // (same anti-pattern as claude-unblock script, documented in brain).
+    // If Enter doesn't submit, human presses Enter manually. Safer than racing.
+    const settleMs = Math.max(2000, Math.min(8000, Math.floor(message.length / 300) * 1000));
     await new Promise(r => setTimeout(r, settleMs));
     execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
-
-    // Verify submission: if ❯ still shows after Enter, Claude didn't process it.
-    // This is NOT content-based pattern matching (race-prone). It checks a single
-    // stable signal: is Claude still at the idle prompt or did it start processing?
-    for (let retry = 0; retry < 3; retry++) {
-      await new Promise(r => setTimeout(r, 3000));
-      try {
-        const check = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-2'], { stdio: 'pipe' }).toString();
-        const checkLines = check.split('\n').filter(l => l.trim());
-        const lastLine = checkLines[checkLines.length - 1] || '';
-        if (!paneHasIdlePrompt(check)) break; // Claude is processing — success
-        // Still at prompt — Enter didn't submit. Retry.
-        console.log(`[AGENT] Enter didn't submit (retry ${retry + 1}/3) — resending`);
-        await new Promise(r => setTimeout(r, 1000));
-        execFileSync('tmux', ['send-keys', '-t', SESSION, 'Enter'], { timeout: 5000 });
-      } catch { break; }
-    }
     console.log(`[AGENT] Delivered to ${SESSION} (paste ${message.length}b, settled after ${polled * 200 + settleMs}ms)`);
   } catch (err) {
     console.error(`[AGENT] tmux delivery failed: ${err.message}`);
