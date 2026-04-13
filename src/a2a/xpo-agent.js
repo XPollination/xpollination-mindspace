@@ -316,7 +316,7 @@ function formatBrainResult(data) {
 function parseMarkers(text) {
   const result = {};
   const lines = text.split('\n');
-  const markers = ['CLAIM', 'BRAIN', 'LEARNINGS', 'TRANSITION', 'FINDINGS', 'PICK'];
+  const markers = ['CLAIM', 'BRAIN', 'LEARNINGS', 'TRANSITION', 'FINDINGS', 'PICK', 'HELP'];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     for (const m of markers) {
@@ -456,15 +456,60 @@ async function executeClaimHandshake(brainQuery) {
   }
 }
 
+// --- HELP: on-demand A2A docs (DESCRIBE) ---
+
+let lastHelpCheck = '';  // dedup: don't respond to same HELP twice
+
+async function checkForHelpRequest(capture) {
+  const markers = parseMarkers(capture);
+  if (!markers.help) return false;
+  if (markers.help === lastHelpCheck) return false; // already answered
+  lastHelpCheck = markers.help;
+
+  console.log(`[AGENT] HELP request: ${markers.help}`);
+  try {
+    const desc = await a2aMessage({ type: 'DESCRIBE' });
+    if (desc.type === 'DESCRIPTION' && desc.actions) {
+      const lines = Object.entries(desc.actions).map(([type, meta]) => {
+        let line = `  ${type}: ${meta.description}`;
+        if (meta.params) line += `\n    params: ${JSON.stringify(meta.params)}`;
+        if (meta.example) line += `\n    example: ${JSON.stringify(meta.example)}`;
+        return line;
+      });
+      await deliverToTmux(`[HELP] Available A2A capabilities (auto-generated from Hive):\n\n${lines.join('\n')}\n\nTo use these, respond with the appropriate markers. The body translates to A2A.`);
+    }
+  } catch (err) {
+    console.error(`[AGENT] DESCRIBE failed: ${err.message}`);
+    await deliverToTmux('[HELP] Could not fetch capabilities from Hive.');
+  }
+  return true;
+}
+
+// --- Idle Pane Watcher (detects HELP: while IDLE) ---
+
+function startIdleWatcher() {
+  // Poll pane every 10s while IDLE to detect HELP: requests
+  if (workPollTimer) clearInterval(workPollTimer);
+  workPollTimer = setInterval(async () => {
+    if (bodyState !== 'IDLE') return;
+    try {
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-15'], { stdio: 'pipe' }).toString();
+      await checkForHelpRequest(capture);
+    } catch { /* capture may fail */ }
+  }, 10000);
+}
+
 // --- Completion Detection + Summary Loop ---
 
 function startCompletionDetection() {
   if (workPollTimer) clearInterval(workPollTimer);
   workPollTimer = setInterval(async () => {
     try {
-      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-5'], { stdio: 'pipe' }).toString();
-      const lines = capture.split('\n').filter(l => l.trim());
-      const last = lines[lines.length - 1] || '';
+      const capture = execFileSync('tmux', ['capture-pane', '-t', SESSION, '-p', '-S', '-10'], { stdio: 'pipe' }).toString();
+
+      // Check for HELP: even during work
+      await checkForHelpRequest(capture);
+
       if (paneHasIdlePrompt(capture)) {
         clearInterval(workPollTimer);
         workPollTimer = null;
@@ -634,7 +679,8 @@ How it works:
   4. Body sends [DELIVERED] → done, next task arrives
 
 Every message carries its response options. Follow the markers.
-Do NOT run scripts, curl, or query databases — body handles everything.`);
+Do NOT run scripts, curl, or query databases — body handles everything.
+Type HELP: to see all available A2A capabilities.`);
 
   if (brainContext) {
     sections.push(`[BRAIN CONTEXT]\n${brainContext}`);
@@ -664,6 +710,9 @@ Do NOT run scripts, curl, or query databases — body handles everything.`);
 
   // Proactive: query for available tasks after startup (like an agent entering the room)
   await queryAndOffer();
+
+  // Start watching pane for HELP: requests while idle
+  startIdleWatcher();
 }
 
 async function sendPromptAndWait(prompt, maxWait = 90) {
