@@ -466,19 +466,24 @@ async function checkForObjectQuery(capture) {
   // Only called when agent is idle (paneHasIdlePrompt guard in caller).
   // Find OBJECT_QUERY: in capture. If the value looks like JSON, collect
   // continuation lines (tmux wraps long lines, breaking JSON across lines).
+  // tmux wraps long lines AND narrow panes break even short text:
+  //   "● OBJECT_QUERY:\n  task\n  status=pending"
+  // Strategy: find "OBJECT_QUERY:" then collect continuation lines until
+  // we hit a blank line, a ❯ prompt, or another marker.
   let queryText = '';
   const captureLines = capture.split('\n');
   for (let i = 0; i < captureLines.length; i++) {
-    const m = captureLines[i].match(/OBJECT_QUERY:\s*(.+)/i);
-    if (m) {
-      queryText = m[1].trim();
-      // If it starts with { but doesn't end with }, collect wrapped lines
-      if (queryText.startsWith('{') && !queryText.endsWith('}')) {
-        for (let j = i + 1; j < captureLines.length && j < i + 5; j++) {
-          queryText += captureLines[j].trim();
-          if (queryText.endsWith('}')) break;
-        }
+    if (captureLines[i].match(/OBJECT_QUERY:/i)) {
+      // Extract anything after the colon on this line
+      const afterColon = captureLines[i].replace(/.*OBJECT_QUERY:\s*/i, '').trim();
+      const parts = [afterColon];
+      // Collect wrapped continuation lines (indented or plain text, up to 5 lines)
+      for (let j = i + 1; j < captureLines.length && j < i + 6; j++) {
+        const next = captureLines[j].trim();
+        if (!next || next.startsWith('❯') || next.startsWith('●') || next.startsWith('─') || next.startsWith('?')) break;
+        parts.push(next);
       }
+      queryText = parts.filter(Boolean).join(' ').trim();
       break;
     }
   }
