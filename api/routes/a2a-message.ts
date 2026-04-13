@@ -27,30 +27,54 @@ const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison', 'orchestrator'];
 
 type MessageHandler = (agent: any, body: any, res: Response) => void | Promise<void>;
 
-const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
-  HEARTBEAT: handleHeartbeat,
-  ROLE_SWITCH: handleRoleSwitch,
-  DISCONNECT: handleDisconnect,
-  CLAIM_TASK: handleClaimTask,
-  TRANSITION: handleTransition,
-  DELIVER: handleDeliver,
-  RELEASE_TASK: handleStub,
-  ATTESTATION_SUBMITTED: handleAttestationSubmitted,
-  OBJECT_QUERY: handleObjectQuery,
-  OBJECT_CREATE: handleObjectCreate,
-  OBJECT_UPDATE: handleObjectUpdate,
-  BRAIN_QUERY: handleBrainQuery,
-  BRAIN_CONTRIBUTE: handleBrainContribute,
-  CAPABILITY_ACTIVATE: handleCapabilityActivate,
-  CAPABILITY_DEACTIVATE: handleCapabilityDeactivate,
-  CAPABILITY_UPGRADE: handleCapabilityUpgrade,
-  DECISION_REQUEST: handleDecisionRequest,
-  DECISION_RESPONSE: handleDecisionResponse,
-  WORKSPACE_DOCK: handleWorkspaceDock,
-  WORKSPACE_UNDOCK: handleWorkspaceUndock,
-  HUMAN_INPUT: handleHumanInput,
-  VERSION_TRANSITION: handleVersionTransition,
+// --- A2A Message Type Registry (handler + docs generated from code) ---
+// Each entry: handler function + meta for DESCRIBE. Adding a handler here
+// automatically makes it discoverable. Body never needs updating.
+const MESSAGE_REGISTRY: Record<string, { handler: MessageHandler; meta: { description: string; params?: Record<string, string>; example?: Record<string, any> } }> = {
+  HEARTBEAT:              { handler: handleHeartbeat, meta: { description: 'Keep connection alive' } },
+  ROLE_SWITCH:            { handler: handleRoleSwitch, meta: { description: 'Switch agent role', params: { new_role: 'liaison|pdsa|dev|qa' } } },
+  DISCONNECT:             { handler: handleDisconnect, meta: { description: 'Disconnect agent gracefully' } },
+  CLAIM_TASK:             { handler: handleClaimTask, meta: { description: 'Claim a ready task (ready→active)', params: { task_slug: 'task identifier' }, example: { type: 'CLAIM_TASK', task_slug: 'my-task' } } },
+  TRANSITION:             { handler: handleTransition, meta: { description: 'Transition task to a new status', params: { task_slug: 'task identifier', to_status: 'target status' } } },
+  DELIVER:                { handler: handleDeliver, meta: { description: 'Deliver task results and transition', params: { task_slug: 'task identifier', transition_to: 'review|approval|testing|complete', payload: '{findings, brain_contribution_id, ...}' }, example: { type: 'DELIVER', task_slug: 'my-task', transition_to: 'review', payload: { findings: 'what was done' } } } },
+  RELEASE_TASK:           { handler: handleStub, meta: { description: 'Release a claimed task back to ready' } },
+  ATTESTATION_SUBMITTED:  { handler: handleAttestationSubmitted, meta: { description: 'Submit attestation for a task' } },
+  OBJECT_QUERY:           { handler: handleObjectQuery, meta: { description: 'Query tasks, missions, capabilities, requirements, decisions', params: { object_type: 'task|mission|capability|requirement|decision|version', filters: '{status, current_role, slug, ...}' }, example: { type: 'OBJECT_QUERY', object_type: 'task', filters: { current_role: 'dev', status: 'ready' } } } },
+  OBJECT_CREATE:          { handler: handleObjectCreate, meta: { description: 'Create a new task or mission', params: { object_type: 'task|mission', data: '{title, role, ...}' } } },
+  OBJECT_UPDATE:          { handler: handleObjectUpdate, meta: { description: 'Update task DNA or metadata', params: { object_type: 'task', object_id: 'slug or id', updates: '{key: value}' } } },
+  BRAIN_QUERY:            { handler: handleBrainQuery, meta: { description: 'Search shared knowledge (brain)', params: { prompt: 'search text', read_only: 'true|false', full_content: 'true for full text' }, example: { type: 'BRAIN_QUERY', prompt: 'recent decisions about authentication', read_only: true, full_content: true } } },
+  BRAIN_CONTRIBUTE:       { handler: handleBrainContribute, meta: { description: 'Store learnings in shared knowledge', params: { prompt: 'contribution text (min 50 chars)', topic: 'related task slug' }, example: { type: 'BRAIN_CONTRIBUTE', prompt: 'Auth via Ed25519 is more robust than JWT because sessions survive weekends', topic: 'auth-upgrade' } } },
+  CAPABILITY_ACTIVATE:    { handler: handleCapabilityActivate, meta: { description: 'Activate a capability on a mission' } },
+  CAPABILITY_DEACTIVATE:  { handler: handleCapabilityDeactivate, meta: { description: 'Deactivate a capability' } },
+  CAPABILITY_UPGRADE:     { handler: handleCapabilityUpgrade, meta: { description: 'Upgrade a capability version' } },
+  DECISION_REQUEST:       { handler: handleDecisionRequest, meta: { description: 'Request a decision from the team', params: { context: 'what needs deciding', options: '[{name, summary}]' } } },
+  DECISION_RESPONSE:      { handler: handleDecisionResponse, meta: { description: 'Respond to a decision request', params: { decision_id: 'id', choice: 'selected option', rationale: 'why' } } },
+  WORKSPACE_DOCK:         { handler: handleWorkspaceDock, meta: { description: 'Dock a workspace (register project)' } },
+  WORKSPACE_UNDOCK:       { handler: handleWorkspaceUndock, meta: { description: 'Undock a workspace' } },
+  HUMAN_INPUT:            { handler: handleHumanInput, meta: { description: 'Relay human input to the system' } },
+  VERSION_TRANSITION:     { handler: handleVersionTransition, meta: { description: 'Transition a version object' } },
+  DESCRIBE:               { handler: handleDescribe, meta: { description: 'Get documentation of all available A2A message types' } },
 };
+
+// Build handler map for message dispatch (backwards compatible)
+const MESSAGE_HANDLERS: Record<string, MessageHandler> = Object.fromEntries(
+  Object.entries(MESSAGE_REGISTRY).map(([k, v]) => [k, v.handler])
+);
+
+// DESCRIBE handler — returns auto-generated docs from the registry
+function handleDescribe(agent: any, body: any, res: Response): void {
+  const docs: Record<string, any> = {};
+  for (const [type, entry] of Object.entries(MESSAGE_REGISTRY)) {
+    if (type === 'DESCRIBE' || type === 'HEARTBEAT' || type === 'DISCONNECT') continue;
+    docs[type] = entry.meta;
+  }
+  res.status(200).json({
+    type: 'DESCRIPTION',
+    agent_id: agent.id,
+    actions: docs,
+    timestamp: new Date().toISOString(),
+  });
+}
 
 const JWT_SECRET_MSG = process.env.JWT_SECRET || 'changeme';
 

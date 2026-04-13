@@ -622,27 +622,24 @@ async function sendStartupPrompts() {
   // Build startup prompt: tutorial (from WELCOME) + brain + tasks + ready
   const sections = [];
 
-  // Tutorial — derived from WELCOME available_actions, self-describing
-  const actionMap = {
-    OBJECT_QUERY:      'query tasks, missions, requirements',
-    BRAIN_QUERY:       'search shared knowledge (brain)',
-    BRAIN_CONTRIBUTE:  'store learnings in shared knowledge',
-    TRANSITION:        'transition tasks between states',
-    DELIVER:           'deliver task results',
-    OBJECT_CREATE:     'create new tasks or missions',
-    OBJECT_UPDATE:     'update task DNA and metadata',
-    DECISION_REQUEST:  'request a decision from the team',
-    DECISION_RESPONSE: 'respond to a decision request',
-  };
-  const capabilities = availableActions
-    .filter(a => actionMap[a])
-    .map(a => `  - ${actionMap[a]}`)
-    .join('\n');
+  // Tutorial — fetched from Hive DESCRIBE (auto-generated from server code)
+  let hiveDocs = '';
+  try {
+    const desc = await a2aMessage({ type: 'DESCRIBE' });
+    if (desc.type === 'DESCRIPTION' && desc.actions) {
+      const lines = Object.entries(desc.actions).map(([type, meta]) => {
+        let line = `  ${type}: ${meta.description}`;
+        if (meta.example) line += `\n    example: ${JSON.stringify(meta.example)}`;
+        return line;
+      });
+      hiveDocs = lines.join('\n');
+    }
+  } catch (err) {
+    console.error(`[AGENT] DESCRIBE failed: ${err.message}`);
+  }
+
   sections.push(`[CONNECTED] You are connected to the Hive via your A2A body.
 Your body handles all server communication. You communicate via text markers.
-
-Your capabilities through the body:
-${capabilities || '  (none announced)'}
 
 How it works:
   1. Body sends [AVAILABLE] with a task → you respond CLAIM: yes/no + BRAIN: <question>
@@ -651,7 +648,8 @@ How it works:
   4. Body sends [DELIVERED] → done, next task arrives automatically
 
 Every message from the body carries its response options. Just follow the markers.
-Do NOT run scripts, curl, or query databases — the body handles everything.`);
+Do NOT run scripts, curl, or query databases — the body handles everything.
+${hiveDocs ? `\nHive capabilities (auto-generated):\n${hiveDocs}` : ''}`);
 
   if (brainContext) {
     sections.push(`[BRAIN CONTEXT]\n${brainContext}`);
