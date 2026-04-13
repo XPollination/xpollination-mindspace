@@ -23,9 +23,9 @@ services:
       - "127.0.0.1:3101:3101"
       - "127.0.0.1:4201:4201"
     volumes:
-      # Live-mount entire workspace over /app — all code changes visible after restart.
+      # Live-mount rc worktree (develop→rc) over /app — code changes visible after restart.
       # Rebuild only needed for: new npm dependencies, Dockerfile changes.
-      - /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace:/app
+      - /home/developer/workspaces/github/PichlerThomas/xpollination-mindspace-rc:/app
       # Preserve node_modules from build (host workspace mount would overwrite them)
       - beta-node-modules:/app/node_modules
       # Data volumes (more specific = overrides workspace's data/)
