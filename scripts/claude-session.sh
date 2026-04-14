@@ -535,26 +535,23 @@ create_agents_session() {
     local key_file="$XPO_KEY_FILE"
     echo "Environment: ${XPO_ENV} (key: ${key_file})"
 
-    # Write self-describing role prompts — no URLs, no scripts, no protocol details
-    # The body sends [AVAILABLE] and [SUMMARY] messages with response options embedded.
-    # The LLM learns the protocol from the messages themselves.
+    # Role prompts — v2: body triggers skills, MCP tools for data
     local roles=("liaison" "pdsa" "dev" "qa")
     for role in "${roles[@]}"; do
         cat > "/tmp/claude-role-${role}.txt" << ROLE
-You are the ${role^^} agent in a 4-agent tmux session (a2a-team).
-Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA.
-Project: xpollination-mindspace
+You are the ${role^^} agent. Project: xpollination-mindspace
 
 ARCHITECTURE:
-- A2A body runs in background (xpo-agent.js) — handles auth, events, brain, delivery
-- You receive [AVAILABLE] task offers and [SUMMARY] requests with response options
-- The body handles ALL server communication — you just do the work and respond to markers
+- A2A body runs in background — receives task assignments via SSE
+- When a task is yours, body triggers: /xpo.${role}.startTask {slug}
+- The skill chains MCP tools: get_task, query_brain, deliver_task
+- You work between tool calls. MCP handles all server communication.
+- Use MCP tools for ALL data: query_tasks, get_task, deliver_task, query_brain
 - Body status: cat /tmp/xpo-agent-${role}.status
 
 RULES:
-- Do NOT run a2a-deliver.cjs or interface-cli.js — the body handles delivery
-- Do NOT use curl to call API endpoints — the body handles all A2A
-- Do NOT query brain directly — the body provides brain context and captures your learnings
+- Do NOT use curl to call API endpoints — use MCP tools
+- Do NOT query the database directly — use query_tasks / get_task MCP tools
 - Your role definition is in CLAUDE.md (auto-loaded)
 ROLE
     done
@@ -789,19 +786,19 @@ create_single_session() {
 
     # Write role prompt
     cat > "/tmp/claude-role-${session}.txt" << ROLE
-You are an agent in session: ${session} | Role: ${role} | Env: ${XPO_ENV}
+You are the ${role^^} agent. Session: ${session} | Env: ${XPO_ENV}
 Project: xpollination-mindspace
 
 ARCHITECTURE:
-- A2A body runs in background — handles auth, events, brain, delivery
-- You receive [AVAILABLE] task offers and [SUMMARY] requests with response options
-- The body handles ALL server communication
-- Body status: cat /tmp/xpo-agent-${session}.status
+- A2A body runs in background — receives task assignments via SSE
+- When a task is yours, body triggers: /xpo.${role}.startTask {slug}
+- The skill chains MCP tools: get_task, query_brain, deliver_task
+- You work between tool calls. MCP handles all server communication.
+- Use MCP tools for ALL data: query_tasks, get_task, deliver_task, query_brain
 
 RULES:
-- Do NOT run a2a-deliver.cjs or interface-cli.js — the body handles delivery
-- Do NOT use curl to call API endpoints — the body handles all A2A
-- Do NOT query brain directly — the body provides context and captures learnings
+- Do NOT use curl to call API endpoints — use MCP tools
+- Do NOT query the database directly — use query_tasks / get_task MCP tools
 ROLE
 
     # Launch Claude
