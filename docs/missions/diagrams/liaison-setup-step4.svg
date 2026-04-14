@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, sans-serif">
+  <title>Step 4: OAuth Complete — Claude Activates</title>
+  <desc>
+    AGENT-READABLE: User authorized Claude on claude.ai. OAuth callback received. Back on /agents
+    page, the terminal shows Claude Code activating. The start-agent.sh auto-runs
+    "/xpo.claude.monitor liaison" which recovers from brain and connects to A2A. Agent card status
+    changes from yellow "Starting..." to green "Connected". The A2A connected event triggers
+    sessionStorage.setItem('cb_liaison_authenticated', 'true').
+  </desc>
+
+  <rect width="900" height="500" fill="#0d1117" rx="8"/>
+  <text x="450" y="30" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Step 4: OAuth Complete — Claude Activates</text>
+
+  <!-- Browser window frame -->
+  <rect x="40" y="50" width="820" height="420" rx="8" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+  <rect x="40" y="50" width="820" height="36" rx="8" fill="#21262d"/>
+  <rect x="40" y="74" width="820" height="12" fill="#21262d"/>
+  <circle cx="62" cy="68" r="5" fill="#f85149"/>
+  <circle cx="80" cy="68" r="5" fill="#d29922"/>
+  <circle cx="98" cy="68" r="5" fill="#3fb950"/>
+  <rect x="140" y="58" width="580" height="20" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="156" y="72" fill="#8b949e" font-size="10">mindspace.xpollination.org/agents</text>
+
+  <!-- LIAISON Agent Card -->
+  <rect x="80" y="100" width="740" height="310" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+
+  <!-- Card header — now GREEN -->
+  <rect x="80" y="100" width="740" height="38" rx="8" fill="#0d2818"/>
+  <rect x="80" y="123" width="740" height="15" fill="#0d2818"/>
+  <rect x="96" y="108" width="65" height="20" rx="10" fill="#f5c2e7" opacity="0.2"/>
+  <text x="128" y="122" fill="#f5c2e7" font-size="10" font-weight="700" text-anchor="middle">LIAISON</text>
+  <!-- Status: Connected (green) -->
+  <circle cx="180" cy="118" r="5" fill="#3fb950"/>
+  <text x="192" y="122" fill="#3fb950" font-size="10" font-weight="600">Connected</text>
+
+  <!-- TERMINAL showing Claude activated -->
+  <rect x="96" y="145" width="708" height="250" rx="6" fill="#0d1117" stroke="#30363d"/>
+
+  <!-- Previous OAuth lines (dimmed) -->
+  <text x="110" y="165" fill="#484f58" font-size="10" font-family="monospace">To authenticate, visit this URL:</text>
+  <text x="110" y="180" fill="#484f58" font-size="10" font-family="monospace">https://claude.ai/oauth/authorize?client_id=...</text>
+  <text x="110" y="195" fill="#484f58" font-size="10" font-family="monospace">Waiting for authentication...</text>
+  <text x="110" y="215" fill="#484f58" font-size="10" font-family="monospace">───────────────────────────────────────────</text>
+
+  <!-- Success message -->
+  <text x="110" y="235" fill="#3fb950" font-size="11" font-family="monospace" font-weight="700">&#x2713; Authentication successful</text>
+  <text x="110" y="253" fill="#c9d1d9" font-size="11" font-family="monospace">Claude Code is ready.</text>
+  <text x="110" y="273" fill="#c9d1d9" font-size="11" font-family="monospace"> </text>
+
+  <!-- Auto-start monitor -->
+  <text x="110" y="291" fill="#58a6ff" font-size="11" font-family="monospace">&#x276f; /xpo.claude.monitor liaison</text>
+  <text x="110" y="311" fill="#c9d1d9" font-size="11" font-family="monospace">Recovering as LIAISON agent...</text>
+  <text x="110" y="329" fill="#8b949e" font-size="10" font-family="monospace">Querying brain for recovery context...</text>
+  <text x="110" y="347" fill="#3fb950" font-size="11" font-family="monospace">LIAISON active. Connected to A2A. Listening for events.</text>
+
+  <!-- Blinking cursor -->
+  <rect x="110" y="360" width="8" height="14" fill="#3fb950" opacity="0.7">
+    <animate attributeName="opacity" values="0.7;0;0.7" dur="1.2s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- SessionStorage update boxes -->
+  <rect x="80" y="420" width="350" height="55" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="255" y="438" fill="#3fb950" font-size="10" font-weight="700" text-anchor="middle">sessionStorage Updated</text>
+  <text x="100" y="454" fill="#c9d1d9" font-size="9" font-family="monospace">cb_liaison_authenticated = "true"</text>
+  <text x="100" y="466" fill="#8b949e" font-size="8">Set when A2A 'connected' event received for liaison role</text>
+
+  <!-- A2A event box -->
+  <rect x="450" y="420" width="370" height="55" rx="6" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="635" y="438" fill="#58a6ff" font-size="10" font-weight="700" text-anchor="middle">A2A Event Stream</text>
+  <text x="470" y="454" fill="#c9d1d9" font-size="9" font-family="monospace">event: connected</text>
+  <text x="470" y="466" fill="#8b949e" font-size="9" font-family="monospace">data: { agent_id: "agent-liaison-user42", role: "liaison" }</text>
+
+  <!-- Arrow: A2A event triggers sessionStorage -->
+  <line x1="450" y1="447" x2="430" y2="447" stroke="#3fb950" stroke-width="2"/>
+  <polygon points="432,443 425,447 432,451" fill="#3fb950"/>
+</svg>

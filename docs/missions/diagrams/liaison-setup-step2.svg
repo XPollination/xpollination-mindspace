@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, sans-serif">
+  <title>Step 2: Click Bubble — Guided Setup Message</title>
+  <desc>
+    AGENT-READABLE: User clicks the chat bubble. The panel expands. Because LIAISON is not running,
+    POST /api/agents/start { role: 'liaison' } fires. Chat shows a one-time setup message:
+    "LIAISON starting. Authenticating with Claude..." with a clickable "Complete setup →" link
+    to /agents. sessionStorage.setItem('cb_liaison_setup_shown', 'true') prevents this from
+    appearing again. The tmux session agent-liaison-{userId} is created.
+  </desc>
+
+  <rect width="900" height="500" fill="#0d1117" rx="8"/>
+  <text x="450" y="30" fill="#3fb950" font-size="15" font-weight="700" text-anchor="middle">Step 2: Click Bubble — Guided Setup Message</text>
+
+  <!-- Browser window frame -->
+  <rect x="40" y="50" width="820" height="420" rx="8" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+  <rect x="40" y="50" width="820" height="36" rx="8" fill="#21262d"/>
+  <rect x="40" y="74" width="820" height="12" fill="#21262d"/>
+  <circle cx="62" cy="68" r="5" fill="#f85149"/>
+  <circle cx="80" cy="68" r="5" fill="#d29922"/>
+  <circle cx="98" cy="68" r="5" fill="#3fb950"/>
+  <rect x="140" y="58" width="580" height="20" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="156" y="72" fill="#8b949e" font-size="10">mindspace.xpollination.org/projects</text>
+
+  <!-- Dimmed page content (focus is on the chat panel) -->
+  <rect x="60" y="100" width="780" height="350" rx="4" fill="#0d1117" opacity="0.4"/>
+
+  <!-- CHAT BUBBLE (clicked state) -->
+  <g transform="translate(790, 410)">
+    <circle cx="0" cy="0" r="24" fill="#c2410c" stroke="#fb923c" stroke-width="2"/>
+    <text x="0" y="6" fill="#fff" font-size="16" text-anchor="middle">&#x2715;</text>
+  </g>
+
+  <!-- EXPANDED CHAT PANEL -->
+  <rect x="480" y="130" width="360" height="310" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+
+  <!-- Panel header -->
+  <rect x="480" y="130" width="360" height="40" rx="12" fill="#21262d"/>
+  <rect x="480" y="155" width="360" height="15" fill="#21262d"/>
+  <text x="500" y="155" fill="#c9d1d9" font-size="12" font-weight="700">Decision Interface</text>
+  <!-- Status dot -->
+  <circle cx="810" cy="150" r="4" fill="#d29922"/>
+  <text x="795" y="154" fill="#d29922" font-size="9" text-anchor="end">connecting</text>
+
+  <!-- Chat body -->
+  <rect x="494" y="180" width="332" height="200" rx="4" fill="#0d1117"/>
+
+  <!-- System message: Starting -->
+  <rect x="504" y="190" width="312" height="24" rx="4" fill="#161b22"/>
+  <text x="514" y="206" fill="#94a3b8" font-size="10" font-weight="700">System</text>
+  <text x="560" y="206" fill="#8b949e" font-size="10">Starting LIAISON...</text>
+
+  <!-- SETUP MESSAGE — the key UI element -->
+  <rect x="504" y="224" width="312" height="60" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="520" y="244" fill="#3fb950" font-size="11" font-weight="600">LIAISON starting.</text>
+  <text x="520" y="260" fill="#3fb950" font-size="11" font-weight="600">Authenticating with Claude...</text>
+  <!-- Clickable link -->
+  <text x="520" y="278" fill="#58a6ff" font-size="11" font-weight="700" text-decoration="underline" style="cursor:pointer">Complete setup &#x2192;</text>
+
+  <!-- Callout for the link -->
+  <line x1="620" y1="278" x2="470" y2="300" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <rect x="310" y="290" width="165" height="30" rx="6" fill="#1c2333" stroke="#58a6ff"/>
+  <text x="392" y="305" fill="#58a6ff" font-size="9" font-weight="600" text-anchor="middle">Links to /agents page</text>
+  <text x="392" y="315" fill="#8b949e" font-size="8" text-anchor="middle">Shows only ONCE per session</text>
+
+  <!-- Input bar -->
+  <rect x="480" y="390" width="360" height="40" rx="0" fill="#21262d"/>
+  <rect x="480" y="390" width="360" height="40" rx="0" fill="#21262d" stroke="#30363d"/>
+  <text x="500" y="414" fill="#484f58" font-size="11">Type a message to LIAISON...</text>
+  <rect x="770" y="396" width="56" height="28" rx="4" fill="#ea580c"/>
+  <text x="798" y="414" fill="#fff" font-size="10" font-weight="600" text-anchor="middle">Send</text>
+
+  <!-- Behind the scenes -->
+  <rect x="50" y="320" width="400" height="120" rx="6" fill="#0d2818" stroke="#3fb950" stroke-dasharray="6,3"/>
+  <text x="250" y="342" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">Behind the Scenes</text>
+  <text x="70" y="362" fill="#8b949e" font-size="10">1. POST /api/agents/start { role: 'liaison' }</text>
+  <text x="70" y="380" fill="#8b949e" font-size="10">2. tmux new-session → agent-liaison-{userId}</text>
+  <text x="70" y="398" fill="#8b949e" font-size="10">3. start-agent.sh launches Claude Code</text>
+  <text x="70" y="416" fill="#8b949e" font-size="10">4. sessionStorage: cb_liaison_setup_shown = true</text>
+  <text x="70" y="434" fill="#d29922" font-size="9" font-weight="600">Claude Code hits OAuth prompt — waiting for user</text>
+
+  <!-- User action indicator -->
+  <rect x="50" y="120" width="200" height="50" rx="8" fill="#1c2333" stroke="#58a6ff" stroke-width="2"/>
+  <text x="150" y="142" fill="#58a6ff" font-size="12" font-weight="700" text-anchor="middle">User Action</text>
+  <text x="150" y="158" fill="#c9d1d9" font-size="10" text-anchor="middle">Click "Complete setup &#x2192;"</text>
+
+  <line x1="250" y1="145" x2="520" y2="275" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+</svg>
