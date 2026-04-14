@@ -39,10 +39,12 @@ services:
     volumes:
       - /mnt/HC_Volume_105173237/mindspace/brain-data:/app/data
       - /mnt/HC_Volume_105173237/mindspace/data-prod:/app/mindspace-data:ro
+      - /home/developer/.xp0/keys:/root/.xp0/keys:ro
     environment:
       - NODE_ENV=production
       - QDRANT_URL=http://qdrant:6333
       - BRAIN_PUBLIC_URL=https://hive.xpollination.earth
+      - MINDSPACE_API_URL=http://host.docker.internal:3101
     depends_on:
       qdrant:
         condition: service_healthy
