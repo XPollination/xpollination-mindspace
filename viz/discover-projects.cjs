@@ -48,13 +48,13 @@ function discoverProjects(workspacePath) {
           seenRealPaths.add(realPath);
         } catch { /* realpathSync failed — keep the project */ }
 
-        // Validate DB has mindspace_nodes table
+        // Validate DB has tasks table (migrated from mindspace_nodes on 2026-03-31)
         try {
           const db = new Database(dbPath, { readonly: true });
-          const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mindspace_nodes'").get();
+          const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'").get();
           db.close();
           if (!table) {
-            // DB exists but has no mindspace_nodes — skip this project
+            // DB exists but has no tasks table — skip this project
             continue;
           }
         } catch { continue; }

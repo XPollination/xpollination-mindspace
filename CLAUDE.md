@@ -6,73 +6,33 @@ MCP (Model Context Protocol) server that powers the XPollination content generat
 
 ## Agent Task Monitoring (ALL AGENTS)
 
-**Every agent must run `/xpo.claude.monitor {role}` to wake up, recover from memory, and start monitoring.**
+## How Agents Work (Body-LLM Protocol)
 
-```
-/xpo.claude.monitor liaison   # or pdsa, qa, dev
-```
+Agents are started via `claude-session-beta a2a-team` (4 agents) or `claude-session-beta <role>` (single agent).
 
-This single command: sets identity → queries memory (brain) for recovery → starts background monitor → waits for work.
+Each agent has a **body** (xpo-agent.js) that runs in the background and handles ALL server communication. The body:
+- Connects to the Hive via A2A (Ed25519 device key)
+- Receives SSE events (task assignments, updates)
+- Queries brain for context
+- Delivers tasks as `[AVAILABLE]` messages with response options
+- Captures your results and delivers them back to the Hive
+- Contributes your learnings to brain automatically
 
-**Skill source:** `xpollination-mindspace/.claude/skills/xpo.claude.monitor/SKILL.md` (git-tracked)
-**Install:** `mkdir -p ~/.claude/skills/xpo.claude.monitor && cp xpollination-mindspace/.claude/skills/xpo.claude.monitor/SKILL.md ~/.claude/skills/xpo.claude.monitor/`
+### What You Do (as an agent)
+1. Body sends `[AVAILABLE]` → you respond with `CLAIM: yes/no` and `BRAIN: <question>`
+2. Body sends `[BRAIN]` context + `[CLAIMED]` confirmation → you do the work
+3. Body sends `[SUMMARY]` → you respond with `LEARNINGS:`, `TRANSITION:`, `FINDINGS:`
+4. Body sends `[DELIVERED]` → done, next task arrives
 
-### How Monitoring Works
-Each agent sees all tasks assigned to their role (any non-terminal status).
-The workflow engine validates transitions — the monitor just surfaces work.
-Role-agnostic extras: liaison sees `approval`, QA sees `approved`/`testing`.
+### What You Do NOT Do
+- Do NOT run `a2a-deliver.cjs` or `interface-cli.js` — they are removed
+- Do NOT use curl to call API endpoints — body handles all A2A
+- Do NOT query brain directly — body provides brain context and captures learnings
+- Do NOT query the database directly — body queries via A2A
 
-### Check for Work
-```bash
-stat -c%s /tmp/agent-work-{role}.json 2>/dev/null || echo 0
-```
-- Returns `0` = no work
-- Returns `>0` = work found, read: `cat /tmp/agent-work-{role}.json`
-
-### When Work is Found
-1. Read the work file to get task ID and details
-2. Get full task DNA: `node src/db/interface-cli.js get <slug>`
-3. Claim task: `node src/db/interface-cli.js transition <slug> active <actor>`
-4. Do the work
-5. **CRITICAL: Write findings to DNA before completing**
-   - `node src/db/interface-cli.js update-dna <slug> '{"findings":"..."}' <actor>`
-   - `dna.findings` = what you discovered
-   - `dna.proposed_design` = your proposal (for design tasks)
-   - `dna.implementation` = what you built (for dev tasks)
-6. Complete task: `node src/db/interface-cli.js transition <slug> review <actor>`
-
-### Work Delivery (A2A Event-Driven)
-
-Agents receive work via **SSE events** from the A2A server. No polling. No work files.
-
-**After completing ANY task:** Send TRANSITION via A2A → server routes next work to you via SSE.
+**Every message from the body carries its response options.** You don't need to memorize the protocol.
 
 **Workflow source of truth:** `tracks/process/context/WORKFLOW.md`
-
-### Database Interface CLI (Regulated Access)
-All agents use `src/db/interface-cli.js` for database operations:
-```bash
-# Get node details
-node src/db/interface-cli.js get <id|slug>
-
-# List nodes with filters
-node src/db/interface-cli.js list --status=ready --role=dev
-
-# Claim task (transition to active)
-node src/db/interface-cli.js transition <slug> active dev
-
-# Update DNA (findings, implementation, etc.)
-node src/db/interface-cli.js update-dna <slug> '{"key":"value"}' dev
-
-# Complete work (dev sends to review, QA can mark complete)
-node src/db/interface-cli.js transition <slug> review dev
-
-# Create new node (pdsa, liaison, system only)
-node src/db/interface-cli.js create task my-slug '{"title":"...","role":"dev"}' pdsa
-```
-
-**Actors:** dev, pdsa, qa, liaison, orchestrator, system
-**Direct SQL access is DENIED** - use interface-cli.js for all operations
 
 ### Self-Contained Objects (CRITICAL)
 **All communication MUST be in the task DNA.** Objects must be readable standalone.

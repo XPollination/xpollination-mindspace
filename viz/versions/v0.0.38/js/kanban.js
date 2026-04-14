@@ -23,7 +23,7 @@ const projectFilter = document.getElementById('project-filter');
 const searchInput = document.getElementById('search');
 
 let selectedTaskId = null;
-let currentFilter = 'active'; // 'active' = non-terminal, 'all' = everything
+let currentFilter = sessionStorage.getItem('kanban-completed-filter') || 'active';
 
 // --- Column Configuration ---
 // Twin status → column mapping. Change this to rearrange tasks.
@@ -32,8 +32,16 @@ const COLUMNS = [
   { id: 'active',   label: 'Active',   statuses: ['active', 'testing'],         color: 'var(--ms-status-active)' },
   { id: 'review',   label: 'Review',   statuses: ['review', 'approval'],        color: 'var(--ms-status-review)' },
   { id: 'approved', label: 'Approved', statuses: ['approved'],                  color: 'var(--ms-status-approved)' },
-  { id: 'done',     label: 'Done',     statuses: ['complete', 'rework', 'blocked', 'cancelled'], color: 'var(--ms-status-complete)' },
+  { id: 'rework',   label: 'Rework',   statuses: ['rework'],                    color: 'var(--ms-status-rework)' },
+  { id: 'blocked',  label: 'Blocked',  statuses: ['blocked', 'cancelled'],      color: 'var(--ms-status-blocked)' },
+  { id: 'done',     label: 'Done',     statuses: ['complete'],                  color: 'var(--ms-status-complete)' },
 ];
+
+function isWithinDays(updatedAt, days) {
+  const updated = new Date(updatedAt).getTime();
+  const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+  return updated >= cutoff;
+}
 
 const STATUS_COLORS = {
   pending: 'var(--ms-status-pending)', ready: 'var(--ms-status-ready)',
@@ -68,7 +76,14 @@ function filterTasks(tasks) {
 
   if (currentFilter === 'active') {
     filtered = filtered.filter(t => !['complete', 'cancelled'].includes(t.status));
+  } else if (currentFilter === '1d' || currentFilter === '7d' || currentFilter === '30d') {
+    const days = parseInt(currentFilter);
+    filtered = filtered.filter(t => {
+      if (!['complete', 'cancelled'].includes(t.status)) return true;
+      return isWithinDays(t.updated_at || t.created_at, days);
+    });
   }
+  // 'all' = no terminal filter
 
   if (search) {
     filtered = filtered.filter(t => {
@@ -133,13 +148,20 @@ function renderCard(task) {
   const project = task.project_slug;
   const isSelected = task.slug === selectedTaskId || task.id === selectedTaskId;
 
-  return `<div class="task-card${isSelected ? ' selected' : ''}" data-id="${esc(task.slug || task.id)}">
+  const isTerminal = ['complete', 'cancelled'].includes(task.status);
+  const isCancelled = task.status === 'cancelled';
+  const isBlocked = task.status === 'blocked';
+  const blockedReason = isBlocked && dna.blocked_reason ? dna.blocked_reason : '';
+
+  return `<div class="task-card${isSelected ? ' selected' : ''}${isTerminal ? ' completed' : ''}${isCancelled ? ' cancelled' : ''}" data-id="${esc(task.slug || task.id)}">
     <div class="task-title">${title}</div>
     <div class="task-meta">
       <span class="task-badge" style="background:${STATUS_COLORS[task.status] || 'var(--ms-muted)'}">${task.status}</span>
       ${role ? `<span class="task-badge" style="background:${ROLE_COLORS[role] || 'var(--ms-muted)'}">${role}</span>` : ''}
       ${project ? `<span class="task-project">${esc(project)}</span>` : ''}
+      ${dna.claimed_by ? `<span class="task-claimed" title="Claimed by ${esc(dna.claimed_by)}">${esc(dna.claimed_by).substring(0, 16)}…</span>` : ''}
     </div>
+    ${blockedReason ? `<div class="task-blocked-reason">${esc(blockedReason)}</div>` : ''}
   </div>`;
 }
 
@@ -174,6 +196,23 @@ function showDetail(task) {
     dna.dev_findings ? field('Dev Findings', `<pre>${esc(dna.dev_findings)}</pre>`) : '',
   ].filter(Boolean);
   if (workFields.length) html += renderSection('Work', workFields, false);
+
+  // Live Output (shown when task is active — runner streaming)
+  if (task.status === 'active') {
+    html += renderSection('Live Output', [
+      `<div id="live-output-${esc(task.slug)}" class="live-output-container">
+         <pre class="live-output-pre"></pre>
+         <div class="live-output-status">Waiting for runner...</div>
+       </div>`
+    ], true);
+  }
+
+  // Runner output (shown when complete — final result)
+  if (dna.runner_output) {
+    html += renderSection('Runner Output', [
+      `<pre style="white-space:pre-wrap;font-size:12px;">${esc(dna.runner_output)}</pre>`
+    ], false);
+  }
 
   // Reviews
   const reviewFields = [
@@ -299,9 +338,22 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
+    sessionStorage.setItem('kanban-completed-filter', currentFilter);
     renderBoard();
   });
 });
+
+// Completed filter dropdown
+const completedFilterEl = document.getElementById('completed-filter');
+if (completedFilterEl) {
+  completedFilterEl.value = currentFilter;
+  completedFilterEl.addEventListener('change', () => {
+    currentFilter = completedFilterEl.value;
+    sessionStorage.setItem('kanban-completed-filter', currentFilter);
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    renderBoard();
+  });
+}
 
 searchInput.addEventListener('input', () => renderBoard());
 projectFilter.addEventListener('change', () => renderBoard());
@@ -380,6 +432,35 @@ async function init() {
       }
     });
 
+    // Runner live output streaming
+    client.on('runner_output', (data) => {
+      const pre = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-pre`);
+      if (pre) { pre.textContent += data.chunk; pre.scrollTop = pre.scrollHeight; }
+      const status = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-status`);
+      if (status) status.textContent = 'Runner active...';
+    });
+
+    client.on('runner_claim', (data) => {
+      try {
+        const updated = client.query('task', { slug: data.task_slug });
+        if (updated && updated.length) { cache.set('task', data.task_slug, updated[0]); }
+      } catch { /* silent */ }
+      renderBoard();
+    });
+
+    client.on('runner_complete', async (data) => {
+      const status = document.querySelector(`#live-output-${CSS.escape(data.task_slug)} .live-output-status`);
+      if (status) status.textContent = 'Completed';
+      try {
+        const updated = await client.query('task', { slug: data.task_slug });
+        if (updated.length) { cache.set('task', data.task_slug, updated[0]); renderBoard(); }
+      } catch { /* silent */ }
+    });
+
+    // Team change events — real-time update when agents spawn/terminate
+    client.on('agent_spawned', () => loadTeam());
+    client.on('agent_terminated', () => loadTeam());
+
     // Deep link: /kanban?task=slug
     const params = new URLSearchParams(window.location.search);
     const taskParam = params.get('task');
@@ -422,3 +503,212 @@ if (liaisonModeEl) {
 }
 
 init().then(() => loadApprovalMode());
+
+// ═══════════════════════════════════════════════════════════════
+// Team Management — per-project runner control
+// Decision 842: Team added via Tasks view, not agent tab.
+// ═══════════════════════════════════════════════════════════════
+
+let teamAgents = [];
+
+function getTeamProject() {
+  return document.getElementById('project-filter')?.value || 'mindspace';
+}
+
+async function addAgent(role) {
+  const project = getTeamProject();
+  try {
+    const res = await fetch(`/api/team/${project}/agent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+      credentials: 'same-origin',
+    });
+    if (!res.ok) { console.warn('addAgent:', res.status, await res.text()); return; }
+    const data = await res.json();
+    teamAgents.push(data);
+    renderTeamStatus();
+  } catch (e) { console.warn('addAgent failed:', e); }
+}
+
+async function addFullTeam() {
+  const project = getTeamProject();
+  try {
+    const res = await fetch(`/api/team/${project}/full`, { method: 'POST', credentials: 'same-origin' });
+    if (!res.ok) { console.warn('addFullTeam:', res.status); return; }
+    const data = await res.json();
+    if (data.agents) teamAgents.push(...data.agents);
+    renderTeamStatus();
+  } catch (e) { console.warn('addFullTeam failed:', e); }
+}
+
+async function terminateAgent(id) {
+  const project = getTeamProject();
+  await fetch(`/api/team/${project}/agent/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+  teamAgents = teamAgents.filter(a => a.id !== id);
+  renderTeamStatus();
+}
+
+async function loadTeam() {
+  const project = getTeamProject();
+  try {
+    const res = await fetch(`/api/team/${project}`, { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const data = await res.json();
+    teamAgents = data.agents || [];
+    renderTeamStatus();
+  } catch { /* API may not be ready */ }
+}
+
+function renderTeamStatus() {
+  const el = document.getElementById('team-status');
+  if (!el) return;
+  if (teamAgents.length === 0) {
+    el.innerHTML = 'No agents';
+    return;
+  }
+  // Filter out stopped/dead agents from display
+  const liveAgents = teamAgents.filter(a => a.status !== 'stopped' && a.status !== 'disconnected');
+  if (liveAgents.length === 0) {
+    el.innerHTML = 'No agents';
+    return;
+  }
+  el.innerHTML = liveAgents.map(a => {
+    const hasTerminal = a.session && a.session.startsWith('runner-');
+    return `
+    <div class="runner-card" data-id="${a.id}">
+      <span class="team-runner-dot ${a.status || 'ready'}"></span>
+      <span class="runner-role">${a.role}</span>
+      <span class="runner-status">${a.status || 'ready'}</span>
+      ${hasTerminal ? `<button class="runner-open" onclick="openTerminal('${a.session}', '${a.role}')">Open</button>` : ''}
+      <button class="team-terminate" data-action="terminate" onclick="terminateAgent('${a.id}')">×</button>
+    </div>`;
+  }).join('') + ` ${liveAgents.length} agent${liveAgents.length > 1 ? 's' : ''}`;
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'now';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  return `${min}m ago`;
+}
+
+async function switchRole(id, newRole) {
+  const project = getTeamProject();
+  try {
+    await fetch(`/api/team/${project}/agent/${id}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole }),
+    });
+    await loadTeam();
+  } catch (e) { console.warn('switchRole failed:', e); }
+}
+
+// Expose team functions globally (kanban.js is a module, onclick needs window scope)
+window.addAgent = addAgent;
+window.addFullTeam = addFullTeam;
+window.terminateAgent = terminateAgent;
+window.switchRole = switchRole;
+
+// Reload team when project filter changes
+document.getElementById('project-filter')?.addEventListener('change', loadTeam);
+
+// Initial team load
+setTimeout(loadTeam, 1500);
+
+// ═══════════════════════════════════════════════════════════════
+// Agent Terminal — xterm.js WebSocket bridge to tmux session
+// ═══════════════════════════════════════════════════════════════
+
+let activeTerminal = null;
+let activeWebSocket = null;
+
+function openTerminal(sessionName, role) {
+  const overlay = document.getElementById('terminal-overlay');
+  const panel = document.getElementById('terminal-panel');
+  const container = document.getElementById('terminal-container');
+  const title = document.getElementById('terminal-title');
+
+  title.textContent = `${(role || '').toUpperCase()} Agent — ${sessionName}`;
+  overlay.classList.add('active');
+  panel.classList.add('active');
+
+  // Clean up previous terminal
+  container.innerHTML = '';
+  if (activeWebSocket) { activeWebSocket.close(); activeWebSocket = null; }
+  if (activeTerminal) { activeTerminal.dispose(); activeTerminal = null; }
+
+  // Create xterm.js instance
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    theme: { background: '#1a1a2e', foreground: '#e0e0e0', cursor: '#ea580c' },
+  });
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+  setTimeout(() => fitAddon.fit(), 100);
+  activeTerminal = term;
+
+  // Connect WebSocket to tmux session
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws/terminal/${sessionName}`);
+  activeWebSocket = ws;
+
+  const wsUrl = `${proto}//${location.host}/ws/terminal/${sessionName}`;
+  term.write(`\x1b[33mConnecting: ${wsUrl}\x1b[0m\r\n`);
+  console.log('[terminal] connecting:', wsUrl);
+
+  ws.onopen = () => {
+    term.write('\x1b[32mWebSocket connected. Waiting for terminal data...\x1b[0m\r\n');
+    console.log('[terminal] WebSocket OPEN');
+    fitAddon.fit();
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+  };
+  ws.onmessage = (e) => {
+    console.log('[terminal] data received:', typeof e.data, e.data?.length || e.data?.size || 0, 'bytes');
+    if (typeof e.data === 'string') term.write(e.data);
+    else if (e.data instanceof Blob) e.data.text().then(t => term.write(t));
+    else if (e.data instanceof ArrayBuffer) term.write(new Uint8Array(e.data));
+  };
+  ws.onclose = (e) => {
+    term.write(`\r\n\x1b[31m[Session disconnected] code=${e.code} reason=${e.reason}\x1b[0m\r\n`);
+    console.log('[terminal] WebSocket CLOSED:', e.code, e.reason);
+  };
+  ws.onerror = (e) => {
+    term.write('\r\n\x1b[31m[Connection error]\x1b[0m\r\n');
+    console.log('[terminal] WebSocket ERROR');
+  };
+
+  // Send terminal input to WebSocket (bidirectional)
+  term.onData((data) => { if (ws.readyState === 1) ws.send(data); });
+
+  // Handle window resize
+  const resizeHandler = () => {
+    fitAddon.fit();
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  };
+  window.addEventListener('resize', resizeHandler);
+  panel._resizeHandler = resizeHandler;
+}
+
+function closeTerminal() {
+  const panel = document.getElementById('terminal-panel');
+  document.getElementById('terminal-overlay')?.classList.remove('active');
+  panel?.classList.remove('active');
+  if (activeWebSocket) { activeWebSocket.close(); activeWebSocket = null; }
+  if (activeTerminal) { activeTerminal.dispose(); activeTerminal = null; }
+  if (panel?._resizeHandler) {
+    window.removeEventListener('resize', panel._resizeHandler);
+    panel._resizeHandler = null;
+  }
+}
+
+window.openTerminal = openTerminal;
+window.closeTerminal = closeTerminal;

@@ -7,14 +7,20 @@
 #   - Hetzner (any user)    → runs tmux directly (auto-switches to developer)
 #   - Remote (e.g. Synology)→ SSHes to Hetzner via VPN
 #
-# Usage:
-#   claude-session <session-name>
+# Zero-knowledge: the command name determines the environment.
+# No flags needed. Symlink names:
+#   claude-session-beta  → connects to Beta Hive (:3101)
+#   claude-session-prod  → connects to Prod Hive (:3100)
+#   claude-session       → defaults to beta
 #
-# Examples:
-#   claude-session claude-agents     # 4-pane: Liaison + PDSA + Dev + QA
-#   claude-session claude-dual       # 3-pane: Orchestrator + PDSA+QA + Dev
-#   claude-session claude-pdsa       # Single-pane PDSA agent
-#   claude-session my-session        # Single-pane Claude session
+# Usage:
+#   claude-session-beta a2a-team      # 4-pane team on Beta
+#   claude-session-prod a2a-team      # 4-pane team on Prod
+#   claude-session-beta liaison       # Single-pane liaison on Beta
+#   claude-session-prod dev           # Single-pane dev on Prod
+#
+# Install (creates symlinks):
+#   npm run install:sessions
 #
 # Behavior:
 #   - Session exists   → attaches to it (idempotent)
@@ -69,6 +75,18 @@ readonly HETZNER_HOME="/home/${HETZNER_USER}"
 readonly SELF_PATH="$(realpath "$0")"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# --- Environment from script name (zero-knowledge) ---
+# claude-session-beta → beta, claude-session-prod → prod, claude-session → beta
+# XPO_ENV may already be set from sudo re-exec (preserves through user switch)
+if [[ -z "${XPO_ENV:-}" ]]; then
+    _SCRIPT_NAME="$(basename "$0")"
+    case "$_SCRIPT_NAME" in
+        claude-session-prod|claude-session-prod.sh) XPO_ENV="prod" ;;
+        *)                                          XPO_ENV="beta" ;;
+    esac
+fi
+readonly XPO_ENV
 
 if [[ -x "${HETZNER_HOME}/.local/bin/claude" ]]; then
     # On Hetzner
@@ -284,18 +302,181 @@ usage() {
 Usage: claude-session <session-name>
 
 Sessions:
-  claude-agents  4-pane layout (Liaison + PDSA + Dev + QA) [WORKFLOW.md v12]
-  claude-dual    3-pane layout (Orchestrator + PDSA+QA + Dev) [legacy]
-  <any-name>     Single-pane Claude session
+  claude-agents    4-pane layout (Liaison + PDSA + Dev + QA) [WORKFLOW.md v12]
+  claude-dual      3-pane layout (Orchestrator + PDSA+QA + Dev) [legacy]
+  agent-<role>     A2A agent body — connects to A2A, launches Claude with role
+                   Roles: agent-liaison, agent-pdsa, agent-dev, agent-qa
+  <any-name>       Single-pane Claude session
 
 The session is created if it doesn't exist, or attached if it does.
 Can be run as thomas — auto-switches to developer via sudo.
+
+A2A server:
+  Environment determined by command name:
+    claude-session-beta → Beta Hive (:3101)
+    claude-session-prod → Prod Hive (:3100)
+  Set this BEFORE running claude-session.
 EOF
     exit 1
 }
 
 is_on_hetzner() {
     [[ "$RUN_MODE" == "hetzner" ]]
+}
+
+# --- Device Key Authentication ---
+# Ed25519 persistent device keys. Register once, connect forever.
+# See: docs/missions/mission-agent-oauth-sessions.md v2.1
+
+# --- Bootstrap URL mapping (only used for first-time registration) ---
+# Once a key is registered, the URL lives in the key file. This mapping
+# is the ONLY place environment-specific URLs appear.
+env_to_bootstrap_url() {
+    case "$1" in
+        prod) echo "http://localhost:3100" ;;
+        *)    echo "http://localhost:3101" ;;
+    esac
+}
+
+check_device_key() {
+    # Uses XPO_ENV (from script name) for key filename
+    local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
+    node_cmd="${node_cmd:-node}"
+    local key_file="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
+
+    if [[ -f "$key_file" ]]; then
+        local key_id api_base
+        key_id=$($node_cmd -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).key_id)}catch{}" "$key_file" 2>/dev/null)
+        api_base=$($node_cmd -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8')).server)}catch{}" "$key_file" 2>/dev/null)
+        if [[ -n "$key_id" && -n "$api_base" ]]; then
+            # Validate key is not revoked — send key_id to server, expect CHALLENGE
+            local check_res
+            check_res=$(curl -s -X POST "${api_base}/a2a/connect" \
+                -H "Content-Type: application/json" \
+                -d "{\"identity\":{\"agent_name\":\"key-check\",\"key_id\":\"${key_id}\"},\"role\":{\"current\":\"liaison\"},\"project\":{\"slug\":\"xpollination-mindspace\"},\"state\":{\"status\":\"active\"},\"metadata\":{\"client\":\"key-check\"}}" 2>/dev/null)
+            local check_type
+            check_type=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).type||'')}catch{console.log('')}" "$check_res" 2>/dev/null)
+
+            if [[ "$check_type" == "CHALLENGE" ]]; then
+                XPO_KEY_FILE="$key_file"
+                echo "  Device key: ${key_id} (${XPO_ENV}, valid)"
+                return 0
+            else
+                echo "  Device key ${key_id} revoked or invalid. Re-registering..."
+                mv "$key_file" "${key_file}.revoked" 2>/dev/null
+                return 1
+            fi
+        fi
+    fi
+    return 1
+}
+
+register_device_key() {
+    local api_base="$1"
+    local jwt_token="$2"
+    local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
+    node_cmd="${node_cmd:-node}"
+    local register_script="${PROJECT_ROOT}/scripts/device-key-register.js"
+
+    $node_cmd "$register_script" --api "$api_base" --token "$jwt_token" --env "$XPO_ENV"
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        XPO_KEY_FILE="${HETZNER_HOME}/.xp0/keys/${XPO_ENV}.json"
+        return 0
+    fi
+    return 1
+}
+
+authenticate_or_load_key() {
+    local session_name="$1"
+    local api_base
+    api_base="$(env_to_bootstrap_url "$XPO_ENV")"
+
+    # 1. Check for existing device key
+    if check_device_key; then
+        return 0
+    fi
+
+    # 2. No key — run device flow to get bootstrap JWT
+    if authenticate_device_flow "$api_base" "$session_name"; then
+        # 3. Register device key using the JWT
+        if register_device_key "$api_base" "$XPO_SESSION_TOKEN"; then
+            echo "  Device key registered (${XPO_ENV})."
+            return 0
+        fi
+        echo "  WARNING: Key registration failed."
+        return 1
+    fi
+    return 1
+}
+
+# --- Device Flow (bootstrap for first-time registration) ---
+
+authenticate_device_flow() {
+    local api_base="$1"
+    local session_name="$2"
+    local node_cmd="${NVM_NODE:+${NVM_NODE}/node}"
+    node_cmd="${node_cmd:-node}"
+
+    echo ""
+    echo "Authenticating with Mindspace..."
+
+    # Request device code
+    local response
+    response=$(curl -s -X POST "${api_base}/api/auth/device/code" \
+        -H "Content-Type: application/json" \
+        -d "{\"client_name\":\"claude-session ${session_name}\"}" 2>/dev/null)
+
+    local device_code user_code verification_uri_complete
+    device_code=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).device_code)}catch{}" "$response" 2>/dev/null)
+    user_code=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).user_code)}catch{}" "$response" 2>/dev/null)
+    verification_uri_complete=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).verification_uri_complete)}catch{}" "$response" 2>/dev/null)
+
+    if [[ -z "$device_code" || -z "$user_code" ]]; then
+        echo "ERROR: Could not get device code from ${api_base}"
+        echo "Response: ${response}"
+        echo ""
+        echo "Falling back to API key from .env..."
+        return 1
+    fi
+
+    echo ""
+    echo "  Approve: ${verification_uri_complete}"
+    echo ""
+    echo "Waiting for approval..."
+
+    # Poll for approval (5s interval, 15min timeout)
+    local attempts=0
+    local max_attempts=180  # 15 min / 5s
+    while [ $attempts -lt $max_attempts ]; do
+        sleep 5
+        local token_response
+        token_response=$(curl -s -X POST "${api_base}/api/auth/device/token" \
+            -H "Content-Type: application/json" \
+            -d "{\"device_code\":\"${device_code}\"}" 2>/dev/null)
+
+        local token error
+        token=$($node_cmd -e "try{const d=JSON.parse(process.argv[1]);if(d.access_token)console.log(d.access_token)}catch{}" "$token_response" 2>/dev/null)
+        error=$($node_cmd -e "try{console.log(JSON.parse(process.argv[1]).error||'')}catch{}" "$token_response" 2>/dev/null)
+
+        if [[ -n "$token" ]]; then
+            echo "✓ Authenticated"
+            XPO_SESSION_TOKEN="$token"
+            return 0
+        fi
+
+        if [[ "$error" == "expired_token" ]]; then
+            echo "✗ Code expired. Run claude-session again."
+            return 1
+        fi
+
+        # authorization_pending → keep polling
+        attempts=$((attempts + 1))
+    done
+
+    echo "✗ Timed out waiting for approval"
+    return 1
 }
 
 has_local_claude() {
@@ -339,96 +520,97 @@ create_agents_session() {
     sync_skills
     sync_settings
 
-    # Write role prompts to temp files (avoids quoting issues in tmux send-keys)
-    cat > /tmp/claude-role-liaison.txt << 'ROLE'
-You are the LIAISON agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON(you), 1=PDSA, 2=DEV, 3=QA.
-Start: /xpo.claude.monitor liaison
-ROLE
+    local workspace="${WORKING_DIR}/xpollination-mindspace"
+    local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
+    local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
+    node_bin="${node_bin:-node}"
 
-    cat > /tmp/claude-role-pdsa.txt << 'ROLE'
-You are the PDSA agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON, 1=PDSA(you), 2=DEV, 3=QA.
-Start: /xpo.claude.monitor pdsa
-ROLE
+    # Authenticate: load existing key or bootstrap via device flow
+    local XPO_KEY_FILE=""
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_or_load_key "$session"; then
+        echo "ERROR: Authentication failed for ${XPO_ENV}. Cannot start agents."
+        exit 1
+    fi
+    local key_file="$XPO_KEY_FILE"
+    echo "Environment: ${XPO_ENV} (key: ${key_file})"
 
-    cat > /tmp/claude-role-dev.txt << 'ROLE'
-You are the DEVELOPMENT agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON, 1=PDSA, 2=DEV(you), 3=QA.
-Start: /xpo.claude.monitor dev
-ROLE
+    # Role prompts — v2: body triggers skills, MCP tools for data
+    local roles=("liaison" "pdsa" "dev" "qa")
+    for role in "${roles[@]}"; do
+        cat > "/tmp/claude-role-${role}.txt" << ROLE
+You are the ${role^^} agent. Project: xpollination-mindspace
 
-    cat > /tmp/claude-role-qa.txt << 'ROLE'
-You are the QA agent in a 4-agent tmux session (claude-agents).
-Panes: 0=LIAISON, 1=PDSA, 2=DEV, 3=QA(you).
-Start: /xpo.claude.monitor qa
-ROLE
+ARCHITECTURE:
+- A2A body runs in background — receives task assignments via SSE
+- When a task is yours, body triggers: /xpo.${role}.startTask {slug}
+- The skill chains MCP tools: get_task, query_brain, deliver_task
+- You work between tool calls. MCP handles all server communication.
+- Use MCP tools for ALL data: query_tasks, get_task, deliver_task, query_brain
+- Body status: cat /tmp/xpo-agent-${role}.status
 
-    # Determine terminal dimensions (passed via env from user-switch, or detect)
+RULES:
+- Do NOT use curl to call API endpoints — use MCP tools
+- Do NOT query the database directly — use query_tasks / get_task MCP tools
+- Your role definition is in CLAUDE.md (auto-loaded)
+ROLE
+    done
+
+    # Determine terminal dimensions
     local cols="${TMUX_COLS:-$(tput cols 2>/dev/null || echo 200)}"
     local rows="${TMUX_ROWS:-$(tput lines 2>/dev/null || echo 50)}"
 
     # Create session with explicit size (pane 0: LIAISON)
-    tmux new-session -d -s "$session" -x "$cols" -y "$rows" -c "$WORKING_DIR"
+    tmux new-session -d -s "$session" -x "$cols" -y "$rows" -c "$workspace"
 
-    # Pre-configure PATH — on Hetzner use nvm node, locally use existing PATH
+    # Pre-configure PATH
     if [[ -n "$NVM_NODE" ]]; then
-        tmux set-environment -t "$session" PATH "${NVM_NODE}:${WORKING_DIR}/xpollination-mcp-server/scripts:/usr/local/bin:/usr/bin:/bin"
+        tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
     fi
-
-    # Export BRAIN_API_KEY so hooks can authenticate with brain API
-    # Check: env var > Hetzner key file > project .env file
-    local brain_key="${BRAIN_API_KEY:-}"
-    if [[ -z "$brain_key" && -f "${HETZNER_HOME}/.brain-api-key" ]]; then
-        brain_key="$(cat "${HETZNER_HOME}/.brain-api-key" 2>/dev/null || echo "")"
-    fi
-    if [[ -z "$brain_key" && -f "${PROJECT_ROOT}/.env" ]]; then
-        brain_key="$(grep '^BRAIN_API_KEY=' "${PROJECT_ROOT}/.env" 2>/dev/null | cut -d= -f2 || echo "")"
-    fi
-    if [ -n "$brain_key" ]; then
-        tmux set-environment -t "$session" BRAIN_API_KEY "$brain_key"
-    fi
-
-    # Split pane 0 → pane 1 to the right (PDSA) — left gets 34%, right gets 66%
-    # Note: use -l (not -p) — tmux 3.4 "-p" fails with "size missing" in detached sessions
-    tmux split-window -t "${session}:0.0" -h -l 66% -c "$WORKING_DIR"
-
-    # Split pane 1 → pane 2 to the right (DEV) — middle gets 50%, right gets 50% of 66%
-    tmux split-window -t "${session}:0.1" -h -l 50% -c "$WORKING_DIR"
-
-    # Split pane 2 vertically → pane 3 below (QA)
-    tmux split-window -t "${session}:0.2" -v -c "$WORKING_DIR"
+    # Split into 4 panes: LIAISON | PDSA | DEV / QA
+    tmux split-window -t "${session}:0.0" -h -l 66% -c "$workspace"
+    tmux split-window -t "${session}:0.1" -h -l 50% -c "$workspace"
+    tmux split-window -t "${session}:0.2" -v -c "$workspace"
 
     tmux rename-window -t "${session}:0" 'LIAISON | PDSA | DEV | QA'
 
-    # Enable mouse support (click to switch panes, scroll, resize)
+    # Enable mouse support (scroll, click, resize)
     tmux set-option -t "$session" mouse on
 
-    # Pane border labels — persistent role names (Claude overrides pane_title with its spinner)
+    # Pane border labels
     tmux set-option -t "$session" pane-border-status top
     tmux set-option -t "$session" pane-border-format \
         ' #{?#{==:#{pane_index},0},LIAISON,#{?#{==:#{pane_index},1},PDSA,#{?#{==:#{pane_index},2},DEV,QA}}} │ #{pane_title} '
 
-    # Start Claude in each pane with role via --append-system-prompt
-    echo "Starting Claude in 4 panes (this takes ~30s per pane)..."
+    echo "Starting 4 A2A agents (body in background, Claude in foreground)..."
 
-    # Write each agent's launch command to a temp script to avoid tmux send-keys
-    # length limits (the --allowedTools list is too long for send-keys)
-    local roles=("liaison" "pdsa" "dev" "qa")
+    # For each pane: start A2A body in background, then launch Claude
     for i in 0 1 2 3; do
         local role="${roles[$i]}"
+        local pane="${session}:0.${i}"
+
+        # Start xpo-agent body in background — device key determines which Hive to connect to
+        # Body reads server URL from key file (no --api needed), handles all A2A protocol
+        local body_cmd="nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --interactive --session ${pane} --key ${key_file} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        tmux send-keys -t "${pane}" "$body_cmd" Enter
+
+        # Write Claude launch script (--allowedTools list too long for send-keys)
+        # Use exec so bash is replaced by claude — tmux pane_current_command will show 'claude'
         local launch_script="/tmp/claude-launch-${role}.sh"
         {
             echo "#!/bin/bash"
+            echo "cd \"${workspace}\""
             echo "export AGENT_ROLE=${role}"
-            printf '%s --allowedTools' "${CLAUDE_BIN}"
+            printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
             for tool in "${ALLOWED_TOOLS[@]}"; do
                 printf ' %q' "$tool"
             done
             printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$role"
         } > "$launch_script"
         chmod +x "$launch_script"
-        tmux send-keys -t "${session}:0.${i}" "bash ${launch_script}" Enter
+
+        # Launch Claude — body detects it via pane_current_command and starts brain recovery
+        tmux send-keys -t "${pane}" "bash ${launch_script}" Enter
     done
 
     # Wait for Claude to be ready in each pane, handle trust prompts
@@ -441,7 +623,8 @@ ROLE
     # Focus LIAISON pane
     tmux select-pane -t "${session}:0.0"
 
-    echo "All 4 agents started."
+    echo "All 4 agents started. A2A bodies running in background."
+    echo "Body logs: /tmp/xpo-agent-{liaison,pdsa,dev,qa}.log"
 }
 
 create_dual_session() {
@@ -483,15 +666,156 @@ create_dual_session() {
     tmux select-pane -t "${session}:0.0"
 }
 
-create_single_session() {
+create_agent_body_session() {
     local session="$1"
+    local role="$2"
 
-    # Auto-deploy skills + hooks before launching agents
+    # Auto-deploy skills + hooks
     sync_skills
     sync_settings
 
-    tmux new-session -d -s "$session" -c "$WORKING_DIR"
-    tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN" Enter
+    local workspace="${WORKING_DIR}/xpollination-mindspace"
+    local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
+
+    if [[ ! -f "$agent_script" ]]; then
+        echo "ERROR: xpo-agent.js not found at ${agent_script}"
+        exit 1
+    fi
+
+    # Authenticate: load existing key or bootstrap via device flow
+    local XPO_KEY_FILE=""
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_or_load_key "$session"; then
+        echo "ERROR: Authentication failed for ${XPO_ENV}. Cannot start agent."
+        exit 1
+    fi
+    local key_file="$XPO_KEY_FILE"
+
+    echo "Starting A2A agent body: ${role} (env: ${XPO_ENV})"
+    echo "  Key:       ${key_file}"
+    echo "  Workspace: ${workspace}"
+    echo "  Script:    ${agent_script}"
+
+    local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
+    node_bin="${node_bin:-node}"
+
+    if [[ "$role" == "liaison" ]]; then
+        # LIAISON mode: Claude runs in the pane (interactive), body runs in background.
+        # Thomas types directly to Claude. SSE events arrive as [TASK] messages.
+        tmux new-session -d -s "$session" -c "$workspace"
+
+        if [[ -n "$NVM_NODE" ]]; then
+            tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+        fi
+
+        # Start body in background — device key determines which Hive
+        local body_cmd="nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --interactive --session ${session} --key ${key_file} > /tmp/xpo-agent-${role}.log 2>&1 &"
+        tmux send-keys -t "${session}:0.0" "$body_cmd" Enter
+
+        # Small delay for body to connect, then launch Claude
+        tmux send-keys -t "${session}:0.0" "sleep 2" Enter
+
+        # Launch Claude with self-describing role prompt
+        local launch_script="/tmp/claude-launch-${role}-a2a.sh"
+        {
+            echo "#!/bin/bash"
+            echo "cd \"${workspace}\""
+            echo "export AGENT_ROLE=${role}"
+            printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
+            for tool in "${ALLOWED_TOOLS[@]}"; do
+                printf ' %q' "$tool"
+            done
+            printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$role"
+        } > "$launch_script"
+        chmod +x "$launch_script"
+
+        tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
+    else
+        # Standard mode: xpo-agent runs as foreground, creates nested tmux for LLM.
+        local launch_cmd="${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --key ${key_file}"
+
+        tmux new-session -d -s "$session" -c "$workspace"
+
+        if [[ -n "$NVM_NODE" ]]; then
+            tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+        fi
+
+        tmux send-keys -t "${session}:0.0" "$launch_cmd" Enter
+    fi
+
+    # Enable mouse (scroll support)
+    tmux set-option -t "$session" mouse on
+
+    echo "Agent body started. Attaching to session..."
+}
+
+create_single_session() {
+    local session="$1"
+    local role="${2:-liaison}"  # default role for single-pane sessions
+
+    # Auto-deploy skills + hooks
+    sync_skills
+    sync_settings
+
+    local workspace="${WORKING_DIR}/xpollination-mindspace"
+    local agent_script="${PROJECT_ROOT}/src/a2a/xpo-agent.js"
+    local node_bin="${NVM_NODE:+${NVM_NODE}/node}"
+    node_bin="${node_bin:-node}"
+
+    # Authenticate: load existing key or bootstrap via device flow
+    local XPO_KEY_FILE=""
+    local XPO_SESSION_TOKEN=""
+    if ! authenticate_or_load_key "$session"; then
+        echo "WARNING: Authentication failed for ${XPO_ENV}. Starting without A2A body."
+        tmux new-session -d -s "$session" -c "$WORKING_DIR"
+        tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN" Enter
+        return
+    fi
+    local key_file="$XPO_KEY_FILE"
+    echo "Environment: ${XPO_ENV} (key: ${key_file})"
+
+    tmux new-session -d -s "$session" -c "$workspace"
+
+    if [[ -n "$NVM_NODE" ]]; then
+        tmux set-environment -t "$session" PATH "${NVM_NODE}:/usr/local/bin:/usr/bin:/bin"
+    fi
+
+    # Start body in background — connects to Hive, delivers events
+    local body_cmd="nohup ${node_bin} ${agent_script} --role ${role} --project xpollination-mindspace --workspace ${workspace} --interactive --session ${session}:0.0 --key ${key_file} > /tmp/xpo-agent-${session}.log 2>&1 &"
+    tmux send-keys -t "${session}:0.0" "$body_cmd" Enter
+
+    # Write role prompt
+    cat > "/tmp/claude-role-${session}.txt" << ROLE
+You are the ${role^^} agent. Session: ${session} | Env: ${XPO_ENV}
+Project: xpollination-mindspace
+
+ARCHITECTURE:
+- A2A body runs in background — receives task assignments via SSE
+- When a task is yours, body triggers: /xpo.${role}.startTask {slug}
+- The skill chains MCP tools: get_task, query_brain, deliver_task
+- You work between tool calls. MCP handles all server communication.
+- Use MCP tools for ALL data: query_tasks, get_task, deliver_task, query_brain
+
+RULES:
+- Do NOT use curl to call API endpoints — use MCP tools
+- Do NOT query the database directly — use query_tasks / get_task MCP tools
+ROLE
+
+    # Launch Claude
+    local launch_script="/tmp/claude-launch-${session}.sh"
+    {
+        echo "#!/bin/bash"
+        echo "cd \"${workspace}\""
+        echo "export AGENT_ROLE=${role}"
+        printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
+        for tool in "${ALLOWED_TOOLS[@]}"; do
+            printf ' %q' "$tool"
+        done
+        printf ' --append-system-prompt "$(cat /tmp/claude-role-%s.txt)"\n' "$session"
+    } > "$launch_script"
+    chmod +x "$launch_script"
+
+    tmux send-keys -t "${session}:0.0" "bash ${launch_script}" Enter
 }
 
 run_remote() {
@@ -538,7 +862,7 @@ run_local_or_hetzner() {
         COLS=$(tput cols 2>/dev/null || echo 200)
         ROWS=$(tput lines 2>/dev/null || echo 50)
         echo "Switching to developer user (${COLS}x${ROWS})..."
-        exec sudo -i -u developer env TMUX_COLS="$COLS" TMUX_ROWS="$ROWS" bash "$SELF_PATH" "$session"
+        exec sudo -i -u developer env TMUX_COLS="$COLS" TMUX_ROWS="$ROWS" XPO_ENV="$XPO_ENV" bash "$SELF_PATH" "$session"
     fi
 
     # Unset TMUX to allow running from inside an existing tmux session
@@ -548,10 +872,19 @@ run_local_or_hetzner() {
         exec tmux attach -t "$session"
     fi
 
+    # Detect role from session name if it matches a known role
+    local role="liaison"  # default
     case "$session" in
-        claude-agents) create_agents_session "$session" ;;
+        *liaison*) role="liaison" ;;
+        *pdsa*)    role="pdsa" ;;
+        *dev*)     role="dev" ;;
+        *qa*)      role="qa" ;;
+    esac
+
+    case "$session" in
+        claude-agents|a2a-team) create_agents_session "$session" ;;
         claude-dual)   create_dual_session "$session" ;;
-        *)             create_single_session "$session" ;;
+        *)             create_single_session "$session" "$role" ;;
     esac
 
     exec tmux attach -t "$session"

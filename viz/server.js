@@ -235,8 +235,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Authentication required' }));
         return;
       }
-      // D1: Redirect browser requests to /login with return_to
-      const returnTo = pathname !== '/' ? `?return_to=${encodeURIComponent(pathname)}` : '';
+      // D1: Redirect browser requests to /login with return_to (preserve query string)
+      const fullPath = pathname + url.search;
+      const returnTo = fullPath !== '/' ? `?return_to=${encodeURIComponent(fullPath)}` : '';
       res.writeHead(302, { 'Location': `/login${returnTo}` });
       res.end();
       return;
@@ -300,16 +301,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // All settings, node actions, and other /api/* routes: catch-all proxy below.
+  // Team Management API — proxied to API server (no local stubs)
 
   // SSE streaming proxy: pipe /a2a/stream/* without buffering (EventSource needs streaming)
+  // HEAD requests return immediately (session validation), GET opens SSE stream
   if (pathname.startsWith('/a2a/stream/')) {
     const cookies = parseCookies(req);
     const proxyHeaders = { ...req.headers, host: `localhost:${API_PORT}` };
     if (cookies.ms_session) proxyHeaders['authorization'] = `Bearer ${cookies.ms_session}`;
     const apiReq = http.request({
       hostname: 'localhost', port: API_PORT, path: pathname + url.search,
-      method: 'GET', headers: proxyHeaders
+      method: req.method, headers: proxyHeaders
     }, (apiRes) => {
       res.writeHead(apiRes.statusCode, apiRes.headers);
       apiRes.pipe(res);
@@ -380,6 +382,15 @@ const server = http.createServer(async (req, res) => {
       serveStatic(res, docPath);
       return;
     }
+  }
+
+  // /reflections — Public knowledge layer (observations from mission work)
+  if (pathname === '/reflections') {
+    const staticRoot = fs.existsSync(path.join(__dirname, 'active'))
+      ? path.resolve(path.join(__dirname, 'active'))
+      : __dirname;
+    serveStatic(res, path.join(staticRoot, 'reflections.html'));
+    return;
   }
 
   // Root route: serve client-rendered Mission Map (Model B — browser as A2A client)
@@ -485,21 +496,31 @@ const BIND_HOST = process.env.VIZ_BIND || '0.0.0.0';
 // WebSocket upgrade proxy for terminal connections → API server
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  console.log(`[ws-upgrade] ${req.url} upgrade=${req.headers.upgrade} connection=${req.headers.connection}`);
   if (url.pathname.startsWith('/ws/terminal/')) {
+    console.log(`[ws-upgrade] proxying to localhost:${API_PORT}${url.pathname}`);
+    const fwdHeaders = { ...req.headers, host: `localhost:${API_PORT}` };
+    console.log(`[ws-upgrade] headers: upgrade=${fwdHeaders.upgrade} connection=${fwdHeaders.connection}`);
     const proxyReq = http.request({
       hostname: 'localhost', port: API_PORT, path: url.pathname,
-      method: 'GET', headers: { ...req.headers, host: `localhost:${API_PORT}` }
+      method: 'GET', headers: fwdHeaders
     });
     proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+      console.log(`[ws-upgrade] upstream 101 received, piping`);
       socket.write('HTTP/1.1 101 Switching Protocols\r\n' +
         Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n') +
         '\r\n\r\n');
       proxySocket.pipe(socket);
       socket.pipe(proxySocket);
     });
-    proxyReq.on('error', () => socket.destroy());
+    proxyReq.on('response', (proxyRes) => {
+      console.log(`[ws-upgrade] upstream HTTP response (NOT upgrade): ${proxyRes.statusCode}`);
+      socket.destroy();
+    });
+    proxyReq.on('error', (err) => { console.log(`[ws-upgrade] proxy error: ${err.message}`); socket.destroy(); });
     proxyReq.end();
   } else {
+    console.log(`[ws-upgrade] rejected: ${url.pathname}`);
     socket.destroy();
   }
 });

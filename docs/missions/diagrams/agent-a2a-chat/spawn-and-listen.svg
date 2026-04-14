@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, sans-serif">
+  <title>Agent Spawn + A2A Listen Flow</title>
+  <desc>
+    AGENT-READABLE: When user clicks +1 Dev: (1) API calls POST /a2a/connect → gets agent_id + token,
+    (2) Creates tmux session with Claude, (3) Starts monitor-v2.js sidecar → connects to
+    GET /a2a/stream/{agent_id} SSE, (4) Monitor receives events and injects into Claude session.
+    Result: agent can SEND via curl and RECEIVE via SSE sidecar.
+  </desc>
+
+  <rect width="900" height="500" fill="#0d1117" rx="8"/>
+  <text x="450" y="30" fill="#3fb950" font-size="16" font-weight="700" text-anchor="middle">Agent Spawn + A2A Listen Flow</text>
+
+  <!-- User clicks +1 Dev -->
+  <rect x="30" y="60" width="140" height="50" rx="8" fill="#1f2937" stroke="#ea580c" stroke-width="2"/>
+  <text x="100" y="82" fill="#ea580c" font-size="11" font-weight="700" text-anchor="middle">User clicks</text>
+  <text x="100" y="97" fill="#ea580c" font-size="11" font-weight="700" text-anchor="middle">+1 Dev</text>
+
+  <!-- Arrow -->
+  <line x1="170" y1="85" x2="210" y2="85" stroke="#8b949e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 1: A2A Connect -->
+  <rect x="210" y="55" width="180" height="60" rx="6" fill="#0d2818" stroke="#3fb950"/>
+  <text x="300" y="77" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">1. POST /a2a/connect</text>
+  <text x="300" y="92" fill="#8b949e" font-size="9" text-anchor="middle">→ agent_id + session_token</text>
+  <text x="300" y="105" fill="#8b949e" font-size="9" text-anchor="middle">→ SSE stream URL</text>
+
+  <line x1="390" y1="85" x2="430" y2="85" stroke="#8b949e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 2: Create tmux -->
+  <rect x="430" y="55" width="180" height="60" rx="6" fill="#161b22" stroke="#2563eb"/>
+  <text x="520" y="77" fill="#2563eb" font-size="10" font-weight="600" text-anchor="middle">2. tmux new-session</text>
+  <text x="520" y="92" fill="#8b949e" font-size="9" text-anchor="middle">claude --allowedTools '*'</text>
+  <text x="520" y="105" fill="#8b949e" font-size="9" text-anchor="middle">--append-system-prompt</text>
+
+  <line x1="610" y1="85" x2="650" y2="85" stroke="#8b949e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 3: Start monitor -->
+  <rect x="650" y="55" width="220" height="60" rx="6" fill="#1a0d2e" stroke="#bc8cff"/>
+  <text x="760" y="77" fill="#bc8cff" font-size="10" font-weight="600" text-anchor="middle">3. Start monitor-v2.js</text>
+  <text x="760" y="92" fill="#8b949e" font-size="9" text-anchor="middle">→ GET /a2a/stream/{agent_id}</text>
+  <text x="760" y="105" fill="#8b949e" font-size="9" text-anchor="middle">SSE listener (background)</text>
+
+  <!-- tmux session box -->
+  <rect x="100" y="160" width="700" height="300" rx="12" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <text x="450" y="185" fill="#3fb950" font-size="13" font-weight="700" text-anchor="middle">tmux session: runner-dev-{userId}</text>
+
+  <!-- Claude pane -->
+  <rect x="130" y="200" width="300" height="240" rx="6" fill="#0d1117" stroke="#2563eb"/>
+  <text x="280" y="225" fill="#2563eb" font-size="12" font-weight="600" text-anchor="middle">Claude Code (foreground)</text>
+  <text x="280" y="250" fill="#8b949e" font-size="10" text-anchor="middle">Interactive session</text>
+  <text x="280" y="270" fill="#8b949e" font-size="10" text-anchor="middle">User sees this in xterm.js</text>
+  <text x="280" y="300" fill="#ea580c" font-size="10" text-anchor="middle">CAN SEND:</text>
+  <text x="280" y="315" fill="#8b949e" font-size="9" text-anchor="middle">curl POST /a2a/messages</text>
+  <text x="280" y="330" fill="#8b949e" font-size="9" text-anchor="middle">{type: HUMAN_INPUT, to: pdsa-agent-id}</text>
+  <text x="280" y="360" fill="#3fb950" font-size="10" text-anchor="middle">CAN RECEIVE:</text>
+  <text x="280" y="375" fill="#8b949e" font-size="9" text-anchor="middle">monitor injects via tmux send-keys</text>
+  <text x="280" y="390" fill="#8b949e" font-size="9" text-anchor="middle">or writes to /tmp/a2a-inbox-{role}.json</text>
+
+  <!-- Monitor sidecar -->
+  <rect x="470" y="200" width="300" height="240" rx="6" fill="#0d1117" stroke="#bc8cff"/>
+  <text x="620" y="225" fill="#bc8cff" font-size="12" font-weight="600" text-anchor="middle">monitor-v2.js (background)</text>
+  <text x="620" y="255" fill="#8b949e" font-size="10" text-anchor="middle">SSE connection to A2A server</text>
+  <text x="620" y="275" fill="#8b949e" font-size="10" text-anchor="middle">Listens for:</text>
+  <text x="620" y="295" fill="#3fb950" font-size="9" text-anchor="middle">• TASK_ASSIGNED → new work</text>
+  <text x="620" y="310" fill="#3fb950" font-size="9" text-anchor="middle">• HUMAN_INPUT → chat message</text>
+  <text x="620" y="325" fill="#3fb950" font-size="9" text-anchor="middle">• REVIEW_NEEDED → review request</text>
+  <text x="620" y="345" fill="#ea580c" font-size="10" text-anchor="middle">On event:</text>
+  <text x="620" y="365" fill="#8b949e" font-size="9" text-anchor="middle">tmux send-keys -t runner-dev</text>
+  <text x="620" y="380" fill="#8b949e" font-size="9" text-anchor="middle">"Message from PDSA: {content}"</text>
+
+  <!-- Arrow between panes -->
+  <line x1="460" y1="350" x2="440" y2="350" stroke="#bc8cff" stroke-width="2" stroke-dasharray="4" marker-end="url(#arrowp)"/>
+  <text x="450" y="340" fill="#bc8cff" font-size="8" text-anchor="middle">inject</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#8b949e"/></marker>
+    <marker id="arrowp" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#bc8cff"/></marker>
+  </defs>
+</svg>

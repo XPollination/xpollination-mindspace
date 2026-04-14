@@ -72,6 +72,13 @@ function checkAgents(): void {
   for (const { slug, role } of requeued) {
     broadcast(EVENT_TYPES.LEASE_EXPIRED, buildLeaseExpired(slug, 'expired'));
   }
+
+  // 4. Clean up stale agent_connections (no heartbeat > 5 min)
+  try {
+    db.prepare(
+      "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE disconnected_at IS NULL AND last_heartbeat < datetime('now', '-5 minutes')"
+    ).run();
+  } catch { /* table may not exist */ }
 }
 
 export function startMonitor(): void {

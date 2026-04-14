@@ -13,6 +13,13 @@ import { createDecision, validateDecision } from '../../src/twins/decision-twin.
 import { cascadeForward } from '../lib/cascade-engine.js';
 import { grantLease, releaseLease, extendLease } from '../lib/lease-manager.js';
 import { EVENT_TYPES, buildTaskAssigned, buildApprovalNeeded, buildReviewNeeded, buildReworkNeeded, buildTaskBlocked, buildDecisionNeeded, buildDecisionResolved, buildBrainGate } from '../lib/event-types.js';
+import { createTwinFromTask } from '../lib/task-bridge.js';
+import { validateTransition, getTargetRole, getEvent, getFixedRole, getInstructions, buildInstructionText, loadConfig } from '../lib/workflow-engine.js';
+import { sendToAgent } from '../lib/sse-manager.js';
+import { execFileSync } from 'node:child_process';
+
+// Load workflow config on module init
+try { loadConfig(); } catch { /* config may not exist yet */ }
 
 export const a2aMessageRouter = Router();
 
@@ -20,29 +27,54 @@ const VALID_ROLES = ['pdsa', 'dev', 'qa', 'liaison', 'orchestrator'];
 
 type MessageHandler = (agent: any, body: any, res: Response) => void | Promise<void>;
 
-const MESSAGE_HANDLERS: Record<string, MessageHandler> = {
-  HEARTBEAT: handleHeartbeat,
-  ROLE_SWITCH: handleRoleSwitch,
-  DISCONNECT: handleDisconnect,
-  CLAIM_TASK: handleStub,
-  TRANSITION: handleTransition,
-  RELEASE_TASK: handleStub,
-  ATTESTATION_SUBMITTED: handleAttestationSubmitted,
-  OBJECT_QUERY: handleObjectQuery,
-  OBJECT_CREATE: handleObjectCreate,
-  OBJECT_UPDATE: handleObjectUpdate,
-  BRAIN_QUERY: handleBrainQuery,
-  BRAIN_CONTRIBUTE: handleBrainContribute,
-  CAPABILITY_ACTIVATE: handleCapabilityActivate,
-  CAPABILITY_DEACTIVATE: handleCapabilityDeactivate,
-  CAPABILITY_UPGRADE: handleCapabilityUpgrade,
-  DECISION_REQUEST: handleDecisionRequest,
-  DECISION_RESPONSE: handleDecisionResponse,
-  WORKSPACE_DOCK: handleWorkspaceDock,
-  WORKSPACE_UNDOCK: handleWorkspaceUndock,
-  HUMAN_INPUT: handleHumanInput,
-  VERSION_TRANSITION: handleVersionTransition,
+// --- A2A Message Type Registry (handler + docs generated from code) ---
+// Each entry: handler function + meta for DESCRIBE. Adding a handler here
+// automatically makes it discoverable. Body never needs updating.
+const MESSAGE_REGISTRY: Record<string, { handler: MessageHandler; meta: { description: string; params?: Record<string, string>; example?: Record<string, any> } }> = {
+  HEARTBEAT:              { handler: handleHeartbeat, meta: { description: 'Keep connection alive' } },
+  ROLE_SWITCH:            { handler: handleRoleSwitch, meta: { description: 'Switch agent role', params: { new_role: 'liaison|pdsa|dev|qa' } } },
+  DISCONNECT:             { handler: handleDisconnect, meta: { description: 'Disconnect agent gracefully' } },
+  CLAIM_TASK:             { handler: handleClaimTask, meta: { description: 'Claim a ready task (ready→active)', params: { task_slug: 'task identifier' }, example: { type: 'CLAIM_TASK', task_slug: 'my-task' } } },
+  TRANSITION:             { handler: handleTransition, meta: { description: 'Transition task to a new status', params: { task_slug: 'task identifier', to_status: 'target status' } } },
+  DELIVER:                { handler: handleDeliver, meta: { description: 'Deliver task results and transition', params: { task_slug: 'task identifier', transition_to: 'review|approval|testing|complete', payload: '{findings, brain_contribution_id, ...}' }, example: { type: 'DELIVER', task_slug: 'my-task', transition_to: 'review', payload: { findings: 'what was done' } } } },
+  RELEASE_TASK:           { handler: handleStub, meta: { description: 'Release a claimed task back to ready' } },
+  ATTESTATION_SUBMITTED:  { handler: handleAttestationSubmitted, meta: { description: 'Submit attestation for a task' } },
+  OBJECT_QUERY:           { handler: handleObjectQuery, meta: { description: 'Query tasks, missions, capabilities, requirements, decisions', params: { object_type: 'task|mission|capability|requirement|decision|version', filters: '{status, current_role, slug, ...}' }, example: { type: 'OBJECT_QUERY', object_type: 'task', filters: { current_role: 'dev', status: 'ready' } } } },
+  OBJECT_CREATE:          { handler: handleObjectCreate, meta: { description: 'Create a new task or mission', params: { object_type: 'task|mission', data: '{title, role, ...}' } } },
+  OBJECT_UPDATE:          { handler: handleObjectUpdate, meta: { description: 'Update task DNA or metadata', params: { object_type: 'task', object_id: 'slug or id', updates: '{key: value}' } } },
+  BRAIN_QUERY:            { handler: handleBrainQuery, meta: { description: 'Search shared knowledge (brain)', params: { prompt: 'search text', read_only: 'true|false', full_content: 'true for full text' }, example: { type: 'BRAIN_QUERY', prompt: 'recent decisions about authentication', read_only: true, full_content: true } } },
+  BRAIN_CONTRIBUTE:       { handler: handleBrainContribute, meta: { description: 'Store learnings in shared knowledge', params: { prompt: 'contribution text (min 50 chars)', topic: 'related task slug' }, example: { type: 'BRAIN_CONTRIBUTE', prompt: 'Auth via Ed25519 is more robust than JWT because sessions survive weekends', topic: 'auth-upgrade' } } },
+  CAPABILITY_ACTIVATE:    { handler: handleCapabilityActivate, meta: { description: 'Activate a capability on a mission' } },
+  CAPABILITY_DEACTIVATE:  { handler: handleCapabilityDeactivate, meta: { description: 'Deactivate a capability' } },
+  CAPABILITY_UPGRADE:     { handler: handleCapabilityUpgrade, meta: { description: 'Upgrade a capability version' } },
+  DECISION_REQUEST:       { handler: handleDecisionRequest, meta: { description: 'Request a decision from the team', params: { context: 'what needs deciding', options: '[{name, summary}]' } } },
+  DECISION_RESPONSE:      { handler: handleDecisionResponse, meta: { description: 'Respond to a decision request', params: { decision_id: 'id', choice: 'selected option', rationale: 'why' } } },
+  WORKSPACE_DOCK:         { handler: handleWorkspaceDock, meta: { description: 'Dock a workspace (register project)' } },
+  WORKSPACE_UNDOCK:       { handler: handleWorkspaceUndock, meta: { description: 'Undock a workspace' } },
+  HUMAN_INPUT:            { handler: handleHumanInput, meta: { description: 'Relay human input to the system' } },
+  VERSION_TRANSITION:     { handler: handleVersionTransition, meta: { description: 'Transition a version object' } },
+  DESCRIBE:               { handler: handleDescribe, meta: { description: 'Get documentation of all available A2A message types' } },
 };
+
+// Build handler map for message dispatch (backwards compatible)
+const MESSAGE_HANDLERS: Record<string, MessageHandler> = Object.fromEntries(
+  Object.entries(MESSAGE_REGISTRY).map(([k, v]) => [k, v.handler])
+);
+
+// DESCRIBE handler — returns auto-generated docs from the registry
+function handleDescribe(agent: any, body: any, res: Response): void {
+  const docs: Record<string, any> = {};
+  for (const [type, entry] of Object.entries(MESSAGE_REGISTRY)) {
+    if (type === 'DESCRIBE' || type === 'HEARTBEAT' || type === 'DISCONNECT') continue;
+    docs[type] = entry.meta;
+  }
+  res.status(200).json({
+    type: 'DESCRIPTION',
+    agent_id: agent.id,
+    actions: docs,
+    timestamp: new Date().toISOString(),
+  });
+}
 
 const JWT_SECRET_MSG = process.env.JWT_SECRET || 'changeme';
 
@@ -120,6 +152,13 @@ function handleHeartbeat(agent: any, _body: any, res: Response): void {
     }
   } catch { /* lease table may not exist in all envs */ }
 
+  // Update agent_connections heartbeat (for Connected Devices UI)
+  try {
+    db.prepare(
+      "UPDATE agent_connections SET last_heartbeat = datetime('now') WHERE agent_id = ? AND disconnected_at IS NULL"
+    ).run(agent.id);
+  } catch { /* table may not exist yet */ }
+
   res.status(200).json({
     type: 'ACK',
     original_type: 'HEARTBEAT',
@@ -176,6 +215,13 @@ function handleDisconnect(agent: any, _body: any, res: Response): void {
   const db = getDb();
   db.prepare("UPDATE agents SET status = 'disconnected', disconnected_at = datetime('now'), last_seen = datetime('now') WHERE id = ?")
     .run(agent.id);
+
+  // Mark agent_connections as disconnected
+  try {
+    db.prepare(
+      "UPDATE agent_connections SET disconnected_at = datetime('now') WHERE agent_id = ? AND disconnected_at IS NULL"
+    ).run(agent.id);
+  } catch { /* table may not exist yet */ }
 
   // Expire active bond
   const bond = getActiveBond(agent.id);
@@ -338,6 +384,11 @@ function handleObjectQuery(agent: any, body: any, res: Response): void {
         const params: any[] = [];
         if (projectSlug) { sql += ' AND project_slug = ?'; params.push(projectSlug); }
         if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
+        if (filters?.status_not_in) {
+          const excluded = filters.status_not_in.split(',').map((s: string) => s.trim());
+          sql += ` AND status NOT IN (${excluded.map(() => '?').join(',')})`;
+          params.push(...excluded);
+        }
         if (filters?.current_role) { sql += ' AND current_role = ?'; params.push(filters.current_role); }
         if (filters?.slug) { sql += ' AND slug = ?'; params.push(filters.slug); }
         if (filters?.id) { sql += ' AND id = ?'; params.push(filters.id); }
@@ -604,6 +655,8 @@ function handleTransition(agent: any, body: any, res: Response): void {
     const wfTransitions = workflowContext(createTask({ slug: task.slug, status: effectiveToStatus, dna: { ...dna, role: newRole } })).available_transitions;
     if (effectiveToStatus === 'ready') {
       sendToRole(newRole, EVENT_TYPES.TASK_ASSIGNED, buildTaskAssigned(task, dna, wfTransitions), task.project_slug);
+      // Bridge: create twin in MindspaceNode so runners can claim it
+      createTwinFromTask(db, { ...task, current_role: newRole, dna_json: JSON.stringify(dna) }).catch(() => {});
     } else if (effectiveToStatus === 'approval') {
       sendToRole('liaison', EVENT_TYPES.APPROVAL_NEEDED, buildApprovalNeeded(task, dna), task.project_slug);
     } else if (effectiveToStatus === 'review') {
@@ -709,11 +762,37 @@ function handleObjectCreate(agent: any, body: any, res: Response): void {
       }
 
       case 'task': {
-        const slug = payload.slug || payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const dna = { title: payload.title, role: payload.current_role || 'liaison', description: payload.description || undefined, ...payload.dna };
+        const slug = payload.slug || payload.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+        // Gate 1: Role must be pdsa or liaison — no direct dev/qa assignment
+        const taskRole = payload.dna?.role || payload.current_role;
+        if (!taskRole) {
+          res.status(400).json({ type: 'ERROR', error: 'Task must have a role. Set dna.role to "pdsa" (PDSA Design Path) or "liaison" (Liaison Content Path).' });
+          return;
+        }
+        if (!['pdsa', 'liaison'].includes(taskRole)) {
+          res.status(400).json({ type: 'ERROR', error: `Task must start with role=pdsa (PDSA Design Path). Got: "${taskRole}". DEV and QA receive work through the workflow, not direct assignment. Set dna.role to "pdsa".` });
+          return;
+        }
+
+        // Gate 2: Required DNA fields
+        const dna = { ...payload.dna, title: payload.title, role: taskRole };
+        const requiredDna = ['title', 'description', 'acceptance_criteria'];
+        const missingDna = requiredDna.filter((f: string) => !dna[f] || (typeof dna[f] === 'string' && dna[f].trim().length === 0));
+        if (missingDna.length > 0) {
+          res.status(400).json({ type: 'ERROR', error: `Task DNA missing required fields: ${missingDna.join(', ')}. Every task needs: title, description, acceptance_criteria.` });
+          return;
+        }
+
+        // Gate 3: Description must be self-contained
+        if (dna.description.length < 100) {
+          res.status(400).json({ type: 'ERROR', error: `Task description too short (${dna.description.length} chars). Must be ≥100 chars — embed context, file paths, and reasoning so an agent can work without reading external documents.` });
+          return;
+        }
+
         db.prepare(
           'INSERT INTO tasks (id, project_slug, title, description, status, current_role, slug, dna_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(id, payload.project_slug, payload.title, payload.description || null, payload.status || config.defaults.status, payload.current_role || 'liaison', slug, JSON.stringify(dna), now, now);
+        ).run(id, payload.project_slug, payload.title, dna.description || null, payload.status || config.defaults.status, taskRole, slug, JSON.stringify(dna), now, now);
 
         const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
         const twin = formatTaskTwin(row);
@@ -868,7 +947,7 @@ const BRAIN_API_URL = process.env.BRAIN_API_URL || 'http://localhost:3200';
 const BRAIN_SERVICE_KEY = process.env.BRAIN_SERVICE_KEY || process.env.BRAIN_API_KEY || '';
 
 async function handleBrainQuery(agent: any, body: any, res: Response): Promise<void> {
-  const { prompt, read_only, session_id: clientSessionId } = body;
+  const { prompt, read_only, session_id: clientSessionId, full_content, filter_category } = body;
   if (!prompt) { res.status(400).json({ type: 'ERROR', error: 'Missing required field: prompt' }); return; }
 
   try {
@@ -881,6 +960,8 @@ async function handleBrainQuery(agent: any, body: any, res: Response): Promise<v
         agent_name: agent.name || agent.id,
         session_id: clientSessionId || agent.session_id,
         read_only: read_only !== false,
+        ...(full_content && { full_content: true }),
+        ...(filter_category && { filter_category }),
       }),
     });
     const data = await brainRes.json();
@@ -1017,6 +1098,183 @@ function handleCapabilityUpgrade(agent: any, body: any, res: Response): void {
 
   broadcast('capability_upgraded', { capability_id: cap.id, from_version: fromVersion, to_version, actor: agent.name || agent.id, timestamp: now });
   res.status(200).json({ type: 'ACK', original_type: 'CAPABILITY_UPGRADE', agent_id: agent.id, capability_id: cap.id, from_version: fromVersion, to_version, timestamp: now });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLAIM_TASK — Agent claims a task via A2A protocol (no DB access)
+// Server validates, grants lease, sends instructions
+// ═══════════════════════════════════════════════════════════════
+function handleClaimTask(agent: any, body: any, res: Response): void {
+  const { task_slug } = body;
+  if (!task_slug) { res.status(400).json({ type: 'ERROR', error: 'task_slug required' }); return; }
+
+  const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE slug = ? OR id = ?').get(task_slug, task_slug) as any;
+  if (!task) { res.status(404).json({ type: 'CLAIM_REJECTED', error: 'Task not found' }); return; }
+
+  // Check task is ready and role matches
+  if (task.status !== 'ready') {
+    res.status(409).json({ type: 'CLAIM_REJECTED', error: `Task status is ${task.status}, not ready` });
+    return;
+  }
+  if (task.current_role && task.current_role !== agent.current_role) {
+    res.status(403).json({ type: 'CLAIM_REJECTED', error: `Task role is ${task.current_role}, you are ${agent.current_role}` });
+    return;
+  }
+
+  // Check no active lease
+  try {
+    const lease = db.prepare("SELECT id FROM leases WHERE task_id = ? AND status = 'active'").get(task.id);
+    if (lease) { res.status(409).json({ type: 'CLAIM_REJECTED', error: 'Task already claimed' }); return; }
+  } catch { /* leases table may not exist */ }
+
+  // Parse DNA and merge claim payload
+  let dna: any = {};
+  try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* */ }
+  if (body.payload) Object.assign(dna, body.payload);
+
+  // Validate transition via config engine
+  const validation = validateTransition('ready', 'active', agent.current_role, dna, db);
+  if (!validation.valid) {
+    res.status(422).json({ type: 'CLAIM_REJECTED', error: validation.error, gate: validation.gate });
+    return;
+  }
+
+  // Execute: update DB, grant lease
+  const now = new Date().toISOString();
+  db.prepare('UPDATE tasks SET status = ?, current_role = ?, claimed_by = ?, claimed_at = ?, dna_json = ?, updated_at = ? WHERE id = ?')
+    .run('active', task.current_role, agent.id, now, JSON.stringify(dna), now, task.id);
+
+  try { grantLease(db, task.id, agent.user_id || agent.id); } catch { /* */ }
+  try {
+    db.prepare('INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), task.id, 'ready', 'active', agent.id, task.project_slug);
+  } catch { /* */ }
+
+  // Build instructions from workflow config
+  const role = agent.current_role;
+  const instructionConfig = getInstructions(role);
+  const instructionText = buildInstructionText(role, task, dna);
+
+  // Deliver instructions to Claude terminal via tmux
+  const sessionName = agent.session_id;
+  if (sessionName?.startsWith('runner-')) {
+    try {
+      execFileSync('tmux', ['send-keys', '-t', sessionName, instructionText, 'Enter'], { timeout: 5000 });
+    } catch { /* tmux session may not exist */ }
+  }
+
+  // Send CLAIM_CONFIRMED via SSE
+  sendToAgent(agent.id, 'claim_confirmed', {
+    task_slug: task.slug, task_id: task.id, title: task.title,
+    dna, instructions: instructionConfig, timestamp: now,
+  });
+
+  broadcast('transition', { task_slug: task.slug, from_status: 'ready', to_status: 'active', actor: agent.id, timestamp: now });
+
+  res.status(200).json({
+    type: 'CLAIM_CONFIRMED', task_slug: task.slug, task_id: task.id,
+    dna, instructions: instructionConfig, timestamp: now,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVER — Agent submits work results via A2A protocol
+// Server validates gates, writes DNA, transitions, routes next
+// ═══════════════════════════════════════════════════════════════
+function handleDeliver(agent: any, body: any, res: Response): void {
+  const { task_slug, transition_to } = body;
+  if (!task_slug) { res.status(400).json({ type: 'ERROR', error: 'task_slug required' }); return; }
+  if (!transition_to) { res.status(400).json({ type: 'ERROR', error: 'transition_to required' }); return; }
+
+  const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE slug = ? OR id = ?').get(task_slug, task_slug) as any;
+  if (!task) { res.status(404).json({ type: 'DELIVERY_REJECTED', error: 'Task not found' }); return; }
+
+  // Parse and merge DNA
+  let dna: any = {};
+  try { dna = JSON.parse(task.dna_json || '{}'); } catch { /* */ }
+
+  // Merge all delivered fields into DNA
+  const deliveredFields = body.payload || body;
+  for (const [key, val] of Object.entries(deliveredFields)) {
+    if (['type', 'agent_id', 'task_slug', 'transition_to'].includes(key)) continue;
+    dna[key] = val;
+  }
+
+  // Validate transition via config engine
+  const fromStatus = task.status;
+  const validation = validateTransition(fromStatus, transition_to, agent.current_role, dna, db);
+  if (!validation.valid) {
+    res.status(422).json({
+      type: 'DELIVERY_REJECTED', task_slug: task.slug,
+      error: validation.error, gate: validation.gate,
+      hint: `Fix the failing gate and deliver again.`,
+    });
+    return;
+  }
+
+  // Resolve target role
+  const targetRole = getTargetRole(fromStatus, transition_to, dna, task.current_role)
+    || getFixedRole(transition_to)
+    || task.current_role;
+
+  // Handle blocked state save
+  if (transition_to === 'blocked') {
+    dna.blocked_from_state = fromStatus;
+    dna.blocked_from_role = task.current_role;
+    dna.blocked_at = new Date().toISOString();
+  }
+
+  // Handle restore from blocked
+  let effectiveStatus = transition_to;
+  let effectiveRole = targetRole;
+  if (fromStatus === 'blocked' && transition_to === 'restore') {
+    effectiveStatus = dna.blocked_from_state || 'ready';
+    effectiveRole = dna.blocked_from_role || task.current_role;
+    delete dna.blocked_from_state;
+    delete dna.blocked_from_role;
+    delete dna.blocked_at;
+    delete dna.blocked_reason;
+  }
+
+  // Execute: update DB
+  const now = new Date().toISOString();
+  db.prepare('UPDATE tasks SET dna_json = ?, status = ?, current_role = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(dna), effectiveStatus, effectiveRole, now, task.id);
+
+  // Release lease on exit from active
+  if (fromStatus === 'active') {
+    try { releaseLease(db, task.id, agent.user_id || agent.id); } catch { /* */ }
+  }
+
+  // Record transition
+  try {
+    db.prepare('INSERT INTO task_transitions (id, task_id, from_status, to_status, actor, project_slug) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), task.id, fromStatus, effectiveStatus, agent.id, task.project_slug);
+  } catch { /* */ }
+
+  // Broadcast transition event
+  broadcast('transition', { task_slug: task.slug, from_status: fromStatus, to_status: effectiveStatus, new_role: effectiveRole, actor: agent.id, timestamp: now });
+
+  // Route event to next role
+  const eventType = getEvent(fromStatus, transition_to);
+  if (eventType && effectiveRole) {
+    const eventData = { task_slug: task.slug, task_id: task.id, title: task.title, role: effectiveRole, dna, timestamp: now };
+    sendToRole(effectiveRole, eventType, eventData, task.project_slug);
+  }
+
+  // Cascade on complete
+  let cascadeResult = null;
+  if (effectiveStatus === 'complete') {
+    try { cascadeResult = cascadeForward(task.id, db); } catch { /* */ }
+  }
+
+  res.status(200).json({
+    type: 'DELIVERY_ACCEPTED', task_slug: task.slug,
+    from_status: fromStatus, to_status: effectiveStatus, new_role: effectiveRole,
+    cascade: cascadeResult, timestamp: now,
+  });
 }
 
 function handleStub(_agent: any, body: any, res: Response): void {

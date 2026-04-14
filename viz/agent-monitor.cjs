@@ -37,7 +37,7 @@ const MAX_RUNTIME = 7200000; // 120 minutes max, then exit
 // Shared project discovery — single source of truth
 const { discoverProjects: _discoverProjects } = require('./discover-projects.cjs');
 const WORKSPACE_PATH = process.env.XPO_WORKSPACE_PATH || "/home/developer/workspaces/github/PichlerThomas";
-const CLI_PATH = process.env.XPO_CLI_PATH || `${WORKSPACE_PATH}/xpollination-mcp-server/src/db/interface-cli.js`;
+const CLI_PATH = process.env.XPO_CLI_PATH || `${WORKSPACE_PATH}/xpollination-mindspace/src/db/interface-cli.js`;
 
 // Add cliPath to each discovered project for backward compat
 const projects = _discoverProjects(WORKSPACE_PATH).map(p => ({ ...p, cliPath: CLI_PATH }));
@@ -109,24 +109,8 @@ function queryDb(dbPath, { role, status } = {}) {
     const db = new Database(dbPath, { readonly: true });
     db.pragma('busy_timeout = 5000');
 
-    // Query both old (mindspace_nodes) and new (tasks) tables
+    // Query tasks table (single source of truth — mindspace_nodes deprecated 2026-03-31)
     let results = [];
-
-    // Old system: mindspace_nodes
-    try {
-      let query = `SELECT id, type, status, slug,
-        json_extract(dna_json, '$.title') as title,
-        json_extract(dna_json, '$.role') as role,
-        updated_at
-        FROM mindspace_nodes WHERE status NOT IN ('complete', 'cancelled', 'backlog')`;
-      const params = [];
-      if (role) { query += ` AND json_extract(dna_json, '$.role') = ?`; params.push(role); }
-      if (status) { query += ' AND status = ?'; params.push(status); }
-      query += ' ORDER BY updated_at DESC';
-      results = db.prepare(query).all(...params);
-    } catch { /* mindspace_nodes may not exist */ }
-
-    // New system: tasks table (SKO hierarchy)
     try {
       let query = `SELECT id, 'task' as type, status, slug, title, current_role as role, updated_at
         FROM tasks WHERE status NOT IN ('complete', 'cancelled')`;
@@ -134,9 +118,8 @@ function queryDb(dbPath, { role, status } = {}) {
       if (role) { query += ' AND current_role = ?'; params.push(role); }
       if (status) { query += ' AND status = ?'; params.push(status); }
       query += ' ORDER BY updated_at DESC';
-      const taskRows = db.prepare(query).all(...params);
-      results = results.concat(taskRows);
-    } catch { /* tasks table may not exist */ }
+      results = db.prepare(query).all(...params);
+    } catch (err) { console.error('Tasks query failed:', err.message); }
 
     db.close();
     return results.map(r => ({

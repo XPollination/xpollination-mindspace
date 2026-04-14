@@ -7,6 +7,9 @@
 <link rel="manifest" href="/assets/favicons/manifest.webmanifest">
 <link rel="stylesheet" href="/mindspace.css">
 <link rel="stylesheet" href="/kanban.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10/lib/addon-fit.min.js"></script>
 </head><body>
 <script type="module" src="/js/mindspace-nav.js"></script>
 <div class="kanban-toolbar">
@@ -18,6 +21,13 @@
     <button class="filter-btn active" data-filter="active">Active</button>
     <button class="filter-btn" data-filter="all">All</button>
   </div>
+  <select id="completed-filter" class="ms-input" title="Completed Tasks Filter" style="width:auto;margin:0;padding:4px 8px;font-size:13px;">
+    <option value="active">Active only</option>
+    <option value="1d">+ Last 1 day</option>
+    <option value="7d">+ Last 7 days</option>
+    <option value="30d">+ Last 30 days</option>
+    <option value="all">All</option>
+  </select>
   <select id="liaison-mode" class="ms-input" title="LIAISON Approval Mode" style="width:auto;margin:0;padding:4px 8px;font-size:13px;">
     <option value="manual">Manual</option>
     <option value="semi">Semi</option>
@@ -25,6 +35,15 @@
     <option value="autonomous">Autonomous</option>
   </select>
   <div class="kanban-stats" id="stats"></div>
+  <div class="team-panel" id="team-panel">
+    <span class="team-label">Team:</span>
+    <button class="team-btn team-full" data-action="add-full-team" onclick="addFullTeam()">+ Full Team</button>
+    <button class="team-btn" data-role="liaison" style="background:var(--ms-accent,#ea580c)" onclick="addAgent('liaison')">+Liaison</button>
+    <button class="team-btn" data-role="pdsa" style="background:#dc2626" onclick="addAgent('pdsa')">+PDSA</button>
+    <button class="team-btn" data-role="dev" style="background:#2563eb" onclick="addAgent('dev')">+Dev</button>
+    <button class="team-btn" data-role="qa" style="background:#dc2626" onclick="addAgent('qa')">+QA</button>
+    <span class="team-status" id="team-status">No agents</span>
+  </div>
 </div>
 <div class="kanban-board" id="board">
   <div class="ms-loading"><div class="ms-spinner"></div><br>Connecting...</div>
@@ -37,6 +56,14 @@
   </div>
   <div class="detail-body" id="detail-body"></div>
   <div class="detail-actions" id="detail-actions"></div>
+</div>
+<div class="terminal-overlay" id="terminal-overlay" onclick="closeTerminal()"></div>
+<div class="terminal-panel" id="terminal-panel">
+  <div class="terminal-header">
+    <span id="terminal-title">Agent Terminal</span>
+    <button class="detail-close" onclick="closeTerminal()">&times;</button>
+  </div>
+  <div id="terminal-container"></div>
 </div>
 <script type="module" src="/js/kanban.js"></script>
 </body></html>

@@ -201,8 +201,22 @@ server.on('upgrade', (req, socket, head) => {
 
 // --- Start ---
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[agent-runtime] listening on 127.0.0.1:${PORT}`);
-  console.log(`[agent-runtime] workspace: ${WORKSPACE}`);
-  console.log(`[agent-runtime] API port: ${API_PORT}`);
-});
+const SOCKET_PATH = process.env.RUNTIME_SOCKET || '/tmp/agent-runtime.sock';
+const USE_SOCKET = process.env.RUNTIME_MODE !== 'tcp';
+
+import { unlinkSync } from 'node:fs';
+
+if (USE_SOCKET) {
+  try { unlinkSync(SOCKET_PATH); } catch { /* doesn't exist */ }
+  server.listen(SOCKET_PATH, () => {
+    // Make socket accessible from Docker (world-writable)
+    try { execFileSync('chmod', ['777', SOCKET_PATH]); } catch { /* */ }
+    console.log(`[agent-runtime] listening on ${SOCKET_PATH}`);
+    console.log(`[agent-runtime] workspace: ${WORKSPACE}`);
+  });
+} else {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[agent-runtime] listening on 0.0.0.0:${PORT}`);
+    console.log(`[agent-runtime] workspace: ${WORKSPACE}`);
+  });
+}

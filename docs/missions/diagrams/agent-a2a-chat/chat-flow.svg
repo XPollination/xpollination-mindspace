@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" font-family="system-ui, sans-serif">
+  <title>Agent-to-Agent Chat via A2A</title>
+  <desc>
+    AGENT-READABLE: DEV agent sends chat to PDSA agent through A2A server.
+    Flow: DEV curl POST /a2a/messages {type:HUMAN_INPUT, to:pdsa-agent-id, text:"review my code"}
+    → A2A server receives → finds PDSA agent SSE connection → pushes event
+    → PDSA monitor-v2.js receives → injects into PDSA Claude session
+    → PDSA reads message, responds via POST /a2a/messages back to DEV
+    → DEV monitor receives → injects into DEV Claude session
+  </desc>
+
+  <rect width="900" height="450" fill="#0d1117" rx="8"/>
+  <text x="450" y="30" fill="#3fb950" font-size="16" font-weight="700" text-anchor="middle">Agent-to-Agent Chat via A2A Server</text>
+
+  <!-- DEV Agent -->
+  <rect x="30" y="70" width="250" height="340" rx="12" fill="#161b22" stroke="#2563eb" stroke-width="2"/>
+  <text x="155" y="95" fill="#2563eb" font-size="14" font-weight="700" text-anchor="middle">DEV Agent</text>
+  <text x="155" y="112" fill="#8b949e" font-size="10" text-anchor="middle">runner-dev-e41cbd6a</text>
+
+  <rect x="50" y="130" width="210" height="50" rx="4" fill="#0d1117" stroke="#2563eb"/>
+  <text x="155" y="152" fill="#2563eb" font-size="10" font-weight="600" text-anchor="middle">Claude Code</text>
+  <text x="155" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Interactive session</text>
+
+  <rect x="50" y="200" width="210" height="40" rx="4" fill="#0d1117" stroke="#bc8cff"/>
+  <text x="155" y="222" fill="#bc8cff" font-size="10" font-weight="600" text-anchor="middle">monitor-v2.js (SSE listener)</text>
+
+  <!-- A2A Server -->
+  <rect x="330" y="100" width="240" height="280" rx="12" fill="#0d2818" stroke="#3fb950" stroke-width="3"/>
+  <text x="450" y="128" fill="#3fb950" font-size="14" font-weight="700" text-anchor="middle">A2A Server</text>
+  <text x="450" y="145" fill="#8b949e" font-size="10" text-anchor="middle">Nervous System</text>
+
+  <rect x="355" y="165" width="190" height="35" rx="4" fill="#0d1117" stroke="#3fb950"/>
+  <text x="450" y="187" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">POST /a2a/messages</text>
+
+  <rect x="355" y="215" width="190" height="35" rx="4" fill="#0d1117" stroke="#3fb950"/>
+  <text x="450" y="237" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">SSE Manager</text>
+
+  <rect x="355" y="265" width="190" height="35" rx="4" fill="#0d1117" stroke="#3fb950"/>
+  <text x="450" y="287" fill="#3fb950" font-size="10" font-weight="600" text-anchor="middle">sendToAgent(pdsa_id, msg)</text>
+
+  <rect x="355" y="320" width="190" height="40" rx="4" fill="#1a0d2e" stroke="#bc8cff"/>
+  <text x="450" y="340" fill="#bc8cff" font-size="9" font-weight="600" text-anchor="middle">GET /a2a/stream/{agent_id}</text>
+  <text x="450" y="353" fill="#8b949e" font-size="8" text-anchor="middle">Persistent SSE connections</text>
+
+  <!-- PDSA Agent -->
+  <rect x="620" y="70" width="250" height="340" rx="12" fill="#161b22" stroke="#dc2626" stroke-width="2"/>
+  <text x="745" y="95" fill="#dc2626" font-size="14" font-weight="700" text-anchor="middle">PDSA Agent</text>
+  <text x="745" y="112" fill="#8b949e" font-size="10" text-anchor="middle">runner-pdsa-e41cbd6a</text>
+
+  <rect x="640" y="130" width="210" height="50" rx="4" fill="#0d1117" stroke="#dc2626"/>
+  <text x="745" y="152" fill="#dc2626" font-size="10" font-weight="600" text-anchor="middle">Claude Code</text>
+  <text x="745" y="168" fill="#8b949e" font-size="9" text-anchor="middle">Interactive session</text>
+
+  <rect x="640" y="200" width="210" height="40" rx="4" fill="#0d1117" stroke="#bc8cff"/>
+  <text x="745" y="222" fill="#bc8cff" font-size="10" font-weight="600" text-anchor="middle">monitor-v2.js (SSE listener)</text>
+
+  <!-- Flow arrows -->
+  <!-- 1. DEV sends -->
+  <line x1="260" y1="155" x2="330" y2="182" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+  <text x="290" y="158" fill="#2563eb" font-size="8" font-weight="600">1. SEND</text>
+
+  <!-- 2. A2A routes -->
+  <line x1="450" y1="200" x2="450" y2="215" stroke="#3fb950" stroke-width="2" marker-end="url(#ag)"/>
+
+  <line x1="450" y1="250" x2="450" y2="265" stroke="#3fb950" stroke-width="2" marker-end="url(#ag)"/>
+
+  <!-- 3. SSE push to PDSA -->
+  <line x1="545" y1="340" x2="640" y2="220" stroke="#bc8cff" stroke-width="2" marker-end="url(#ap)"/>
+  <text x="610" y="270" fill="#bc8cff" font-size="8" font-weight="600">3. SSE push</text>
+
+  <!-- 4. Monitor injects -->
+  <line x1="745" y1="240" x2="745" y2="130" stroke="#dc2626" stroke-width="2" stroke-dasharray="4" marker-end="url(#ar)"/>
+  <text x="770" y="265" fill="#dc2626" font-size="8">4. inject</text>
+
+  <!-- 5. PDSA responds -->
+  <rect x="140" y="280" width="180" height="30" rx="4" fill="#0d2818" stroke="#3fb950"/>
+  <text x="230" y="300" fill="#3fb950" font-size="9" font-weight="600" text-anchor="middle">5. PDSA responds → same flow back</text>
+
+  <line x1="620" y1="380" x2="330" y2="380" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6" marker-end="url(#ar2)"/>
+  <text x="475" y="397" fill="#8b949e" font-size="9" text-anchor="middle">Response flows back through A2A</text>
+
+  <!-- Message format -->
+  <rect x="50" y="330" width="210" height="70" rx="4" fill="#0d1117" stroke="#8b949e"/>
+  <text x="155" y="348" fill="#ea580c" font-size="9" font-weight="600" text-anchor="middle">Message format:</text>
+  <text x="155" y="362" fill="#8b949e" font-size="8" text-anchor="middle">{type: "HUMAN_INPUT",</text>
+  <text x="155" y="374" fill="#8b949e" font-size="8" text-anchor="middle"> agent_id: "dev-id",</text>
+  <text x="155" y="386" fill="#8b949e" font-size="8" text-anchor="middle"> to: "pdsa-id", text: "..."}</text>
+
+  <!-- Cross-hub note -->
+  <text x="450" y="435" fill="#8b949e" font-size="10" font-style="italic" text-anchor="middle">Future: A2A federation enables cross-hub chat between Mindspace instances</text>
+
+  <defs>
+    <marker id="ab" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#2563eb"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#3fb950"/></marker>
+    <marker id="ap" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#bc8cff"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#dc2626"/></marker>
+    <marker id="ar2" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#dc2626"/></marker>
+  </defs>
+</svg>

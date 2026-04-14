@@ -5,6 +5,7 @@ interface SseConnection {
   agentId: string;
   role: string | null;
   projectSlug: string | null;
+  deviceKeyId: string | null;
   connectedAt: Date;
   heartbeatInterval: NodeJS.Timeout;
 }
@@ -16,7 +17,7 @@ const connections = new Map<string, SseConnection>();
  * Register an SSE connection for an agent.
  * Replaces any existing connection for the same agent_id (only one stream per agent).
  */
-export function addConnection(agentId: string, res: Response, role?: string, projectSlug?: string): void {
+export function addConnection(agentId: string, res: Response, role?: string, projectSlug?: string, deviceKeyId?: string): void {
   // Close existing connection if any (agent reconnected)
   removeConnection(agentId);
 
@@ -45,6 +46,7 @@ export function addConnection(agentId: string, res: Response, role?: string, pro
     agentId,
     role: role || null,
     projectSlug: projectSlug || null,
+    deviceKeyId: deviceKeyId || null,
     connectedAt: new Date(),
     heartbeatInterval
   });
@@ -104,6 +106,24 @@ export function sendToRole(role: string, event: string, data: unknown, projectSl
     }
   }
   return sent;
+}
+
+/**
+ * Disconnect all SSE streams authenticated with a specific device key.
+ * Sends a 'revoked' event before closing. Used when a key is revoked from Settings.
+ */
+export function disconnectByDeviceKey(deviceKeyId: string): number {
+  let count = 0;
+  for (const [agentId, conn] of connections) {
+    if (conn.deviceKeyId === deviceKeyId) {
+      try {
+        conn.res.write(`event: revoked\ndata: ${JSON.stringify({ reason: 'Device key revoked', timestamp: new Date().toISOString() })}\n\n`);
+      } catch { /* already closed */ }
+      removeConnection(agentId);
+      count++;
+    }
+  }
+  return count;
 }
 
 /**
