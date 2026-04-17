@@ -1,0 +1,226 @@
+#!/bin/bash
+# brain — CLI for xp0 shared knowledge base
+# Three spaces: private (only you), protected (your org), public (everyone)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PARSER="${SCRIPT_DIR}/brain-parse.py"
+CONFIG_DIR="${HOME}/.config/brain"
+CONFIG_FILE="${CONFIG_DIR}/config"
+BRAIN_URL="${BRAIN_URL:-https://hive.xpollination.earth}"
+AGENT_ID="${BRAIN_AGENT_ID:-agent-$(whoami)}"
+AGENT_NAME="${BRAIN_AGENT_NAME:-$(whoami)}"
+SESSION_ID="${BRAIN_SESSION_ID:-$(date +%Y%m%d-%H%M)}"
+
+load_config() {
+  if [ ! -f "$CONFIG_FILE" ]; then
+    echo "ERROR: Brain not configured. Run: brain setup <API_KEY>" >&2
+    echo "Get your API key at: https://mindspace.xpollination.earth/settings" >&2
+    exit 1
+  fi
+  source "$CONFIG_FILE"
+  BRAIN_URL="${BRAIN_URL:-https://hive.xpollination.earth}"
+}
+
+brain_api() {
+  local method="$1" path="$2" data="${3:-}"
+  local args=(-s -X "$method" "${BRAIN_URL}${path}" -H "Authorization: Bearer ${API_KEY}" -H "Content-Type: application/json")
+  [ -n "$data" ] && args+=(-d "$data")
+  curl "${args[@]}" 2>/dev/null
+}
+
+check_min_length() {
+  if [ "${#1}" -lt "${2:-50}" ]; then
+    echo "ERROR: Content must be at least ${2:-50} characters (got ${#1})." >&2
+    exit 1
+  fi
+}
+
+# --- Space guidance ---
+# Prints proactive info about which space is being used and what it means.
+# Called on every write operation (contribute, refine, supersede, correct).
+space_guidance() {
+  local space="$1"
+  case "$space" in
+    private)
+      echo "SPACE: private — only you and your agents." >&2
+      ;;
+    protected)
+      echo "SPACE: protected — your organization." >&2
+      ;;
+    public)
+      echo "SPACE: public — everyone, permanently." >&2
+      echo "  ⚠  No credentials, personal data, or client-specific content." >&2
+      ;;
+  esac
+}
+
+# Warn when space is not explicitly set
+space_default_notice() {
+  local space="$1"
+  if [ "$space" = "protected" ]; then
+    echo "INFO: No --space specified → protected (org)." >&2
+  fi
+}
+
+CMD="${1:-help}"; shift || true
+
+case "$CMD" in
+  setup)
+    KEY="${1:-}"
+    [ -z "$KEY" ] && echo "Usage: brain setup <API_KEY>" && exit 1
+    mkdir -p "$CONFIG_DIR"
+    printf 'API_KEY="%s"\nBRAIN_URL="https://hive.xpollination.earth"\n' "$KEY" > "$CONFIG_FILE"
+    chmod 600 "$CONFIG_FILE"
+    echo "Config saved to ${CONFIG_FILE}"
+    curl -s -H "Authorization: Bearer ${KEY}" "https://hive.xpollination.earth/api/v1/health" | python3 "$PARSER" setup
+    ;;
+  health)
+    load_config
+    brain_api GET "/api/v1/health" | python3 "$PARSER" health
+    ;;
+  query|q)
+    PROMPT="$1"; shift; SPACE=""
+    while [ $# -gt 0 ]; do case "$1" in --space) SPACE="$2"; shift 2;; *) shift;; esac; done
+    load_config
+    PAYLOAD=$(python3 -c "
+import json,sys
+d={'prompt':sys.argv[1],'agent_id':sys.argv[2],'agent_name':sys.argv[3],'session_id':sys.argv[4],'read_only':True}
+if sys.argv[5]: d['space']=sys.argv[5]
+print(json.dumps(d))
+" "$PROMPT" "$AGENT_ID" "$AGENT_NAME" "$SESSION_ID" "${SPACE:-}")
+    brain_api POST "/api/v1/memory" "$PAYLOAD" | python3 "$PARSER" query
+    ;;
+  contribute|c)
+    PROMPT="$1"; shift; CAT=""; TOPIC=""; SPACE=""; EXPLICIT_SPACE=false
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --category) CAT="$2"; shift 2;;
+        --topic) TOPIC="$2"; shift 2;;
+        --space) SPACE="$2"; EXPLICIT_SPACE=true; shift 2;;
+        *) shift;;
+      esac
+    done
+    # Default to protected
+    [ -z "$SPACE" ] && SPACE="protected"
+    check_min_length "$PROMPT" 50
+    # Proactive guidance
+    if [ "$EXPLICIT_SPACE" = false ]; then
+      space_default_notice "$SPACE"
+    fi
+    space_guidance "$SPACE"
+    echo "---" >&2
+    load_config
+    PAYLOAD=$(python3 -c "
+import json,sys
+d={'prompt':sys.argv[1],'agent_id':sys.argv[2],'agent_name':sys.argv[3],'session_id':sys.argv[4],'space':sys.argv[7]}
+if sys.argv[5]: d['thought_category']=sys.argv[5]
+if sys.argv[6]: d['topic']=sys.argv[6]
+print(json.dumps(d))
+" "$PROMPT" "$AGENT_ID" "$AGENT_NAME" "$SESSION_ID" "$CAT" "$TOPIC" "$SPACE")
+    brain_api POST "/api/v1/memory" "$PAYLOAD" | python3 "$PARSER" contribute
+    ;;
+  refine|r)
+    TID="$1"; PROMPT="$2"; shift 2; SPACE=""
+    while [ $# -gt 0 ]; do case "$1" in --space) SPACE="$2"; shift 2;; *) shift;; esac; done
+    [ -z "$SPACE" ] && SPACE="protected"
+    check_min_length "$PROMPT" 30
+    space_guidance "$SPACE"
+    echo "---" >&2
+    load_config
+    PAYLOAD=$(python3 -c "
+import json,sys
+d={'prompt':sys.argv[1],'agent_id':sys.argv[3],'agent_name':sys.argv[4],'session_id':sys.argv[5],'refines':sys.argv[2],'space':sys.argv[6]}
+print(json.dumps(d))
+" "$PROMPT" "$TID" "$AGENT_ID" "$AGENT_NAME" "$SESSION_ID" "$SPACE")
+    brain_api POST "/api/v1/memory" "$PAYLOAD" | python3 "$PARSER" refine
+    ;;
+  supersede)
+    TID="$1"; PROMPT="$2"; shift 2; SPACE=""
+    while [ $# -gt 0 ]; do case "$1" in --space) SPACE="$2"; shift 2;; *) shift;; esac; done
+    [ -z "$SPACE" ] && SPACE="protected"
+    check_min_length "$PROMPT" 50
+    space_guidance "$SPACE"
+    echo "WARNING: This will mark thought $TID as superseded." >&2
+    read -p "Continue? [y/N] " -r
+    [[ ! "$REPLY" =~ ^[Yy]$ ]] && echo "Cancelled." && exit 0
+    load_config
+    PAYLOAD=$(python3 -c "
+import json,sys
+d={'prompt':sys.argv[1],'agent_id':sys.argv[3],'agent_name':sys.argv[4],'session_id':sys.argv[5],'supersedes':[sys.argv[2]],'space':sys.argv[6]}
+print(json.dumps(d))
+" "$PROMPT" "$TID" "$AGENT_ID" "$AGENT_NAME" "$SESSION_ID" "$SPACE")
+    brain_api POST "/api/v1/memory" "$PAYLOAD" | python3 "$PARSER" supersede
+    ;;
+  correct)
+    TID="$1"; WRONG="$2"; RIGHT="$3"; shift 3; SPACE=""
+    while [ $# -gt 0 ]; do case "$1" in --space) SPACE="$2"; shift 2;; *) shift;; esac; done
+    [ -z "$SPACE" ] && SPACE="protected"
+    space_guidance "$SPACE"
+    echo "---" >&2
+    load_config
+    PAYLOAD=$(python3 -c "
+import json,sys
+d={'prompt':'Correction: '+sys.argv[2]+' -> '+sys.argv[3],'agent_id':sys.argv[4],'agent_name':sys.argv[5],'session_id':sys.argv[6],'refines':sys.argv[1],'corrected_fact':sys.argv[2],'correct_fact':sys.argv[3],'thought_category':'correction','space':sys.argv[7]}
+print(json.dumps(d))
+" "$TID" "$WRONG" "$RIGHT" "$AGENT_ID" "$AGENT_NAME" "$SESSION_ID" "$SPACE")
+    brain_api POST "/api/v1/memory" "$PAYLOAD" | python3 "$PARSER" correct
+    ;;
+  thought|t)
+    load_config
+    brain_api GET "/api/v1/memory/thought/$1" | python3 "$PARSER" thought
+    ;;
+  recovery)
+    load_config
+    brain_api GET "/api/v1/recovery/${1:-$AGENT_ID}" | python3 "$PARSER" recovery
+    ;;
+  domains|d)
+    load_config
+    brain_api GET "/api/v1/memory/domains" | python3 "$PARSER" domains
+    ;;
+  share)
+    load_config
+    echo "INFO: Moving thought $1 from private → protected (org-visible)." >&2
+    PAYLOAD=$(python3 -c "import json; print(json.dumps({'thought_id':'$1'}))")
+    brain_api POST "/api/v1/memory/share" "$PAYLOAD" | python3 "$PARSER" share
+    ;;
+  help|--help|-h)
+    cat << 'HELP'
+brain — xp0 shared knowledge CLI
+
+SPACES:
+  --space private      Only you and your agents (personal notes, drafts)
+  --space protected    Your org (Thomas + Robin) — DEFAULT for all writes
+  --space public       Everyone (abstract patterns, universal knowledge)
+
+  Without --space: defaults to PROTECTED. The CLI tells you which space
+  is being used and what it means on every write operation.
+
+SETUP:
+  brain setup <API_KEY>         Save API key (get from mindspace.xpollination.earth/settings)
+  brain health                  Check brain connection
+
+KNOWLEDGE:
+  brain query "question"                     Search (default: your spaces)
+  brain query "question" --space public      Search public only
+  brain contribute "insight"                 Store (default: protected)
+  brain contribute "insight" --space private  Store privately
+    --category <cat>            operational_learning, design_decision, state_snapshot, correction, ...
+    --topic <topic>             Topic tag for grouping
+
+REFINEMENT:
+  brain refine <id> "update"                 Improve thought (default: protected)
+  brain supersede <id> "new"                 Replace outdated (confirms interactively)
+  brain correct <id> "wrong" "right"         Record correction
+
+EXPLORATION:
+  brain thought <id>            Read full thought by ID
+  brain domains                 List knowledge domains
+  brain share <id>              Move thought: private → protected
+
+RECOVERY:
+  brain recovery [agent-id]     Get agent recovery context
+HELP
+    ;;
+  *) echo "Unknown: $CMD. Run 'brain help'." >&2; exit 1 ;;
+esac
