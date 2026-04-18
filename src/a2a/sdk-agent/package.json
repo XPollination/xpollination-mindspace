@@ -1,0 +1,11 @@
+{
+  "name": "@xpollination/sdk-agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Claude Agent SDK runner for xpollination — A2A body + streaming SDK push (sidecar for xpo-agent.js)",
+  "main": "runner.mjs",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.0"
+  }
+}
