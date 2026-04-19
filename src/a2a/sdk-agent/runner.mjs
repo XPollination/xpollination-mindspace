@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SDK Agent Runner — sidecar alternative to xpo-agent.js + Claude CLI
 //
-// Connects to A2A Hive (Ed25519 device key), opens SSE stream, logs events.
-// Stage 1: auth + connect + event log only. SDK streaming push added in Stage 2.
+// Connects to A2A Hive (Ed25519 device key), opens SSE stream, pushes each
+// event into a Claude Agent SDK streaming-input query. Assistant output is
+// logged; A2A deliver-back is Stage 3.
 //
 // Usage:
 //   node runner.mjs --role liaison-sdk --key ~/.xp0/keys/prod.json
@@ -11,6 +12,7 @@ import { parseArgs } from 'node:util';
 import { randomUUID, createPrivateKey, sign } from 'node:crypto';
 import { existsSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { query as sdkQuery } from '@anthropic-ai/claude-agent-sdk';
 
 const { values: args } = parseArgs({
   options: {
@@ -43,6 +45,79 @@ log(`Device key loaded: ${deviceKey.key_id} (${deviceKey.algorithm}, server=${de
 let API_URL = deviceKey.server;
 let agentId = null;
 let sessionToken = null;
+
+// Push-based async queue of SDKUserMessage, consumed by sdkQuery().
+// Each SSE event translates to one message.
+function createUserMessageQueue() {
+  const waiters = [];
+  const buffer = [];
+  let closed = false;
+  return {
+    push(msg) {
+      if (closed) return;
+      if (waiters.length > 0) waiters.shift().resolve({ value: msg, done: false });
+      else buffer.push(msg);
+    },
+    close() {
+      closed = true;
+      while (waiters.length > 0) waiters.shift().resolve({ value: undefined, done: true });
+    },
+    [Symbol.asyncIterator]() {
+      return {
+        next: () => {
+          if (buffer.length > 0) return Promise.resolve({ value: buffer.shift(), done: false });
+          if (closed) return Promise.resolve({ value: undefined, done: true });
+          return new Promise(resolve => waiters.push({ resolve }));
+        },
+        return: () => { closed = true; return Promise.resolve({ value: undefined, done: true }); },
+      };
+    },
+  };
+}
+
+function eventToUserMessage(eventType, data) {
+  const text = `[A2A EVENT ${eventType}]\n${JSON.stringify(data, null, 2)}`;
+  return {
+    type: 'user',
+    message: { role: 'user', content: text },
+    parent_tool_use_id: null,
+  };
+}
+
+let sdkSession = null; // { queue, query, consumer }
+
+function startSDKSession() {
+  const queue = createUserMessageQueue();
+  const systemPrompt = [
+    `You are an xp0 SDK-agent with role "${ROLE}".`,
+    'You receive A2A events describing tasks, messages, and state changes from the Hive.',
+    'For this stage: observe and narrate. Do not invoke tools; simply acknowledge each event.',
+  ].join(' ');
+  const q = sdkQuery({
+    prompt: queue,
+    options: { systemPrompt, model: 'claude-opus-4-7', permissionMode: 'default' },
+  });
+  const consumer = (async () => {
+    try {
+      for await (const msg of q) {
+        log(`SDK ${msg.type}: ${JSON.stringify(msg).slice(0, 300)}`);
+      }
+      log('SDK query ended');
+    } catch (err) {
+      log(`SDK consumer error: ${err.stack || err.message}`);
+    }
+  })();
+  sdkSession = { queue, query: q, consumer };
+  log('SDK session started');
+}
+
+function stopSDKSession() {
+  if (!sdkSession) return;
+  try { sdkSession.queue.close(); } catch {}
+  try { sdkSession.query.close(); } catch {}
+  sdkSession = null;
+  log('SDK session stopped');
+}
 
 async function connectA2A() {
   const identity = {
@@ -123,7 +198,7 @@ async function listenSSE() {
         try {
           const data = JSON.parse(line.slice(6));
           log(`EVENT ${currentEvent}: ${JSON.stringify(data).slice(0, 200)}`);
-          // Stage 2 TODO: push into SDK streaming input
+          if (sdkSession) sdkSession.queue.push(eventToUserMessage(currentEvent, data));
         } catch (err) {
           log(`EVENT ${currentEvent}: parse error: ${err.message}`);
         }
@@ -152,9 +227,11 @@ async function main() {
     try {
       await connectA2A();
       reconnectDelay = 5000;
+      if (!sdkSession) startSDKSession();
       await Promise.race([listenSSE(), heartbeatLoop()]);
     } catch (err) {
       log(`ERROR: ${err.message} — reconnecting in ${reconnectDelay}ms`);
+      stopSDKSession();
       await new Promise(r => setTimeout(r, reconnectDelay));
       reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     }
