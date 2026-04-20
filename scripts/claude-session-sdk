@@ -1,0 +1,96 @@
+#!/bin/bash
+#===============================================================================
+# claude-session-sdk — Sidecar launcher for Claude Agent SDK runner
+#
+# Starts the SDK-based agent (no tmux, no Claude CLI). Pushes A2A events
+# directly into the Claude Agent SDK streaming input. Parallel to the existing
+# claude-session-beta/prod launchers — does not replace them.
+#
+# Usage:
+#   claude-session-sdk liaison-sdk             # default: prod hive, new liaison-sdk role
+#   claude-session-sdk liaison-sdk --foreground # don't daemonize, stay in TTY
+#
+# Requirements:
+#   - Prod device key at ~/.xp0/keys/prod.json (register via claude-session-prod)
+#   - SSH tunnel: localhost:3100 → xp0-prod:3100 (opened automatically if missing)
+#   - Claude Code OAuth token: reads ~/.claude/.credentials.json (claudeAiOauth field)
+#   - Node 22.x (nvm) + installed deps in src/a2a/sdk-agent/node_modules
+#
+# Logs: /tmp/xpo-agent-<role>.log (structured, one event per line)
+#===============================================================================
+
+set -euo pipefail
+
+readonly HETZNER_HOME="/home/developer"
+readonly NVM_NODE="${HETZNER_HOME}/.nvm/versions/node/v22.22.0/bin"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+readonly RUNNER="${PROJECT_ROOT}/src/a2a/sdk-agent/runner.mjs"
+readonly KEY_FILE="${HETZNER_HOME}/.xp0/keys/prod.json"
+readonly TUNNEL_PORT=3100
+
+usage() {
+    cat <<'EOF'
+Usage: claude-session-sdk <role> [--foreground]
+
+  claude-session-sdk liaison-sdk                # start as daemon, log to /tmp/xpo-agent-<role>.log
+  claude-session-sdk liaison-sdk --foreground   # stay attached to TTY
+
+Requires: ~/.xp0/keys/prod.json (run claude-session-prod once to register).
+EOF
+    exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+
+ROLE="$1"
+shift || true
+MODE="${1:-daemon}"
+
+if [[ ! -f "$KEY_FILE" ]]; then
+    echo "ERROR: device key missing at $KEY_FILE"
+    echo "Register with: claude-session-prod <session-name>  (then approve in browser)"
+    exit 1
+fi
+
+if [[ ! -f "$RUNNER" ]]; then
+    echo "ERROR: runner missing at $RUNNER"
+    exit 1
+fi
+
+# Ensure SSH tunnel is up (prod hive only binds 127.0.0.1 on xp0-prod)
+if ! ss -tln 2>/dev/null | awk '{print $4}' | grep -qE ":${TUNNEL_PORT}$"; then
+    echo "Opening SSH tunnel localhost:${TUNNEL_PORT} → xp0-prod:${TUNNEL_PORT}..."
+    ssh -o ExitOnForwardFailure=yes -fN -L "${TUNNEL_PORT}:localhost:${TUNNEL_PORT}" xp0-prod
+    sleep 1
+fi
+
+# Health check
+if ! curl -sf "http://localhost:${TUNNEL_PORT}/health" >/dev/null; then
+    echo "ERROR: hive not reachable on localhost:${TUNNEL_PORT}"
+    exit 1
+fi
+
+export PATH="${NVM_NODE}:${PATH}"
+CMD=(node "$RUNNER" --role "$ROLE" --key "$KEY_FILE")
+
+LOGFILE="/tmp/xpo-agent-${ROLE}.log"
+
+if [[ "$MODE" == "--foreground" ]]; then
+    echo "Starting sdk-agent foreground, role=${ROLE}"
+    exec "${CMD[@]}"
+else
+    echo "Starting sdk-agent daemon, role=${ROLE}"
+    echo "Log: $LOGFILE"
+    nohup "${CMD[@]}" >> "$LOGFILE" 2>&1 &
+    local_pid=$!
+    echo "PID: $local_pid"
+    sleep 1
+    if kill -0 "$local_pid" 2>/dev/null; then
+        echo "Running. Tail log: tail -f $LOGFILE"
+    else
+        echo "ERROR: process exited immediately. Check $LOGFILE:"
+        tail -20 "$LOGFILE"
+        exit 1
+    fi
+fi
