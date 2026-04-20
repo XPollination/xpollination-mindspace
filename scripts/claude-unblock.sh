@@ -53,7 +53,9 @@ readonly REDISCOVER_INTERVAL=10  # re-discover every 10 cycles (~60s at 6s poll)
 # --- Functions ---
 
 is_on_hetzner() {
-    [[ -x "$CLAUDE_BIN" ]]
+    # Developer has claude under their home; system-wide install (e.g. maria's
+    # runtime) lives at /usr/local/bin/claude. Either marker means we're on the box.
+    [[ -x "$CLAUDE_BIN" ]] || [[ -x "/usr/local/bin/claude" ]]
 }
 
 run_remote() {
@@ -383,8 +385,22 @@ EOF
 fi
 
 if is_on_hetzner; then
-    # If running as thomas, re-exec as developer
-    if [[ "$(whoami)" != "developer" ]]; then
+    CURRENT_USER="$(whoami)"
+
+    # Runtime users run the monitor locally in their own tmux server.
+    # Orchestrator user (typically thomas) spawns a maria-context monitor in
+    # the background AND then re-execs as developer for the foreground monitor.
+    # Each runtime user has its own tmux server, so 'claude-unblock' session
+    # names don't collide — each monitor only sees its own user's Claude panes.
+    if [[ "$CURRENT_USER" != "developer" && "$CURRENT_USER" != "maria" ]]; then
+        # Background-spawn maria monitor (idempotent via tmux has-session check below)
+        if getent passwd maria >/dev/null 2>&1; then
+            sudo -n -iu maria bash "$SELF_PATH" "$MODE" "${EXTRA_ARGS[@]}" \
+                </dev/null >/tmp/claude-unblock-maria-launch.log 2>&1 &
+            disown
+            echo "Spawned maria-context unblock monitor in background (log: /tmp/claude-unblock-maria-launch.log)."
+            echo "  To attach manually: sudo -n -iu maria tmux attach -t claude-unblock"
+        fi
         exec sudo -i -u developer bash "$SELF_PATH" "$MODE" "${EXTRA_ARGS[@]}"
     fi
 
@@ -395,18 +411,28 @@ if is_on_hetzner; then
     SESSION_NAME="claude-unblock"
     RUN_FLAG="--run-${MODE}"
 
-    # If session exists, just attach
+    # If session exists, just attach (or exit quietly when no tty, e.g. background spawn)
     if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-        echo "Monitor already running. Attaching..."
-        exec tmux attach -t "$SESSION_NAME"
+        if [[ -t 1 ]]; then
+            echo "Monitor already running. Attaching..."
+            exec tmux attach -t "$SESSION_NAME"
+        else
+            echo "Monitor already running (no tty — staying detached)."
+            exit 0
+        fi
     fi
 
     # Create new session running the monitor
-    echo "Starting unblock monitor in tmux session '$SESSION_NAME'..."
+    echo "Starting unblock monitor in tmux session '$SESSION_NAME' (user: $CURRENT_USER)..."
     tmux new-session -d -s "$SESSION_NAME" "bash $SELF_PATH $RUN_FLAG ${EXTRA_ARGS[*]:-}"
 
-    # Attach
-    exec tmux attach -t "$SESSION_NAME"
+    # Attach only when invoked interactively; background spawns stay detached
+    if [[ -t 1 ]]; then
+        exec tmux attach -t "$SESSION_NAME"
+    else
+        echo "Monitor started in background tmux session '$SESSION_NAME' (no tty)."
+        exit 0
+    fi
 else
     # Not on Hetzner — SSH in
     run_remote "$MODE"
