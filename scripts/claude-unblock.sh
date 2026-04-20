@@ -267,18 +267,23 @@ run_monitor() {
                 # SAFETY: Only auto-confirm tool PERMISSION, TRUST, and SAFETY prompts.
                 # Never auto-confirm AskUserQuestion (human decision prompts).
                 # Four prompt types exist:
-                # 1. Tool execution: "● Bash(...)" — have ● bullet near options
+                # 1. Tool execution: "● Bash(...)" / "● Write(...)" — ● bullet near options
                 # 2. Trust/domain:   "Do you want to allow Claude to fetch..." — no ●
                 # 3. Safety warning: "Do you want to proceed?" — no ●, command safety check
                 # 4. AskUserQuestion: "? Approve to send?" — no ● AND no trust/safety language
                 #
-                # Strategy: check last 20 lines for ● OR known safe prompt language.
-                # If none found, skip (likely AskUserQuestion).
+                # Window sizing: Write/Edit prompts can display a long diff BETWEEN the
+                # ● marker and the prompt itself (30+ lines for a file of any size). A
+                # 20-line tail misses the ● and the monitor skips the prompt. Use the full
+                # 300-line scrollback for ● detection; regex specificity is the safety net.
                 local prompt_header
-                prompt_header=$(echo "$output" | tail -20 | tr '\n' ' ' | tr -s ' ')
+                prompt_header=$(echo "$output" | tail -80 | tr '\n' ' ' | tr -s ' ')
                 if ! echo "$prompt_header" | grep -qE '●'; then
-                    # No ● bullet — check for trust/safety prompt language
-                    if ! echo "$prompt_header" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed'; then
+                    # No ● bullet — check for trust/safety prompt language. Include
+                    # file-action phrasings ("Do you want to create|save|write|overwrite")
+                    # because Write/Edit prompts render before "Esc to cancel" without ●
+                    # when the diff pushes the bullet far above the visible window.
+                    if ! echo "$prompt_header" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed|Do you want to (create|save|write|overwrite|make these edits)'; then
                         continue
                     fi
                 fi
