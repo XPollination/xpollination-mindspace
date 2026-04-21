@@ -43,8 +43,8 @@ describe("ms-a11-1-agent-card: agent-card.ts", () => {
     expect(content).toMatch(/export.*agentCardRouter/);
   });
 
-  it("contains name: Mindspace Orchestrator", () => {
-    expect(content).toMatch(/Mindspace Orchestrator/);
+  it("contains name: Sina", () => {
+    expect(content).toMatch(/name:\s*['"]Sina['"]/);
   });
 
   it("contains protocol: xpo-a2a-v1", () => {

@@ -4,7 +4,7 @@ const agentCardRouter = Router();
 
 // Per REQ-A2A-001 §4.A2A.6 — Agent Card discovery endpoint
 const AGENT_CARD = {
-  name: 'Mindspace Orchestrator',
+  name: 'Sina',
   description: 'XPollination task orchestration and agent coordination',
   version: '1.0',
   protocol: 'xpo-a2a-v1',
