@@ -23,6 +23,13 @@ OFFICE_HOST=178.104.208.66
 OFFICE_USER=xpo-agent
 OFFICE_KEY=/home/developer/.ssh/id_ed25519_xp0_newserver
 
+# Key belongs to developer; wrap SSH via sudo when invoker is not developer.
+if [[ "$(id -un)" == "developer" ]]; then
+    SSH_WRAP=(ssh)
+else
+    SSH_WRAP=(sudo -u developer env "TERM=${TERM:-xterm-256color}" ssh)
+fi
+
 DEV_USERS=(developer)
 OFFICE_USERS=(xpo-agent maria thomas)
 
@@ -62,7 +69,7 @@ run_local_user() {
 
 run_remote_user() {
     local user="$1"
-    ssh -i "$OFFICE_KEY" -o StrictHostKeyChecking=accept-new \
+    "${SSH_WRAP[@]}" -i "$OFFICE_KEY" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes \
         "${OFFICE_USER}@${OFFICE_HOST}" \
         "bash -c \$'$_user_session_handler' _ '$user' '$LIST_ONLY'"
 }

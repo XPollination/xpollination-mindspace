@@ -35,6 +35,13 @@ readonly OFFICE_USER="xpo-agent"
 readonly OFFICE_KEY="/home/developer/.ssh/id_ed25519_xp0_newserver"
 readonly OFFICE_USERS=(xpo-agent maria thomas)
 
+# SSH key is developer-only; when invoked by other users, wrap via sudo -u developer.
+if [[ "$(id -un)" == "developer" ]]; then
+    SSH_WRAP=(ssh)
+else
+    SSH_WRAP=(sudo -u developer env "TERM=${TERM:-xterm-256color}" ssh)
+fi
+
 # Parse args
 INTERVAL=5
 LOCAL_ONLY=0
@@ -169,7 +176,7 @@ for U in xpo-agent maria thomas; do
     done <<< "$panes"
 done
 '
-    ssh -i "$OFFICE_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
+    "${SSH_WRAP[@]}" -i "$OFFICE_KEY" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes -o ConnectTimeout=5 \
         "${OFFICE_USER}@${OFFICE_HOST}" "$remote_script" 2>/dev/null || true
 }
 
