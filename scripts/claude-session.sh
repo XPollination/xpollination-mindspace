@@ -108,6 +108,13 @@ else
     readonly NVM_NODE=""
 fi
 
+# Permission model: bypass all permission checks. Replaces the legacy
+# claude-unblock sidecar monitor (overengineering — see brain lesson
+# 2026-04-23). Safe here because dev sessions are already trusted and
+# sandboxed agent sessions (maria/sina/bible) run as passwd-locked
+# users with no sudo, bridge-only access, and isolated home dirs.
+readonly CLAUDE_FLAGS="--dangerously-skip-permissions"
+
 # Pre-approved tool patterns for agents — eliminates most permission prompts.
 # Agents still can't do destructive ops (rm -rf, git reset --hard) without confirmation.
 # Why: 368 individual Bash rules accumulated in settings.local.json, one per prompt confirmation.
@@ -601,7 +608,7 @@ ROLE
             echo "#!/bin/bash"
             echo "cd \"${workspace}\""
             echo "export AGENT_ROLE=${role}"
-            printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
+            printf 'exec %s %s --allowedTools' "${CLAUDE_BIN}" "${CLAUDE_FLAGS}"
             for tool in "${ALLOWED_TOOLS[@]}"; do
                 printf ' %q' "$tool"
             done
@@ -642,9 +649,9 @@ create_dual_session() {
     tmux rename-window -t "${session}:0" 'ORCHESTRATOR | PDSA+QA | DEV'
 
     # Start Claude in all 3 panes
-    tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN" Enter
-    tmux send-keys -t "${session}:0.1" "$CLAUDE_BIN" Enter
-    tmux send-keys -t "${session}:0.2" "$CLAUDE_BIN" Enter
+    tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN $CLAUDE_FLAGS" Enter
+    tmux send-keys -t "${session}:0.1" "$CLAUDE_BIN $CLAUDE_FLAGS" Enter
+    tmux send-keys -t "${session}:0.2" "$CLAUDE_BIN $CLAUDE_FLAGS" Enter
 
     # Wait for Claude to be ready in each pane, handle trust prompts
     for pane in "${session}:0.0" "${session}:0.1" "${session}:0.2"; do
@@ -721,7 +728,7 @@ create_agent_body_session() {
             echo "#!/bin/bash"
             echo "cd \"${workspace}\""
             echo "export AGENT_ROLE=${role}"
-            printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
+            printf 'exec %s %s --allowedTools' "${CLAUDE_BIN}" "${CLAUDE_FLAGS}"
             for tool in "${ALLOWED_TOOLS[@]}"; do
                 printf ' %q' "$tool"
             done
@@ -768,7 +775,7 @@ create_single_session() {
     if ! authenticate_or_load_key "$session"; then
         echo "WARNING: Authentication failed for ${XPO_ENV}. Starting without A2A body."
         tmux new-session -d -s "$session" -c "$WORKING_DIR"
-        tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN" Enter
+        tmux send-keys -t "${session}:0.0" "$CLAUDE_BIN $CLAUDE_FLAGS" Enter
         return
     fi
     local key_file="$XPO_KEY_FILE"
@@ -807,7 +814,7 @@ ROLE
         echo "#!/bin/bash"
         echo "cd \"${workspace}\""
         echo "export AGENT_ROLE=${role}"
-        printf 'exec %s --allowedTools' "${CLAUDE_BIN}"
+        printf 'exec %s %s --allowedTools' "${CLAUDE_BIN}" "${CLAUDE_FLAGS}"
         for tool in "${ALLOWED_TOOLS[@]}"; do
             printf ' %q' "$tool"
         done

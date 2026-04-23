@@ -42,6 +42,46 @@
 
 set -euo pipefail
 
+# --- Deprecation notice (2026-04-23) ---
+# claude-unblock was a 150-line sidecar that polled tmux panes and auto-clicked
+# permission prompts. The claude CLI has had a native --dangerously-skip-
+# permissions flag the whole time. For sandboxed agent-users (maria, sina,
+# thomas/bible on office-xp0 — all passwd-locked, no sudo, bridge-only access)
+# the flag is the right config and this sidecar is not needed.
+#
+# As of 2026-04-23, claude-session / claude-maria / claude-bible launch
+# claude with --dangerously-skip-permissions. This script is DEPRECATED and
+# only runs if you pass --legacy explicitly.
+#
+# Brain: search for "overengineering" + "claude-unblock" (contributed 2026-04-23).
+cat >&2 <<'DEPRECATION'
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  [DEPRECATED] claude-unblock is no longer needed.                            ║
+║                                                                              ║
+║  It was built to auto-click permission prompts. The right fix was always a  ║
+║  native flag: claude --dangerously-skip-permissions.                         ║
+║                                                                              ║
+║  As of 2026-04-23, claude-session / claude-maria / claude-bible all use     ║
+║  that flag. Nothing to unblock. This script is overengineering — a 150-line ║
+║  sidecar for a problem the right config never had.                           ║
+║                                                                              ║
+║  Brain-Lesson: native config > sidecar. See query:                           ║
+║    brain query "overengineering claude-unblock native flag"                  ║
+║                                                                              ║
+║  If you still need to run the legacy monitor (e.g. to unblock an agent      ║
+║  started without the flag), pass --legacy explicitly:                        ║
+║    claude-unblock --legacy [agent-filter...]                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+DEPRECATION
+
+if [[ "${1:-}" != "--legacy" ]]; then
+    echo "Exiting. Pass --legacy to force-run." >&2
+    exit 0
+fi
+shift  # drop --legacy so downstream arg-parsing stays unchanged
+
 # --- Configuration ---
 readonly HETZNER_VPN_IP="10.33.33.1"
 readonly HETZNER_USER="developer"
@@ -412,6 +452,35 @@ run_monitor() {
     done
 }
 
+# Supervisor: keep the monitor alive across silent crashes.
+# run_monitor uses `set -euo pipefail`; any non-zero in a pipe (empty
+# grep, transient tmux capture failure, bash 5 array corner case) can
+# exit the script without a visible error. Pre-supervisor, that killed
+# the tmux session silently. Now: wrap in a retry loop so crashes are
+# announced in-pane and the loop respawns automatically.
+run_monitor_supervised() {
+    local restart_count=0
+    # ERR trap reveals the failing line next time a crash happens,
+    # so we can close this class of bug permanently (CMM3 iteration).
+    trap 'echo "[$(date "+%H:%M:%S")] !!! ERR trap: exit=$? line=$LINENO cmd=${BASH_COMMAND}" >&2' ERR
+    while true; do
+        # Disable strict-exit for the inner call so pipefail can't take
+        # down the supervisor itself.
+        set +e
+        run_monitor "$@"
+        local exit_code=$?
+        set -e
+
+        restart_count=$((restart_count + 1))
+        echo ""
+        echo "========================================"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] !!! run_monitor exited (code=$exit_code)"
+        echo "Restart #$restart_count — respawning in 5s..."
+        echo "========================================"
+        sleep 5
+    done
+}
+
 # --- Main ---
 
 MODE="${1:-all}"
@@ -424,9 +493,9 @@ if [[ "$MODE" == "--run-"* ]]; then
     run_mode="${MODE#--run-}"
     # Split remaining args — "agents" and "liaison" are backward compat filters
     if [[ "$run_mode" == "all" ]]; then
-        run_monitor "all"
+        run_monitor_supervised "all"
     else
-        run_monitor "$run_mode" "${EXTRA_ARGS[@]}"
+        run_monitor_supervised "$run_mode" "${EXTRA_ARGS[@]}"
     fi
     exit 0
 fi
