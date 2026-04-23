@@ -51,7 +51,8 @@ case "${1:-}" in
         ;;
 esac
 
-REMOTE_CMD="sudo -iu thomas tmux new-session -A -s $SESSION claude --dangerously-skip-permissions $SKILL"
+ENSURE_CONF='grep -q "set -g mouse on" ~/.tmux.conf 2>/dev/null || echo "set -g mouse on" >> ~/.tmux.conf'
+REMOTE_CMD="sudo -iu thomas bash -c '$ENSURE_CONF; tmux new-session -A -s $SESSION claude --dangerously-skip-permissions $SKILL'"
 
 if [[ "$(id -un)" == "developer" ]]; then
     exec ssh -t -i "$REMOTE_KEY" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes \
