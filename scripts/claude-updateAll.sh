@@ -30,7 +30,7 @@ fi
 
 # Hosts and the users on each host that run Claude Code.
 DEV_USERS=(developer)
-OFFICE_USERS=(xpo-agent maria thomas)
+OFFICE_USERS=(xpo-agent maria thomas sina)
 
 _local_run() {
     local user="$1"; shift

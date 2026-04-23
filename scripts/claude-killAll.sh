@@ -31,7 +31,7 @@ else
 fi
 
 DEV_USERS=(developer)
-OFFICE_USERS=(xpo-agent maria thomas)
+OFFICE_USERS=(xpo-agent maria thomas sina)
 
 # Remote-safe: prints tmux sessions running claude for a single user, and
 # optionally kills them. Designed to be embedded into a remote SSH command.

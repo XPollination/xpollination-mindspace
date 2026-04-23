@@ -33,7 +33,7 @@ readonly SELF_PATH="$(realpath "$0")"
 readonly OFFICE_HOST="178.104.208.66"
 readonly OFFICE_USER="xpo-agent"
 readonly OFFICE_KEY="/home/developer/.ssh/id_ed25519_xp0_newserver"
-readonly OFFICE_USERS=(xpo-agent maria thomas)
+readonly OFFICE_USERS=(xpo-agent maria thomas sina)
 
 # SSH key is developer-only; when invoked by other users, wrap via sudo -u developer.
 if [[ "$(id -un)" == "developer" ]]; then
