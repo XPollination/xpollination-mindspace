@@ -49,6 +49,36 @@ readonly HETZNER_HOME="/home/${HETZNER_USER}"
 readonly SELF_PATH="$(realpath "$0")"
 readonly CLAUDE_BIN="${HETZNER_HOME}/.local/bin/claude"
 readonly REDISCOVER_INTERVAL=10  # re-discover every 10 cycles (~60s at 6s poll)
+readonly EXCLUDE_FILE="${HOME}/.config/claude-unblock/exclude-sessions"
+
+# Global: loaded by load_excludes(), read by is_excluded_session()
+declare -a EXCLUDES=()
+
+load_excludes() {
+    EXCLUDES=()
+    if [[ -n "${CLAUDE_UNBLOCK_EXCLUDE_SESSIONS:-}" ]]; then
+        local env_val="${CLAUDE_UNBLOCK_EXCLUDE_SESSIONS//[[:space:]]/}"
+        IFS=',' read -ra env_excl <<< "$env_val"
+        for e in "${env_excl[@]}"; do [[ -n "$e" ]] && EXCLUDES+=("$e"); done
+    fi
+    if [[ -f "$EXCLUDE_FILE" ]]; then
+        while IFS= read -r line; do
+            line="${line#"${line%%[![:space:]]*}"}"  # ltrim
+            line="${line%"${line##*[![:space:]]}"}"  # rtrim
+            [[ -z "$line" || "${line:0:1}" == "#" ]] && continue
+            EXCLUDES+=("$line")
+        done < "$EXCLUDE_FILE"
+    fi
+}
+
+is_excluded_session() {
+    local session="$1"
+    local excl
+    for excl in "${EXCLUDES[@]}"; do
+        [[ "$session" == "$excl" ]] && return 0
+    done
+    return 1
+}
 
 # --- Functions ---
 
@@ -88,14 +118,33 @@ get_agent_name() {
 discover_agents() {
     # Auto-detect all panes running claude across ALL tmux sessions.
     # Returns lines of: TARGET AGENT_NAME
-    # Uses tmux list-panes -a to find every pane, then filters for claude processes.
+    # Checks BOTH pane_current_command AND child process tree.
+    # Claude Code often runs as bash→bash→claude, so pane_current_command shows "bash".
     local pane_list
-    pane_list=$(tmux list-panes -a -F '#{session_name} #{window_index} #{pane_index} #{pane_current_command}' 2>/dev/null) || return
+    pane_list=$(tmux list-panes -a -F '#{session_name} #{window_index} #{pane_index} #{pane_current_command} #{pane_pid}' 2>/dev/null) || return
 
-    while IFS=' ' read -r session win_idx pane_idx cmd; do
-        # Match panes running claude (the CLI binary)
+    while IFS=' ' read -r session win_idx pane_idx cmd pane_pid; do
+        # Skip excluded sessions entirely (e.g. human-interactive panes)
+        if is_excluded_session "$session"; then
+            continue
+        fi
+
+        local target="${session}:${win_idx}.${pane_idx}"
+        local found=false
+
+        # Direct match: pane command is claude
         if [[ "$cmd" == *"claude"* ]]; then
-            local target="${session}:${win_idx}.${pane_idx}"
+            found=true
+        fi
+
+        # Child process match: claude runs as child of bash
+        if [[ "$found" == "false" && -n "$pane_pid" ]]; then
+            if pstree -p "$pane_pid" 2>/dev/null | grep -q "claude"; then
+                found=true
+            fi
+        fi
+
+        if [[ "$found" == "true" ]]; then
             local name
             name=$(get_agent_name "$session" "$pane_idx")
             echo "${target} ${name}"
@@ -109,6 +158,11 @@ run_monitor() {
 
     echo "=== claude-unblock: auto-discovery ==="
     echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
+
+    load_excludes
+    if [[ ${#EXCLUDES[@]} -gt 0 ]]; then
+        echo "Excluded sessions: ${EXCLUDES[*]}"
+    fi
 
     # Wait until at least one agent is detected
     local discovery_output=""
@@ -187,6 +241,11 @@ run_monitor() {
     local confirm_count=0
     local scan_count=0
 
+    # Dedup: remember the hash of the last prompt we fired on per target.
+    # Without this we re-fire on the same prompt every 6s until Claude's UI
+    # clears, and the stray keystrokes land as typed input in the next turn.
+    declare -A LAST_FIRED_HASH
+
     while true; do
         # Re-discover agents periodically
         if (( scan_count > 0 && scan_count % REDISCOVER_INTERVAL == 0 )); then
@@ -241,10 +300,9 @@ run_monitor() {
             output=$(tmux capture-pane -t "$TARGET" -p -S -300 2>/dev/null) || continue
 
             # Only process if there's an active prompt (bottom of pane has prompt indicator)
-            # Use tail -12 because narrow panes wrap the footer across many lines:
-            # "Esc to cancel · Tab to amend · ctrl+e to explain" can span 8+ lines
+            # Use tail -20 for narrow panes where footer wraps across many lines
             local bottom
-            bottom=$(echo "$output" | tail -12)
+            bottom=$(echo "$output" | tail -20)
 
             # Active prompt detection: two prompt formats exist:
             # 1. Tool execution prompts: show "Esc to cancel" footer
@@ -253,84 +311,94 @@ run_monitor() {
             # tool output (line numbers, numbered lists) and cause false positives.
             local bottom_collapsed
             bottom_collapsed=$(echo "$bottom" | tr '\n' ' ' | tr -s ' ')
-            if echo "$bottom_collapsed" | grep -qE 'Esc to cancel|Do you want to allow'; then
+            if ! echo "$bottom_collapsed" | grep -qE 'Esc to cancel|Do you want to allow'; then
+                # Prompt is gone — reset dedup so the next fresh prompt fires.
+                unset "LAST_FIRED_HASH[$TARGET]"
+                continue
+            fi
 
-                # Use ONLY the prompt area for option matching (last 40 lines).
-                # The full 300-line scrollback contains prior agent output that
-                # causes false matches — e.g. "2." in output + "Yes" elsewhere
-                # would match "2\..*Yes" and pick option 2 (No) instead of 1 (Yes).
-                local prompt_area
-                prompt_area=$(echo "$output" | tail -40 | tr '\n' ' ' | tr -s ' ')
+            # Use FULL scrollback for prompt area — narrow panes (68 chars) wrap
+            # long commands across 100+ lines, pushing "❯ 1. Yes" far from "3. No".
+            # Safety: the "Esc to cancel" gate above ensures we're in a real prompt.
+            # The ● bullet check below prevents AskUserQuestion false positives.
+            local prompt_area
+            prompt_area=$(echo "$output" | tr '\n' ' ' | tr -s ' ')
 
-                # SAFETY: Only auto-confirm tool PERMISSION, TRUST, and SAFETY prompts.
-                # Never auto-confirm AskUserQuestion (human decision prompts).
-                # Four prompt types exist:
-                # 1. Tool execution: "● Bash(...)" — have ● bullet near options
-                # 2. Trust/domain:   "Do you want to allow Claude to fetch..." — no ●
-                # 3. Safety warning: "Do you want to proceed?" — no ●, command safety check
-                # 4. AskUserQuestion: "? Approve to send?" — no ● AND no trust/safety language
-                #
-                # Strategy: check last 20 lines for ● OR known safe prompt language.
-                # If none found, skip (likely AskUserQuestion).
-                local prompt_header
-                prompt_header=$(echo "$output" | tail -20 | tr '\n' ' ' | tr -s ' ')
-                if ! echo "$prompt_header" | grep -qE '●'; then
-                    # No ● bullet — check for trust/safety prompt language
-                    if ! echo "$prompt_header" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed'; then
-                        continue
-                    fi
-                fi
+            # Dedup: hash the prompt text. If we've already fired on THIS exact
+            # prompt, skip until it changes (i.e., Claude dismisses it).
+            local prompt_hash
+            prompt_hash=$(echo "$prompt_area" | md5sum | cut -d' ' -f1)
+            if [[ "${LAST_FIRED_HASH[$TARGET]:-}" == "$prompt_hash" ]]; then
+                continue
+            fi
 
-                # Find the best option: prefer "don't ask again" > numbered Yes > Enter
-                if echo "$prompt_area" | grep -qiE "don.t ask again"; then
-                    # Extract the option number for "don't ask again"
-                    # Use single-digit [1-9] only — multi-digit numbers (183, etc.)
-                    # are line numbers from Read tool output, not option numbers.
-                    local option
-                    option=$(echo "$prompt_area" | grep -oiE '[1-9]\.[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
-                    if [[ -n "$option" ]]; then
-                        tmux send-keys -t "$TARGET" "$option"
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option $option (don't ask again) [#$confirm_count]"
-                        sleep 3
-                        continue
-                    fi
-                fi
 
-                if echo "$prompt_area" | grep -qE '❯.*[0-9]+\. Yes'; then
-                    # Pick the highest-numbered "Yes" option (allow all > allow once)
-                    # but NEVER pick an option that doesn't contain "Yes"
-                    if echo "$prompt_area" | grep -qE '3\.[^0-9]*Yes'; then
-                        tmux send-keys -t "$TARGET" 3
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 3 (yes/allow all) [#$confirm_count]"
-                    elif echo "$prompt_area" | grep -qE '2\.[^0-9]*Yes'; then
-                        tmux send-keys -t "$TARGET" 2
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 2 (yes/allow all) [#$confirm_count]"
-                    else
-                        tmux send-keys -t "$TARGET" 1
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 1 (yes) [#$confirm_count]"
-                    fi
-                    sleep 3
+            # SAFETY: Only auto-confirm tool PERMISSION, TRUST, and SAFETY prompts.
+            # Never auto-confirm AskUserQuestion (human decision prompts).
+            # Four prompt types exist:
+            # 1. Tool execution: "● Bash(...)" — have ● bullet near options
+            # 2. Trust/domain:   "Do you want to allow Claude to fetch..." — no ●
+            # 3. Safety warning: "Do you want to proceed?" — no ●, command safety check
+            # 4. AskUserQuestion: "? Approve to send?" — no ● AND no trust/safety language
+            #
+            # Strategy: check full scrollback for ● OR known safe prompt language.
+            # If none found, skip (likely AskUserQuestion).
+            if ! echo "$prompt_area" | grep -qE '●'; then
+                if ! echo "$prompt_area" | grep -qE 'Do you want to allow|Claude wants to|Do you want to proceed'; then
                     continue
                 fi
+            fi
 
-                # Fallback: "Do you want to proceed" with numbered options
-                if echo "$prompt_area" | grep -qE 'Do you want'; then
-                    if echo "$prompt_area" | grep -qE '[0-9]+\. Yes'; then
-                        tmux send-keys -t "$TARGET" 1
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed prompt (option 1) [#$confirm_count]"
-                    else
-                        tmux send-keys -t "$TARGET" Enter
-                        confirm_count=$((confirm_count + 1))
-                        echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed 'Do you want' (Enter) [#$confirm_count]"
-                    fi
-                    sleep 3
+            # Find the best option: prefer "don't ask again" > numbered Yes > Enter
+            if echo "$prompt_area" | grep -qiE "don.t ask again"; then
+                local option
+                option=$(echo "$prompt_area" | grep -oiE '[1-9]\.[^.]{0,80}don.t ask again' | head -1 | grep -oE '^[1-9]')
+                if [[ -n "$option" ]]; then
+                    LAST_FIRED_HASH[$TARGET]="$prompt_hash"
+                    tmux send-keys -t "$TARGET" "$option"
+                    confirm_count=$((confirm_count + 1))
+                    echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option $option (don't ask again) [#$confirm_count]"
+                    sleep 10
                     continue
                 fi
+            fi
+
+            if echo "$prompt_area" | grep -qE '❯.*[0-9]+\. Yes'; then
+                # Pick the highest-numbered "Yes" option (allow all > allow once)
+                if echo "$prompt_area" | grep -qE '3\.[^0-9]*Yes'; then
+                    LAST_FIRED_HASH[$TARGET]="$prompt_hash"
+                    tmux send-keys -t "$TARGET" 3
+                    confirm_count=$((confirm_count + 1))
+                    echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 3 (yes/allow all) [#$confirm_count]"
+                elif echo "$prompt_area" | grep -qE '2\.[^0-9]*Yes'; then
+                    LAST_FIRED_HASH[$TARGET]="$prompt_hash"
+                    tmux send-keys -t "$TARGET" 2
+                    confirm_count=$((confirm_count + 1))
+                    echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 2 (yes/allow all) [#$confirm_count]"
+                else
+                    LAST_FIRED_HASH[$TARGET]="$prompt_hash"
+                    tmux send-keys -t "$TARGET" 1
+                    confirm_count=$((confirm_count + 1))
+                    echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Option 1 (yes) [#$confirm_count]"
+                fi
+                sleep 10
+                continue
+            fi
+
+            # Fallback: "Do you want to proceed" with numbered options
+            if echo "$prompt_area" | grep -qE 'Do you want'; then
+                LAST_FIRED_HASH[$TARGET]="$prompt_hash"
+                if echo "$prompt_area" | grep -qE '[0-9]+\. Yes'; then
+                    tmux send-keys -t "$TARGET" 1
+                    confirm_count=$((confirm_count + 1))
+                    echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed prompt (option 1) [#$confirm_count]"
+                else
+                    tmux send-keys -t "$TARGET" Enter
+                    confirm_count=$((confirm_count + 1))
+                    echo "[$(date '+%H:%M:%S')] $PANE_NAME: ✓ Confirmed 'Do you want' (Enter) [#$confirm_count]"
+                fi
+                sleep 10
+                continue
             fi
         done
 

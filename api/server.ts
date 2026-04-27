@@ -66,6 +66,7 @@ const db = getDb();
 logger.info('Database connected (WAL mode, migrations table ready)');
 
 app.use('/health', healthRouter);
+app.use('/api/health', healthRouter);
 app.use('/a2a/stream', a2aStreamRouter);
 app.use('/a2a/connect', a2aConnectRouter);
 app.use('/.well-known/agent.json', agentCardRouter);
